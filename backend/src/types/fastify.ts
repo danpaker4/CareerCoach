@@ -1,4 +1,4 @@
-export type registerRouter = (fastify: TypedFastify) => void;
+export type registerRouter = (fastify: TypedFastify) => void | Promise<void>;
 
 import { FastifyBaseLogger, FastifyInstance, FastifySchema, RawReplyDefaultExpression, RawRequestDefaultExpression, RawServerDefault, RouteGenericInterface } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
