@@ -1,13 +1,14 @@
 import type { FastifySchema } from "fastify";
+import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
 
 export const updateUserSchema = {
   response: {
-    200: z.object({
+    [StatusCodes.OK]: z.object({
       message: z.string(),
       status: z.string(),
     }),
-    404: z.object({
+    [StatusCodes.NOT_FOUND]: z.object({
       error: z.string(),
     }),
   },

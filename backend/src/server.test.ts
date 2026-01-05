@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "./server";
 
 describe("Server", () => {
@@ -19,7 +20,7 @@ describe("Server", () => {
       method: "GET",
       url: "/invalid-route",
     });
-    expect(res.statusCode).toBe(404);
+    expect(res.statusCode).toBe(StatusCodes.NOT_FOUND);
   });
 });
 

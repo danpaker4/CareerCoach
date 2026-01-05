@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../server";
 
 describe("Users Router", () => {
@@ -21,7 +22,7 @@ describe("Users Router", () => {
         url: "/users/123",
       });
 
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(StatusCodes.OK);
       expect(response.json()).toEqual({
         message: "User 123 updated",
         status: "OK",
@@ -34,7 +35,7 @@ describe("Users Router", () => {
         url: "/users/abc-456",
       });
 
-      expect(response.statusCode).toBe(200);
+      expect(response.statusCode).toBe(StatusCodes.OK);
       expect(response.json()).toEqual({
         message: "User abc-456 updated",
         status: "OK",
