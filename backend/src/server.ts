@@ -11,7 +11,7 @@ export type { ServerConfig };
 export class Server implements Service {
     readonly app: TypedFastify;
     private config: ServerConfig;
-    private readonly DBClient: MongoClient;
+    readonly DBClient: MongoClient;
 
     constructor(config: ServerConfig) {
         this.config = config;
@@ -22,7 +22,7 @@ export class Server implements Service {
     start = async (): Promise<void> => {
         try {
             await this.DBClient.start();
-            this.app.register(usersRouter());
+            this.app.register(usersRouter(this.DBClient.users));
             const address = await this.app.listen({
                 port: this.config.port,
                 host: this.config.host || "0.0.0.0",

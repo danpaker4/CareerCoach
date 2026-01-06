@@ -1,6 +1,36 @@
 import type { FastifySchema } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
+import { UserSchema } from "./user.model";
+
+export const getUserSchema = {
+    response: {
+        [StatusCodes.OK]: UserSchema,
+        [StatusCodes.NOT_FOUND]: z.object({
+            error: z.string(),
+        }),
+    },
+    params: z.object({
+        userId: z.string().min(1, "userId cannot be empty"),
+    }),
+} satisfies FastifySchema;
+
+export const createUserSchema = {
+    response: {
+        [StatusCodes.CREATED]: UserSchema,
+        [StatusCodes.BAD_REQUEST]: z.object({
+            error: z.string(),
+        }),
+    },
+    body: z.object({
+        firstName: z.string(),
+        lastName: z.string(),
+        email: z.string().email(),
+        password: z.string(),
+        birthDate: z.date(),
+        currentJob: z.string().optional(),
+    }),
+} satisfies FastifySchema;
 
 export const updateUserSchema = {
     response: {

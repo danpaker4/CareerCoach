@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const UserSchema = z.object({
-    id: z.string(),
+    id: z.string().uuid(),
     firstName: z.string(),
     lastName: z.string(),
     email: z.string().email(),
