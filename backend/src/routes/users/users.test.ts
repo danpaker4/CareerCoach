@@ -3,7 +3,10 @@ import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../server";
 
 describe("Users Router", () => {
-    const config: ServerConfig = { port: 4322 };
+    const config: ServerConfig = { port: 4322, mongoConfig: {
+        mongoConnectionString: "mongodb://localhost:27017",
+        mongoKeyPath: undefined
+    } };
 
     const server = new Server(config);
 

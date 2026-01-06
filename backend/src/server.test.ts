@@ -3,7 +3,10 @@ import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "./server";
 
 describe("Server", () => {
-  const config: ServerConfig = { port: 4321 };
+  const config: ServerConfig = { port: 4321, mongoConfig: {
+    mongoConnectionString: "mongodb://localhost:27017",
+    mongoKeyPath: undefined
+  } };
 
   const server = new Server(config);
 
