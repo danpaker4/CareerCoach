@@ -1,19 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { StatusCodes } from "http-status-codes";
-import { Server, type ServerConfig } from "../../server";
-import type { User } from "./user.model";
+import { Server, type ServerConfig } from "../../../server";
+import { mockUser, testServerConfig } from "./users-mocks";
 
-describe("Users Router", () => {
-    const config: ServerConfig = {
-        port: 4322,
-        mongoConfig: {
-            mongoConnectionString: "mongodb://localhost:27017",
-            mongoKeyPath: undefined,
-        },
-    };
-
+describe("Users Router - PATCH /users/:userId", () => {
+    const config: ServerConfig = testServerConfig;
     const server = new Server(config);
-    const testUserId = "test-user-123";
+    const testUserId = mockUser.id;
     const newUserId = "new-user-456";
 
     beforeAll(async () => {
@@ -26,17 +19,7 @@ describe("Users Router", () => {
     });
 
     beforeEach(async () => {
-        const testUser: User = {
-            id: testUserId,
-            firstName: "John",
-            lastName: "Doe",
-            email: "john.doe@example.com",
-            password: "hashedpassword",
-            birthDate: new Date("1990-01-01"),
-            currentJob: "Developer",
-        };
-
-        await server.DBClient.users.insertOne(testUser);
+        await server.DBClient.users.insertOne(mockUser);
     });
 
     afterEach(async () => {
