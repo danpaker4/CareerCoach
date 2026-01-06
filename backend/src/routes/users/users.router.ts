@@ -5,7 +5,7 @@ import { UsersHandler } from "./users.handler";
 type registerRouter = (fastify: TypedFastify) => void;
 
 export const usersRouter = (): registerRouter => (fastify: TypedFastify): void => {
-  const handler = UsersHandler();
+    const handler = UsersHandler();
 
-  fastify.patch("/users/:userId", { schema: updateUserSchema }, handler.updateUserHandler);
+    fastify.patch("/users/:userId", { schema: updateUserSchema }, handler.updateUserHandler);
 };
