@@ -2,6 +2,7 @@ import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClien
 import { Service } from "../types/service";
 import type { User } from "../routes/users/user.model";
 import type { Pipeline } from "../routes/MyPipline/pipeline.model";
+import type { PipelineJob } from "../routes/jobsInPipeline/pipeline-job.model";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -9,6 +10,7 @@ export class MongoClient implements Service {
     private db!: Db;
     public users!: Collection<User>;
     public pipelines!: Collection<Pipeline>;
+    public pipelineJobs!: Collection<PipelineJob>;
 
     constructor(
         config: DatabaseConfig
@@ -28,6 +30,7 @@ export class MongoClient implements Service {
             
             this.users = this.db.collection<User>("users");
             this.pipelines = this.db.collection<Pipeline>("pipelines");
+            this.pipelineJobs = this.db.collection<PipelineJob>("pipelineJobs");
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
             console.error('Failed To Connect MongoDb', err);
