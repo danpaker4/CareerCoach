@@ -1,7 +1,8 @@
 import type { User } from "../user.model";
+import { v4 as uuidv4 } from "uuid";
 
 export const mockUser: User = {
-    id: "test-user-123",
+    id: uuidv4(),
     firstName: "John",
     lastName: "Doe",
     email: "john.doe@example.com",
@@ -28,7 +29,7 @@ export const mockUserWithoutJob = {
 };
 
 export const testServerConfig = {
-    port: 4322,
+    port: 0,
     mongoConfig: {
         mongoConnectionString: "mongodb://localhost:27017",
         mongoKeyPath: undefined,
