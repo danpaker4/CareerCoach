@@ -1,22 +1,23 @@
+import { Login, type LoginType } from '../../types/login'
 import './ButtonToggle.css'
 
 interface ButtonToggleProps {
-  activeButton: 'signIn' | 'signUp'
-  onButtonClick: (button: 'signIn' | 'signUp') => void
+  activeButton: LoginType
+  onButtonClick: (button: LoginType) => void
 }
 
 function ButtonToggle({ activeButton, onButtonClick }: ButtonToggleProps) {
   return (
     <div className="button-toggle">
       <button
-        className={`toggle-button ${activeButton === 'signIn' ? 'active' : ''}`}
-        onClick={() => onButtonClick('signIn')}
+        className={`toggle-button ${activeButton === Login.signIn ? 'active' : ''}`}
+        onClick={() => onButtonClick(Login.signIn)}
       >
         Log In
       </button>
       <button
-        className={`toggle-button ${activeButton === 'signUp' ? 'active' : ''}`}
-        onClick={() => onButtonClick('signUp')}
+        className={`toggle-button ${activeButton === Login.signUp ? 'active' : ''}`}
+        onClick={() => onButtonClick(Login.signUp)}
       >
         Sign Up
       </button>

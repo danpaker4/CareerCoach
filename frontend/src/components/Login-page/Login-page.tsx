@@ -2,13 +2,14 @@ import { useState } from 'react'
 import Card from '../Card/Card'
 import ButtonToggle from '../Card/ButtonToggle'
 import SignIn from './signIn-component/SignIn'
-import SignUp from './SignUp'
+import SignUp from './signUp-component/SignUp'
+import { Login, type LoginType } from '../../types/login'
 import './Login-page.css'
 
 function LoginPage() {
-  const [activeButton, setActiveButton] = useState<'signIn' | 'signUp'>('signIn')
+  const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
 
-  const handleButtonClick = (button: 'signIn' | 'signUp') => {
+  const handleButtonClick = (button: LoginType) => {
     setActiveButton(button)
   }
 
@@ -26,11 +27,10 @@ function LoginPage() {
           <p className="card-subtitle">Your smart career management platform</p>
         </div>
         <ButtonToggle activeButton={activeButton} onButtonClick={handleButtonClick} />
-        {activeButton === 'signIn' ? <SignIn /> : <SignUp />}
+        {activeButton === Login.signIn ? <SignIn /> : <SignUp />}
       </Card>
     </div>
   )
 }
 
 export default LoginPage
-
