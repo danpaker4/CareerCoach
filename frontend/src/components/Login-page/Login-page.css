@@ -1,0 +1,17 @@
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.login-content {
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+}
+
+.login-content {
+  margin-bottom: 1rem;
+}
