@@ -1,0 +1,16 @@
+.home-container {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.home-content {
+  text-align: center;
+}
+
+.home-content h1 {
+  margin-bottom: 1rem;
+}
+
