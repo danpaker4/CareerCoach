@@ -2,12 +2,13 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockUser, testServerConfig } from "./users-mocks";
+import { v4 as uuidv4 } from "uuid";
 
 describe("Users Router - GET /users/:userId", () => {
     const config: ServerConfig = testServerConfig;
     const server = new Server(config);
     const testUserId = mockUser.id;
-    const nonExistentUserId = "non-existent-user-999";
+    const nonExistentUserId = uuidv4();
 
     beforeAll(async () => {
         await server.start();

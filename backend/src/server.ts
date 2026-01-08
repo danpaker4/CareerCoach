@@ -4,6 +4,7 @@ import type { TypedFastify } from "./types/fastify";
 import { createFastifyInstance } from "./utils/fastify";
 import { Logs, toError } from "./utils/logger";
 import { usersRouter } from "./routes/users/users.router";
+import { pipelineRouter } from "./routes/MyPipline/pipeline.router";
 import { MongoClient } from "./mongo/mongo";
 
 export type { ServerConfig };
@@ -23,6 +24,7 @@ export class Server implements Service {
         try {
             await this.DBClient.start();
             this.app.register(usersRouter(this.DBClient.users));
+            this.app.register(pipelineRouter(this.DBClient.pipelines));
             const address = await this.app.listen({
                 port: this.config.port,
                 host: this.config.host || "0.0.0.0",

@@ -49,9 +49,16 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
 
         updateUserHandler: async (request: SchematicRequest<typeof updateUserSchema>, reply: FastifyReply) => {
             const { userId } = request.params;
+            const updateData = request.body;
 
             try {
-                await usersCollection.updateOne({ id: userId }, { $set: { name: "John Doe" } }, { upsert: true });
+                await usersCollection.updateOne(
+                    { id: userId },
+                    {
+                        $set: updateData,
+                    },
+                    { upsert: true }
+                );
                 reply.code(StatusCodes.OK).send({ message: `User ${userId} updated`, status: "OK" });
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });

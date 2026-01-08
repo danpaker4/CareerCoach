@@ -2,12 +2,13 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockUser, testServerConfig } from "./users-mocks";
+import { v4 as uuidv4 } from "uuid";
 
 describe("Users Router - PATCH /users/:userId", () => {
     const config: ServerConfig = testServerConfig;
     const server = new Server(config);
     const testUserId = mockUser.id;
-    const newUserId = "new-user-456";
+    const newUserId = uuidv4();
 
     beforeAll(async () => {
         await server.start();
@@ -35,6 +36,7 @@ describe("Users Router - PATCH /users/:userId", () => {
             const response = await server.app.inject({
                 method: "PATCH",
                 url: `/users/${testUserId}`,
+                payload: { firstName: "UpdatedName" },
             });
 
             expect(response.statusCode).toBe(StatusCodes.OK);
@@ -45,7 +47,7 @@ describe("Users Router - PATCH /users/:userId", () => {
 
             const userAfter = await server.DBClient.users.findOne({ id: testUserId });
             expect(userAfter).toBeDefined();
-            expect(userAfter?.firstName).toBe("John");
+            expect(userAfter?.firstName).toBe("UpdatedName");
             expect(userAfter?.lastName).toBe("Doe");
         });
 
@@ -58,14 +60,15 @@ describe("Users Router - PATCH /users/:userId", () => {
             const response = await server.app.inject({
                 method: "PATCH",
                 url: `/users/${newUserId}`,
+                payload: { firstName: "NewUser", lastName: "LastName" },
             });
 
             expect(response.statusCode).toBe(StatusCodes.OK);
 
             const userAfter = await server.DBClient.users.findOne({ id: newUserId });
             expect(userAfter).toBeDefined();
-            expect(userAfter?.firstName).toBe("John");
-            expect(userAfter?.lastName).toBe("Doe");
+            expect(userAfter?.firstName).toBe("NewUser");
+            expect(userAfter?.lastName).toBe("LastName");
             expect(userAfter?.id).toBe(newUserId);
         });
     });
