@@ -2,6 +2,9 @@ import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClien
 import { Service } from "../types/service";
 import type { User } from "../routes/users/user.model";
 import type { Pipeline } from "../routes/MyPipline/pipeline.model";
+import type { PipelineJob } from "../routes/jobsInPipeline/pipeline-job.model";
+import type { SkillMatcher } from "../routes/skillMatcher/skill-matcher.model";
+import type { CareerRoadMap } from "../routes/careerRoadMap/career-roadmap.model";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -9,6 +12,9 @@ export class MongoClient implements Service {
     private db!: Db;
     public users!: Collection<User>;
     public pipelines!: Collection<Pipeline>;
+    public pipelineJobs!: Collection<PipelineJob>;
+    public skillMatchers!: Collection<SkillMatcher>;
+    public careerRoadMaps!: Collection<CareerRoadMap>;
 
     constructor(
         config: DatabaseConfig
@@ -28,6 +34,9 @@ export class MongoClient implements Service {
             
             this.users = this.db.collection<User>("users");
             this.pipelines = this.db.collection<Pipeline>("pipelines");
+            this.pipelineJobs = this.db.collection<PipelineJob>("pipelineJobs");
+            this.skillMatchers = this.db.collection<SkillMatcher>("skillMatchers");
+            this.careerRoadMaps = this.db.collection<CareerRoadMap>("careerRoadMaps");
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
             console.error('Failed To Connect MongoDb', err);

@@ -5,6 +5,9 @@ import { createFastifyInstance } from "./utils/fastify";
 import { Logs, toError } from "./utils/logger";
 import { usersRouter } from "./routes/users/users.router";
 import { pipelineRouter } from "./routes/MyPipline/pipeline.router";
+import { pipelineJobRouter } from "./routes/jobsInPipeline/pipeline-job.router";
+import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
+import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.router";
 import { MongoClient } from "./mongo/mongo";
 
 export type { ServerConfig };
@@ -25,6 +28,9 @@ export class Server implements Service {
             await this.DBClient.start();
             this.app.register(usersRouter(this.DBClient.users));
             this.app.register(pipelineRouter(this.DBClient.pipelines));
+            this.app.register(pipelineJobRouter(this.DBClient.pipelineJobs));
+            this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
+            this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
             const address = await this.app.listen({
                 port: this.config.port,
                 host: this.config.host || "0.0.0.0",
