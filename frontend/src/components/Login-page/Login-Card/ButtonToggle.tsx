@@ -1,4 +1,4 @@
-import { Login, type LoginType } from '../../types/login'
+import { Login, type LoginType } from '../../../types/login'
 import './ButtonToggle.css'
 
 interface ButtonToggleProps {
