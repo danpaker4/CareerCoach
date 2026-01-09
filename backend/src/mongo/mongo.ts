@@ -54,5 +54,5 @@ export class MongoClient implements Service {
 
 export type DatabaseConfig = {
     mongoConnectionString: string;
-    mongoKeyPath: string | undefined;
+    mongoKeyPath?: string;
 };

@@ -1,14 +1,11 @@
 import { Server } from "./server";
+import { createSystemConfig, EnvSchema, ServerConfig } from "./types/config";
+import dotenv from 'dotenv';
 
-const server = new Server(
-  {
-    port: 3000,
-    host: "0.0.0.0",
-    mongoConfig: {
-      mongoConnectionString: "mongodb://localhost:27017",
-      mongoKeyPath: undefined
-    }
-  }
-); 
+dotenv.config();
+
+const config: ServerConfig = createSystemConfig(EnvSchema.parse(process.env))
+
+const server = new Server(config);
 
 server.start();

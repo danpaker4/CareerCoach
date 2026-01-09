@@ -32,8 +32,8 @@ export class Server implements Service {
             this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
             this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
             const address = await this.app.listen({
-                port: this.config.port,
-                host: this.config.host || "0.0.0.0",
+                port: this.config.serverConfig.port,
+                host: this.config.serverConfig.host,
             });
             Logs.logInfo(`Server listening on ${address}`, {});
         } catch (e) {
