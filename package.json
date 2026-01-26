@@ -9,9 +9,13 @@
     "dev": "concurrently -n BACK,FRONT \"npm run dev:backend\" \"npm run dev:frontend\""
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "concurrently": "^9.0.0"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1"
+  }
 }

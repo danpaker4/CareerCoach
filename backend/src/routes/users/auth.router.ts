@@ -2,11 +2,10 @@ import { FastifyInstance } from "fastify";
 import { Collection } from "mongodb";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from 'uuid'; 
-import { User } from "./user.model"; // המודל של החבר שלך
+import { User } from "./user.model";
 
 export const authRouter = (usersCollection: Collection<User>) => async (app: FastifyInstance) => {
 
-    // --- הרשמה (Register) ---
     app.post("/api/auth/register", async (req, reply) => {
         const { firstName, lastName, email, password, birthDate, currentJob } = req.body as any;
 
@@ -40,7 +39,6 @@ export const authRouter = (usersCollection: Collection<User>) => async (app: Fas
         });
     });
 
-    // --- התחברות (Login) ---
     app.post("/api/auth/login", async (req, reply) => {
         const { email, password } = req.body as any;
 
