@@ -13,14 +13,12 @@ export const chatRouter = (chatsCollection: Collection<any>, usersCollection: Co
         if (!message) return reply.status(400).send({ error: "Message is required" });
 
         try {
-            // Fetch User Context
             let userContext = "The user is a guest.";
             const user = await usersCollection.findOne({ id: userId });
             if (user) {
                 userContext = `User: ${user.firstName} ${user.lastName}, Current Job: ${user.currentJob || "N/A"}`;
             }
 
-            // Fetch Chat History (Limit 5)
             const historyDocs = await chatsCollection.find({ userId })
                 .sort({ createdAt: -1 })
                 .limit(5)
@@ -35,7 +33,6 @@ export const chatRouter = (chatsCollection: Collection<any>, usersCollection: Co
                 return "";
             }).join("\n\n");
 
-            // AI System Prompt
             const prompt = `
                 You are 'CareerCoach', an expert, encouraging, and thorough AI Career Counselor.
                 
@@ -56,11 +53,9 @@ export const chatRouter = (chatsCollection: Collection<any>, usersCollection: Co
                 5. **Tone:** Professional, motivating, and personalized.
             `;
 
-            // Generate Content
             const result = await model.generateContent(prompt);
             const response = result.response.text();
 
-            // Save to DB
             await chatsCollection.insertOne({
                 userId,
                 messages: [
