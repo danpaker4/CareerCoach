@@ -7,3 +7,4 @@ dist
 scripts/dist-deps
 scripts/temp_build_zone
 scripts/parts
+.env
