@@ -1,15 +1,30 @@
-import './Home.css'
+import { ChatInterface } from '../chat-component/Chat';
+import './Home.css';
 
-function Home() {
-  return (
-    <div className="home-container">
-      <div className="home-content">
-        <h1>Career Coach</h1>
-        <p>Welcome to Career Coach</p>
-      </div>
-    </div>
-  )
+interface HomeProps {
+    user?: {
+        _id: string;
+        firstName: string;
+        lastName: string;
+    };
+    onLogout?: () => void;
 }
 
-export default Home
-
+export default function Home({ user, onLogout }: HomeProps) {
+    return (
+        <div className="home-content">
+            <main className="hero-section">
+                <div className="hero-text">
+                    <h1>Find Your Dream Job <br /> With CareerCoach</h1>
+                    <p>Your personal AI career counselor is here to help you succeed.</p>
+                </div>
+            </main>
+            
+            
+            <ChatInterface 
+                userId={user?._id || "guest"} 
+                userName={user?.firstName} 
+            />
+        </div>
+    );
+}

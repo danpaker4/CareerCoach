@@ -1,21 +1,19 @@
 import { useState } from 'react'
-import ButtonToggle from '../Card/ButtonToggle'
-import Card from '../Card/Card'
+import { ENV } from '../../config'
+import { Login, type LoginType } from '../../types/login'
 import './Login-page.css'
 import SignIn from './signIn-component/SignIn'
-import SignUp from './SignUp'
-import { ENV } from '../../config'
+import SignUp from './signUp-component/SignUp'
+import Card from './Login-Card/Card'
+import ButtonToggle from './Login-Card/ButtonToggle'
 
 function LoginPage() {
-  const [activeButton, setActiveButton] = useState<'signIn' | 'signUp'>('signIn')
-
-  const handleButtonClick = (button: 'signIn' | 'signUp') => {
-    setActiveButton(button)
-  };
+  const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
 
   const loginWithGithub = () => {
     window.location.assign(`https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&prompt=consent`)
   };
+  const handleButtonClick = (button: LoginType) => setActiveButton(button)
 
   return (
     <div className="login-container">
@@ -32,11 +30,10 @@ function LoginPage() {
           <p className="card-subtitle">Your smart career management platform</p>
         </div>
         <ButtonToggle activeButton={activeButton} onButtonClick={handleButtonClick} />
-        {activeButton === 'signIn' ? <SignIn /> : <SignUp />}
+        {activeButton === Login.signIn ? <SignIn /> : <SignUp />}
       </Card>
     </div>
   )
 }
 
 export default LoginPage
-

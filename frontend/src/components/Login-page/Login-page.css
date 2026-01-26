@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 5px;
 }
 
 .login-content {
@@ -13,5 +13,5 @@
 }
 
 .login-content {
-  margin-bottom: 1rem;
+  margin-bottom: 5px;
 }
