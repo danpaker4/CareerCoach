@@ -1,59 +1,83 @@
-import type { Service } from "./types/service";
-import type { ServerConfig } from "./types/config";
-import type { TypedFastify } from "./types/fastify";
-import { createFastifyInstance } from "./utils/fastify";
-import { Logs, toError } from "./utils/logger";
+import Fastify, { FastifyInstance } from "fastify";
+import cors from "@fastify/cors";
+import dotenv from "dotenv";
+import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
+
+import { MongoClient } from "./mongo/mongo"; 
+import { authRouter } from "./routes/users/auth.router";
 import { usersRouter } from "./routes/users/users.router";
-import { authRouter } from "./routes/users/auth.router"; 
 import { pipelineRouter } from "./routes/MyPipline/pipeline.router";
 import { pipelineJobRouter } from "./routes/jobsInPipeline/pipeline-job.router";
 import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
 import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.router";
-import { chatRouter } from "./routes/chat/chat.router"; 
-import { MongoClient } from "./mongo/mongo";
-import dotenv from "dotenv";
+import { chatRouter } from "./routes/chat/chat.router";
 
 dotenv.config();
 
-export type { ServerConfig };
+export interface ServerConfig {
+    port: number;
+    mongoConfig: {
+        mongoConnectionString: string;
+        mongoKeyPath?: string;
+    };
+}
 
-export class Server implements Service {
-    readonly app: TypedFastify;
+export class Server {
+    readonly app: FastifyInstance;
     private config: ServerConfig;
     readonly DBClient: MongoClient;
 
     constructor(config: ServerConfig) {
         this.config = config;
-        this.app = createFastifyInstance();
+        this.app = Fastify({ logger: true });
         this.DBClient = new MongoClient(this.config.mongoConfig);
+        
+        this.app.setValidatorCompiler(validatorCompiler);
+        this.app.setSerializerCompiler(serializerCompiler);
     }
 
-    start = async (): Promise<void> => {
+    public async start() {
         try {
+            console.log("🔄 Starting Server...");
             await this.DBClient.start();
-            
-            this.app.register(usersRouter(this.DBClient.users));
-            this.app.register(authRouter(this.DBClient.users));
-            this.app.register(pipelineRouter(this.DBClient.pipelines));
-            this.app.register(pipelineJobRouter(this.DBClient.pipelineJobs));
-            this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
-            this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
-            
-            // Connected with Users collection context
-            this.app.register(chatRouter(this.DBClient.chats, this.DBClient.users)); 
+            console.log(" MongoDB Connected");
 
-            const address = await this.app.listen({
-                port: this.config.serverConfig.port,
-                host: this.config.serverConfig.host,
+            await this.app.register(cors, {
+                methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+                allowedHeaders: ['Content-Type', 'Authorization']
             });
-            Logs.logInfo(`Server listening on ${address}`, {});
-        } catch (e) {
-            Logs.logError("Server failed to run", toError(e), {});
+
+            await this.app.register(authRouter(this.DBClient.users));
+            await this.app.register(usersRouter(this.DBClient.users));
+            await this.app.register(pipelineRouter(this.DBClient.pipelines));
+            await this.app.register(pipelineJobRouter(this.DBClient.pipelineJobs));
+            await this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
+            await this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
+            
+            await this.app.register(chatRouter(this.DBClient.chats, this.DBClient.users));
+
+            const address = await this.app.listen({ 
+                port: this.config.port, 
+                host: "0.0.0.0" 
+            });
+            
+            console.log(`🚀 Server running on ${address}`);
+
+        } catch (err) {
+            console.error("🔥 Server failed to start:", err);
+            this.app.log.error(err);
             process.exit(1);
         }
-    };
-
-    stop = async (): Promise<void> => {
-        await this.app.close();
-    };
+    }
 }
+
+const config: ServerConfig = {
+    port: parseInt(process.env.PORT || "3000"),
+    mongoConfig: {
+        mongoConnectionString: process.env.MONGO_CONNECTION_STRING || "mongodb://127.0.0.1:27017/careerCoachDB",
+        mongoKeyPath: process.env.MONGO_KEY_PATH
+    }
+};
+
+const server = new Server(config);
+server.start();

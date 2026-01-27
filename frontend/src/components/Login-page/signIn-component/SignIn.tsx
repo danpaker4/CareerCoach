@@ -1,44 +1,64 @@
 import { useState } from 'react';
 import './SignIn.css';
-import { ENV } from '../../../config';
+import { User } from '../../../App';
 
-export default function SignIn() {
+interface SignInProps {
+    onLoginSuccess: (user: User) => void;
+}
+
+export default function SignIn({ onLoginSuccess }: SignInProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
 
-    const loginWithGithub = () => {
-        window.location.assign(`https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&prompt=consent`)
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        try {
+            const response = await fetch('http://127.0.0.1:3000/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                onLoginSuccess(data.user);
+            } else {
+                setError(data.error || 'Invalid email or password');
+            }
+        } catch (err) {
+            console.error(err);
+            setError('Server connection failed');
+        }
     };
 
     return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <h2>Welcome Back</h2>
-                <p className="auth-subtitle">Log in to continue your career journey</p>
-                <button onClick={loginWithGithub}>Login with Github</button>
-
-                <form className="auth-form" onSubmit={(e) => e.preventDefault()}>
-                    <div className="input-group">
-                        <label>Email</label>
-                        <input
-                            type="email"
-                            placeholder="name@example.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                        />
-                    </div>
-                    <div className="input-group">
-                        <label>Password</label>
-                        <input
-                            type="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                    </div>
-                    <button type="submit" className="auth-btn">Log In</button>
-                </form>
+        <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="input-group">
+                <label>Email</label>
+                <input
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />
             </div>
-        </div>
+            <div className="input-group">
+                <label>Password</label>
+                <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+            </div>
+            
+            {error && <p style={{color: 'red', fontSize: '0.9rem'}}>{error}</p>}
+
+            <button type="submit" className="auth-btn">Log In</button>
+        </form>
     );
 }

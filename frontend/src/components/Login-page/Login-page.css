@@ -1,17 +1,61 @@
 .login-container {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px;
+    display: flex;
+    justify-content: center; /* ממרכז אופקית */
+    align-items: center;     /* ממרכז אנכית */
+    min-height: calc(100vh - 80px); /* גובה המסך פחות ההדר */
+    width: 100%;
+    background-color: #f8f9fa; /* רבע גוון אפור לרקע נקי */
+    padding: 20px;
+    box-sizing: border-box;
 }
 
-.login-content {
-  max-width: 400px;
-  width: 100%;
-  text-align: center;
+/* מוודא שהכרטיס לא נמרח */
+.login-container > * {
+    width: 100%;
+    max-width: 450px; /* רוחב מקסימלי לכרטיס */
 }
 
-.login-content {
-  margin-bottom: 5px;
+/* עיצוב המפריד (קו ה-Or continue) */
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 20px 0;
+    color: #9ca3af;
+    font-size: 0.85rem;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.divider span {
+    padding: 0 10px;
+}
+
+.github-btn-styled {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #24292f;
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.github-btn-styled:hover {
+    background-color: #1a1f24;
+}
+
+/* רווח בין הכרטיס לטפסים */
+.form-wrapper {
+    margin-bottom: 20px;
 }

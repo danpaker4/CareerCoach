@@ -16,10 +16,12 @@ export class MongoClient implements Service {
     public pipelineJobs!: Collection<PipelineJob>;
     public skillMatchers!: Collection<SkillMatcher>;
     public careerRoadMaps!: Collection<CareerRoadMap>;
-    public chats!: Collection<ChatSession>; // <--- הוספה חדשה
+    public chats!: Collection<ChatSession>; 
 
     constructor(config: DatabaseConfig) {
-        const dbKeyPathOption = config.mongoKeyPath ? { tlsCertificateKeyFile: config.mongoKeyPath } : {};
+       const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
+    ? { tlsCertificateKeyFile: config.mongoKeyPath } 
+    : {};
         this.connectionOptions = { ...dbKeyPathOption };
         this.mongoClient = new MongoDbClient(config.mongoConnectionString, this.connectionOptions);
     }
