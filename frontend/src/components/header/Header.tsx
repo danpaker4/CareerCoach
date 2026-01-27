@@ -1,17 +1,30 @@
 import { Link } from 'react-router-dom';
 import './Header.css';
 
-export default function Header() {
+interface HeaderProps {
+    userName?: string;
+}
+
+export default function Header({ userName }: HeaderProps) {
     return (
         <header className="navbar">
-            <div className="logo">CareerCoach</div>
+            <div className="logo" style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#2563eb' }}>
+                CareerCoach
+            </div>
+            
             <nav className="nav-links">
                 <Link to="/">Home</Link>
-                <Link to="/about">About</Link>
+                {userName && <Link to="/roadmap">My Roadmap</Link>}
             </nav>
+
             <div className="auth-buttons">
-                <Link to="/login" className="btn-login">Log In</Link>
-                <Link to="/signup" className="btn-signup">Sign Up</Link>
+                {userName ? (
+                    <div className="user-welcome">👋 Hi, {userName}</div>
+                ) : (
+                    <Link to="/login" className="btn-primary">
+                        Log In / Sign Up
+                    </Link>
+                )}
             </div>
         </header>
     );

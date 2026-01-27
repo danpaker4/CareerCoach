@@ -6,31 +6,54 @@ import SignIn from './signIn-component/SignIn'
 import SignUp from './signUp-component/SignUp'
 import Card from './Login-Card/Card'
 import ButtonToggle from './Login-Card/ButtonToggle'
+import { User } from '../../App'
 
-function LoginPage() {
+interface LoginPageProps {
+  onLoginSuccess: (user: User) => void;
+}
+
+function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
 
-  const loginWithGithub = () => {
-    window.location.assign(`https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&prompt=consent`)
-  };
   const handleButtonClick = (button: LoginType) => setActiveButton(button)
+
+  const loginWithGithub = () => {
+    if (ENV.GITHUB_CLIENT_ID) {
+        window.location.assign(`https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&prompt=consent`)
+    } else {
+        alert("Github Client ID is missing configuration");
+    }
+  };
 
   return (
     <div className="login-container">
       <Card>
         <div className="card-header">
-          <div className="card-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="24" height="24" rx="6" fill="#2563eb" />
-              <path d="M8 7V5C8 4.46957 8.21071 3.96086 8.58579 3.58579C8.96086 3.21071 9.46957 3 10 3H14C14.5304 3 15.0391 3.21071 15.4142 3.58579C15.7893 3.96086 16 4.46957 16 5V7M8 7H6C5.46957 7 4.96086 7.21071 4.58579 7.58579C4.21071 7.96086 4 8.46957 4 9V18C4 18.5304 4.21071 19.0391 4.58579 19.4142C4.96086 19.7893 5.46957 20 6 20H18C18.5304 20 19.0391 19.7893 19.4142 19.4142C19.7893 19.0391 20 18.5304 20 18V9C20 8.46957 19.7893 7.96086 19.4142 7.58579C19.0391 7.21071 18.5304 7 18 7H16M8 7H16" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
           <h2 className="card-title">Welcome to CareerCoach</h2>
-          <button onClick={loginWithGithub}>Login with Github</button>
           <p className="card-subtitle">Your smart career management platform</p>
         </div>
+        
         <ButtonToggle activeButton={activeButton} onButtonClick={handleButtonClick} />
-        {activeButton === Login.signIn ? <SignIn /> : <SignUp />}
+
+        <div className="form-wrapper">
+            {activeButton === Login.signIn 
+                ? <SignIn onLoginSuccess={onLoginSuccess} /> 
+                : <SignUp onLoginSuccess={onLoginSuccess} />
+            }
+        </div>
+
+        <div className="social-login-section">
+            <div className="divider">
+                <span>Or continue with</span>
+            </div>
+            
+            <button onClick={loginWithGithub} className="github-btn-styled">
+                <svg height="20" viewBox="0 0 16 16" version="1.1" width="20" aria-hidden="true" fill="currentColor" style={{marginRight: '10px'}}>
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                GitHub
+            </button>
+        </div>
       </Card>
     </div>
   )

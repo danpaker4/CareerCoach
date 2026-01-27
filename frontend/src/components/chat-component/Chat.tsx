@@ -1,74 +1,110 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './Chat.css';
-
-interface Message {
-    role: 'user' | 'model';
-    text: string;
-}
 
 interface ChatProps {
     userId: string;
-    userName?: string; 
+    userName?: string;
+}
+
+interface Message {
+    role: 'user' | 'model';
+    content: string;
 }
 
 export function ChatInterface({ userId, userName }: ChatProps) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const sendMessage = async () => {
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+
+    // פונקציה להגדלת התיבה
+    const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setInput(e.target.value);
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
+
+    const handleSend = async () => {
         if (!input.trim()) return;
 
-        const userMessage = input;
+        const userMessage = { role: 'user' as const, content: input };
+        setMessages(prev => [...prev, userMessage]);
         setInput('');
-        setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+        
+        // איפוס גובה התיבה
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+        }
+        
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3000/api/chat', {
+            const response = await fetch('http://127.0.0.1:3000/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    userId: userId, 
-                    message: userMessage 
-                })
+                body: JSON.stringify({ userId, message: input })
             });
 
-            if (!response.ok) throw new Error("Server error");
             const data = await response.json();
-            setMessages(prev => [...prev, { role: 'model', text: data.response }]);
+            if (data.response) {
+                setMessages(prev => [...prev, { role: 'model', content: data.response }]);
+            } else {
+                setMessages(prev => [...prev, { role: 'model', content: "I couldn't understand that." }]);
+            }
         } catch (error) {
-            console.error(error);
-            setMessages(prev => [...prev, { role: 'model', text: "⚠️ Error connecting to AI." }]);
+            setMessages(prev => [...prev, { role: 'model', content: "Server connection error." }]);
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="chat-widget">
-            {!isOpen && (
-                <button className="chat-toggle-btn" onClick={() => setIsOpen(true)}>💬</button>
-            )}
-            {isOpen && (
-                <div className="chat-window">
-                    <div className="chat-header">
-                        <div className="header-title">CareerMate AI</div>
-                        <button className="close-btn" onClick={() => setIsOpen(false)}>×</button>
-                    </div>
-                    <div className="chat-messages">
-                        {messages.map((msg, idx) => (
-                            <div key={idx} className={`message ${msg.role}`}>{msg.text}</div>
-                        ))}
-                        {isLoading && <div className="message model">Thinking...</div>}
-                    </div>
-                    <div className="chat-input-area">
-                        <input value={input} onChange={e => setInput(e.target.value)} />
-                        <button onClick={sendMessage}>Send</button>
+        <div className="chat-container">
+            <div className="messages-area">
+                <div className="message-wrapper model">
+                    <div className="message-bubble">
+                        Hi {userName || 'there'}! 👋 I'm CareerCoach AI.
                     </div>
                 </div>
-            )}
+                {messages.map((msg, index) => (
+                    <div key={index} className={`message-wrapper ${msg.role}`}>
+                        <div className="message-bubble">{msg.content}</div>
+                    </div>
+                ))}
+                {isLoading && <div className="message-wrapper model"><div className="message-bubble">Typing...</div></div>}
+                <div ref={messagesEndRef} />
+            </div>
+
+            <div className="input-area">
+                <textarea
+                    ref={textareaRef}
+                    placeholder="Type a message..."
+                    value={input}
+                    onChange={handleInput}
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                />
+                <button onClick={handleSend} disabled={isLoading || !input.trim()}>➤</button>
+            </div>
         </div>
     );
 }

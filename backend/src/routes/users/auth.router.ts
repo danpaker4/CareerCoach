@@ -7,52 +7,58 @@ import { User } from "./user.model";
 export const authRouter = (usersCollection: Collection<User>) => async (app: FastifyInstance) => {
 
     app.post("/api/auth/register", async (req, reply) => {
-        const { firstName, lastName, email, password, birthDate, currentJob } = req.body as any;
+        console.log("📝 Register request received:", req.body); 
 
-        if (!email || !password || !firstName || !lastName || !birthDate) {
-            return reply.status(400).send({ error: "Missing required fields" });
+        try {
+            const { firstName, lastName, email, password, birthDate, currentJob } = req.body as any;
+
+            if (!email || !password || !firstName || !lastName || !birthDate) {
+                console.log("Missing fields");
+                return reply.status(400).send({ error: "Missing required fields" });
+            }
+
+            const existingUser = await usersCollection.findOne({ email });
+            if (existingUser) {
+                console.log("User already exists:", email);
+                return reply.status(400).send({ error: "Email already exists" });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const newUser: User = {
+                id: uuidv4(),
+                firstName,
+                lastName,
+                email,
+                password: hashedPassword,
+                birthDate: new Date(birthDate),
+                currentJob: currentJob || ""
+            };
+
+            await usersCollection.insertOne(newUser);
+            console.log(" User saved to DB:", newUser.id); 
+
+            return reply.send({ 
+                success: true, 
+                userId: newUser.id,
+                user: { firstName, lastName, email } 
+            });
+        } catch (err) {
+            console.error("🔥 Error in register:", err);
+            return reply.status(500).send({ error: "Internal Server Error" });
         }
-
-        const existingUser = await usersCollection.findOne({ email });
-        if (existingUser) {
-            return reply.status(400).send({ error: "Email already exists" });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newUser: User = {
-            id: uuidv4(),
-            firstName,
-            lastName,
-            email,
-            password: hashedPassword,
-            birthDate: new Date(birthDate),
-            currentJob: currentJob || ""
-        };
-
-        await usersCollection.insertOne(newUser);
-        
-        return reply.send({ 
-            success: true, 
-            userId: newUser.id,
-            user: { firstName, lastName, email } 
-        });
     });
 
     app.post("/api/auth/login", async (req, reply) => {
-        const { email, password } = req.body as any;
+         const { email, password } = req.body as any;
+         const user = await usersCollection.findOne({ email });
+         // ...
+         if (!user) return reply.status(401).send({ error: "Invalid email or password" });
+         
+         const isMatch = await bcrypt.compare(password, user.password);
+         if (!isMatch) return reply.status(401).send({ error: "Invalid email or password" });
 
-        const user = await usersCollection.findOne({ email });
-        if (!user) {
-            return reply.status(401).send({ error: "Invalid email or password" });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return reply.status(401).send({ error: "Invalid email or password" });
-        }
-
-        return reply.send({
+         return reply.send({
             success: true,
             user: {
                 id: user.id,
