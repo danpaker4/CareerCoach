@@ -12,10 +12,9 @@ export const getAccessTokenGitSchema = {
         authorization: authorizationHeaderOptionalSchema,
     }),
     response: {
-        [StatusCodes.OK]: 'OK',
+        [StatusCodes.OK]: "OK",
         [StatusCodes.NOT_FOUND]: z.object({
             error: z.string(),
         }),
     },
-
 } satisfies FastifySchema;

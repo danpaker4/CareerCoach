@@ -1,0 +1,10 @@
+node_modules
+coverage
+dist
+.turbo
+*.tsbuildinfo
+.docusaurus
+scripts/dist-deps
+scripts/temp_build_zone
+scripts/parts
+.env

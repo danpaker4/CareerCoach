@@ -4,9 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev:backend": "npm --prefix backend run dev",
+    "dev:users-service": "npm --prefix users-service run dev",
+    "dev:chat-service": "npm --prefix chat-service run dev",
+    "dev:job-service": "npm --prefix job-service run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev": "concurrently -n BACK,FRONT \"npm run dev:backend\" \"npm run dev:frontend\""
+    "dev": "concurrently -n USERS,CHAT,JOBS,FRONT \"npm run dev:users-service\" \"npm run dev:chat-service\" \"npm run dev:job-service\" \"npm run dev:frontend\""
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -2,10 +2,11 @@ import { FastifyInstance } from "fastify";
 import { Collection } from "mongodb";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const chatRouter = (chatsCollection: Collection<any>, usersCollection: Collection<any>) => async (app: FastifyInstance) => {
+export const chatRouter = (chatsCollection: Collection<any>) => async (app: FastifyInstance) => {
     
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
     const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    const usersServiceBaseUrl = process.env.USERS_SERVICE_BASE_URL || "http://127.0.0.1:3001";
 
     app.post("/api/chat", async (req, reply) => {
         const { userId, message } = req.body as { userId: string, message: string };
@@ -14,9 +15,16 @@ export const chatRouter = (chatsCollection: Collection<any>, usersCollection: Co
 
         try {
             let userContext = "The user is a guest.";
-            const user = await usersCollection.findOne({ id: userId });
-            if (user) {
-                userContext = `User: ${user.firstName} ${user.lastName}, Current Job: ${user.currentJob || "N/A"}`;
+            if (userId) {
+                try {
+                    const response = await fetch(`${usersServiceBaseUrl}/users/${userId}`);
+                    if (response.ok) {
+                        const user = await response.json() as { firstName: string; lastName: string; currentJob?: string };
+                        userContext = `User: ${user.firstName} ${user.lastName}, Current Job: ${user.currentJob || "N/A"}`;
+                    }
+                } catch (err) {
+                    app.log.warn({ err, userId }, "Failed fetching user context from users-service");
+                }
             }
 
             const historyDocs = await chatsCollection.find({ userId })
