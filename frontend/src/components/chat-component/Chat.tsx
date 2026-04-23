@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './Chat.css';
+import { ENV } from '../../config';
 
 interface ChatProps {
     userId: string;
@@ -58,7 +59,7 @@ export function ChatInterface({ userId, userName }: ChatProps) {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://127.0.0.1:3000/api/chat', {
+            const response = await fetch(`${ENV.CHAT_SERVICE_BASE_URL}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, message: input })

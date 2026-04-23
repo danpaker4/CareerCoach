@@ -8,5 +8,4 @@ export const githubRouter = (): registerRouter => (fastify: TypedFastify): void 
 
     fastify.get("/accessTokenGit", handler.getAccessTokenGit);
     fastify.get("/userData", handler.getAccessTokenGit);
-
 };

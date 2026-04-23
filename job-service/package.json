@@ -1,0 +1,45 @@
+{
+    "name": "job-service",
+    "version": "1.0.0",
+    "main": "index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "test": "vitest",
+        "test:ui": "vitest --ui",
+        "test:run": "vitest run"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "engines": {
+        "node": ">=22.0.0"
+    },
+    "dependencies": {
+        "@eslint/js": "^9.35.0",
+        "@fastify/cors": "^11.2.0",
+        "@fastify/type-provider-typebox": "^6.1.0",
+        "@google/generative-ai": "^0.24.1",
+        "bcryptjs": "^3.0.3",
+        "dotenv": "^17.2.3",
+        "fastify": "^5.6.2",
+        "fastify-type-provider-zod": "^5.1.0",
+        "http-status-codes": "^2.3.0",
+        "mongodb": "^7.0.0",
+        "typescript-eslint": "^8.38.0",
+        "uuid": "^13.0.0",
+        "zod": "^4.0.0"
+    },
+    "devDependencies": {
+        "@types/bcryptjs": "^2.4.6",
+        "@types/node": "^25.0.10",
+        "@types/uuid": "^10.0.0",
+        "@vitest/ui": "^4.0.16",
+        "tsx": "^4.21.0",
+        "typescript": "^5.8.3",
+        "vite-tsconfig-paths": "^4.1.1",
+        "vitest": "^4.0.16"
+    }
+}
