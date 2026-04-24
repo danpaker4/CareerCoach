@@ -1,6 +1,6 @@
 .navbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   padding: 15px 40px;
   background: white;
@@ -20,6 +20,12 @@
   font-weight: 600;
 }
 
+.nav-links {
+  display: flex;
+  align-items: center;
+  margin-left: 24px;
+}
+
 .nav-links a {
   margin: 0 15px;
   text-decoration: none;
@@ -27,7 +33,11 @@
   font-weight: 500;
 }
 
-.auth-buttons { display: flex; gap: 10px; }
+.auth-buttons {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
 
 .btn-primary,
 .btn-logout {
