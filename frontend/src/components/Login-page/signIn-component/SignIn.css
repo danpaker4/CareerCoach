@@ -51,7 +51,21 @@ h2 {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 16px;
+  color: #6b7280;
+  background-color: #f9fafb;
+  color-scheme: light;
   box-sizing: border-box;
+}
+
+.input-group input::placeholder {
+  color: #9ca3af;
+}
+
+.input-group input:-webkit-autofill,
+.input-group input:-webkit-autofill:hover,
+.input-group input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #6b7280;
+  -webkit-box-shadow: 0 0 0 1000px #f9fafb inset;
 }
 
 .auth-btn {
