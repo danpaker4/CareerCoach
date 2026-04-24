@@ -9,6 +9,17 @@
 
 .logo { font-size: 24px; font-weight: bold; color: #007bff; }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hello-user {
+  color: #334155;
+  font-weight: 600;
+}
+
 .nav-links a {
   margin: 0 15px;
   text-decoration: none;
@@ -17,6 +28,23 @@
 }
 
 .auth-buttons { display: flex; gap: 10px; }
+
+.btn-primary,
+.btn-logout {
+  text-decoration: none;
+  padding: 8px 20px;
+  border: 1px solid #007bff;
+  border-radius: 20px;
+  color: #007bff;
+  background: white;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn-logout:hover,
+.btn-primary:hover {
+  background: #eff6ff;
+}
 
 .btn-login {
   text-decoration: none;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './SignUp.css';
 import { User } from '../../../App';
 import { ENV } from '../../../config';
+import { apiFetch } from '../../../lib/apiClient';
 
 interface SignUpProps {
     onLoginSuccess: (user: User) => void;
@@ -39,7 +40,7 @@ export default function SignUp({ onLoginSuccess }: SignUpProps) {
             formData.append('githubUrl', githubUrl);
             formData.append('cv', cvFile);
 
-            const response = await fetch(`${ENV.USERS_SERVICE_BASE_URL}/api/auth/register`, {
+            const response = await apiFetch(`${ENV.USERS_SERVICE_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 body: formData,
             });

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Header from '../header/Header';
 import { ChatInterface } from '../chat-component/Chat'; 
 import './CareerRoadmap.css';
 

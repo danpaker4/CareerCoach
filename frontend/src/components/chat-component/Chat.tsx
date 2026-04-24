@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import './Chat.css';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 
 interface ChatProps {
     userId: string;
@@ -59,7 +60,7 @@ export function ChatInterface({ userId, userName }: ChatProps) {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${ENV.CHAT_SERVICE_BASE_URL}/api/chat`, {
+            const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, message: input })

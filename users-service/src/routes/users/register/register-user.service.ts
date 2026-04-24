@@ -2,10 +2,10 @@ import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import type { Collection } from "mongodb";
 import type { MultipartFile } from "@fastify/multipart";
-import type { User } from "./user.model";
-import { extractTextFromCv } from "../cv/cv-parser.service";
-import { extractAchievementsWithGemini } from "../cv/enrich-with-gemini/gemini.service";
-import { uploadCvToS3 } from "../cv/s3-upload/s3-upload.service";
+import type { User } from "../user.model";
+import { extractTextFromCv } from "../../cv/cv-parser.service";
+import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemini.service";
+import { uploadCvToS3 } from "../../cv/s3-upload/s3-upload.service";
 import type { RegisterUserInput } from "./register-user.types";
 import {
   ensurePdfFile,

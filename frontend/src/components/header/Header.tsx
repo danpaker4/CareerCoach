@@ -3,13 +3,16 @@ import './Header.css';
 
 interface HeaderProps {
     userName?: string;
+    onLogout: () => void;
 }
 
-export default function Header({ userName }: HeaderProps) {
+export default function Header({ userName, onLogout }: HeaderProps) {
     return (
         <header className="navbar">
-            <div className="logo" style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#2563eb' }}>
-                CareerCoach
+            <div className="brand">
+                <div className="logo" style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#2563eb' }}>
+                    CareerCoach
+                </div>
             </div>
             
             <nav className="nav-links">
@@ -19,7 +22,9 @@ export default function Header({ userName }: HeaderProps) {
 
             <div className="auth-buttons">
                 {userName ? (
-                    <div className="user-welcome">👋 Hi, {userName}</div>
+                    <button type="button" className="btn-logout" onClick={onLogout}>
+                        Logout ({userName})
+                    </button>
                 ) : (
                     <Link to="/login" className="btn-primary">
                         Log In / Sign Up
