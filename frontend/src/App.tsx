@@ -12,13 +12,21 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
+  birthDate?: string;
   currentJob?: string;
+  linkedInUrl?: string;
+  githubUrl?: string;
+  cv?: string;
+  achievements?: {
+    id: string;
+    name: string;
+    grade: number;
+  }[];
 }
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // פונקציה שתקרא כשהמשתמש מתחבר (מה-Login Page)
   const handleLoginSuccess = (user: User) => {
     console.log("App: User logged in:", user);
     setCurrentUser(user);

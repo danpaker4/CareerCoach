@@ -1,5 +1,6 @@
 import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
 
 import { MongoClient } from "./mongo/mongo"; 
@@ -38,6 +39,12 @@ export class Server {
             await this.app.register(cors, {
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ['Content-Type', 'Authorization']
+            });
+            await this.app.register(multipart, {
+                limits: {
+                    fileSize: 5 * 1024 * 1024,
+                    files: 1,
+                },
             });
 
             await this.app.register(authRouter(this.DBClient.users));

@@ -8,6 +8,7 @@ export const mockUser: User = {
     email: "john.doe@example.com",
     password: "hashedpassword",
     birthDate: new Date("1990-01-01"),
+    achievements: [],
     currentJob: "Developer",
 };
 

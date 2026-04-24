@@ -1,72 +1,96 @@
 import { FastifyInstance } from "fastify";
+import type { MultipartFile } from "@fastify/multipart";
 import { Collection } from "mongodb";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from 'uuid'; 
 import { User } from "./user.model";
+import { registerUser } from "./register-user.service";
+
+type RegisterFields = Record<string, string>;
+type RegisterMultipartData = {
+    fields: RegisterFields;
+    cvFile: MultipartFile | null;
+};
+
+const appendPart = (
+    current: RegisterMultipartData,
+    part: Awaited<ReturnType<AsyncIterator<any>["next"]>>["value"],
+): RegisterMultipartData => {
+    if (part?.type === "file" && part.fieldname === "cv") {
+        return { ...current, cvFile: part as MultipartFile };
+    }
+    if (part?.type === "field") {
+        return {
+            ...current,
+            fields: {
+                ...current.fields,
+                [part.fieldname]: String(part.value ?? ""),
+            },
+        };
+    }
+    return current;
+};
+
+const readMultipartData = async (
+    iterator: AsyncIterator<any>,
+    acc: RegisterMultipartData = { fields: {}, cvFile: null },
+): Promise<RegisterMultipartData> => {
+    const next = await iterator.next();
+    if (next.done) {
+        return acc;
+    }
+    return readMultipartData(iterator, appendPart(acc, next.value));
+};
 
 export const authRouter = (usersCollection: Collection<User>) => async (app: FastifyInstance) => {
 
     app.post("/api/auth/register", async (req, reply) => {
-        console.log("📝 Register request received:", req.body); 
-
         try {
-            const { firstName, lastName, email, password, birthDate, currentJob } = req.body as any;
-
-            if (!email || !password || !firstName || !lastName || !birthDate) {
-                console.log("Missing fields");
-                return reply.status(400).send({ error: "Missing required fields" });
+            if (!req.isMultipart()) {
+                return reply.status(400).send({ error: "Registration must use multipart/form-data" });
             }
 
-            const existingUser = await usersCollection.findOne({ email });
-            if (existingUser) {
-                console.log("User already exists:", email);
-                return reply.status(400).send({ error: "Email already exists" });
-            }
+            const parts = req.parts();
+            const { fields, cvFile } = await readMultipartData(parts[Symbol.asyncIterator]());
 
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            const newUser: User = {
-                id: uuidv4(),
-                firstName,
-                lastName,
-                email,
-                password: hashedPassword,
-                birthDate: new Date(birthDate),
-                currentJob: currentJob || ""
-            };
-
-            await usersCollection.insertOne(newUser);
-            console.log(" User saved to DB:", newUser.id); 
+            const user = await registerUser(usersCollection, {
+                firstName: fields.firstName,
+                lastName: fields.lastName,
+                email: fields.email,
+                password: fields.password,
+                birthDate: fields.birthDate,
+                currentJob: fields.currentJob,
+                linkedInUrl: fields.linkedInUrl,
+                githubUrl: fields.githubUrl,
+                cvFile,
+            });
 
             return reply.send({ 
                 success: true, 
-                userId: newUser.id,
-                user: { firstName, lastName, email } 
+                userId: user.id,
+                user,
             });
         } catch (err) {
             console.error("🔥 Error in register:", err);
-            return reply.status(500).send({ error: "Internal Server Error" });
+            const message = err instanceof Error ? err.message : "Internal Server Error";
+            const statusCode = message.includes("exists") || message.includes("Missing") || message.includes("must") || message.includes("required")
+                ? 400
+                : 500;
+            return reply.status(statusCode).send({ error: message });
         }
     });
 
     app.post("/api/auth/login", async (req, reply) => {
          const { email, password } = req.body as any;
          const user = await usersCollection.findOne({ email });
-         // ...
          if (!user) return reply.status(401).send({ error: "Invalid email or password" });
          
          const isMatch = await bcrypt.compare(password, user.password);
          if (!isMatch) return reply.status(401).send({ error: "Invalid email or password" });
 
+         const { password: _password, ...safeUser } = user;
          return reply.send({
             success: true,
-            user: {
-                id: user.id,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                email: user.email,
-                currentJob: user.currentJob
-            }
+            user: safeUser,
         });
     });
 };

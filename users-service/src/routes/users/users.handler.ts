@@ -38,6 +38,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                 const newUser: User = {
                     id: uuidv4(),
                     ...userData,
+                    achievements: userData.achievements ?? [],
                 };
 
                 await usersCollection.insertOne(newUser);
