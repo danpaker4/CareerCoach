@@ -6,16 +6,18 @@ interface ButtonToggleProps {
   onButtonClick: (button: LoginType) => void
 }
 
-function ButtonToggle({ activeButton, onButtonClick }: ButtonToggleProps) {
+export const ButtonToggle = ({ activeButton, onButtonClick }: ButtonToggleProps) => {
   return (
     <div className="button-toggle">
       <button
+        type="button"
         className={`toggle-button ${activeButton === Login.signIn ? 'active' : ''}`}
         onClick={() => onButtonClick(Login.signIn)}
       >
         Log In
       </button>
       <button
+        type="button"
         className={`toggle-button ${activeButton === Login.signUp ? 'active' : ''}`}
         onClick={() => onButtonClick(Login.signUp)}
       >
@@ -24,6 +26,4 @@ function ButtonToggle({ activeButton, onButtonClick }: ButtonToggleProps) {
     </div>
   )
 }
-
-export default ButtonToggle
 

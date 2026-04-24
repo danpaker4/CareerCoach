@@ -5,7 +5,7 @@ import jwt, { TokenExpiredError } from "jsonwebtoken";
 import { User } from "../users/user.model";
 import { registerUser } from "../users/register/register-user.service";
 import { clearAuthCookies, generateAccessToken, generateRefreshToken, setAccessTokenCookie, setAuthCookies, verifyToken } from "./auth-tokens.service";
-import { ACCESS_TOKEN_COOKIE, readMultipartData, REFRESH_TOKEN_COOKIE, toSafeUser } from "./auth.utils";
+import { ACCESS_TOKEN_COOKIE, isLoginBody, readMultipartData, REFRESH_TOKEN_COOKIE, toSafeUser } from "./auth.utils";
 
 export const authRouter = (usersCollection: Collection<User>) => async (app: FastifyInstance) => {
 
@@ -52,7 +52,11 @@ export const authRouter = (usersCollection: Collection<User>) => async (app: Fas
     });
 
     app.post("/api/auth/login", async (req, reply) => {
-         const { email, password } = req.body as any;
+         if (!isLoginBody(req.body)) {
+            return reply.status(400).send({ error: "Email and password are required" });
+         }
+
+         const { email, password } = req.body;
          const user = await usersCollection.findOne({ email });
          if (!user) return reply.status(401).send({ error: "Invalid email or password" });
          

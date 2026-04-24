@@ -1,14 +1,9 @@
 import z from "zod";
-import { DatabaseConfig } from "../mongo/mongo";
 
 export interface CommonServerConfig {
   port: number;
   host?: string;
 }
-
-// export type ServerConfig = CommonServerConfig & {
-//   mongoConfig: DatabaseConfig;
-// };
 
 export const envString = (name: string) =>
   z.string().min(1, `${name} is required`);

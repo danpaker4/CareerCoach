@@ -1,4 +1,4 @@
-import type { PdfTextParser } from "./cv-parser.types";
+import type { PdfParseConstructor, PdfTextParser } from "./cv-parser.types";
 import {
   GENERIC_PARSE_ERROR_PREFIX,
   throwIfEmptyBuffer,
@@ -6,21 +6,28 @@ import {
   toError,
 } from "./cv-parser.utils";
 
-const loadPdfParseClass = async (): Promise<new (options: { data: Buffer }) => PdfTextParser> => {
+const isPdfParseModule = (value: unknown): value is { PDFParse: PdfParseConstructor } => {
+  if (typeof value !== "object" || value === null || !("PDFParse" in value)) {
+    return false;
+  }
+
+  return typeof value.PDFParse === "function";
+};
+
+const loadPdfParseClass = async (): Promise<PdfParseConstructor> => {
   const moduleOrError = await import("pdf-parse").catch((error) => error);
   if (moduleOrError instanceof Error) {
     throw new Error(`${GENERIC_PARSE_ERROR_PREFIX} ${toError(moduleOrError).message}`);
   }
 
-  const PDFParse = (moduleOrError as any).PDFParse;
-  if (typeof PDFParse !== "function") {
+  if (!isPdfParseModule(moduleOrError)) {
     throw new Error("pdf-parse runtime does not expose PDFParse class");
   }
 
-  return PDFParse as new (options: { data: Buffer }) => PdfTextParser;
+  return moduleOrError.PDFParse;
 };
 
-const buildParser = (PDFParse: new (options: { data: Buffer }) => PdfTextParser, fileBuffer: Buffer): PdfTextParser => {
+const buildParser = (PDFParse: PdfParseConstructor, fileBuffer: Buffer): PdfTextParser => {
   const parser = new PDFParse({ data: fileBuffer });
   if (!parser) {
     throw new Error("Failed to initialize PDF parser");

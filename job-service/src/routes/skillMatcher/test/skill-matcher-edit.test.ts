@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockSkillMatcher, mockUserId, testServerConfig } from "./skill-matcher-mocks";
+import type { SkillMatcher } from "../skill-matcher.model";
 
 describe("Skill Matcher Router - PATCH /skill-matcher/:userId/:jobId/:skill", () => {
     const config: ServerConfig = testServerConfig;
@@ -33,10 +34,10 @@ describe("Skill Matcher Router - PATCH /skill-matcher/:userId/:jobId/:skill", ()
         });
 
         expect(response.statusCode).toBe(StatusCodes.OK);
-        const updatedSkillMatcher = response.json();
-        const skill = updatedSkillMatcher.skillToImprove.find((s: any) => s.skill === skillName);
+        const updatedSkillMatcher: SkillMatcher = response.json();
+        const skill = updatedSkillMatcher.skillToImprove.find((s) => s.skill === skillName);
         expect(skill).toBeDefined();
-        expect(skill.isDone).toBe(true);
+        expect(skill?.isDone).toBe(true);
 
         const dbSkillMatcher = await server.DBClient.skillMatchers.findOne({ userId: mockUserId, jobId: mockSkillMatcher.jobId });
         const dbSkill = dbSkillMatcher?.skillToImprove.find((s) => s.skill === skillName);
@@ -52,10 +53,10 @@ describe("Skill Matcher Router - PATCH /skill-matcher/:userId/:jobId/:skill", ()
         });
 
         expect(response.statusCode).toBe(StatusCodes.OK);
-        const updatedSkillMatcher = response.json();
-        const skill = updatedSkillMatcher.skillToImprove.find((s: any) => s.skill === skillName);
+        const updatedSkillMatcher: SkillMatcher = response.json();
+        const skill = updatedSkillMatcher.skillToImprove.find((s) => s.skill === skillName);
         expect(skill).toBeDefined();
-        expect(skill.isDone).toBe(false);
+        expect(skill?.isDone).toBe(false);
     });
 
     it("should return 404 when skill matcher does not exist", async () => {

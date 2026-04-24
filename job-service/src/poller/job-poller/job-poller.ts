@@ -8,28 +8,28 @@ import { saveEnrichedJobs } from "./stages/save/save-enriched-jobs";
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 export const startJobPollerSchedule = (jobsCollection: Collection<EnrichedJob>) => {
-    let isRunning = false;
+    const runState = { isRunning: false };
 
     const run = async () => {
-        if (isRunning) {
+        if (runState.isRunning) {
             console.log("⏭️ Skipping poller tick: previous run is still active");
             return;
         }
 
-        isRunning = true;
+        runState.isRunning = true;
         try {
             await jobPoller(jobsCollection);
         } catch (error) {
             console.error("🔥 Job poller failed:", error);
         } finally {
-            isRunning = false;
+            runState.isRunning = false;
         }
     };
 
     void run();
     setInterval(() => {
         void run();
-    }, TEN_MINUTES_MS * 1000);
+    }, TEN_MINUTES_MS);
 };
 
 export const jobPoller = async (jobsCollection: Collection<EnrichedJob>) => {

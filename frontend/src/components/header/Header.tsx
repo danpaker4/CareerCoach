@@ -6,11 +6,11 @@ interface HeaderProps {
     onLogout: () => void;
 }
 
-export default function Header({ userName, onLogout }: HeaderProps) {
+export const Header = ({ userName, onLogout }: HeaderProps) => {
     return (
         <header className="navbar">
             <div className="brand">
-                <div className="logo" style={{ fontWeight: 'bold', fontSize: '1.5rem', color: '#2563eb' }}>
+                <div className="logo">
                     CareerCoach
                 </div>
             </div>
@@ -33,4 +33,4 @@ export default function Header({ userName, onLogout }: HeaderProps) {
             </div>
         </header>
     );
-}
+};

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import './Home.css';
 
-export default function Home() {
+export const Home = () => {
     const navigate = useNavigate();
 
     return (
@@ -17,4 +17,4 @@ export default function Home() {
             </main>
         </div>
     );
-}
+};

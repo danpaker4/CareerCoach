@@ -10,7 +10,7 @@ export const inferFallback = (job: AdaptedJob): Pick<EnrichedJob, "salary" | "re
       : "mid";
 
   return {
-    salary: 100 as number,
+    salary: 100,
     requirements: [
       `${seniorityLevel} level experience relevant to ${job.jobTitle}`,
       "Strong communication and collaboration skills",

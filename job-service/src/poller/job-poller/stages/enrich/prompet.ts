@@ -10,9 +10,9 @@ Return ONLY valid JSON with this exact shape:
 }
 
 Rules:
-- salary must be in the format of a number. must be as doller per hour
+- salary must be numeric and represent dollars per hour.
 - If salary/requirements/benefits are explicitly written, use them.
-- If any value is missing, infer a realistic value from the role title, company and seniority.
+- If a value is missing, infer a realistic value from the role title, company and seniority.
 - Keep requirements and benefits short bullet-style phrases.
 - All returned values must be in English.
 

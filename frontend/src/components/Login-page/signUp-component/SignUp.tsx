@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import './SignUp.css';
-import { User } from '../../../App';
+import type { User } from '../../../types/user';
 import { ENV } from '../../../config';
 import { apiFetch } from '../../../lib/apiClient';
+import { readAuthResponse } from '../../../lib/authResponse';
 
 interface SignUpProps {
     onLoginSuccess: (user: User) => void;
 }
 
-export default function SignUp({ onLoginSuccess }: SignUpProps) {
+export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
@@ -20,7 +21,7 @@ export default function SignUp({ onLoginSuccess }: SignUpProps) {
     const [cvFile, setCvFile] = useState<File | null>(null);
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
         if (!cvFile) {
@@ -45,22 +46,21 @@ export default function SignUp({ onLoginSuccess }: SignUpProps) {
                 body: formData,
             });
 
-            const data = await response.json();
+            const data = await readAuthResponse(response);
 
-            if (response.ok && data.success) {
+            if (response.ok && data.success && data.user) {
                 onLoginSuccess(data.user);
             } else {
                 setError(data.error || 'Registration failed');
             }
-        } catch (err) {
-            console.error(err);
+        } catch {
             setError('Server connection failed. Is the backend running?');
         }
     };
 
     return (
         <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="input-row" style={{display: 'flex', gap: '10px'}}>
+            <div className="input-row">
                 <div className="input-group">
                     <label>First Name</label>
                     <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
@@ -104,7 +104,7 @@ export default function SignUp({ onLoginSuccess }: SignUpProps) {
                     onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
                     required
                 />
-                {cvFile && <p style={{ marginTop: '6px', fontSize: '0.85rem' }}>Selected: {cvFile.name}</p>}
+                {cvFile && <p className="selected-file">Selected: {cvFile.name}</p>}
             </div>
 
             <div className="input-group">
@@ -112,9 +112,9 @@ export default function SignUp({ onLoginSuccess }: SignUpProps) {
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
 
-            {error && <p style={{color: 'red', fontSize: '0.9rem'}}>{error}</p>}
+            {error && <p className="form-error">{error}</p>}
             
             <button type="submit" className="auth-btn">Create Account</button>
         </form>
     );
-}
+};

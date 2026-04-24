@@ -1,17 +1,9 @@
 import { useState } from 'react';
 import { ChatInterface } from '../chat-component/Chat'; 
 import './CareerRoadmap.css';
+import type { CareerRoadmapProps } from './career-roadmap.types';
 
-interface UserProps {
-    user?: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-    };
-}
-
-export default function CareerRoadmap({ user }: UserProps) {
+export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
     const [isChatOpen, setIsChatOpen] = useState(false);
 
     return (
@@ -74,7 +66,7 @@ export default function CareerRoadmap({ user }: UserProps) {
                             <span>25%</span>
                         </div>
                         <div className="progress-bar-bg">
-                            <div className="progress-bar-fill" style={{ width: '25%' }}></div>
+                            <div className="progress-bar-fill quarter-progress"></div>
                         </div>
                     </div>
 
@@ -114,4 +106,4 @@ export default function CareerRoadmap({ user }: UserProps) {
             )}
         </div>
     );
-}
+};

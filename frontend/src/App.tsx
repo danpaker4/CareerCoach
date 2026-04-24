@@ -1,36 +1,20 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
-import Header from './components/header/Header';
-import Home from './components/home-page/Home';
-import LoginPage from './components/Login-page/Login-page'; // השינוי הגדול: משתמשים בעמוד הראשי
-import CareerRoadmap from './components/career-roadmap/CareerRoadmap';
+import { Header } from './components/header/Header';
+import { Home } from './components/home-page/Home';
+import { LoginPage } from './components/Login-page/Login-page';
+import { CareerRoadmap } from './components/career-roadmap/CareerRoadmap';
 import { apiFetch } from './lib/apiClient';
 import { ENV } from './config';
+import type { User } from './types/user';
+import { hasErrorCode, readUserResponse } from './App.utils';
 
 const AUTH_ME_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/me`;
 const AUTH_REFRESH_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/refresh`;
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
 
-// הגדרת טיפוס המשתמש (כדי שיהיה מסודר)
-export interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  birthDate?: string;
-  currentJob?: string;
-  linkedInUrl?: string;
-  githubUrl?: string;
-  cv?: string;
-  achievements?: {
-    id: string;
-    name: string;
-    grade: number;
-  }[];
-}
-
-function App() {
+export const App = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const userDisplayName = currentUser
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ')
@@ -47,13 +31,12 @@ function App() {
     const loadCurrentUser = async () => {
       const response = await fetchCurrentUser();
       if (response.ok) {
-        const data = await response.json();
-        setCurrentUser(data.user);
+        setCurrentUser(await readUserResponse(response));
         return;
       }
 
-      const payload = await response.json().catch(() => null);
-      if (payload?.errorCode !== 'ACCESS_TOKEN_EXPIRED') {
+      const payload: unknown = await response.json().catch(() => null);
+      if (!hasErrorCode(payload, 'ACCESS_TOKEN_EXPIRED')) {
         setCurrentUser(null);
         return;
       }
@@ -65,15 +48,13 @@ function App() {
       }
 
       const retryResponse = await fetchCurrentUser();
-      const retryData = retryResponse.ok ? await retryResponse.json() : null;
-      setCurrentUser(retryData?.user ?? null);
+      setCurrentUser(retryResponse.ok ? await readUserResponse(retryResponse) : null);
     };
 
     loadCurrentUser().catch(() => setCurrentUser(null));
   }, []);
 
   const handleLoginSuccess = (user: User) => {
-    console.log("App: User logged in:", user);
     setCurrentUser(user);
   };
 
@@ -109,6 +90,6 @@ function App() {
       </div>
     </Router>
   );
-}
+};
 
 export default App;

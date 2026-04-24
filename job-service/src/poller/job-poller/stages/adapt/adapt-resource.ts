@@ -1,14 +1,59 @@
 import type { AdaptedJob } from "./adapt-resource.types";
 
-export const adaptResource = (resource: any[]): AdaptedJob[] => {
-  return resource.map((job: any) => ({
-    id: job.id as string,
-    jobTitle: job.job_title,
-    url: job.final_url as string,
-    company: job.company as string,
-    seniority: job.seniority as string,
-    description: job.description as string,
-    lon: job.longitude as number,
-    lat: job.latitude as number,
-  }));
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+
+const readRequiredString = (record: Record<string, unknown>, key: string): string | null => {
+  const value = record[key];
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
 };
+
+const readNullableNumber = (record: Record<string, unknown>, key: string): number | null => {
+  const value = record[key];
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const toAdaptedJob = (value: unknown): AdaptedJob | null => {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const id = readRequiredString(record, "id");
+  const jobTitle = readRequiredString(record, "job_title");
+  const url = readRequiredString(record, "final_url");
+  const company = readRequiredString(record, "company");
+  const seniority = readRequiredString(record, "seniority");
+  const description = readRequiredString(record, "description");
+
+  if (!id || !jobTitle || !url || !company || !seniority || !description) {
+    return null;
+  }
+
+  return {
+    id,
+    jobTitle,
+    url,
+    company,
+    seniority,
+    description,
+    lon: readNullableNumber(record, "longitude"),
+    lat: readNullableNumber(record, "latitude"),
+  };
+};
+
+export const adaptResource = (resource: readonly unknown[]): AdaptedJob[] =>
+  resource.map(toAdaptedJob).filter((job): job is AdaptedJob => job !== null);

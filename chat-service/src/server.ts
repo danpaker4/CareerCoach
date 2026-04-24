@@ -4,18 +4,13 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 
 import { MongoClient } from "./mongo/mongo"; 
 import { chatRouter } from "./routes/chat/chat.router";
+import type { ServerConfig } from "./server.types";
 
-export interface ServerConfig {
-    port: number;
-    mongoConfig: {
-        mongoConnectionString: string;
-        mongoKeyPath?: string;
-    };
-}
+export type { ServerConfig } from "./server.types";
 
 export class Server {
     readonly app: FastifyInstance;
-    private config: ServerConfig;
+    private readonly config: ServerConfig;
     readonly DBClient: MongoClient;
 
     constructor(config: ServerConfig) {
@@ -27,7 +22,7 @@ export class Server {
         this.app.setSerializerCompiler(serializerCompiler);
     }
 
-    public async start() {
+    start = async (): Promise<void> => {
         try {
             console.log("🔄 Starting Server...");
             await this.DBClient.start();
@@ -52,5 +47,10 @@ export class Server {
             this.app.log.error(err);
             process.exit(1);
         }
-    }
+    };
+
+    stop = async (): Promise<void> => {
+        await this.app.close();
+        await this.DBClient.stop();
+    };
 }

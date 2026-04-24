@@ -6,11 +6,14 @@ const isRefreshRequest = (url: string): boolean => url.includes("/api/auth/refre
 const isAuthBootstrapRequest = (url: string): boolean =>
   url.includes("/api/auth/login") || url.includes("/api/auth/register");
 
-const shouldTryRefresh = (status: number, payload: any): boolean => {
+const isErrorPayload = (payload: unknown): payload is { errorCode?: string } =>
+  typeof payload === "object" && payload !== null && "errorCode" in payload;
+
+const shouldTryRefresh = (status: number, payload: unknown): boolean => {
   if (status !== 401) {
     return false;
   }
-  const code = payload?.errorCode;
+  const code = isErrorPayload(payload) ? payload.errorCode : undefined;
   return code === "ACCESS_TOKEN_EXPIRED" || code === "ACCESS_TOKEN_MISSING";
 };
 

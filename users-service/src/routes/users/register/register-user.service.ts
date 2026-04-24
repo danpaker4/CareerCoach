@@ -1,7 +1,6 @@
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import type { Collection } from "mongodb";
-import type { MultipartFile } from "@fastify/multipart";
 import type { User } from "../user.model";
 import { extractTextFromCv } from "../../cv/cv-parser.service";
 import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemini.service";
@@ -23,8 +22,7 @@ export const registerUser = async (
     throw new Error("Missing required fields");
   }
 
-  ensurePdfFile(input.cvFile);
-  const cvFile = input.cvFile as MultipartFile;
+  const cvFile = ensurePdfFile(input.cvFile);
 
   const existingUser = await usersCollection.findOne({ email });
   throwIfUserAlreadyExists(Boolean(existingUser));

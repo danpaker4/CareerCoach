@@ -10,10 +10,26 @@ export const cleanStringArray = (value: unknown): string[] => {
     .filter((item) => item.length > 0);
 };
 
+const isGeminiExtract = (payload: unknown): payload is GeminiExtract => {
+  if (typeof payload !== "object" || payload === null) {
+    return false;
+  }
+
+  const salaryIsValid = !("salary" in payload) || typeof payload.salary === "number";
+  const requirementsAreValid = !("requirements" in payload) || Array.isArray(payload.requirements);
+  const benefitsAreValid = !("benefits" in payload) || Array.isArray(payload.benefits);
+  return salaryIsValid && requirementsAreValid && benefitsAreValid;
+};
+
+const parseJsonObject = (raw: string): GeminiExtract | null => {
+  const payload: unknown = JSON.parse(raw);
+  return isGeminiExtract(payload) ? payload : null;
+};
+
 export const parseGeminiJson = (raw: string): GeminiExtract | null => {
   const direct = raw.trim();
   try {
-    return JSON.parse(direct) as GeminiExtract;
+    return parseJsonObject(direct);
   } catch {
     // ignore and try extracting JSON block
   }
@@ -23,7 +39,7 @@ export const parseGeminiJson = (raw: string): GeminiExtract | null => {
   if (start >= 0 && end > start) {
     const slice = direct.slice(start, end + 1);
     try {
-      return JSON.parse(slice) as GeminiExtract;
+      return parseJsonObject(slice);
     } catch {
       return null;
     }

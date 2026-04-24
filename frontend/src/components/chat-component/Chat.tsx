@@ -1,19 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import './Chat.css';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import type { ChatProps, ChatResponse, Message } from './chat.types';
 
-interface ChatProps {
-    userId: string;
-    userName?: string;
-}
+const createMessage = (role: Message['role'], content: string): Message => ({
+    id: crypto.randomUUID(),
+    role,
+    content,
+});
 
-interface Message {
-    role: 'user' | 'model';
-    content: string;
-}
+const readChatResponse = async (response: Response): Promise<ChatResponse> => {
+    const payload: unknown = await response.json().catch(() => ({}));
+    if (typeof payload !== 'object' || payload === null || !('response' in payload)) {
+        return {};
+    }
 
-export function ChatInterface({ userId, userName }: ChatProps) {
+    return typeof payload.response === 'string' ? { response: payload.response } : {};
+};
+
+export const ChatInterface = ({ userId, userName }: ChatProps) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +36,7 @@ export function ChatInterface({ userId, userName }: ChatProps) {
     }, [messages]);
 
     // פונקציה להגדלת התיבה
-    const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
         setInput(e.target.value);
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
@@ -38,7 +44,7 @@ export function ChatInterface({ userId, userName }: ChatProps) {
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
@@ -48,7 +54,7 @@ export function ChatInterface({ userId, userName }: ChatProps) {
     const handleSend = async () => {
         if (!input.trim()) return;
 
-        const userMessage = { role: 'user' as const, content: input };
+        const userMessage = createMessage('user', input);
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         
@@ -66,14 +72,15 @@ export function ChatInterface({ userId, userName }: ChatProps) {
                 body: JSON.stringify({ userId, message: input })
             });
 
-            const data = await response.json();
-            if (data.response) {
-                setMessages(prev => [...prev, { role: 'model', content: data.response }]);
+            const data = await readChatResponse(response);
+            const modelResponse = data.response;
+            if (modelResponse) {
+                setMessages(prev => [...prev, createMessage('model', modelResponse)]);
             } else {
-                setMessages(prev => [...prev, { role: 'model', content: "I couldn't understand that." }]);
+                setMessages(prev => [...prev, createMessage('model', "I couldn't understand that.")]);
             }
-        } catch (error) {
-            setMessages(prev => [...prev, { role: 'model', content: "Server connection error." }]);
+        } catch {
+            setMessages(prev => [...prev, createMessage('model', "Server connection error.")]);
         } finally {
             setIsLoading(false);
         }
@@ -87,8 +94,8 @@ export function ChatInterface({ userId, userName }: ChatProps) {
                         Hi {userName || 'there'}! 👋 I'm CareerCoach AI.
                     </div>
                 </div>
-                {messages.map((msg, index) => (
-                    <div key={index} className={`message-wrapper ${msg.role}`}>
+                {messages.map((msg) => (
+                    <div key={msg.id} className={`message-wrapper ${msg.role}`}>
                         <div className="message-bubble">{msg.content}</div>
                     </div>
                 ))}
@@ -105,8 +112,8 @@ export function ChatInterface({ userId, userName }: ChatProps) {
                     onKeyDown={handleKeyDown}
                     rows={1}
                 />
-                <button onClick={handleSend} disabled={isLoading || !input.trim()}>➤</button>
+                <button type="button" onClick={handleSend} disabled={isLoading || !input.trim()}>➤</button>
             </div>
         </div>
     );
-}
+};
