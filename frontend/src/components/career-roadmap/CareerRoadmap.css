@@ -144,6 +144,10 @@
     border-radius: 5px;
 }
 
+.quarter-progress {
+    width: 25%;
+}
+
 /* Current Step Box */
 .current-step-box {
     background-color: #f8fafc;

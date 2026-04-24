@@ -3,6 +3,7 @@ import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockUser, testServerConfig } from "./users-mocks";
 import { v4 as uuidv4 } from "uuid";
+import { authHeadersForUser, dropLegacyUsernameIndex } from "./users-test-utils";
 
 describe("Users Router - GET /users/:userId", () => {
     const config: ServerConfig = testServerConfig;
@@ -12,6 +13,7 @@ describe("Users Router - GET /users/:userId", () => {
 
     beforeAll(async () => {
         await server.start();
+        await dropLegacyUsernameIndex(server.DBClient.users);
     });
 
     afterAll(async () => {
@@ -32,6 +34,7 @@ describe("Users Router - GET /users/:userId", () => {
             const response = await server.app.inject({
                 method: "GET",
                 url: `/users/${testUserId}`,
+                headers: authHeadersForUser(mockUser),
             });
 
             expect(response.statusCode).toBe(StatusCodes.OK);
@@ -47,6 +50,7 @@ describe("Users Router - GET /users/:userId", () => {
             const response = await server.app.inject({
                 method: "GET",
                 url: `/users/${nonExistentUserId}`,
+                headers: authHeadersForUser(mockUser),
             });
 
             expect(response.statusCode).toBe(StatusCodes.NOT_FOUND);
@@ -62,6 +66,7 @@ describe("Users Router - GET /users/:userId", () => {
             const response = await server.app.inject({
                 method: "GET",
                 url: `/users/${testUserId}`,
+                headers: authHeadersForUser(mockUser),
             });
 
             expect(response.statusCode).toBe(StatusCodes.OK);

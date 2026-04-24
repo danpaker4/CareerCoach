@@ -20,6 +20,7 @@ const shouldRetryGeminiError = (error: unknown): boolean => {
 const enrichSingleJob = async (
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   job: AdaptedJob,
+  attempt = 1,
 ): Promise<EnrichedJob> => {
   if (!job.description.trim()) {
     return { ...job, ...inferFallback(job) };
@@ -27,43 +28,39 @@ const enrichSingleJob = async (
 
   const prompt = buildEnrichmentPrompt(job);
 
-  for (let attempt = 1; attempt <= MAX_GEMINI_RETRIES; attempt += 1) {
-    try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const parsed = parseGeminiJson(text);
-      if (!parsed) {
-        return { ...job, ...inferFallback(job) };
-      }
-
-      const salary = parsed.salary as number;
-      const requirements = cleanStringArray(parsed.requirements);
-      const benefits = cleanStringArray(parsed.benefits);
-
-      const fallback = inferFallback(job);
-      return {
-        ...job,
-        salary,
-        requirements: requirements.length > 0 ? requirements : fallback.requirements,
-        benefits: benefits.length > 0 ? benefits : fallback.benefits,
-      };
-    } catch (error) {
-      const canRetry = shouldRetryGeminiError(error) && attempt < MAX_GEMINI_RETRIES;
-      if (canRetry) {
-        const delay = RETRY_BASE_DELAY_MS * attempt;
-        console.warn(
-          `Gemini request failed with service unavailability for job ${job.id}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_GEMINI_RETRIES})`,
-        );
-        await sleep(delay);
-        continue;
-      }
-
-      console.warn(`Gemini enrichment failed for job ${job.id}. Using fallback values.`);
-      return { ...job, ...inferFallback(job) };
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const parsed = parseGeminiJson(text);
+    const fallback = inferFallback(job);
+    if (!parsed) {
+      return { ...job, ...fallback };
     }
-  }
 
-  return { ...job, ...inferFallback(job) };
+    const salary = typeof parsed.salary === "number" ? parsed.salary : fallback.salary;
+    const requirements = cleanStringArray(parsed.requirements);
+    const benefits = cleanStringArray(parsed.benefits);
+
+    return {
+      ...job,
+      salary,
+      requirements: requirements.length > 0 ? requirements : fallback.requirements,
+      benefits: benefits.length > 0 ? benefits : fallback.benefits,
+    };
+  } catch (error) {
+    const canRetry = shouldRetryGeminiError(error) && attempt < MAX_GEMINI_RETRIES;
+    if (canRetry) {
+      const delay = RETRY_BASE_DELAY_MS * attempt;
+      console.warn(
+        `Gemini request failed with service unavailability for job ${job.id}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_GEMINI_RETRIES})`,
+      );
+      await sleep(delay);
+      return enrichSingleJob(model, job, attempt + 1);
+    }
+
+    console.warn(`Gemini enrichment failed for job ${job.id}. Using fallback values.`);
+    return { ...job, ...inferFallback(job) };
+  }
 };
 
 export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]> => {
@@ -76,10 +73,5 @@ export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]>
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
 
-  const enrichedJobs: EnrichedJob[] = [];
-  for (const job of jobs) {
-    enrichedJobs.push(await enrichSingleJob(model, job));
-  }
-
-  return enrichedJobs;
+  return Promise.all(jobs.map((job) => enrichSingleJob(model, job)));
 };

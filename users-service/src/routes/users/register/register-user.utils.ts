@@ -2,13 +2,14 @@ import type { MultipartFile } from "@fastify/multipart";
 
 export const MAX_CV_SIZE_BYTES = 5 * 1024 * 1024;
 
-export const ensurePdfFile = (cvFile: MultipartFile | null): void => {
+export const ensurePdfFile = (cvFile: MultipartFile | null): MultipartFile => {
   if (!cvFile) {
     throw new Error("CV file is required");
   }
   if (cvFile.mimetype !== "application/pdf") {
     throw new Error("CV file must be a PDF");
   }
+  return cvFile;
 };
 
 export const throwIfUserAlreadyExists = (exists: boolean): void => {

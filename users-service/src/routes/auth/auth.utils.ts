@@ -1,6 +1,5 @@
-import { MultipartFile } from "@fastify/multipart";
-import { RegisterMultipartData } from "./auth.types";
-import { User } from "../users/user.model";
+import type { RegisterMultipartData, MultipartIteratorPart, AuthTokenPayload, LoginBody } from "./auth.types";
+import type { User } from "../users/user.model";
 
 export const ACCESS_TOKEN_COOKIE = "accessToken";
 export const REFRESH_TOKEN_COOKIE = "refreshToken";
@@ -16,10 +15,36 @@ export const getJwtSecret = (): string => {
   return secret;
 };
 
+export const isLoginBody = (body: unknown): body is LoginBody => {
+  if (typeof body !== "object" || body === null) {
+    return false;
+  }
+
+  return (
+    "email" in body &&
+    "password" in body &&
+    typeof body.email === "string" &&
+    typeof body.password === "string"
+  );
+};
+
+export const isAuthTokenPayload = (payload: unknown): payload is AuthTokenPayload => {
+  if (typeof payload !== "object" || payload === null) {
+    return false;
+  }
+
+  return (
+    "userId" in payload &&
+    "email" in payload &&
+    typeof payload.userId === "string" &&
+    typeof payload.email === "string"
+  );
+};
+
 export const appendPart = (
-  current: import("./auth.types").RegisterMultipartData,
-  part: import("./auth.types").MultipartIteratorPart,
-): import("./auth.types").RegisterMultipartData => {
+  current: RegisterMultipartData,
+  part: MultipartIteratorPart,
+): RegisterMultipartData => {
   if (part?.type === "file" && part.fieldname === "cv") {
     return { ...current, cvFile: part };
   }
@@ -36,7 +61,7 @@ export const appendPart = (
 };
 
 export const readMultipartData = async (
-  iterator: AsyncIterator<any>,
+  iterator: AsyncIterator<MultipartIteratorPart>,
   acc: RegisterMultipartData = { fields: {}, cvFile: null },
 ): Promise<RegisterMultipartData> => {
   const next = await iterator.next();

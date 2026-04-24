@@ -69,3 +69,9 @@ h2 {
 .auth-btn:hover {
   background: #0056b3;
 }
+
+.form-error {
+  color: red;
+  font-size: 0.9rem;
+  margin: 0;
+}

@@ -1,19 +1,20 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import './SignIn.css';
-import { User } from '../../../App';
+import type { User } from '../../../types/user';
 import { ENV } from '../../../config';
 import { apiFetch } from '../../../lib/apiClient';
+import { readAuthResponse } from '../../../lib/authResponse';
 
 interface SignInProps {
     onLoginSuccess: (user: User) => void;
 }
 
-export default function SignIn({ onLoginSuccess }: SignInProps) {
+export const SignIn = ({ onLoginSuccess }: SignInProps) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
 
@@ -24,15 +25,14 @@ export default function SignIn({ onLoginSuccess }: SignInProps) {
                 body: JSON.stringify({ email, password })
             });
 
-            const data = await response.json();
+            const data = await readAuthResponse(response);
 
-            if (response.ok && data.success) {
+            if (response.ok && data.success && data.user) {
                 onLoginSuccess(data.user);
             } else {
                 setError(data.error || 'Invalid email or password');
             }
-        } catch (err) {
-            console.error(err);
+        } catch {
             setError('Server connection failed');
         }
     };
@@ -58,9 +58,9 @@ export default function SignIn({ onLoginSuccess }: SignInProps) {
                 />
             </div>
             
-            {error && <p style={{color: 'red', fontSize: '0.9rem'}}>{error}</p>}
+            {error && <p className="form-error">{error}</p>}
 
             <button type="submit" className="auth-btn">Log In</button>
         </form>
     );
-}
+};

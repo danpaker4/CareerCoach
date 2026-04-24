@@ -27,13 +27,13 @@ const createS3Client = (): S3Client => {
   });
 };
 
-let s3Client: S3Client | null = null;
+const s3ClientRef: { current: S3Client | null } = { current: null };
 
 const getS3Client = (): S3Client => {
-  if (!s3Client) {
-    s3Client = createS3Client();
+  if (!s3ClientRef.current) {
+    s3ClientRef.current = createS3Client();
   }
-  return s3Client;
+  return s3ClientRef.current;
 };
 
 export const uploadCvToS3 = async (userId: string, cvBuffer: Buffer): Promise<string> => {

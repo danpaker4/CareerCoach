@@ -5,6 +5,7 @@ import {
   ACCESS_TOKEN_COOKIE,
   ACCESS_TOKEN_EXPIRES_IN_SECONDS,
   getJwtSecret,
+  isAuthTokenPayload,
   REFRESH_TOKEN_COOKIE,
   REFRESH_TOKEN_EXPIRES_IN_SECONDS,
 } from "./auth.utils";
@@ -15,8 +16,13 @@ export const generateAccessToken = (payload: AuthTokenPayload): string =>
 export const generateRefreshToken = (payload: AuthTokenPayload): string =>
   jwt.sign(payload, getJwtSecret(), { expiresIn: REFRESH_TOKEN_EXPIRES_IN_SECONDS });
 
-export const verifyToken = (token: string): AuthTokenPayload =>
-  jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
+export const verifyToken = (token: string): AuthTokenPayload => {
+  const payload = jwt.verify(token, getJwtSecret());
+  if (!isAuthTokenPayload(payload)) {
+    throw new Error("Invalid token payload");
+  }
+  return payload;
+};
 
 const cookieBaseOptions = () => ({
   httpOnly: true as const,

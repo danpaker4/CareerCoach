@@ -17,7 +17,13 @@ export type RegisterMultipartData = {
   cvFile: MultipartFile | null;
 };
 
-export type MultipartIteratorPart = Awaited<ReturnType<AsyncIterator<any>["next"]>>["value"];
+export type MultipartField = {
+  type: "field";
+  fieldname: string;
+  value: unknown;
+};
+
+export type MultipartIteratorPart = MultipartFile | MultipartField;
 
 export type LoginBody = {
   email: string;

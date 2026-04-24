@@ -55,6 +55,10 @@
     background-color: #1a1f24;
 }
 
+.github-icon {
+    margin-right: 10px;
+}
+
 /* רווח בין הכרטיס לטפסים */
 .form-wrapper {
     margin-bottom: 20px;

@@ -3,6 +3,7 @@ import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockUser, testServerConfig } from "./users-mocks";
 import { v4 as uuidv4 } from "uuid";
+import { authHeadersForUser, dropLegacyUsernameIndex } from "./users-test-utils";
 
 describe("Users Router - PATCH /users/:userId", () => {
     const config: ServerConfig = testServerConfig;
@@ -12,6 +13,7 @@ describe("Users Router - PATCH /users/:userId", () => {
 
     beforeAll(async () => {
         await server.start();
+        await dropLegacyUsernameIndex(server.DBClient.users);
     });
 
     afterAll(async () => {
@@ -36,6 +38,7 @@ describe("Users Router - PATCH /users/:userId", () => {
             const response = await server.app.inject({
                 method: "PATCH",
                 url: `/users/${testUserId}`,
+                headers: authHeadersForUser(mockUser),
                 payload: { firstName: "UpdatedName" },
             });
 
@@ -60,6 +63,7 @@ describe("Users Router - PATCH /users/:userId", () => {
             const response = await server.app.inject({
                 method: "PATCH",
                 url: `/users/${newUserId}`,
+                headers: authHeadersForUser(mockUser),
                 payload: { firstName: "NewUser", lastName: "LastName" },
             });
 

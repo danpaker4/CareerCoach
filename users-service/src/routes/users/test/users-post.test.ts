@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
-import { mockUserData, mockUserWithoutJob, testServerConfig } from "./users-mocks";
+import { mockUser, mockUserData, mockUserWithoutJob, testServerConfig } from "./users-mocks";
+import { authHeadersForUser, dropLegacyUsernameIndex } from "./users-test-utils";
 
 describe("Users Router - POST /users", () => {
     const config: ServerConfig = testServerConfig;
@@ -9,6 +10,7 @@ describe("Users Router - POST /users", () => {
 
     beforeAll(async () => {
         await server.start();
+        await dropLegacyUsernameIndex(server.DBClient.users);
     });
 
     afterAll(async () => {
@@ -17,7 +19,7 @@ describe("Users Router - POST /users", () => {
 
     afterEach(async () => {
         await server.DBClient.users.deleteMany({
-            email: { $in: [mockUserData.email, mockUserWithoutJob.email] },
+            email: { $in: [mockUserData.email, mockUserWithoutJob.email, "different.email@example.com"] },
         });
     });
 
@@ -26,6 +28,7 @@ describe("Users Router - POST /users", () => {
             const response = await server.app.inject({
                 method: "POST",
                 url: "/users",
+                headers: authHeadersForUser(mockUser),
                 payload: mockUserData,
             });
 
@@ -47,6 +50,7 @@ describe("Users Router - POST /users", () => {
             const response = await server.app.inject({
                 method: "POST",
                 url: "/users",
+                headers: authHeadersForUser(mockUser),
                 payload: mockUserWithoutJob,
             });
 
@@ -67,12 +71,14 @@ describe("Users Router - POST /users", () => {
             const response1 = await server.app.inject({
                 method: "POST",
                 url: "/users",
+                headers: authHeadersForUser(mockUser),
                 payload: mockUserData,
             });
 
             const response2 = await server.app.inject({
                 method: "POST",
                 url: "/users",
+                headers: authHeadersForUser(mockUser),
                 payload: {
                     ...mockUserData,
                     email: "different.email@example.com",
@@ -94,6 +100,7 @@ describe("Users Router - POST /users", () => {
             const response = await server.app.inject({
                 method: "POST",
                 url: "/users",
+                headers: authHeadersForUser(mockUser),
                 payload: mockUserData,
             });
 

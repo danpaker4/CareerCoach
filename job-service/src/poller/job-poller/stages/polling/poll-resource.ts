@@ -2,6 +2,17 @@ export type TheirStackSearchRequest = Record<string, unknown>;
 export type TheirStackSearchResponse = Record<string, unknown>;
 
 const THEIRSTACK_JOBS_SEARCH_URL = "https://api.theirstack.com/v1/jobs/search";
+const POSTED_AT_MAX_AGE_DAYS = 7;
+const JOB_COUNTRY_CODES = ["IL"];
+const JOB_SEARCH_LIMIT = 1;
+
+const isTheirStackSearchResponse = (payload: unknown): payload is { data: unknown[] } => {
+  if (typeof payload !== "object" || payload === null || !("data" in payload)) {
+    return false;
+  }
+
+  return Array.isArray(payload.data);
+};
 
 export const pollResource = async (): Promise<unknown[]> => {
   const apiKey = process.env.THEIRSTACK_API_KEY;
@@ -17,9 +28,9 @@ export const pollResource = async (): Promise<unknown[]> => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      posted_at_max_age_days: 7,
-      job_country_code_or: ["IL"],
-      limit: 1
+      posted_at_max_age_days: POSTED_AT_MAX_AGE_DAYS,
+      job_country_code_or: JOB_COUNTRY_CODES,
+      limit: JOB_SEARCH_LIMIT
     }),
   });
 
@@ -30,7 +41,10 @@ export const pollResource = async (): Promise<unknown[]> => {
     );
   }
 
-  const data = await res.json() as { data: unknown[] };
-  console.log(data);
-  return data.data as unknown[];
-}
+  const data: unknown = await res.json();
+  if (!isTheirStackSearchResponse(data)) {
+    throw new Error("Resource poll failed: invalid TheirStack response shape");
+  }
+
+  return data.data;
+};

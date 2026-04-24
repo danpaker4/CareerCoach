@@ -93,7 +93,12 @@ Also enforce:
 
 const parseGeminiResponse = (raw: string): GeminiAchievementsPayload | null => {
   try {
-    return JSON.parse(raw) as GeminiAchievementsPayload;
+    const payload: unknown = JSON.parse(raw);
+    if (typeof payload !== "object" || payload === null || !("achievements" in payload)) {
+      return null;
+    }
+
+    return Array.isArray(payload.achievements) ? { achievements: payload.achievements } : null;
   } catch {
     return null;
   }

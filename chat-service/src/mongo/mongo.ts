@@ -5,8 +5,8 @@ import type { ChatSession } from "../routes/chat/chat.model";
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
-    private db!: Db;
-    public chats!: Collection<ChatSession>; 
+    private db: Db | null = null;
+    private chatsCollection: Collection<ChatSession> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -21,7 +21,7 @@ export class MongoClient implements Service {
             await this.mongoClient.connect();
             this.db = this.mongoClient.db();
             
-            this.chats = this.db.collection<ChatSession>("chats");
+            this.chatsCollection = this.db.collection<ChatSession>("chats");
             
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -31,10 +31,17 @@ export class MongoClient implements Service {
     };
 
     stop = async (): Promise<void> => {
-        if (this.mongoClient) {
-            await this.mongoClient.close();
-            console.log('MongoDb Connection Closed');
+        await this.mongoClient.close();
+        this.db = null;
+        this.chatsCollection = null;
+        console.log('MongoDb Connection Closed');
+    };
+
+    get chats(): Collection<ChatSession> {
+        if (!this.chatsCollection) {
+            throw new Error("Chats collection is not initialized");
         }
+        return this.chatsCollection;
     }
 }
 
