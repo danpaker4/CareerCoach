@@ -29,6 +29,14 @@ export const createUserSchema = {
         password: z.string(),
         birthDate: z.coerce.date(),
         currentJob: z.string().optional(),
+        linkedInUrl: z.string().optional(),
+        githubUrl: z.string().optional(),
+        cv: z.string().optional(),
+        achievements: z.array(z.object({
+            id: z.string().uuid(),
+            name: z.string(),
+            grade: z.number().min(1).max(100),
+        })).default([]),
     }),
 } satisfies FastifySchema;
 
@@ -52,6 +60,14 @@ export const updateUserSchema = {
         password: z.string().optional(),
         birthDate: z.coerce.date().optional(),
         currentJob: z.string().optional(),
+        linkedInUrl: z.string().optional(),
+        githubUrl: z.string().optional(),
+        cv: z.string().optional(),
+        achievements: z.array(z.object({
+            id: z.string().uuid(),
+            name: z.string(),
+            grade: z.number().min(1).max(100),
+        })).optional(),
     }),
 } satisfies FastifySchema;
 

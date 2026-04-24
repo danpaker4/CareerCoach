@@ -1,19 +1,15 @@
 import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
+import cookie from "@fastify/cookie";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
-
 import { MongoClient } from "./mongo/mongo"; 
-import { authRouter } from "./routes/users/auth.router";
+import { authRouter } from "./routes/auth/auth.router";
 import { usersRouter } from "./routes/users/users.router";
 import { githubRouter } from "./routes/github/github.router";
+import type { ServerConfig } from "./server.types";
 
-export interface ServerConfig {
-    port: number;
-    mongoConfig: {
-        mongoConnectionString: string;
-        mongoKeyPath?: string;
-    };
-}
+export type { ServerConfig } from "./server.types";
 
 export class Server {
     readonly app: FastifyInstance;
@@ -36,8 +32,17 @@ export class Server {
             console.log(" MongoDB Connected");
 
             await this.app.register(cors, {
+                origin: true,
+                credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ['Content-Type', 'Authorization']
+            });
+            await this.app.register(cookie);
+            await this.app.register(multipart, {
+                limits: {
+                    fileSize: 5 * 1024 * 1024,
+                    files: 1,
+                },
             });
 
             await this.app.register(authRouter(this.DBClient.users));
