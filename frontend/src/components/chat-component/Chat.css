@@ -45,6 +45,11 @@
     justify-content: flex-start;
 }
 
+.message-wrapper.assistant,
+.message-wrapper.system {
+    justify-content: flex-start;
+}
+
 .message-bubble {
     max-width: 80%;
     padding: 12px 16px;
@@ -66,6 +71,14 @@
 
 /* בועה של ה-AI */
 .message-wrapper.model .message-bubble {
+    background-color: #ffffff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    border-bottom-left-radius: 4px;
+}
+
+.message-wrapper.assistant .message-bubble,
+.message-wrapper.system .message-bubble {
     background-color: #ffffff;
     color: #1e293b;
     border: 1px solid #e2e8f0;

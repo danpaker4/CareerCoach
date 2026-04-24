@@ -29,11 +29,13 @@ export class Server {
             console.log(" MongoDB Connected");
 
             await this.app.register(cors, {
+                origin: true,
+                credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
 
-            await this.app.register(chatRouter(this.DBClient.chats));
+            await this.app.register(chatRouter(this.DBClient.conversations));
 
             const address = await this.app.listen({ 
                 port: this.config.port, 

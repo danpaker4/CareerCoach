@@ -100,7 +100,12 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
 
                     <ChatInterface 
                         userId={user?.id || "guest"} 
-                        userName={user?.firstName} 
+                        userProfile={{
+                            firstName: user?.firstName,
+                            lastName: user?.lastName,
+                            currentJob: user?.currentJob,
+                            achievements: user?.achievements,
+                        }}
                     />
                 </div>
             )}
