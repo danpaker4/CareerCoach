@@ -4,6 +4,7 @@ import type { Pipeline } from "../routes/MyPipline/pipeline.model";
 import type { PipelineJob } from "../routes/jobsInPipeline/pipeline-job.model";
 import type { SkillMatcher } from "../routes/skillMatcher/skill-matcher.model";
 import type { CareerRoadMap } from "../routes/careerRoadMap/career-roadmap.model";
+import type { EnrichedJob } from "../poller/job-poller/stages/enrich/types";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -13,6 +14,7 @@ export class MongoClient implements Service {
     public pipelineJobs!: Collection<PipelineJob>;
     public skillMatchers!: Collection<SkillMatcher>;
     public careerRoadMaps!: Collection<CareerRoadMap>;
+    public jobs!: Collection<EnrichedJob>;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -31,6 +33,7 @@ export class MongoClient implements Service {
             this.pipelineJobs = this.db.collection<PipelineJob>("pipelineJobs");
             this.skillMatchers = this.db.collection<SkillMatcher>("skillMatchers");
             this.careerRoadMaps = this.db.collection<CareerRoadMap>("careerRoadMaps");
+            this.jobs = this.db.collection<EnrichedJob>("jobs");
             
             console.log('MongoDb Connection Succeeded');
         } catch (err) {

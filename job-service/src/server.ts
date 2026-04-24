@@ -7,6 +7,7 @@ import { pipelineRouter } from "./routes/MyPipline/pipeline.router";
 import { pipelineJobRouter } from "./routes/jobsInPipeline/pipeline-job.router";
 import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
 import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.router";
+import { startJobPollerSchedule } from "./poller/job-poller/job-poller";
 
 export interface ServerConfig {
     port: number;
@@ -50,7 +51,7 @@ export class Server {
                 port: this.config.port, 
                 host: process.env.HOST || "127.0.0.1" 
             });
-            
+            startJobPollerSchedule(this.DBClient.jobs);
             console.log(`🚀 Server running on ${address}`);
 
         } catch (err) {
