@@ -100,6 +100,8 @@
     padding: 12px 16px;
     border: 1px solid #e2e8f0;
     background-color: #f8fafc;
+    color: #111827;
+    caret-color: #111827;
     border-radius: 24px; /* עיגול יפה יותר */
     font-size: 0.95rem;
     font-family: inherit; /* יורש את הפונט היפה של האתר! */
@@ -114,6 +116,10 @@
     
     transition: all 0.2s ease;
     direction: auto; /* תמיכה בעברית/אנגלית אוטומטית */
+}
+
+.input-area textarea::placeholder {
+    color: #9ca3af;
 }
 
 .input-area textarea:focus {

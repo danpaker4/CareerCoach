@@ -2,37 +2,54 @@ import type { Conversation } from "./conversation.model";
 import type { ConversationResponse, ProfileInput } from "./conversation.types";
 import { ChatExternalService } from "../chat/external-route/chat.external.service";
 import { ConversationRepository } from "./conversation.repository";
-import { formatAchievementsForWelcome, profileToSeedAchievements, toConversationResponse } from "./conversation.utils";
+import { profileToSeedAchievements, toConversationResponse } from "./conversation.utils";
+import { ConversationStageService } from "./conversation.stage.service";
 
 export class ChatConversationService {
-    constructor(private readonly repository: ConversationRepository, private readonly chatExternalService: ChatExternalService) {}
+    constructor(
+        private readonly repository: ConversationRepository,
+        private readonly chatExternalService: ChatExternalService,
+        private readonly stageService: ConversationStageService
+    ) { }
 
     getProfileAchievements = (profile?: ProfileInput): { id: string; name: string; grade: number }[] =>
         profileToSeedAchievements(profile);
 
-    ensureConversation = async (userId: string, profileAchievements?: readonly { id: string; name: string; grade: number }[]): Promise<Conversation> => {
+    ensureConversationExists = async (userId: string, profileAchievements?: readonly { id: string; name: string; grade: number }[]): Promise<void> => {
         const existingConversation = await this.repository.findConversationByUserId(userId);
         
         if (existingConversation) {
             
             if (existingConversation.achievements.length === 0 && profileAchievements && profileAchievements.length > 0) {
                 await this.repository.updateAchievements(userId, [...profileAchievements]);
-                const updatedConversation = await this.repository.findConversationByUserId(userId);
-                
-                return updatedConversation ?? existingConversation;
             }
+            return;
         }
 
         const achievements = profileAchievements && profileAchievements.length > 0
             ? [...profileAchievements]
             : await this.chatExternalService.readUserAchievements(userId);
-        const firstAssistantMessage = `Hi! I already know the following achievements:\n${formatAchievementsForWelcome(achievements)}\n\nIs this accurate, or should I update anything before we continue?`;
+        const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
         
-        return this.repository.createConversation(userId, achievements, firstAssistantMessage);
+        await this.repository.createConversation(
+            userId,
+            achievements,
+            firstAssistantMessage,
+            { currentStageIndex: 0, awaitingConfirmation: false, stageNotes: {}, surfacedAchievementIds: [] }
+        );
+    };
+
+    getConversationOrThrow = async (userId: string): Promise<Conversation> => {
+        const conversation = await this.repository.findConversationByUserId(userId);
+        if (!conversation) {
+            throw new Error(`Conversation ${userId} was expected to exist but was not found`);
+        }
+        return conversation;
     };
 
     getConversationResponse = async (userId: string): Promise<ConversationResponse> => {
-        const conversation = await this.ensureConversation(userId);
+        await this.ensureConversationExists(userId);
+        const conversation = await this.getConversationOrThrow(userId);
         return toConversationResponse(conversation);
     };
 
@@ -50,5 +67,19 @@ export class ChatConversationService {
             content,
             timestamp: new Date(),
         });
+    };
+
+    updateAchievements = async (
+        userId: string,
+        achievements: readonly { id: string; name: string; grade: number }[]
+    ): Promise<void> => {
+        await this.repository.updateAchievements(userId, [...achievements]);
+    };
+
+    updateStageProgress = async (
+        userId: string,
+        stageProgress: Conversation["stageProgress"]
+    ): Promise<void> => {
+        await this.repository.updateStageProgress(userId, stageProgress);
     };
 }

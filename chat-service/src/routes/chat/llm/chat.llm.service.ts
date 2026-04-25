@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Conversation } from "../conversation/conversation.model";
-import type { JobSearchResultItem, LlmDecision } from "../chat.types";
-import { buildDecisionPrompt, buildRecommendationPrompt } from "./chat.prompt.builder";
+import type { ConversationStage } from "../conversation/conversation.stage.consts";
+import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
+import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.builder";
 
 const EMPTY_FILTERS = {
     skills: [],
@@ -37,6 +38,19 @@ const parseDecision = (rawText: string): LlmDecision => {
                 ? ((obj.searchFilters as Record<string, unknown>).keywords as unknown[]).filter((value): value is string => typeof value === "string")
                 : [],
         },
+    };
+};
+
+const parseStageDecision = (rawText: string): StageLlmDecision => {
+    const parsed: unknown = JSON.parse(rawText);
+    if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("LLM returned non-object stage payload");
+    }
+
+    const obj = parsed as Record<string, unknown>;
+    return {
+        reply: typeof obj.reply === "string" ? obj.reply : "Thanks. Tell me a bit more so I can guide you accurately.",
+        shouldAdvanceStage: obj.shouldAdvanceStage === true,
     };
 };
 
@@ -76,6 +90,23 @@ export class ChatLlmService {
                 shouldSearchJobs: false,
                 recommendedJobIds: jobs.map((job) => job.jobId),
                 searchFilters: EMPTY_FILTERS,
+            };
+        }
+    };
+
+    generateStageReply = async (
+        conversation: Conversation,
+        latestUserMessage: string,
+        stage: ConversationStage
+    ): Promise<StageLlmDecision> => {
+        const result = await this.model.generateContent(buildStagePrompt(conversation, latestUserMessage, stage));
+        const rawText = result.response.text();
+        try {
+            return parseStageDecision(rawText);
+        } catch {
+            return {
+                reply: "Got it. Can you share a bit more detail so I can guide you better?",
+                shouldAdvanceStage: false,
             };
         }
     };

@@ -44,3 +44,8 @@ export type LlmDecision = {
 };
 
 export type { ProfileInput } from "./conversation/conversation.types";
+
+export type StageLlmDecision = {
+    reply: string;
+    shouldAdvanceStage: boolean;
+};

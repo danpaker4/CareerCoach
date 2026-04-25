@@ -1,4 +1,5 @@
 import type { Conversation } from "../conversation/conversation.model";
+import type { ConversationStage } from "../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
 
 const buildHistory = (conversation: Conversation): string =>
@@ -71,6 +72,39 @@ Strict rules:
 - Mention jobId in reply when recommending jobs.
 - Never invent salary, company details, or extra requirements.
 - Never disclose internal achievement scores/grades to the user.
+
+User achievements:
+${achievementsText(conversation)}
+
+Conversation so far:
+${buildHistory(conversation)}
+
+Latest user message:
+${latestUserMessage}
+`;
+
+export const buildStagePrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+    stage: ConversationStage
+): string => `
+You are CareerCoach AI.
+You are currently in a guided conversation stage with this objective:
+"${stage.objective}"
+
+Respond ONLY with valid JSON:
+{
+  "reply": "string",
+  "shouldAdvanceStage": boolean
+}
+
+Rules:
+- Speak naturally like a human, not robotic.
+- Do NOT repeat the same sentence every turn.
+- Ask follow-up questions when more detail is needed.
+- Set shouldAdvanceStage=true only when you have enough information for the current objective.
+- Set shouldAdvanceStage=false when you still need details.
+- Never disclose internal achievement scores/grades.
 
 User achievements:
 ${achievementsText(conversation)}
