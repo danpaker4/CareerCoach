@@ -1,7 +1,8 @@
 import type { Collection } from "mongodb";
-import type { ChatMessage, Conversation, UserAchievement } from "./chat.model";
+import type { ChatMessage, UserAchievement } from "../chat/chat.model";
+import type { Conversation } from "./conversation.model";
 
-export class ChatRepository {
+export class ConversationRepository {
     constructor(private readonly conversationsCollection: Collection<Conversation>) {}
 
     findConversationByUserId = async (userId: string): Promise<Conversation | null> =>

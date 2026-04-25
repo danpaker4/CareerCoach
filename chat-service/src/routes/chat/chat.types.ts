@@ -1,24 +1,9 @@
-import type { UserAchievement } from "./chat.model";
-
-export type ConversationResponse = {
-    userId: string;
-    achievements: UserAchievement[];
-    messages: {
-        role: "system" | "user" | "assistant";
-        content: string;
-        timestamp: string;
-    }[];
-};
+import type { ProfileInput } from "./conversation/conversation.types";
 
 export type ChatMessageRequestBody = {
     userId: string;
     message: string;
-    userProfile?: {
-        firstName?: string;
-        lastName?: string;
-        currentJob?: string;
-        achievements?: UserAchievement[];
-    };
+    userProfile?: ProfileInput;
 };
 
 export type ChatMessageResponse = {
@@ -30,6 +15,10 @@ export type UserAchievementResponse = {
     id: string;
     name: string;
     grade: number;
+};
+
+export type UserProfileResponse = {
+    achievements?: UserAchievementResponse[];
 };
 
 export type JobSearchRequest = {
@@ -53,3 +42,5 @@ export type LlmDecision = {
     recommendedJobIds: string[];
     searchFilters: JobSearchRequest;
 };
+
+export type { ProfileInput } from "./conversation/conversation.types";

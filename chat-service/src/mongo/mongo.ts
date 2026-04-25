@@ -1,6 +1,6 @@
 import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClientOptions } from "mongodb";
 import { Service } from "../types/service";
-import type { Conversation } from "../routes/chat/chat.model";
+import type { Conversation } from "../routes/chat/conversation/conversation.model";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
