@@ -34,6 +34,8 @@ Rules:
 - If there are no jobs in context yet, recommendedJobIds must be [].
 - Do not mention salary, company details, or requirements unless explicitly provided in supplied jobs context.
 - Never disclose internal achievement scores/grades to the user.
+- Keep replies concise: maximum 2-3 short lines unless extra detail is truly necessary.
+- Do not ask about remote/hybrid/on-site preferences.
 
 User achievements:
 ${achievementsText(conversation)}
@@ -72,6 +74,8 @@ Strict rules:
 - Mention jobId in reply when recommending jobs.
 - Never invent salary, company details, or extra requirements.
 - Never disclose internal achievement scores/grades to the user.
+- Keep replies concise: maximum 2-3 short lines unless extra detail is truly necessary.
+- Do not ask about remote/hybrid/on-site preferences.
 
 User achievements:
 ${achievementsText(conversation)}
@@ -105,6 +109,8 @@ Rules:
 - Set shouldAdvanceStage=true only when you have enough information for the current objective.
 - Set shouldAdvanceStage=false when you still need details.
 - Never disclose internal achievement scores/grades.
+- Keep replies concise: maximum 2-3 short lines unless extra detail is truly necessary.
+- Do not ask about remote/hybrid/on-site preferences.
 
 User achievements:
 ${achievementsText(conversation)}

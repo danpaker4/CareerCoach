@@ -14,6 +14,6 @@ export const CONVERSATION_STAGES: readonly ConversationStage[] = [
     },
     {
         id: "preferences",
-        objective: "Understand job preferences: role type, domain/industry, and work style constraints.",
+        objective: "Understand job preferences: role type, domain/industry, and relevant career constraints supported by the product.",
     },
 ];

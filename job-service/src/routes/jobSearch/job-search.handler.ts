@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Collection } from "mongodb";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller/stages/enrich/types";
 import type { JobSearchRequest, JobSearchResponseItem } from "./job-search.types";
@@ -18,16 +19,19 @@ const isJobSearchRequest = (body: unknown): body is JobSearchRequest => {
     );
 };
 
-const normalize = (items: readonly string[]): string[] => items.map((item) => item.toLowerCase().trim()).filter(Boolean);
+const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
+const VECTOR_MODEL = "text-embedding-004";
+const SEARCH_LIMIT = 10;
+const NUM_CANDIDATES = 100;
 
-const scoreJob = (job: EnrichedJob, request: JobSearchRequest): number => {
-    const haystack = `${job.jobTitle} ${job.description} ${job.seniority}`.toLowerCase();
-    const signals = [...normalize(request.skills), ...normalize(request.interests), ...normalize(request.keywords)];
-    const signalScore = signals.reduce((total, signal) => total + (haystack.includes(signal) ? 1 : 0), 0);
-    const experienceScore = request.experienceLevel
-        ? (job.seniority.toLowerCase().includes(request.experienceLevel.toLowerCase()) ? 2 : 0)
-        : 0;
-    return signalScore + experienceScore;
+const buildQueryText = (request: JobSearchRequest): string => {
+    const sections = [
+        `Skills: ${request.skills.join(", ")}`,
+        `Interests: ${request.interests.join(", ")}`,
+        `Experience level: ${request.experienceLevel}`,
+        `Keywords: ${request.keywords.join(", ")}`,
+    ];
+    return sections.join("\n");
 };
 
 const toJobSearchResponseItem = (job: EnrichedJob): JobSearchResponseItem => ({
@@ -39,6 +43,11 @@ const toJobSearchResponseItem = (job: EnrichedJob): JobSearchResponseItem => ({
 });
 
 export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
+    const embeddingApiKey = process.env.GEMINI_API_KEY;
+    const embeddingModel = embeddingApiKey
+        ? new GoogleGenerativeAI(embeddingApiKey).getGenerativeModel({ model: VECTOR_MODEL })
+        : null;
+
     const searchJobs = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         const payload: unknown = request.body;
         if (!isJobSearchRequest(payload)) {
@@ -46,17 +55,45 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
             return;
         }
 
-        try {
-            // This endpoint is an application-level ranking example. It can be replaced
-            // by Atlas Vector Search without changing the API contract.
-            const jobs = await jobsCollection.find({}).limit(500).toArray();
-            const rankedJobs = jobs
-                .map((job) => ({ job, score: scoreJob(job, payload) }))
-                .sort((left, right) => right.score - left.score)
-                .slice(0, 10)
-                .map(({ job }) => toJobSearchResponseItem(job));
+        if (!embeddingModel) {
+            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "GEMINI_API_KEY is required for vector job search" });
+            return;
+        }
 
-            reply.status(StatusCodes.OK).send(rankedJobs);
+        try {
+            const queryText = buildQueryText(payload);
+            const embeddingResult = await embeddingModel.embedContent(queryText);
+            const queryVector = embeddingResult.embedding?.values;
+            if (!Array.isArray(queryVector)) {
+                reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Failed generating query embedding" });
+                return;
+            }
+
+            const rankedJobs = await jobsCollection.aggregate([
+                {
+                    $vectorSearch: {
+                        index: VECTOR_INDEX_NAME,
+                        path: "searchEmbedding",
+                        queryVector,
+                        numCandidates: NUM_CANDIDATES,
+                        limit: SEARCH_LIMIT,
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        id: 1,
+                        jobTitle: 1,
+                        url: 1,
+                        seniority: 1,
+                        description: 1,
+                    },
+                },
+            ]).toArray();
+
+            const responsePayload = rankedJobs.map((job) => toJobSearchResponseItem(job as EnrichedJob));
+
+            reply.status(StatusCodes.OK).send(responsePayload);
         } catch (error) {
             request.log.error({ error }, "Job search failed");
             reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Job search failed" });
