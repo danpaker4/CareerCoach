@@ -4,6 +4,7 @@ import multipart from "@fastify/multipart";
 import cookie from "@fastify/cookie";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
 import { MongoClient } from "./mongo/mongo"; 
+import { AUTH_ROUTE_PREFIX } from "./routes/auth/auth.consts";
 import { authRouter } from "./routes/auth/auth.router";
 import { usersRouter } from "./routes/users/users.router";
 import { githubRouter } from "./routes/github/github.router";
@@ -29,7 +30,7 @@ export class Server {
         try {
             console.log("🔄 Starting Server...");
             await this.DBClient.start();
-            console.log(" MongoDB Connected");
+            console.log("MongoDB Connected");
 
             await this.app.register(cors, {
                 origin: true,
@@ -45,13 +46,15 @@ export class Server {
                 },
             });
 
-            await this.app.register(authRouter(this.DBClient.users));
+            await this.app.register(authRouter(this.DBClient.users), {
+                prefix: AUTH_ROUTE_PREFIX,
+            });
             await this.app.register(usersRouter(this.DBClient.users));
             await this.app.register(githubRouter());
 
             const address = await this.app.listen({ 
                 port: this.config.port, 
-                host: process.env.HOST || "127.0.0.1" 
+                host: this.config.host,
             });
             
             console.log(`🚀 Server running on ${address}`);

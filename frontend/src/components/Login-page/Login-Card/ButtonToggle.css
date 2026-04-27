@@ -1,30 +1,33 @@
 .button-toggle {
   display: flex;
   gap: 0;
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   overflow: hidden;
-  background-color: #f3f4f6;
+  background-color: var(--clr-slate-100);
+  padding: 4px;
+  margin-bottom: 24px;
 }
 
 .toggle-button {
   flex: 1;
-  padding: 0.75rem 1.5rem;
+  padding: 9px 16px;
   border: none;
   background-color: transparent;
-  color: #6b7280;
-  font-size: 1rem;
-  font-weight: 500;
+  color: var(--clr-slate-500);
+  font-size: var(--fz-sm);
+  font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
+  border-radius: var(--r-md);
+  transition: all var(--t-fast);
 }
 
 .toggle-button.active {
-  background-color: #2563eb;
-  color: white;
+  background-color: white;
+  color: var(--clr-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .toggle-button:hover:not(.active) {
-  background-color: #e5e7eb;
-  color: #374151;
+  color: var(--clr-slate-700);
 }
-

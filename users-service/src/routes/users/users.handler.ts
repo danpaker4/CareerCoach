@@ -1,16 +1,12 @@
+import { randomUUID } from "crypto";
 import { FastifyReply } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { SchematicRequest } from "../../types/fastify";
 import type { User } from "./user.model";
 import { createUserSchema, getUserSchema, updateUserSchema } from "./users.schema";
-import { v4 as uuidv4 } from "uuid";
-
-type UsersHandlerType = {
-    getUserHandler: (request: SchematicRequest<typeof getUserSchema>, reply: FastifyReply) => Promise<void>;
-    createUserHandler: (request: SchematicRequest<typeof createUserSchema>, reply: FastifyReply) => Promise<void>;
-    updateUserHandler: (request: SchematicRequest<typeof updateUserSchema>, reply: FastifyReply) => Promise<void>;
-};
+import type { UsersHandlerType } from "./users.types";
+import { serializeRouteError } from "./users.utils";
 
 export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerType => {
     return {
@@ -27,7 +23,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
 
                 reply.code(StatusCodes.OK).send(user);
             } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }
         },
 
@@ -36,7 +32,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                 const userData = request.body;
 
                 const newUser: User = {
-                    id: uuidv4(),
+                    id: randomUUID(),
                     ...userData,
                     achievements: userData.achievements ?? [],
                 };
@@ -44,7 +40,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                 await usersCollection.insertOne(newUser);
                 reply.code(StatusCodes.CREATED).send(newUser);
             } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }
         },
 
@@ -62,7 +58,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                 );
                 reply.code(StatusCodes.OK).send({ message: `User ${userId} updated`, status: "OK" });
             } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }
         },
     };

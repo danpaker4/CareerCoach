@@ -1,13 +1,17 @@
 import { Server } from "./server";
 import dotenv from 'dotenv';
+import { ServerEnvSchema } from "./server.types";
 
 dotenv.config();
 
+const env = ServerEnvSchema.parse(process.env);
+
 const server = new Server({
-  port: parseInt(process.env.PORT || "3001", 10),
+  port: env.PORT,
+  host: env.HOST,
   mongoConfig: {
-    mongoConnectionString: process.env.MONGO_CONNECTION_STRING || "mongodb://127.0.0.1:27017/careerCoachDB",
-    mongoKeyPath: process.env.MONGO_KEY_PATH,
+    mongoConnectionString: env.MONGO_CONNECTION_STRING,
+    mongoKeyPath: env.MONGO_KEY_PATH,
   },
 });
 

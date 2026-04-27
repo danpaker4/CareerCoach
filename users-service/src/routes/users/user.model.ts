@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 export const UserSchema = z.object({
-    id: z.string().uuid(),
+    id: z.uuid(),
     firstName: z.string(),
     lastName: z.string(),
-    email: z.string().email(),
+    email: z.email(),
     password: z.string(),
     birthDate: z.date(),
     achievements: z.array(z.object({
-        id: z.string().uuid(),
+        id: z.uuid(),
         name: z.string(),
         grade: z.number().min(1).max(100),
     })).default([]),

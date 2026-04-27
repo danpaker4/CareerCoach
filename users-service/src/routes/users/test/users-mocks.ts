@@ -1,8 +1,8 @@
+import { randomUUID } from "crypto";
 import type { User } from "../user.model";
-import { v4 as uuidv4 } from "uuid";
 
 export const mockUser: User = {
-    id: uuidv4(),
+    id: randomUUID(),
     firstName: "John",
     lastName: "Doe",
     email: "john.doe@example.com",
@@ -31,6 +31,7 @@ export const mockUserWithoutJob = {
 
 export const testServerConfig = {
     port: 0,
+    host: "127.0.0.1",
     mongoConfig: {
         mongoConnectionString: "mongodb://localhost:27017",
         mongoKeyPath: undefined,

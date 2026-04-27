@@ -1,18 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { Header } from './components/header/Header';
 import { Home } from './components/home-page/Home';
 import { LoginPage } from './components/Login-page/Login-page';
 import { CareerRoadmap } from './components/career-roadmap/CareerRoadmap';
-import { apiFetch } from './lib/apiClient';
+import { SkillMatcher } from './components/skill-matcher/SkillMatcher';
+import { Pipeline } from './components/pipeline/Pipeline';
+import { Profile } from './components/profile/Profile';
+import { Dashboard } from './components/dashboard/Dashboard';
+import { MySkills } from './components/my-skills/MySkills';
+import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
+import { GithubCallback } from './components/github-callback/GithubCallback';
+import { NotFound } from './components/not-found/NotFound';
+import { PageTransition } from './components/page-transition/PageTransition';
+import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
-import { hasErrorCode, readUserResponse } from './App.utils';
 import { isUser } from './lib/authResponse';
+import { clearStoredAccessToken } from './lib/authSession';
 
-const AUTH_ME_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/me`;
-const AUTH_REFRESH_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/refresh`;
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
 const AUTH_USER_STORAGE_KEY = 'career_coach_current_user';
 
@@ -35,6 +42,23 @@ const persistUser = (user: User | null): void => {
   window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
 };
 
+interface ProtectedRouteProps {
+  user: User | null | undefined;
+  children: ReactNode;
+}
+
+const ProtectedRoute = ({ user, children }: ProtectedRouteProps) => {
+  if (user === undefined) return null;
+  if (user === null) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const AppLoader = () => (
+  <div className="app-loader">
+    <div className="spinner" />
+  </div>
+);
+
 export const App = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -48,39 +72,24 @@ export const App = () => {
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ')
     : undefined;
 
-  useEffect(() => {
-    const fetchCurrentUser = () => fetch(AUTH_ME_PATH, { credentials: 'include' });
+  const bootstrapRan = useRef(false);
 
-    const refreshAccessToken = () => fetch(AUTH_REFRESH_PATH, {
-      method: 'POST',
-      credentials: 'include',
-    });
+  useEffect(() => {
+    if (bootstrapRan.current) {
+      return;
+    }
+    bootstrapRan.current = true;
 
     const loadCurrentUser = async () => {
-      const response = await fetchCurrentUser();
-      if (response.ok) {
-        const user = await readUserResponse(response);
-        setCurrentUser(user);
-        persistUser(user);
-        return;
-      }
+      const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
 
-      const payload: unknown = await response.json().catch(() => null);
-      if (!hasErrorCode(payload, 'ACCESS_TOKEN_EXPIRED')) {
+      const user = await refreshAccessToken();
+      if (!user || isAuthPage) {
         setCurrentUser(null);
         persistUser(null);
         return;
       }
 
-      const refreshResponse = await refreshAccessToken();
-      if (!refreshResponse.ok) {
-        setCurrentUser(null);
-        persistUser(null);
-        return;
-      }
-
-      const retryResponse = await fetchCurrentUser();
-      const user = retryResponse.ok ? await readUserResponse(retryResponse) : null;
       setCurrentUser(user);
       persistUser(user);
     };
@@ -98,34 +107,106 @@ export const App = () => {
 
   const handleLogout = async () => {
     await apiFetch(AUTH_LOGOUT_PATH, { method: 'POST' });
+    clearStoredAccessToken();
     setCurrentUser(null);
     persistUser(null);
     window.location.assign('/login');
   };
 
+  if (currentUser === undefined) {
+    return <AppLoader />;
+  }
+
   return (
     <Router>
       <div className="App">
+        <Header userName={userDisplayName} onLogout={handleLogout} />
 
-        <Header userName={userDisplayName} onLogout={handleLogout} /> 
-        
-        <Routes>
-          <Route path="/" element={<Home />} />
+        <PageTransition>
+          <Routes>
+            <Route path="/" element={<Home />} />
 
-          <Route 
-            path="/login" 
-            element={
-              currentUser ? <Navigate to="/roadmap" /> : <LoginPage onLoginSuccess={handleLoginSuccess} />
-            } 
-          />
-          
-          <Route 
-            path="/roadmap" 
-            element={<CareerRoadmap user={currentUser || undefined} />} 
-          />
-          
-          <Route path="/signup" element={<Navigate to="/login" />} />
-        </Routes>
+            <Route
+              path="/login"
+              element={
+                currentUser ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />
+              }
+            />
+
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  {currentUser ? <Dashboard user={currentUser} /> : null}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/roadmap"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  <CareerRoadmap user={currentUser ?? undefined} />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/skill-matcher"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  <SkillMatcher user={currentUser ?? undefined} />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/pipeline"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  <Pipeline user={currentUser ?? undefined} />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  {currentUser
+                    ? <Profile user={currentUser} onUserUpdated={(u) => setCurrentUser(u)} />
+                    : null}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/my-skills"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  {currentUser ? <MySkills user={currentUser} /> : null}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/job-suggestions"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  {currentUser ? <JobSuggestions user={currentUser} /> : null}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/auth/github/callback"
+              element={<GithubCallback onLoginSuccess={handleLoginSuccess} />}
+            />
+
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </PageTransition>
       </div>
     </Router>
   );

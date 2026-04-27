@@ -9,6 +9,7 @@ import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
 import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.router";
 import { jobSearchRouter } from "./routes/jobSearch/job-search.router";
 import { startJobPollerSchedule } from "./poller/job-poller";
+import { jobsRouter } from "./routes/jobs/jobs.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -34,6 +35,8 @@ export class Server {
             console.log(" MongoDB Connected");
 
             await this.app.register(cors, {
+                origin: true,
+                credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
@@ -43,6 +46,7 @@ export class Server {
             await this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
             await this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
+            await this.app.register(jobsRouter(this.DBClient.jobs, this.DBClient.skillMatchers));
 
             const address = await this.app.listen({ 
                 port: this.config.port, 
