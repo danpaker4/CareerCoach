@@ -25,10 +25,6 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setError('');
-        if (!cvFile) {
-            setError('CV PDF file is required');
-            return;
-        }
 
         try {
             const formData = new FormData();
@@ -40,7 +36,9 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
             formData.append('currentJob', currentJob);
             formData.append('linkedInUrl', linkedInUrl);
             formData.append('githubUrl', githubUrl);
-            formData.append('cv', cvFile);
+            if (cvFile) {
+                formData.append('cv', cvFile);
+            }
 
             const response = await apiFetch(`${ENV.USERS_SERVICE_BASE_URL}/api/auth/register`, {
                 method: 'POST',
@@ -99,12 +97,11 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
             </div>
 
             <div className="input-group">
-                <label>CV (PDF)</label>
+                <label>CV (PDF, optional)</label>
                 <input
                     type="file"
                     accept="application/pdf"
                     onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
-                    required
                 />
                 {cvFile && <p className="selected-file">Selected: {cvFile.name}</p>}
             </div>
