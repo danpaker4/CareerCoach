@@ -32,6 +32,11 @@ type EmbeddingFetchError = {
     statusText?: string;
 };
 
+type MongoSearchError = {
+    code?: number;
+    codeName?: string;
+};
+
 const sleep = async (ms: number): Promise<void> => {
     await new Promise((resolve) => setTimeout(resolve, ms));
 };
@@ -53,6 +58,19 @@ const toJobSearchResponseItem = (job: EnrichedJob): JobSearchResponseItem => ({
     seniority: job.seniority,
     description: job.description,
 });
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildTitleCandidates = (request: JobSearchRequest): string[] => {
+    const roleLikePhrases = [
+        ...request.keywords,
+        ...request.interests,
+        request.keywords.join(" "),
+        request.interests.join(" "),
+    ].map((value) => value.trim()).filter((value) => value.length > 0);
+
+    return roleLikePhrases.filter((value, index, arr) => arr.indexOf(value) === index);
+};
 
 export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
     const embeddingApiKey = process.env.GEMINI_API_KEY;
@@ -90,6 +108,37 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
         return null;
     };
 
+    const searchByJobTitleFallback = async (requestBody: JobSearchRequest): Promise<JobSearchResponseItem[]> => {
+        const titleCandidates = buildTitleCandidates(requestBody);
+        if (titleCandidates.length === 0) {
+            return [];
+        }
+
+        const exactTitleOr = titleCandidates.map((title) => ({
+            jobTitle: { $regex: `^${escapeRegex(title)}$`, $options: "i" },
+        }));
+        const exactMatches = await jobsCollection.find(
+            { $or: exactTitleOr },
+            { projection: { _id: 0, id: 1, jobTitle: 1, url: 1, seniority: 1, description: 1 } }
+        ).limit(SEARCH_LIMIT).toArray();
+        if (exactMatches.length >= SEARCH_LIMIT) {
+            return exactMatches.map((job) => toJobSearchResponseItem(job as EnrichedJob));
+        }
+
+        const partialTitleOr = titleCandidates.map((title) => ({
+            jobTitle: { $regex: escapeRegex(title), $options: "i" },
+        }));
+        const partialMatches = await jobsCollection.find(
+            { $or: partialTitleOr },
+            { projection: { _id: 0, id: 1, jobTitle: 1, url: 1, seniority: 1, description: 1 } }
+        ).limit(SEARCH_LIMIT).toArray();
+        const mergedMatches = [...exactMatches, ...partialMatches].filter(
+            (job, index, jobs) => jobs.findIndex((candidate) => candidate.id === job.id) === index
+        ).slice(0, SEARCH_LIMIT);
+
+        return mergedMatches.map((job) => toJobSearchResponseItem(job as EnrichedJob));
+    };
+
     const searchJobs = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         const payload: unknown = request.body;
         if (!isJobSearchRequest(payload)) {
@@ -99,10 +148,10 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
 
         try {
             const queryText = buildQueryText(payload);
-            console.log("queryText", queryText);
             const queryVector = embeddingClient ? await generateQueryVector(queryText) : null;
             if (!queryVector) {
-                reply.status(StatusCodes.OK).send([]);
+                const fallbackResults = await searchByJobTitleFallback(payload);
+                reply.status(StatusCodes.OK).send(fallbackResults);
                 return;
             }
 
@@ -133,7 +182,15 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
         } catch (error) {
             const embeddingError = error as EmbeddingFetchError;
             if (embeddingError.status === 429) {
-                reply.status(StatusCodes.TOO_MANY_REQUESTS).send({ error: "Embedding provider rate limited; retry shortly" });
+                const fallbackResults = await searchByJobTitleFallback(payload);
+                reply.status(StatusCodes.OK).send(fallbackResults);
+                return;
+            }
+            const mongoError = error as MongoSearchError;
+            const isSearchNotEnabled = mongoError.code === 31082 || mongoError.codeName === "SearchNotEnabled";
+            if (isSearchNotEnabled) {
+                const fallbackResults = await searchByJobTitleFallback(payload);
+                reply.status(StatusCodes.OK).send(fallbackResults);
                 return;
             }
             request.log.error({ error }, "Job search failed");
