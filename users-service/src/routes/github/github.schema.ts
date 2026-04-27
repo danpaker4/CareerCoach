@@ -1,19 +1,23 @@
 import { FastifySchema } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import z from "zod";
+import { UserSchema } from "../users/user.model";
 
-export const authorizationHeaderOptionalSchema = z.string()
-    .transform((v) => v.trim())
-    .transform((v) => (/^bearer\s+/i.test(v) ? v : `Bearer ${v}`))
-    .optional();
-
-export const getAccessTokenGitSchema = {
-    headers: z.object({
-        authorization: authorizationHeaderOptionalSchema,
+export const githubCallbackSchema = {
+    querystring: z.object({
+        code: z.string(),
+        redirectUri: z.string().url(),
     }),
     response: {
-        [StatusCodes.OK]: "OK",
-        [StatusCodes.NOT_FOUND]: z.object({
+        [StatusCodes.OK]: z.object({
+            success: z.boolean(),
+            user: UserSchema,
+            accessToken: z.string(),
+        }),
+        [StatusCodes.BAD_REQUEST]: z.object({
+            error: z.string(),
+        }),
+        [StatusCodes.INTERNAL_SERVER_ERROR]: z.object({
             error: z.string(),
         }),
     },

@@ -50,7 +50,9 @@ export class Server {
                 prefix: AUTH_ROUTE_PREFIX,
             });
             await this.app.register(usersRouter(this.DBClient.users));
-            await this.app.register(githubRouter());
+            await this.app.register(githubRouter(this.DBClient.users), {
+                prefix: AUTH_ROUTE_PREFIX,
+            });
 
             const address = await this.app.listen({ 
                 port: this.config.port, 
