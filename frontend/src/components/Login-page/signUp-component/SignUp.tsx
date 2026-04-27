@@ -4,6 +4,7 @@ import type { User } from '../../../types/user';
 import { ENV } from '../../../config';
 import { apiFetch } from '../../../lib/apiClient';
 import { readAuthResponse } from '../../../lib/authResponse';
+import { setStoredAccessToken } from '../../../lib/authSession';
 
 interface SignUpProps {
     onLoginSuccess: (user: User) => void;
@@ -48,7 +49,8 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
 
             const data = await readAuthResponse(response);
 
-            if (response.ok && data.success && data.user) {
+            if (response.ok && data.success && data.user && data.accessToken) {
+                setStoredAccessToken(data.accessToken);
                 onLoginSuccess(data.user);
             } else {
                 setError(data.error || 'Registration failed');

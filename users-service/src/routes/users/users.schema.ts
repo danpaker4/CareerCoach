@@ -25,7 +25,7 @@ export const createUserSchema = {
     body: z.object({
         firstName: z.string(),
         lastName: z.string(),
-        email: z.string().email(),
+        email: z.email(),
         password: z.string(),
         birthDate: z.coerce.date(),
         currentJob: z.string().optional(),
@@ -33,7 +33,7 @@ export const createUserSchema = {
         githubUrl: z.string().optional(),
         cv: z.string().optional(),
         achievements: z.array(z.object({
-            id: z.string().uuid(),
+            id: z.uuid(),
             name: z.string(),
             grade: z.number().min(1).max(100),
         })).default([]),
@@ -56,7 +56,7 @@ export const updateUserSchema = {
     body: z.object({
         firstName: z.string().optional(),
         lastName: z.string().optional(),
-        email: z.string().email().optional(),
+        email: z.email().optional(),
         password: z.string().optional(),
         birthDate: z.coerce.date().optional(),
         currentJob: z.string().optional(),
@@ -64,7 +64,7 @@ export const updateUserSchema = {
         githubUrl: z.string().optional(),
         cv: z.string().optional(),
         achievements: z.array(z.object({
-            id: z.string().uuid(),
+            id: z.uuid(),
             name: z.string(),
             grade: z.number().min(1).max(100),
         })).optional(),

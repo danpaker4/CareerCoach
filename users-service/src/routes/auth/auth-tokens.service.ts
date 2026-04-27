@@ -1,59 +1,38 @@
-import type { FastifyReply } from "fastify";
 import jwt from "jsonwebtoken";
-import type { AuthTokenPayload, AuthTokens } from "./auth.types";
+import type { AuthTokenPayload, AuthTokenSubject } from "./auth.types";
 import {
-  ACCESS_TOKEN_COOKIE,
-  ACCESS_TOKEN_EXPIRES_IN_SECONDS,
-  getJwtSecret,
+  getAccessTokenExpiresInSeconds,
   isAuthTokenPayload,
-  REFRESH_TOKEN_COOKIE,
-  REFRESH_TOKEN_EXPIRES_IN_SECONDS,
+  getRefreshTokenExpiresInSeconds,
+  getAccessJwtSecret,
+  getRefreshJwtSecret,
 } from "./auth.utils";
 
-export const generateAccessToken = (payload: AuthTokenPayload): string =>
-  jwt.sign(payload, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRES_IN_SECONDS });
+export const generateAccessToken = (payload: AuthTokenSubject): string =>
+  jwt.sign({ ...payload, tokenType: "access" }, getAccessJwtSecret(), {
+    expiresIn: getAccessTokenExpiresInSeconds(),
+  });
 
-export const generateRefreshToken = (payload: AuthTokenPayload): string =>
-  jwt.sign(payload, getJwtSecret(), { expiresIn: REFRESH_TOKEN_EXPIRES_IN_SECONDS });
+export const generateRefreshToken = (payload: AuthTokenSubject): string =>
+  jwt.sign({ ...payload, tokenType: "refresh" }, getRefreshJwtSecret(), {
+    expiresIn: getRefreshTokenExpiresInSeconds(),
+  });
 
-export const verifyToken = (token: string): AuthTokenPayload => {
-  const payload = jwt.verify(token, getJwtSecret());
+const verifyTypedToken = (token: string, tokenType: AuthTokenPayload["tokenType"], secret: string): AuthTokenPayload => {
+  const payload = jwt.verify(token, secret);
   if (!isAuthTokenPayload(payload)) {
     throw new Error("Invalid token payload");
   }
+
+  if (payload.tokenType !== tokenType) {
+    throw new Error(`Invalid ${tokenType} token`);
+  }
+
   return payload;
 };
 
-const cookieBaseOptions = () => ({
-  httpOnly: true as const,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
-  path: "/",
-});
+export const verifyAccessToken = (token: string): AuthTokenPayload =>
+  verifyTypedToken(token, "access", getAccessJwtSecret());
 
-export const setAccessTokenCookie = (reply: FastifyReply, accessToken: string): void => {
-  reply.setCookie(ACCESS_TOKEN_COOKIE, accessToken, {
-    ...cookieBaseOptions(),
-    maxAge: ACCESS_TOKEN_EXPIRES_IN_SECONDS,
-  });
-};
-
-export const setRefreshTokenCookie = (reply: FastifyReply, refreshToken: string): void => {
-  reply.setCookie(REFRESH_TOKEN_COOKIE, refreshToken, {
-    ...cookieBaseOptions(),
-    maxAge: REFRESH_TOKEN_EXPIRES_IN_SECONDS,
-  });
-};
-
-export const setAuthCookies = (
-  reply: FastifyReply,
-  tokens: AuthTokens,
-): void => {
-  setAccessTokenCookie(reply, tokens.accessToken);
-  setRefreshTokenCookie(reply, tokens.refreshToken);
-};
-
-export const clearAuthCookies = (reply: FastifyReply): void => {
-  reply.clearCookie(ACCESS_TOKEN_COOKIE, { path: "/" });
-  reply.clearCookie(REFRESH_TOKEN_COOKIE, { path: "/" });
-};
+export const verifyRefreshToken = (token: string): AuthTokenPayload =>
+  verifyTypedToken(token, "refresh", getRefreshJwtSecret());

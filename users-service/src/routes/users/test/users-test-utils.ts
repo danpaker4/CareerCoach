@@ -1,15 +1,22 @@
 import type { Collection } from "mongodb";
 import { generateAccessToken } from "../../auth/auth-tokens.service";
-import { ACCESS_TOKEN_COOKIE } from "../../auth/auth.utils";
+import { getAccessTokenCookie } from "../../auth/auth.utils";
 import type { User } from "../user.model";
 
-const TEST_JWT_SECRET = "test-secret";
+const TEST_JWT_ACCESS_SECRET = "test-access-secret";
+const TEST_JWT_REFRESH_SECRET = "test-refresh-secret";
 
 export const authHeadersForUser = (user: Pick<User, "id" | "email">): Record<string, string> => {
-    process.env.JWT_SECRET = process.env.JWT_SECRET || TEST_JWT_SECRET;
+    process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || TEST_JWT_ACCESS_SECRET;
+    process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || TEST_JWT_REFRESH_SECRET;
+    process.env.ACCESS_TOKEN_COOKIE = process.env.ACCESS_TOKEN_COOKIE || "accessToken";
+    process.env.REFRESH_TOKEN_COOKIE = process.env.REFRESH_TOKEN_COOKIE || "refreshToken";
+    process.env.JWT_ACCESS_EXPIRES_IN_SECONDS = process.env.JWT_ACCESS_EXPIRES_IN_SECONDS || "60";
+    process.env.JWT_REFRESH_EXPIRES_IN_SECONDS = process.env.JWT_REFRESH_EXPIRES_IN_SECONDS || "604800";
     const accessToken = generateAccessToken({ userId: user.id, email: user.email });
     return {
-        cookie: `${ACCESS_TOKEN_COOKIE}=${accessToken}`,
+        authorization: `Bearer ${accessToken}`,
+        cookie: `${getAccessTokenCookie()}=${accessToken}`,
     };
 };
 

@@ -1,15 +1,15 @@
+import { randomUUID } from "crypto";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockUser, testServerConfig } from "./users-mocks";
-import { v4 as uuidv4 } from "uuid";
 import { authHeadersForUser, dropLegacyUsernameIndex } from "./users-test-utils";
 
 describe("Users Router - PATCH /users/:userId", () => {
     const config: ServerConfig = testServerConfig;
     const server = new Server(config);
     const testUserId = mockUser.id;
-    const newUserId = uuidv4();
+    const newUserId = randomUUID();
 
     beforeAll(async () => {
         await server.start();

@@ -8,10 +8,10 @@ import { CareerRoadmap } from './components/career-roadmap/CareerRoadmap';
 import { apiFetch } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
-import { hasErrorCode, readUserResponse } from './App.utils';
+import { readUserResponse } from './App.utils';
+import { clearStoredAccessToken, getStoredAccessToken } from './lib/authSession';
 
 const AUTH_ME_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/me`;
-const AUTH_REFRESH_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/refresh`;
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
 
 export const App = () => {
@@ -21,34 +21,15 @@ export const App = () => {
     : undefined;
 
   useEffect(() => {
-    const fetchCurrentUser = () => fetch(AUTH_ME_PATH, { credentials: 'include' });
-
-    const refreshAccessToken = () => fetch(AUTH_REFRESH_PATH, {
-      method: 'POST',
-      credentials: 'include',
-    });
-
     const loadCurrentUser = async () => {
-      const response = await fetchCurrentUser();
-      if (response.ok) {
-        setCurrentUser(await readUserResponse(response));
-        return;
-      }
-
-      const payload: unknown = await response.json().catch(() => null);
-      if (!hasErrorCode(payload, 'ACCESS_TOKEN_EXPIRED')) {
+      const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
+      if (isAuthPage && !getStoredAccessToken()) {
         setCurrentUser(null);
         return;
       }
 
-      const refreshResponse = await refreshAccessToken();
-      if (!refreshResponse.ok) {
-        setCurrentUser(null);
-        return;
-      }
-
-      const retryResponse = await fetchCurrentUser();
-      setCurrentUser(retryResponse.ok ? await readUserResponse(retryResponse) : null);
+      const response = await apiFetch(AUTH_ME_PATH);
+      setCurrentUser(response.ok ? await readUserResponse(response) : null);
     };
 
     loadCurrentUser().catch(() => setCurrentUser(null));
@@ -60,6 +41,7 @@ export const App = () => {
 
   const handleLogout = async () => {
     await apiFetch(AUTH_LOGOUT_PATH, { method: 'POST' });
+    clearStoredAccessToken();
     setCurrentUser(null);
     window.location.assign('/login');
   };

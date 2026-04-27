@@ -2,11 +2,8 @@ import { FastifyReply } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import { SchematicRequest } from "../../types/fastify";
 import { getAccessTokenGitSchema } from "./github.schema";
-
-type GithubHandlerType = {
-    getAccessTokenGit: (request: SchematicRequest<typeof getAccessTokenGitSchema>, reply: FastifyReply) => Promise<void>;
-    getUserData: (request: SchematicRequest<typeof getAccessTokenGitSchema>, reply: FastifyReply) => Promise<void>;
-};
+import type { GithubHandlerType } from "./github.types";
+import { serializeRouteError } from "./github.utils";
 
 export const GithubHandler = (): GithubHandlerType => {
     return {
@@ -14,7 +11,7 @@ export const GithubHandler = (): GithubHandlerType => {
             try {
                 reply.code(StatusCodes.OK).send("OK");
             } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }
         },
 
@@ -42,7 +39,7 @@ export const GithubHandler = (): GithubHandlerType => {
 
                 reply.code(StatusCodes.OK).send(data);
             } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }
         },
     };

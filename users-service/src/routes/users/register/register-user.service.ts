@@ -1,5 +1,5 @@
+import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
 import type { Collection } from "mongodb";
 import type { User } from "../user.model";
 import { extractTextFromCv } from "../../cv/cv-parser.service";
@@ -30,7 +30,7 @@ export const registerUser = async (
   const cvBuffer = await cvFile.toBuffer();
   validateCvBuffer(cvBuffer);
 
-  const userId = uuidv4();
+  const userId = randomUUID();
   const cvS3Path = await uploadCvToS3(userId, cvBuffer);
   const cvText = await extractTextFromCv(cvBuffer);
   const achievementsFromGemini = await extractAchievementsWithGemini({
@@ -53,7 +53,7 @@ export const registerUser = async (
     githubUrl: githubUrl || undefined,
     cv: cvS3Path,
     achievements: achievementsFromGemini.map((achievement) => ({
-      id: uuidv4(),
+      id: randomUUID(),
       name: achievement.name,
       grade: achievement.grade,
     })),

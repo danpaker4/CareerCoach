@@ -3,6 +3,7 @@ import type { User } from '../types/user';
 export interface AuthResponse {
   success?: boolean;
   user?: User;
+  accessToken?: string;
   error?: string;
 }
 
@@ -29,6 +30,7 @@ export const readAuthResponse = async (response: Response): Promise<AuthResponse
   return {
     success: 'success' in payload && payload.success === true,
     user: 'user' in payload && isUser(payload.user) ? payload.user : undefined,
+    accessToken: 'accessToken' in payload && typeof payload.accessToken === 'string' ? payload.accessToken : undefined,
     error: 'error' in payload && typeof payload.error === 'string' ? payload.error : undefined,
   };
 };

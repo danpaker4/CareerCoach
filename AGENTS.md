@@ -14,6 +14,7 @@
 
 ## TypeScript Rules
 - Always use strict TypeScript-compatible code.
+- Never use deprecated APIs, functions, methods, types, or overloads when a supported replacement exists.
 - Never use `any` unless explicitly requested.
 - Prefer `unknown` over `any` when the type is not yet known.
 - Avoid unsafe type assertions. Narrow types properly when possible.
@@ -176,10 +177,14 @@
 
 # API and Data Handling
 - Validate external data at boundaries.
+- Put environment variables in `.env` and document them in `.env.example`.
+- Always validate environment variables with Zod before use.
+- Environment variables should be required by default; only make them optional when there is a clear, intentional reason.
 - Never trust API responses blindly.
 - Normalize data only when it improves code clarity or consistency.
 - Handle loading, empty, error, and success states explicitly.
 - Avoid silent failures.
+- When returning `INTERNAL_SERVER_ERROR` from a route handler, include the caught error details in the response payload.
 
 ---
 
@@ -188,7 +193,12 @@
 - Do not create new folders or abstractions without a clear reason.
 - Name files consistently with the framework conventions already used in the repo.
 - Keep utility functions out of components when they are reusable or non-UI-specific.
+- Put feature-specific utility/helper functions in a sibling `*.utils.ts` file next to the feature that uses them.
+- Put feature-specific constants in a sibling `*.consts.ts` file next to the file that uses them.
 - Put feature-specific types in a sibling `*.types.ts` file next to the file that uses them.
+- This also applies to implementation-local type aliases and interfaces in handlers, routers, services, hooks, and components when they describe reusable or named contracts for that feature.
+- This also applies to implementation-local helper functions in handlers, routers, services, hooks, and components when they are not the file's primary exported behavior.
+- Do not leave exported shared constants or exported shared types inside implementation files when a sibling `*.consts.ts` or `*.types.ts` file is appropriate.
 - Name sibling type files after the feature or module, for example `chat.router.ts` should use `chat.types.ts`.
 
 ---
