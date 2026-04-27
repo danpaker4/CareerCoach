@@ -30,6 +30,18 @@ export const deleteDreamJobSchema = {
     }),
 } satisfies FastifySchema;
 
+// Added: schema for creating a new career roadmap (POST /career-roadmap)
+export const createCareerRoadMapSchema = {
+    response: {
+        [StatusCodes.CREATED]: CareerRoadMapSchema,
+    },
+    body: z.object({
+        userId: z.string().uuid("userId must be a valid UUID"),
+        dreamJob: z.string().min(1, "dreamJob cannot be empty"),
+        stagesToDreamJob: z.array(StageToDreamJobSchema),
+    }),
+} satisfies FastifySchema;
+
 export const editStagesSchema = {
     response: {
         [StatusCodes.OK]: CareerRoadMapSchema,

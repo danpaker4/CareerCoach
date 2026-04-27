@@ -1,0 +1,336 @@
+.myskills-page {
+  background: var(--clr-slate-50);
+  min-height: calc(100vh - 64px);
+  padding-bottom: 60px;
+}
+
+.myskills-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 36px 24px;
+}
+
+/* Header */
+.myskills-header {
+  margin-bottom: 32px;
+}
+
+.myskills-title {
+  font-size: var(--fz-3xl);
+  font-weight: 800;
+  color: var(--clr-slate-900);
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+
+.myskills-subtitle {
+  color: var(--clr-slate-500);
+  font-size: var(--fz-sm);
+}
+
+/* Stats row */
+.myskills-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.myskills-stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--clr-slate-200);
+}
+
+.myskills-stat-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.myskills-stat-icon-wrap--blue   { background: var(--clr-primary-100); }
+.myskills-stat-icon-wrap--green  { background: var(--clr-success-bg); }
+.myskills-stat-icon-wrap--yellow { background: var(--clr-warning-bg); }
+.myskills-stat-icon-wrap--purple { background: var(--clr-purple-bg); }
+
+.myskills-stat-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.myskills-stat-icon--blue   { filter: invert(32%) sepia(96%) saturate(1250%) hue-rotate(210deg) brightness(90%); }
+.myskills-stat-icon--green  { filter: invert(37%) sepia(76%) saturate(500%) hue-rotate(100deg) brightness(85%); }
+.myskills-stat-icon--yellow { filter: invert(55%) sepia(80%) saturate(700%) hue-rotate(15deg) brightness(90%); }
+.myskills-stat-icon--purple { filter: invert(33%) sepia(80%) saturate(700%) hue-rotate(260deg) brightness(90%); }
+
+.myskills-stat-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.myskills-stat-label {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-500);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.myskills-stat-value {
+  font-size: var(--fz-2xl);
+  font-weight: 800;
+  color: var(--clr-slate-900);
+  line-height: 1.2;
+}
+
+/* Section */
+.myskills-section {
+  margin-bottom: 36px;
+}
+
+.myskills-section-title {
+  font-size: var(--fz-xl);
+  font-weight: 700;
+  color: var(--clr-slate-900);
+  margin-bottom: 16px;
+}
+
+/* Achievements grid */
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.achievement-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.achievement-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.achievement-name {
+  font-size: var(--fz-sm);
+  font-weight: 600;
+  color: var(--clr-slate-800);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.achievement-grade-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-500);
+}
+
+.achievement-grade-pct {
+  font-weight: 700;
+  color: var(--clr-slate-700);
+}
+
+.achievement-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: var(--clr-slate-200);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+
+.achievement-bar-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  transition: width 0.6s ease;
+}
+
+.achievement-bar-fill--badge-green  { background: var(--clr-success); }
+.achievement-bar-fill--badge-yellow { background: var(--clr-warning); }
+.achievement-bar-fill--badge-red    { background: var(--clr-error); }
+
+/* Skill sets */
+.skillsets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.skillset-card {
+  /* extends surface-card */
+}
+
+.skillset-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.skillset-title {
+  font-size: var(--fz-base);
+  font-weight: 700;
+  color: var(--clr-slate-900);
+  margin-bottom: 2px;
+}
+
+.skillset-sub {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-500);
+}
+
+.skillset-pct-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.skillset-pct-badge {
+  font-size: var(--fz-sm);
+  font-weight: 700;
+  color: var(--clr-primary);
+  min-width: 36px;
+  text-align: right;
+}
+
+.skillset-progress-bar-bg {
+  width: 120px;
+  height: 6px;
+  background: var(--clr-slate-200);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+
+.skillset-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--clr-primary), var(--clr-accent));
+  border-radius: var(--r-full);
+  transition: width 0.6s ease;
+}
+
+/* Skill checklist */
+.skillset-checklist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skillset-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--clr-slate-50);
+  border-radius: var(--r-md);
+  border: 1px solid var(--clr-slate-200);
+  transition: background var(--t-fast);
+}
+
+.skillset-item--done {
+  background: var(--clr-success-bg);
+  border-color: #bbf7d0;
+}
+
+.skillset-checkbox {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-sm);
+  border: 2px solid var(--clr-slate-300);
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.skillset-checkbox--checked {
+  background: var(--clr-success);
+  border-color: var(--clr-success);
+}
+
+.skillset-check-img {
+  width: 11px;
+  height: 11px;
+  filter: brightness(0) invert(1);
+}
+
+.skillset-skill-name {
+  flex: 1;
+  font-size: var(--fz-sm);
+  color: var(--clr-slate-700);
+  font-weight: 500;
+}
+
+.skillset-item--done .skillset-skill-name {
+  color: var(--clr-success);
+  text-decoration: line-through;
+  text-decoration-color: var(--clr-success);
+}
+
+.skillset-item-empty {
+  font-size: var(--fz-sm);
+  color: var(--clr-slate-400);
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* Empty state */
+.myskills-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.myskills-empty-icon {
+  width: 36px;
+  height: 36px;
+  opacity: 0.2;
+  filter: invert(32%) sepia(96%) saturate(1250%) hue-rotate(210deg) brightness(90%);
+}
+
+.myskills-empty p {
+  font-size: var(--fz-sm);
+  color: var(--clr-slate-500);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .myskills-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .myskills-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .achievements-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { Collection } from "mongodb";
+import type { User } from "../users/user.model";
 import { AUTH_ROUTE_PATHS } from "./auth.consts";
 import { getAuthenticatedUser, loginUser, logoutUser, refreshAccessToken, registerUser } from "./auth.handler";
-import type { User } from "../users/user.model";
 
 export const authRouter = (usersCollection: Collection<User>) => async (app: FastifyInstance) => {
   app.post(AUTH_ROUTE_PATHS.register, registerUser(usersCollection));
