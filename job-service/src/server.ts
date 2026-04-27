@@ -8,7 +8,7 @@ import { pipelineJobRouter } from "./routes/jobsInPipeline/pipeline-job.router";
 import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
 import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.router";
 import { jobSearchRouter } from "./routes/jobSearch/job-search.router";
-import { startJobPollerSchedule } from "./poller/job-poller/job-poller";
+import { startJobPollerSchedule } from "./poller/job-poller";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";

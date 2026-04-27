@@ -35,7 +35,14 @@ export class ChatConversationService {
             userId,
             achievements,
             firstAssistantMessage,
-            { currentStageIndex: 0, awaitingConfirmation: false, stageNotes: {}, surfacedAchievementIds: [] }
+            {
+                currentStageIndex: 0,
+                currentStageId: "achievements",
+                completedStageIds: [],
+                awaitingConfirmation: false,
+                stageNotes: {},
+                surfacedAchievementIds: []
+            }
         );
     };
 

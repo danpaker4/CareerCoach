@@ -1,6 +1,6 @@
 import type { Collection } from "mongodb";
 import type { TypedFastify } from "../../types/fastify";
-import type { EnrichedJob } from "../../poller/job-poller/stages/enrich/types";
+import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import { JobSearchHandler } from "./job-search.handler";
 
 type RegisterRouter = (fastify: TypedFastify) => void;

@@ -3,6 +3,8 @@ import type { ChatMessage, UserAchievement } from "../chat/chat.model";
 
 export interface ConversationStageProgress {
     currentStageIndex: number;
+    currentStageId?: string;
+    completedStageIds?: string[];
     awaitingConfirmation: boolean;
     stageNotes: Record<string, string[]>;
     surfacedAchievementIds?: string[];

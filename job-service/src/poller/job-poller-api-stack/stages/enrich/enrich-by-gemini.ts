@@ -4,7 +4,7 @@ import type { EnrichedJob } from "./types";
 import { buildEnrichmentPrompt } from "./prompet";
 import { inferFallback } from "./fallback/fallback-logic";
 import { cleanStringArray, parseGeminiJson } from "./utils/gemini-response-utils";
-import { buildSearchableText, createEmbedding, createEmbeddingClient } from "./embedding";
+import { buildSearchableText, createEmbedding, createEmbeddingClient, type EmbeddingClient } from "./embedding";
 
 const MAX_GEMINI_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
@@ -20,7 +20,7 @@ const shouldRetryGeminiError = (error: unknown): boolean => {
 
 const enrichSingleJob = async (
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
-  embeddingModel: ReturnType<GoogleGenerativeAI["getGenerativeModel"]> | null,
+  embeddingModel: EmbeddingClient | null,
   job: AdaptedJob,
   attempt = 1,
 ): Promise<EnrichedJob> => {
@@ -122,7 +122,7 @@ export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]>
     });
   }
 
-  const modelName = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
+  const modelName = process.env.LLM_MODEL || "gemini-2.5-flash-lite";
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
   const embeddingModel = createEmbeddingClient(apiKey);

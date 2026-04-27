@@ -17,6 +17,19 @@ export class ChatService {
 
     getConversation = async (userId: string) => this.conversationService.getConversationResponse(userId);
 
+    private isStageSkipRequested = (message: string): boolean => {
+        const normalized = message.toLowerCase();
+        const skipSignals = [
+            "skip stage",
+            "skip to jobs",
+            "jump to jobs",
+            "show me jobs",
+            "find jobs now",
+            "go to final stage",
+        ];
+        return skipSignals.some((signal) => normalized.includes(signal));
+    };
+
     sendMessage = async (userId: string, message: string, profile?: ProfileInput): Promise<ChatMessageResponse> => {
         const normalizedMessage = message.trim();
         if (normalizedMessage.length === 0) {
@@ -31,13 +44,18 @@ export class ChatService {
 
         // get conversation after user message
         const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(userId);
-        const stageProgressWithNote = this.stageService.recordStageMessage(conversationAfterUserMessage, normalizedMessage);
-        const currentStage = this.stageService.getCurrentStage(conversationAfterUserMessage);
-        let stageProgressForNextFlow = stageProgressWithNote;
+        const currentStage = this.stageService.getCurrentStage(conversationAfterUserMessage, normalizedMessage);
+        const stageProgressWithNote = currentStage
+            ? this.stageService.recordStageMessage(conversationAfterUserMessage, normalizedMessage, currentStage.id)
+            : conversationAfterUserMessage.stageProgress;
+        const shouldSkipStages = this.isStageSkipRequested(normalizedMessage);
+        let stageProgressForNextFlow = shouldSkipStages
+            ? this.stageService.completeAllStages(stageProgressWithNote)
+            : stageProgressWithNote;
 
-        if (currentStage) {
+        if (currentStage && !shouldSkipStages) {
             const stageReply = await this.llmService.generateStageReply(conversationAfterUserMessage, normalizedMessage, currentStage);
-            const nextStageProgress = this.stageService.applyStageAdvance(stageProgressWithNote, stageReply.shouldAdvanceStage);
+            const nextStageProgress = this.stageService.applyStageAdvance(stageProgressWithNote, currentStage.id, stageReply.shouldAdvanceStage);
             await this.conversationService.updateStageProgress(userId, nextStageProgress);
             stageProgressForNextFlow = nextStageProgress;
 
@@ -45,7 +63,7 @@ export class ChatService {
                 ...conversationAfterUserMessage,
                 stageProgress: nextStageProgress,
             };
-            const nextStage = this.stageService.getCurrentStage(conversationAfterStageAdvance);
+            const nextStage = this.stageService.getCurrentStage(conversationAfterStageAdvance, normalizedMessage);
             if (nextStage) {
                 await this.conversationService.appendAssistantMessage(userId, stageReply.reply);
                 return { reply: stageReply.reply };

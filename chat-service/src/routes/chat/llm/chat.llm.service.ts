@@ -59,7 +59,7 @@ export class ChatLlmService {
 
     constructor(geminiApiKey: string) {
         const genAI = new GoogleGenerativeAI(geminiApiKey);
-        this.model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+        this.model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     }
 
     decideNextStep = async (conversation: Conversation, latestUserMessage: string): Promise<LlmDecision> => {
