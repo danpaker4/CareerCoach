@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { ENV } from '../../config';
 import './GithubCallback.css';
 import type { User } from '../../types/user';
+import { setStoredAccessToken } from '../../lib/authSession';
 
 interface GithubCallbackProps {
   onLoginSuccess: (user: User) => void;
@@ -48,8 +49,14 @@ export const GithubCallback = ({ onLoginSuccess }: GithubCallbackProps) => {
       return;
     }
 
+    if (window.opener) {
+      window.opener.postMessage({ type: 'GITHUB_CODE', code }, window.location.origin);
+      window.close();
+      return;
+    }
+
     fetch(
-      `${ENV.USERS_SERVICE_BASE_URL}/api/auth/github/callback?code=${encodeURIComponent(code)}`,
+      `${ENV.USERS_SERVICE_BASE_URL}/api/auth/github/callback?code=${encodeURIComponent(code)}&redirectUri=${encodeURIComponent(window.location.origin + '/auth/github/callback')}`,
       {
         method: 'GET',
         credentials: 'include',
@@ -66,9 +73,14 @@ export const GithubCallback = ({ onLoginSuccess }: GithubCallbackProps) => {
               : `Authentication failed (${res.status})`;
           throw new Error(msg);
         }
-        const data: unknown = await res.json();
-        const user = parseUser(data);
+        const data: any = await res.json();
+        const user = parseUser(data.user || data);
         if (!user) throw new Error('Invalid user data received');
+
+        if (data.accessToken) {
+          setStoredAccessToken(data.accessToken);
+        }
+
         onLoginSuccess(user);
         navigate('/dashboard', { replace: true });
       })

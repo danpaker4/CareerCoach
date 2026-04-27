@@ -15,4 +15,9 @@ export interface User {
   githubUrl?: string;
   cv?: string;
   achievements?: Achievement[];
+  githubId?: number;
+  avatarUrl?: string;
+  bio?: string;
+  location?: string;
+  company?: string;
 }

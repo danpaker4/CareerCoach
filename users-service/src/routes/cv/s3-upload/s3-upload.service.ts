@@ -57,3 +57,25 @@ export const uploadCvToS3 = async (userId: string, cvBuffer: Buffer): Promise<st
 
   return `s3://${bucket}/${objectKey}`;
 };
+
+export const uploadAvatarToS3 = async (userId: string, avatarBuffer: Buffer, contentType: string, extension: string): Promise<string> => {
+  const bucket = process.env.S3_BUCKET;
+  if (!bucket) {
+    throw new Error("S3_BUCKET is missing");
+  }
+  const uploadPrefix = process.env.S3_UPLOAD_PREFIX || "uploads";
+
+  const s3 = getS3Client();
+  const objectKey = `${uploadPrefix}/avatar/${userId}.${extension}`;
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: objectKey,
+      Body: avatarBuffer,
+      ContentType: contentType,
+    }),
+  );
+
+  return `s3://${bucket}/${objectKey}`;
+};

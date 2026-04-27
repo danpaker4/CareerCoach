@@ -26,7 +26,7 @@ const buildAuthenticatedUser = (user: SafeUser): AuthenticatedUser => {
   };
 };
 
-const buildAuthenticatedSession = (user: SafeUser): AuthenticatedUserSession => {
+export const buildAuthenticatedSession = (user: SafeUser): AuthenticatedUserSession => {
   const authenticatedUser = buildAuthenticatedUser(user);
 
   return {
@@ -73,6 +73,10 @@ export const loginUserSession = async (
   const authenticatedUser = await usersCollection.findOne({ email: normalizeEmail(credentials.email) });
   if (authenticatedUser === null) {
     throw new AuthRouteError(StatusCodes.UNAUTHORIZED, "Invalid email or password");
+  }
+
+  if (!authenticatedUser.password) {
+    throw new AuthRouteError(StatusCodes.UNAUTHORIZED, "Please log in using GitHub.");
   }
 
   const passwordMatches = await bcrypt.compare(credentials.password, authenticatedUser.password);
