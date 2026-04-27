@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { Header } from './components/header/Header';
@@ -14,13 +14,11 @@ import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { GithubCallback } from './components/github-callback/GithubCallback';
 import { NotFound } from './components/not-found/NotFound';
 import { PageTransition } from './components/page-transition/PageTransition';
-import { apiFetch } from './lib/apiClient';
+import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
-import { hasErrorCode, readUserResponse } from './App.utils';
+import { clearStoredAccessToken } from './lib/authSession';
 
-const AUTH_ME_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/me`;
-const AUTH_REFRESH_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/refresh`;
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
 
 interface ProtectedRouteProps {
@@ -47,35 +45,24 @@ export const App = () => {
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ')
     : undefined;
 
-  useEffect(() => {
-    const fetchCurrentUser = () => fetch(AUTH_ME_PATH, { credentials: 'include' });
+  const bootstrapRan = useRef(false);
 
-    const refreshAccessToken = () => fetch(AUTH_REFRESH_PATH, {
-      method: 'POST',
-      credentials: 'include',
-    });
+  useEffect(() => {
+    if (bootstrapRan.current) {
+      return;
+    }
+    bootstrapRan.current = true;
 
     const loadCurrentUser = async () => {
-      const response = await fetchCurrentUser();
-      if (response.ok) {
-        setCurrentUser(await readUserResponse(response));
-        return;
-      }
+      const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
 
-      const payload: unknown = await response.json().catch(() => null);
-      if (!hasErrorCode(payload, 'ACCESS_TOKEN_EXPIRED')) {
+      const user = await refreshAccessToken();
+      if (!user || isAuthPage) {
         setCurrentUser(null);
         return;
       }
 
-      const refreshResponse = await refreshAccessToken();
-      if (!refreshResponse.ok) {
-        setCurrentUser(null);
-        return;
-      }
-
-      const retryResponse = await fetchCurrentUser();
-      setCurrentUser(retryResponse.ok ? await readUserResponse(retryResponse) : null);
+      setCurrentUser(user);
     };
 
     loadCurrentUser().catch(() => setCurrentUser(null));
@@ -87,6 +74,7 @@ export const App = () => {
 
   const handleLogout = async () => {
     await apiFetch(AUTH_LOGOUT_PATH, { method: 'POST' });
+    clearStoredAccessToken();
     setCurrentUser(null);
     window.location.assign('/login');
   };

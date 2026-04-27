@@ -1,5 +1,5 @@
+import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
 import type { Collection } from "mongodb";
 import type { User } from "../user.model";
 import { extractTextFromCv } from "../../cv/cv-parser.service";
@@ -7,8 +7,8 @@ import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemin
 import { uploadCvToS3 } from "../../cv/s3-upload/s3-upload.service";
 import type { RegisterUserInput } from "./register-user.types";
 import {
-  ensurePdfFile,
   throwIfUserAlreadyExists,
+  validatePdfFile,
   validateCvBuffer,
 } from "./register-user.utils";
 
@@ -22,23 +22,31 @@ export const registerUser = async (
     throw new Error("Missing required fields");
   }
 
-  const cvFile = ensurePdfFile(input.cvFile);
-
   const existingUser = await usersCollection.findOne({ email });
   throwIfUserAlreadyExists(Boolean(existingUser));
 
-  const cvBuffer = await cvFile.toBuffer();
-  validateCvBuffer(cvBuffer);
+  const userId = randomUUID();
+  const { cvFile } = input;
+  validatePdfFile(cvFile);
 
-  const userId = uuidv4();
-  const cvS3Path = await uploadCvToS3(userId, cvBuffer);
-  const cvText = await extractTextFromCv(cvBuffer);
-  const achievementsFromGemini = await extractAchievementsWithGemini({
-    cvText,
-    currentJob,
-    linkedInUrl,
-    githubUrl,
-  });
+  const { cvS3Path, achievementsFromGemini } = cvFile
+    ? await (async () => {
+      const cvBuffer = await cvFile.toBuffer();
+      validateCvBuffer(cvBuffer);
+      const uploadedCvS3Path = await uploadCvToS3(userId, cvBuffer);
+      const cvText = await extractTextFromCv(cvBuffer);
+      const extractedAchievements = await extractAchievementsWithGemini({
+        cvText,
+        currentJob,
+        linkedInUrl,
+        githubUrl,
+      });
+      return {
+        cvS3Path: uploadedCvS3Path,
+        achievementsFromGemini: extractedAchievements,
+      };
+    })()
+    : { cvS3Path: undefined, achievementsFromGemini: [] };
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const newUser: User = {
@@ -53,7 +61,7 @@ export const registerUser = async (
     githubUrl: githubUrl || undefined,
     cv: cvS3Path,
     achievements: achievementsFromGemini.map((achievement) => ({
-      id: uuidv4(),
+      id: randomUUID(),
       name: achievement.name,
       grade: achievement.grade,
     })),
