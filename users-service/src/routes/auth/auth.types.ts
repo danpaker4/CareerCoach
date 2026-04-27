@@ -60,7 +60,6 @@ export type TokenErrorResponses = {
 };
 
 export type AuthConfig = {
-  accessTokenCookie: string;
   refreshTokenCookie: string;
   accessJwtSecret: string;
   refreshJwtSecret: string;

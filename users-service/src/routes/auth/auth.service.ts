@@ -4,7 +4,7 @@ import type { Collection } from "mongodb";
 import { registerUser } from "../users/register/register-user.service";
 import type { RegisterUserInput } from "../users/register/register-user.types";
 import type { User } from "../users/user.model";
-import { generateAccessToken, generateRefreshToken, verifyAccessToken, verifyRefreshToken } from "./auth-tokens.service";
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "./auth-tokens.service";
 import { AuthRouteError } from "./auth.types";
 import type { AuthTokenSubject, AuthenticatedUser, AuthenticatedUserSession, LoginBody, SafeUser } from "./auth.types";
 import { toSafeUser } from "./auth.utils";
@@ -81,12 +81,6 @@ export const loginUserSession = async (
   }
 
   return buildAuthenticatedSession(toSafeUser(authenticatedUser));
-};
-
-export const getCurrentUser = async (usersCollection: Collection<User>, accessToken: string): Promise<SafeUser> => {
-  const payload = verifyAccessToken(accessToken);
-  const user = await findUserById(usersCollection, payload.userId);
-  return toSafeUser(user);
 };
 
 export const refreshUserAccessToken = async (

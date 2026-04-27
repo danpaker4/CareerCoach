@@ -1,11 +1,11 @@
-const ACCESS_TOKEN_STORAGE_KEY = "careerCoach.accessToken";
+const tokenStore: { current: string | null } = { current: null };
 
-export const getStoredAccessToken = (): string | null => window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+export const getStoredAccessToken = (): string | null => tokenStore.current;
 
-export const setStoredAccessToken = (accessToken: string): void => {
-  window.localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+export const setStoredAccessToken = (token: string): void => {
+  tokenStore.current = token;
 };
 
 export const clearStoredAccessToken = (): void => {
-  window.localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  tokenStore.current = null;
 };

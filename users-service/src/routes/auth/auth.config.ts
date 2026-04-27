@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { AuthConfig } from "./auth.types";
 
 const AuthEnvSchema = z.object({
-  ACCESS_TOKEN_COOKIE: z.string().min(1),
   REFRESH_TOKEN_COOKIE: z.string().min(1),
   JWT_ACCESS_SECRET: z.string().min(1),
   JWT_REFRESH_SECRET: z.string().min(1),
@@ -12,7 +11,6 @@ const AuthEnvSchema = z.object({
 });
 
 const createAuthConfig = (env: z.infer<typeof AuthEnvSchema>): AuthConfig => ({
-  accessTokenCookie: env.ACCESS_TOKEN_COOKIE,
   refreshTokenCookie: env.REFRESH_TOKEN_COOKIE,
   accessJwtSecret: env.JWT_ACCESS_SECRET,
   refreshJwtSecret: env.JWT_REFRESH_SECRET,

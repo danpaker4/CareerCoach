@@ -2,10 +2,10 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import jwt, { TokenExpiredError } from "jsonwebtoken";
 import { verifyAccessToken } from "./auth-tokens.service";
-import { getAccessTokenCookie, getBearerToken } from "./auth.utils";
+import { getBearerToken } from "./auth.utils";
 
 export const authenticateRequest = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-  const accessToken = getBearerToken(request) ?? request.cookies[getAccessTokenCookie()];
+  const accessToken = getBearerToken(request);
   if (!accessToken) {
     reply.status(StatusCodes.UNAUTHORIZED).send({ error: "Access token missing", errorCode: "ACCESS_TOKEN_MISSING" });
     return;

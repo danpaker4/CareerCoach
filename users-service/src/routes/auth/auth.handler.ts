@@ -2,9 +2,8 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { Collection } from "mongodb";
 import type { User } from "../users/user.model";
-import { clearAuthCookies, setAccessTokenCookie, setAuthCookies } from "./auth.cookies";
+import { clearAuthCookies, setAuthCookies } from "./auth.cookies";
 import {
-  getCurrentUser,
   loginUserSession,
   refreshUserAccessToken,
   registerUserSession,
@@ -15,7 +14,6 @@ import {
   isAuthRouteError,
   isLoginBody,
   readMultipartData,
-  resolveAccessToken,
   sendAuthError,
   sendKnownTokenError,
 } from "./auth.utils";
@@ -80,38 +78,6 @@ export const loginUser = (usersCollection: Collection<User>): AuthRouteHandler =
     }
   };
 
-export const getAuthenticatedUser = (usersCollection: Collection<User>): AuthRouteHandler =>
-  async (request, reply) => {
-    const accessToken = resolveAccessToken(request);
-    if (!accessToken) {
-      reply.status(StatusCodes.UNAUTHORIZED).send({
-        error: "Access token missing",
-        errorCode: "ACCESS_TOKEN_MISSING",
-      });
-      return;
-    }
-
-    try {
-      const user = await getCurrentUser(usersCollection, accessToken);
-      reply.send({ success: true, user });
-    } catch (error) {
-      if (isAuthRouteError(error)) {
-        if (error.errorCode === "ACCESS_TOKEN_INVALID") {
-          clearAuthCookies(reply);
-        }
-
-        sendAuthError(reply, error);
-        return;
-      }
-
-      sendKnownTokenError(reply, error, {
-        expired: { error: "Access token expired", errorCode: "ACCESS_TOKEN_EXPIRED" },
-        invalid: { error: "Invalid access token", errorCode: "ACCESS_TOKEN_INVALID" },
-        unknown: { error: "Unauthorized", errorCode: "UNAUTHORIZED" },
-      });
-    }
-  };
-
 export const refreshAccessToken = (usersCollection: Collection<User>): AuthRouteHandler =>
   async (request, reply) => {
     const refreshToken = request.cookies[getRefreshTokenCookie()];
@@ -126,10 +92,10 @@ export const refreshAccessToken = (usersCollection: Collection<User>): AuthRoute
 
     try {
       const session = await refreshUserAccessToken(usersCollection, refreshToken);
-      setAccessTokenCookie(reply, session.accessToken);
       reply.send({
         success: true,
         accessToken: session.accessToken,
+        user: session.user,
       });
     } catch (error) {
       clearAuthCookies(reply);

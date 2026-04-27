@@ -58,11 +58,6 @@ export const getBearerToken = (request: FastifyRequest): string | null => {
   return token.length > 0 ? token : null;
 };
 
-export const resolveAccessToken = (request: FastifyRequest): string | null =>
-  getBearerToken(request) ?? request.cookies[getAuthConfig().accessTokenCookie] ?? null;
-
-export const getAccessTokenCookie = (): string => getAuthConfig().accessTokenCookie;
-
 export const getRefreshTokenCookie = (): string => getAuthConfig().refreshTokenCookie;
 
 export const getAccessTokenExpiresInSeconds = (): number => getAuthConfig().accessTokenExpiresInSeconds;

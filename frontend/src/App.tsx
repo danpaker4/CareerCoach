@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { Header } from './components/header/Header';
@@ -14,13 +14,11 @@ import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { GithubCallback } from './components/github-callback/GithubCallback';
 import { NotFound } from './components/not-found/NotFound';
 import { PageTransition } from './components/page-transition/PageTransition';
-import { apiFetch } from './lib/apiClient';
+import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
-import { readUserResponse } from './App.utils';
-import { clearStoredAccessToken, getStoredAccessToken } from './lib/authSession';
+import { clearStoredAccessToken } from './lib/authSession';
 
-const AUTH_ME_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/me`;
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
 
 interface ProtectedRouteProps {
@@ -47,16 +45,24 @@ export const App = () => {
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ')
     : undefined;
 
+  const bootstrapRan = useRef(false);
+
   useEffect(() => {
+    if (bootstrapRan.current) {
+      return;
+    }
+    bootstrapRan.current = true;
+
     const loadCurrentUser = async () => {
       const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
-      if (isAuthPage && !getStoredAccessToken()) {
+
+      const user = await refreshAccessToken();
+      if (!user || isAuthPage) {
         setCurrentUser(null);
         return;
       }
 
-      const response = await apiFetch(AUTH_ME_PATH);
-      setCurrentUser(response.ok ? await readUserResponse(response) : null);
+      setCurrentUser(user);
     };
 
     loadCurrentUser().catch(() => setCurrentUser(null));
