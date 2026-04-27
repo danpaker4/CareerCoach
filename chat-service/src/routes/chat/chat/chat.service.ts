@@ -33,29 +33,44 @@ export class ChatService {
         const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(userId);
         const stageProgressWithNote = this.stageService.recordStageMessage(conversationAfterUserMessage, normalizedMessage);
         const currentStage = this.stageService.getCurrentStage(conversationAfterUserMessage);
+        let stageProgressForNextFlow = stageProgressWithNote;
 
         if (currentStage) {
             const stageReply = await this.llmService.generateStageReply(conversationAfterUserMessage, normalizedMessage, currentStage);
             const nextStageProgress = this.stageService.applyStageAdvance(stageProgressWithNote, stageReply.shouldAdvanceStage);
             await this.conversationService.updateStageProgress(userId, nextStageProgress);
-            await this.conversationService.appendAssistantMessage(userId, stageReply.reply);
-            return { reply: stageReply.reply };
+            stageProgressForNextFlow = nextStageProgress;
+
+            const conversationAfterStageAdvance = {
+                ...conversationAfterUserMessage,
+                stageProgress: nextStageProgress,
+            };
+            const nextStage = this.stageService.getCurrentStage(conversationAfterStageAdvance);
+            if (nextStage) {
+                await this.conversationService.appendAssistantMessage(userId, stageReply.reply);
+                return { reply: stageReply.reply };
+            }
         }
 
-        await this.conversationService.updateStageProgress(userId, stageProgressWithNote);
+        await this.conversationService.updateStageProgress(userId, stageProgressForNextFlow);
+
+        const conversationForDecision = {
+            ...conversationAfterUserMessage,
+            stageProgress: stageProgressForNextFlow,
+        };
 
         // upsert achievement from user message
         const updatedAchievements = await this.externalService.upsertAchievementFromUserMessage(
             userId,
             normalizedMessage,
-            conversationAfterUserMessage.achievements
+            conversationForDecision.achievements
         ).catch(() => null);
 
         if (updatedAchievements) {
             await this.conversationService.updateAchievements(userId, updatedAchievements);
         }
 
-        const llmDecision = await this.llmService.decideNextStep(conversationAfterUserMessage, normalizedMessage);
+        const llmDecision = await this.llmService.decideNextStep(conversationForDecision, normalizedMessage);
 
         if (!llmDecision.shouldSearchJobs) {
             const sanitizedReply = this.validationService.sanitizeReply(llmDecision.reply);
@@ -64,7 +79,7 @@ export class ChatService {
         }
 
         const jobs = await this.externalService.searchJobs(llmDecision.searchFilters);
-        const jobAwareDecision = await this.llmService.generateJobAwareReply(conversationAfterUserMessage, normalizedMessage, jobs);
+        const jobAwareDecision = await this.llmService.generateJobAwareReply(conversationForDecision, normalizedMessage, jobs);
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
         const validatedJobs = jobs.filter((job) => validJobIds.includes(job.jobId)).slice(0, 10);
         const sanitizedReply = this.validationService.sanitizeReply(jobAwareDecision.reply);

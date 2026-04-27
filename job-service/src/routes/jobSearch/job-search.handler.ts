@@ -20,9 +20,15 @@ const isJobSearchRequest = (body: unknown): body is JobSearchRequest => {
 };
 
 const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
-const VECTOR_MODEL = "text-embedding-004";
+const VECTOR_MODEL = process.env.JOB_EMBEDDING_MODEL || "text-embedding-004";
 const SEARCH_LIMIT = 10;
 const NUM_CANDIDATES = 100;
+const FALLBACK_VECTOR_MODELS = ["gemini-embedding-001", "embedding-001"] as const;
+
+type EmbeddingFetchError = {
+    status?: number;
+    statusText?: string;
+};
 
 const buildQueryText = (request: JobSearchRequest): string => {
     const sections = [
@@ -44,9 +50,31 @@ const toJobSearchResponseItem = (job: EnrichedJob): JobSearchResponseItem => ({
 
 export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
     const embeddingApiKey = process.env.GEMINI_API_KEY;
-    const embeddingModel = embeddingApiKey
-        ? new GoogleGenerativeAI(embeddingApiKey).getGenerativeModel({ model: VECTOR_MODEL })
-        : null;
+    const embeddingClient = embeddingApiKey ? new GoogleGenerativeAI(embeddingApiKey) : null;
+
+    const generateQueryVector = async (queryText: string): Promise<number[] | null> => {
+        if (!embeddingClient) {
+            return null;
+        }
+
+        const modelCandidates = [VECTOR_MODEL, ...FALLBACK_VECTOR_MODELS];
+        for (const modelName of modelCandidates) {
+            try {
+                const model = embeddingClient.getGenerativeModel({ model: modelName });
+                const embeddingResult = await model.embedContent(queryText);
+                const queryVector = embeddingResult.embedding?.values;
+                return Array.isArray(queryVector) ? queryVector : null;
+            } catch (error) {
+                const embeddingError = error as EmbeddingFetchError;
+                const isNotFound = embeddingError.status === 404;
+                if (!isNotFound) {
+                    throw error;
+                }
+            }
+        }
+
+        return null;
+    };
 
     const searchJobs = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         const payload: unknown = request.body;
@@ -55,17 +83,11 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
             return;
         }
 
-        if (!embeddingModel) {
-            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "GEMINI_API_KEY is required for vector job search" });
-            return;
-        }
-
         try {
             const queryText = buildQueryText(payload);
-            const embeddingResult = await embeddingModel.embedContent(queryText);
-            const queryVector = embeddingResult.embedding?.values;
-            if (!Array.isArray(queryVector)) {
-                reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Failed generating query embedding" });
+            const queryVector = embeddingClient ? await generateQueryVector(queryText) : null;
+            if (!queryVector) {
+                reply.status(StatusCodes.OK).send([]);
                 return;
             }
 
@@ -90,7 +112,6 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
                     },
                 },
             ]).toArray();
-
             const responsePayload = rankedJobs.map((job) => toJobSearchResponseItem(job as EnrichedJob));
 
             reply.status(StatusCodes.OK).send(responsePayload);
