@@ -19,11 +19,9 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
   const handleButtonClick = (button: LoginType) => setActiveButton(button)
 
   const loginWithGithub = () => {
-    if (ENV.GITHUB_CLIENT_ID) {
-        window.location.assign(`https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&prompt=consent`)
-    } else {
-        alert("Github Client ID is missing configuration");
-    }
+    window.location.assign(
+      `https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/github/callback')}&scope=user:email`
+    );
   };
 
   return (
@@ -44,14 +42,20 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
         </div>
 
         <div className="social-login-section">
-            <div className="divider">
-                <span>Or continue with</span>
-            </div>
-            
-            <button type="button" onClick={loginWithGithub} className="github-btn-styled">
-                <img className="github-icon" src={githubIcon} alt="" aria-hidden="true" />
-                GitHub
-            </button>
+          <div className="divider">
+            <span>Or continue with</span>
+          </div>
+          <button
+            type="button"
+            onClick={loginWithGithub}
+            className="github-btn-styled"
+            disabled={!ENV.GITHUB_CLIENT_ID}
+            title={!ENV.GITHUB_CLIENT_ID ? 'GitHub OAuth not configured - set VITE_CLIENT_ID in .env' : 'Continue with GitHub'}
+          >
+            <img className="github-icon" src={githubIcon} alt="" aria-hidden="true" />
+            GitHub
+          </button>
+
         </div>
       </Card>
     </div>

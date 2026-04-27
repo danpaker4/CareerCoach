@@ -29,6 +29,8 @@ export class Server {
             console.log(" MongoDB Connected");
 
             await this.app.register(cors, {
+                origin: true,
+                credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ['Content-Type', 'Authorization']
             });

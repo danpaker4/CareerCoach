@@ -1,109 +1,308 @@
-import { useState } from 'react';
-import { ChatInterface } from '../chat-component/Chat'; 
+import { useState, useEffect, useCallback } from 'react';
+import { ChatInterface } from '../chat-component/Chat';
+import { CreateRoadmapModal } from './CreateRoadmapModal';
+import { ENV } from '../../config';
+import iconChart from '../../assets/icon-chart.svg';
+import iconTrophy from '../../assets/icon-trophy.svg';
+import iconList from '../../assets/icon-list.svg';
+import iconMessage from '../../assets/icon-message.svg';
+import iconCheck from '../../assets/icon-check.svg';
+import iconPlus from '../../assets/icon-plus.svg';
 import './CareerRoadmap.css';
-import type { CareerRoadmapProps } from './career-roadmap.types';
+import type { CareerRoadmapData, CareerRoadmapProps, FetchState } from './career-roadmap.types';
+
+const ROADMAP_URL = (userId: string) =>
+  `${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${userId}`;
+
+const parseRoadmapResponse = (data: unknown): CareerRoadmapData[] => {
+  if (!Array.isArray(data)) return [];
+  return data.filter((item): item is CareerRoadmapData => {
+    if (typeof item !== 'object' || item === null) return false;
+    const obj = item as Record<string, unknown>;
+    return (
+      typeof obj.id === 'string' &&
+      typeof obj.dreamJob === 'string' &&
+      Array.isArray(obj.stagesToDreamJob)
+    );
+  });
+};
+
+const STEP_CONTENT = [
+  {
+    label: 'Foundation & Fundamentals',
+    description: 'Build the core skills and knowledge base required for your target role. Focus on essential technologies, tools, and industry practices.',
+    actions: ['Master core programming fundamentals', 'Complete foundational courses or certifications', 'Build small practice projects', 'Learn industry-standard development tools'],
+  },
+  {
+    label: 'Intermediate Growth',
+    description: 'Apply your knowledge on real projects and deepen your technical expertise. Start building a portfolio that demonstrates your growing capabilities.',
+    actions: ['Contribute to real-world projects', 'Build a portfolio with meaningful use cases', 'Learn testing, CI/CD, and best practices', 'Collaborate and get code review feedback'],
+  },
+  {
+    label: 'Advanced Proficiency',
+    description: 'Develop deep expertise in your domain and tackle complex engineering challenges. Become a reliable resource for technical decisions.',
+    actions: ['Solve complex architectural problems', 'Lead technical discussions and design reviews', 'Mentor junior developers on best practices', 'Study advanced patterns and system design'],
+  },
+  {
+    label: 'Leadership & Expertise',
+    description: 'Lead technical initiatives and drive impactful decisions. Your experience and judgment shape the direction of projects and teams.',
+    actions: ['Lead cross-functional technical projects', 'Drive architecture and tooling decisions', 'Build and grow high-performing team members', 'Contribute to engineering roadmaps and OKRs'],
+  },
+  {
+    label: 'Final Stretch',
+    description: 'The last steps before reaching your dream role. Polish your skills, strengthen your network, and position yourself as a standout candidate.',
+    actions: ['Prepare thoroughly for senior-level interviews', 'Build and nurture your professional network', 'Refine your portfolio and personal brand', 'Apply to your top target companies'],
+  },
+];
 
 export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
-    const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [fetchState, setFetchState] = useState<FetchState>('idle');
+  const [roadmaps, setRoadmaps] = useState<CareerRoadmapData[]>([]);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
 
-    return (
-        <div className="roadmap-page">
-            
-            <main className="roadmap-container">
+  const loadData = useCallback(() => {
+    if (!user?.id) return;
+    setFetchState('loading');
+    fetch(ROADMAP_URL(user.id), { credentials: 'include' })
+      .then(async (res) => {
+        if (res.status === 404) { setRoadmaps([]); setFetchState('success'); return; }
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const data: unknown = await res.json();
+        setRoadmaps(parseRoadmapResponse(data));
+        setFetchState('success');
+      })
+      .catch((err: unknown) => {
+        setErrorMessage(err instanceof Error ? err.message : 'Something went wrong');
+        setFetchState('error');
+      });
+  }, [user?.id]);
 
-                <div className="roadmap-header">
-                    <div>
-                        <h1>Career Roadmap</h1>
-                        <p className="subtitle">Define your career goals and track your growth plan</p>
-                    </div>
-                    <div className="header-actions">
-                        <button 
-                            className="btn-ai-guide"
-                            onClick={() => setIsChatOpen(!isChatOpen)}
-                        >
-                            <span className="icon">💬</span> AI Career Guide
-                        </button>
-                        <button className="btn-add-goal">
-                            <span className="icon">+</span> Add Goal
-                        </button>
-                    </div>
-                </div>
+  useEffect(() => { loadData(); }, [loadData]);
 
-                <div className="stats-row">
-                    <div className="stat-card">
-                        <div className="stat-icon blue">📈</div>
-                        <div className="stat-info">
-                            <span className="stat-label">Active Roadmaps</span>
-                            <span className="stat-value">1</span>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon green">🎖️</div>
-                        <div className="stat-info">
-                            <span className="stat-label">Completed</span>
-                            <span className="stat-value">0</span>
-                        </div>
-                    </div>
-                    <div className="stat-card">
-                        <div className="stat-icon purple">📅</div>
-                        <div className="stat-info">
-                            <span className="stat-label">Total Roadmaps</span>
-                            <span className="stat-value">1</span>
-                        </div>
-                    </div>
-                </div>
+  // Keep active tab in bounds when roadmaps change
+  useEffect(() => {
+    if (activeTab >= roadmaps.length && roadmaps.length > 0) {
+      setActiveTab(roadmaps.length - 1);
+    }
+  }, [roadmaps.length, activeTab]);
 
-                {/* כרטיס המסלול הראשי */}
-                <div className="main-roadmap-card">
-                    <div className="card-top-info">
-                        <h3>Mid-Level Software Engineer <span className="arrow">→</span> Senior Software Engineer</h3>
-                        <p className="meta-info">Target: 31.12.2026 • 2 years timeline • 1 of 4 steps completed</p>
-                    </div>
+  const totalRoadmaps = roadmaps.length;
+  const completedRoadmaps = roadmaps.filter((r) =>
+    r.stagesToDreamJob.length > 0 && r.stagesToDreamJob.every((s) => s.isDone)
+  ).length;
 
-                    <div className="progress-section">
-                        <div className="progress-label">
-                            <span>Overall Progress</span>
-                            <span>25%</span>
-                        </div>
-                        <div className="progress-bar-bg">
-                            <div className="progress-bar-fill quarter-progress"></div>
-                        </div>
-                    </div>
+  const activeRoadmap = roadmaps[activeTab] ?? null;
 
-                    {/* השלב הנוכחי */}
-                    <div className="current-step-box">
-                        <div className="step-check-icon">✓</div>
-                        <div className="step-content">
-                            <div className="step-header">
-                                <span className="step-time">Months 1-6</span>
-                                <span className="step-badge completed">Completed</span>
-                            </div>
-                            <h4>Mid-Level Software Engineer (Current)</h4>
-                            <p className="step-description">Key Actions:</p>
-                            <ul className="step-list">
-                                <li>Master advanced algorithms and data structures</li>
-                                <li>Take on more complex features and projects</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+  return (
+    <div className="roadmap-page">
+      <main className="roadmap-container">
 
-            </main>
-
-            {/* החלון הצף של הצ'אט */}
-            {isChatOpen && (
-                <div className="floating-chat-wrapper">
-                    <div className="chat-header-bar">
-                        <span>CareerCoach AI</span>
-                        <button className="close-chat" onClick={() => setIsChatOpen(false)}>✕</button>
-                    </div>
-
-                    <ChatInterface 
-                        userId={user?.id || "guest"} 
-                        userName={user?.firstName} 
-                    />
-                </div>
-            )}
+        <div className="roadmap-header">
+          <div>
+            <h1 className="roadmap-title">Career Roadmap</h1>
+            <p className="roadmap-subtitle">Your personalized path to your dream role</p>
+          </div>
+          <div className="header-actions">
+            <button
+              type="button"
+              className="btn-add-goal"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <img src={iconPlus} alt="" aria-hidden="true" className="btn-icon btn-icon--white" />
+              Add Roadmap
+            </button>
+            <button
+              type="button"
+              className="btn-ai-guide"
+              onClick={() => setIsChatOpen(!isChatOpen)}
+            >
+              <img src={iconMessage} alt="" aria-hidden="true" className="btn-icon btn-icon--white" />
+              AI Career Guide
+            </button>
+          </div>
         </div>
-    );
+
+        <div className="stats-row">
+          <div className="stat-card">
+            <div className="stat-icon-wrap stat-icon-wrap--blue">
+              <img src={iconChart} alt="" aria-hidden="true" className="stat-icon-img stat-icon-img--blue" />
+            </div>
+            <div className="stat-info">
+              <span className="stat-label">Active Roadmaps</span>
+              <span className="stat-value">{fetchState === 'success' ? totalRoadmaps - completedRoadmaps : '-'}</span>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon-wrap stat-icon-wrap--green">
+              <img src={iconTrophy} alt="" aria-hidden="true" className="stat-icon-img stat-icon-img--green" />
+            </div>
+            <div className="stat-info">
+              <span className="stat-label">Completed</span>
+              <span className="stat-value">{fetchState === 'success' ? completedRoadmaps : '-'}</span>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon-wrap stat-icon-wrap--purple">
+              <img src={iconList} alt="" aria-hidden="true" className="stat-icon-img stat-icon-img--purple" />
+            </div>
+            <div className="stat-info">
+              <span className="stat-label">Total Roadmaps</span>
+              <span className="stat-value">{fetchState === 'success' ? totalRoadmaps : '-'}</span>
+            </div>
+          </div>
+        </div>
+
+        {fetchState === 'loading' && (
+          <div className="page-loading"><div className="spinner" /><p>Loading your roadmap...</p></div>
+        )}
+
+        {fetchState === 'error' && (
+          <div className="page-error">
+            <p>Could not load roadmap: {errorMessage}</p>
+            <button type="button" className="btn-outline" style={{ marginTop: 16 }} onClick={loadData}>
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {fetchState === 'success' && roadmaps.length === 0 && (
+          <div className="roadmap-empty surface-card">
+            <img src={iconChart} alt="" className="roadmap-empty-icon" aria-hidden="true" />
+            <h2>No roadmap yet</h2>
+            <p>Create a personalized career roadmap to track your path to your dream role.</p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button type="button" className="btn-primary" onClick={() => setShowCreateModal(true)}>
+                <img src={iconPlus} alt="" className="btn-icon btn-icon--white" aria-hidden="true" />
+                Create Roadmap
+              </button>
+              <button type="button" className="btn-outline" onClick={() => setIsChatOpen(true)}>
+                <img src={iconMessage} alt="" className="btn-icon" aria-hidden="true" />
+                AI Career Guide
+              </button>
+            </div>
+          </div>
+        )}
+
+        {fetchState === 'success' && roadmaps.length > 0 && (
+          <div className="roadmap-tab-area">
+
+            {roadmaps.length > 1 && (
+              <div className="roadmap-tab-bar" role="tablist" aria-label="Career roadmaps">
+                {roadmaps.map((rm, idx) => (
+                  <button
+                    key={rm.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={idx === activeTab}
+                    className={`roadmap-tab${idx === activeTab ? ' roadmap-tab--active' : ''}`}
+                    onClick={() => setActiveTab(idx)}
+                  >
+                    <span className="roadmap-tab-label">{rm.dreamJob}</span>
+                    {rm.stagesToDreamJob.every((s) => s.isDone) && rm.stagesToDreamJob.length > 0 && (
+                      <span className="roadmap-tab-done-dot" title="Completed" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeRoadmap && (() => {
+              const doneCount = activeRoadmap.stagesToDreamJob.filter((s) => s.isDone).length;
+              const totalStages = activeRoadmap.stagesToDreamJob.length;
+              const pct = totalStages === 0 ? 0 : Math.round((doneCount / totalStages) * 100);
+
+              return (
+                <div className="main-roadmap-card" key={activeRoadmap.id}>
+                  <div className="card-top-info">
+                    <h3 className="roadmap-card-title">
+                      Path to <span className="dream-job-name">{activeRoadmap.dreamJob}</span>
+                    </h3>
+                    <p className="meta-info">
+                      {doneCount} of {totalStages} steps completed
+                    </p>
+                  </div>
+
+                  <div className="progress-section">
+                    <div className="progress-label">
+                      <span>Overall Progress</span>
+                      <span className="progress-pct">{pct}%</span>
+                    </div>
+                    <div className="progress-bar-bg">
+                      <div className="progress-bar-fill" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="steps-list">
+                    {activeRoadmap.stagesToDreamJob.map((stage, idx) => {
+                      const content = STEP_CONTENT[idx] ?? { label: `Step ${idx + 1}`, description: '', actions: [] };
+                      const isNext = !stage.isDone && (idx === 0 || activeRoadmap.stagesToDreamJob[idx - 1]?.isDone);
+                      const isLocked = !stage.isDone && !isNext;
+
+                      return (
+                        <div
+                          key={stage.jobId}
+                          className={`step-row${isLocked ? ' step-row--locked' : ''}`}
+                        >
+                          <div className={`step-circle ${stage.isDone ? 'step-circle--done' : isNext ? 'step-circle--pending' : 'step-circle--locked'}`}>
+                            {stage.isDone
+                              ? <img src={iconCheck} alt="done" className="step-check-img" />
+                              : <span>{idx + 1}</span>}
+                          </div>
+                          <div className="step-body">
+                            <div className="step-meta">
+                              <span className="step-time">Step {idx + 1}</span>
+                              {stage.isDone && <span className="badge badge-green">Completed</span>}
+                              {isNext && <span className="badge badge-yellow">In Progress</span>}
+                              {isLocked && <span className="badge badge-blue">Upcoming</span>}
+                            </div>
+                            <h4 className="step-heading">{content.label}</h4>
+                            <p className="step-desc">{content.description}</p>
+                            {(stage.isDone || isNext) && content.actions.length > 0 && (
+                              <ul className="step-actions">
+                                {content.actions.map((action) => (
+                                  <li key={action}>{action}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+      </main>
+
+      {showCreateModal && user?.id && (
+        <CreateRoadmapModal
+          userId={user.id}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            setShowCreateModal(false);
+            loadData();
+            setActiveTab(roadmaps.length); // switch to the new tab
+          }}
+        />
+      )}
+
+      {isChatOpen && (
+        <div className="floating-chat-wrapper">
+          <div className="chat-header-bar">
+            <span>CareerCoach AI</span>
+            <button type="button" className="close-chat" onClick={() => setIsChatOpen(false)} aria-label="Close chat">
+              X
+            </button>
+          </div>
+          <ChatInterface userId={user?.id ?? 'guest'} userName={user?.firstName} />
+        </div>
+      )}
+    </div>
+  );
 };
