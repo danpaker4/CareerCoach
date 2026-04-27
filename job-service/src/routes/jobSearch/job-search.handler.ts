@@ -99,6 +99,7 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
 
         try {
             const queryText = buildQueryText(payload);
+            console.log("queryText", queryText);
             const queryVector = embeddingClient ? await generateQueryVector(queryText) : null;
             if (!queryVector) {
                 reply.status(StatusCodes.OK).send([]);

@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const DEFAULT_MOCK_JOBS_COUNT = 8;
-const GEMINI_MODEL = process.env.LLM_MODEL || "gemini-2.5-flash-lite";
+const GEMINI_MODEL = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
 
 export type MockGeneratedJob = {
   id: string;

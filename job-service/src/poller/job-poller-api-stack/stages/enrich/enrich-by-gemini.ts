@@ -122,7 +122,7 @@ export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]>
     });
   }
 
-  const modelName = process.env.LLM_MODEL || "gemini-2.5-flash-lite";
+  const modelName = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
   const embeddingModel = createEmbeddingClient(apiKey);

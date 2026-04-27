@@ -20,7 +20,7 @@ export const startJobPollerSchedule = (jobsCollection: Collection<EnrichedJob>) 
         runState.isRunning = true;
         try {
             // await jobPoller(jobsCollection);
-            await jobPollerMock(jobsCollection);
+            // await jobPollerMock(jobsCollection);
         } catch (error) {
             console.error("🔥 Job poller failed:", error);
         } finally {
