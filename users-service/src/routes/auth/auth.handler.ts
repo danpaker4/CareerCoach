@@ -37,7 +37,7 @@ export const registerUser = (usersCollection: Collection<User>): AuthRouteHandle
         currentJob: fields.currentJob,
         linkedInUrl: fields.linkedInUrl,
         githubUrl: fields.githubUrl,
-        cvFile,
+        cvFile: cvFile as any,
       });
 
       setAuthCookies(reply, {

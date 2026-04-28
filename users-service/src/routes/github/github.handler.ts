@@ -1,45 +1,41 @@
 import { FastifyReply } from "fastify";
 import { StatusCodes } from "http-status-codes";
+import type { Collection } from "mongodb";
 import { SchematicRequest } from "../../types/fastify";
-import { getAccessTokenGitSchema } from "./github.schema";
+import { githubCallbackSchema } from "./github.schema";
 import type { GithubHandlerType } from "./github.types";
-import { serializeRouteError } from "./github.utils";
+import { exchangeCodeForAccessToken, fetchGithubUserEmails, fetchGithubUserProfile, loginOrCreateGithubUser } from "./github.service";
+import type { User } from "../users/user.model";
+import { setAuthCookies } from "../auth/auth.cookies";
 
-export const GithubHandler = (): GithubHandlerType => {
+export const GithubHandler = (usersCollection: Collection<User>): GithubHandlerType => {
     return {
-        getAccessTokenGit: async (request: SchematicRequest<typeof getAccessTokenGitSchema>, reply: FastifyReply) => {
+        githubCallback: async (request: SchematicRequest<typeof githubCallbackSchema>, reply: FastifyReply) => {
             try {
-                reply.code(StatusCodes.OK).send("OK");
-            } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
-            }
-        },
+                const { code, redirectUri } = request.query;
+                const accessToken = await exchangeCodeForAccessToken(code, redirectUri);
+                const [profile, emails] = await Promise.all([
+                    fetchGithubUserProfile(accessToken),
+                    fetchGithubUserEmails(accessToken)
+                ]);
 
-        getUserData: async (request: SchematicRequest<typeof getAccessTokenGitSchema>, reply: FastifyReply) => {
-            const { authorization } = request.headers;
+                const session = await loginOrCreateGithubUser(usersCollection, profile, emails);
 
-            if (!authorization) {
-                return reply.code(StatusCodes.UNAUTHORIZED).send({
-                    error: "Missing Authorization header",
+                setAuthCookies(reply, {
+                    accessToken: session.accessToken,
+                    refreshToken: session.refreshToken,
                 });
-            }
 
-            try {
-                const response = await fetch("https://api.github.com/user", {
-                    method: "GET",
-                    headers: {
-                        Authorization: authorization,
-                    },
+                reply.code(StatusCodes.OK).send({
+                    success: true,
+                    user: session.user,
+                    accessToken: session.accessToken,
                 });
-                const data = await response.json();
-
-                if (!response.ok) {
-                    return reply.code(response.status).send(data);
-                }
-
-                reply.code(StatusCodes.OK).send(data);
             } catch (error) {
-                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
+                console.error(error);
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+                    error: error instanceof Error ? error.message : "Internal server error"
+                });
             }
         },
     };
