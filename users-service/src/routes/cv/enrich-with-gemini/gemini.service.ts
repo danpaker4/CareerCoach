@@ -116,7 +116,7 @@ export const extractAchievementsWithGemini = async (input: {
     return [];
   }
 
-  const modelName = process.env.LLM_MODEL || "gemini-flash-latest";
+  const modelName = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
 

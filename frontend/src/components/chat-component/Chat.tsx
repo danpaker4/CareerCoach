@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import './Chat.css';
 import { ENV } from '../../config';
-import { apiFetch } from '../../lib/apiClient';
-import type { ChatProps, ChatResponse, Message } from './chat.types';
+import type { ChatProps, ChatResponse, ConversationResponse, Message } from './chat.types';
 
 const createMessage = (role: Message['role'], content: string): Message => ({
     id: crypto.randomUUID(),
@@ -12,14 +11,22 @@ const createMessage = (role: Message['role'], content: string): Message => ({
 
 const readChatResponse = async (response: Response): Promise<ChatResponse> => {
     const payload: unknown = await response.json().catch(() => ({}));
-    if (typeof payload !== 'object' || payload === null || !('response' in payload)) {
+    if (typeof payload !== 'object' || payload === null || !('reply' in payload)) {
         return {};
     }
 
-    return typeof payload.response === 'string' ? { response: payload.response } : {};
+    return typeof payload.reply === 'string' ? { reply: payload.reply } : {};
 };
 
-export const ChatInterface = ({ userId, userName }: ChatProps) => {
+const readConversationResponse = async (response: Response): Promise<ConversationResponse | null> => {
+    const payload: unknown = await response.json().catch(() => null);
+    if (typeof payload !== 'object' || payload === null || !('messages' in payload)) {
+        return null;
+    }
+    return payload as ConversationResponse;
+};
+
+export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +41,31 @@ export const ChatInterface = ({ userId, userName }: ChatProps) => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    useEffect(() => {
+        const loadConversation = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/${userId}`);
+                if (!response.ok) {
+                    return;
+                }
+                const conversation = await readConversationResponse(response);
+                if (!conversation) {
+                    return;
+                }
+                setMessages(conversation.messages.map((message) => ({
+                    id: crypto.randomUUID(),
+                    role: message.role,
+                    content: message.content,
+                })));
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadConversation().catch(() => undefined);
+    }, [userId]);
 
     // פונקציה להגדלת התיבה
     const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -66,21 +98,21 @@ export const ChatInterface = ({ userId, userName }: ChatProps) => {
         setIsLoading(true);
 
         try {
-            const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/api/chat`, {
+            const response = await fetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, message: input })
+                body: JSON.stringify({ userId, message: input, userProfile })
             });
 
             const data = await readChatResponse(response);
-            const modelResponse = data.response;
-            if (modelResponse) {
-                setMessages(prev => [...prev, createMessage('model', modelResponse)]);
+            const assistantReply = data.reply;
+            if (assistantReply) {
+                setMessages(prev => [...prev, createMessage('assistant', assistantReply)]);
             } else {
-                setMessages(prev => [...prev, createMessage('model', "I couldn't understand that.")]);
+                setMessages(prev => [...prev, createMessage('assistant', "I couldn't understand that.")]);
             }
         } catch {
-            setMessages(prev => [...prev, createMessage('model', "Server connection error.")]);
+            setMessages(prev => [...prev, createMessage('assistant', "Server connection error.")]);
         } finally {
             setIsLoading(false);
         }
@@ -89,17 +121,12 @@ export const ChatInterface = ({ userId, userName }: ChatProps) => {
     return (
         <div className="chat-container">
             <div className="messages-area">
-                <div className="message-wrapper model">
-                    <div className="message-bubble">
-                        Hi {userName || 'there'}! 👋 I'm CareerCoach AI.
-                    </div>
-                </div>
                 {messages.map((msg) => (
                     <div key={msg.id} className={`message-wrapper ${msg.role}`}>
                         <div className="message-bubble">{msg.content}</div>
                     </div>
                 ))}
-                {isLoading && <div className="message-wrapper model"><div className="message-bubble">Typing...</div></div>}
+                {isLoading && <div className="message-wrapper assistant"><div className="message-bubble">Typing...</div></div>}
                 <div ref={messagesEndRef} />
             </div>
 

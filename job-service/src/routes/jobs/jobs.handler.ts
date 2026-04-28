@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
-import type { EnrichedJob } from "../../poller/job-poller/stages/enrich/types";
+import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
 
 type GetJobsQuery = { search?: string; userId?: string };

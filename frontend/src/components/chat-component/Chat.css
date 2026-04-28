@@ -33,6 +33,11 @@
 .message-wrapper.user  { justify-content: flex-end; }
 .message-wrapper.model { justify-content: flex-start; }
 
+.message-wrapper.assistant,
+.message-wrapper.system {
+    justify-content: flex-start;
+}
+
 .message-bubble {
   max-width: 80%;
   padding: 10px 14px;
@@ -51,6 +56,14 @@
 }
 
 .message-wrapper.model .message-bubble {
+  background: white;
+  color: var(--clr-slate-800);
+  border: 1px solid var(--clr-slate-200);
+  border-bottom-left-radius: 4px;
+}
+
+.message-wrapper.assistant .message-bubble,
+.message-wrapper.system .message-bubble {
   background: white;
   color: var(--clr-slate-800);
   border: 1px solid var(--clr-slate-200);
@@ -83,6 +96,10 @@
   max-height: 110px;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
   direction: auto;
+}
+
+.input-area textarea::placeholder {
+    color: #9ca3af;
 }
 
 .input-area textarea:focus {

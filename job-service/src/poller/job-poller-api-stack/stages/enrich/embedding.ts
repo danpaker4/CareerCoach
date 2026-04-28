@@ -1,0 +1,54 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const DEFAULT_EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"] as const;
+
+export type EmbeddingClient = {
+  genAI: GoogleGenerativeAI;
+  modelNames: string[];
+};
+
+const normalizeList = (items: readonly string[]): string =>
+  items.map((item) => item.trim()).filter(Boolean).join(", ");
+
+export const buildSearchableText = (input: {
+  jobTitle: string;
+  description: string;
+  requirements: readonly string[];
+  benefits: readonly string[];
+}): string => [
+  `Job title: ${input.jobTitle}`,
+  `Description: ${input.description}`,
+  `Requirements: ${normalizeList(input.requirements)}`,
+  `Benefits: ${normalizeList(input.benefits)}`,
+].join("\n");
+
+export const createEmbeddingClient = (apiKey: string): EmbeddingClient => {
+  const preferredModel = process.env.JOB_EMBEDDING_MODEL;
+  const modelNames = [
+    ...(preferredModel ? [preferredModel] : []),
+    ...DEFAULT_EMBEDDING_MODELS,
+  ].filter((name, index, arr) => arr.indexOf(name) === index);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return { genAI, modelNames };
+};
+
+export const createEmbedding = async (
+  client: EmbeddingClient,
+  text: string,
+): Promise<number[]> => {
+  let lastError: unknown = null;
+  for (const modelName of client.modelNames) {
+    try {
+      const model = client.genAI.getGenerativeModel({ model: modelName });
+      const result = await model.embedContent(text);
+      const values = result.embedding?.values;
+      if (Array.isArray(values)) {
+        return values;
+      }
+      lastError = new Error(`Embedding model ${modelName} returned invalid vector`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error("All embedding models failed");
+};

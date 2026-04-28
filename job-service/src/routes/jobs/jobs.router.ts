@@ -1,6 +1,6 @@
 import type { Collection } from "mongodb";
 import type { FastifyInstance } from "fastify";
-import type { EnrichedJob } from "../../poller/job-poller/stages/enrich/types";
+import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
 import { JobsHandler } from "./jobs.handler";
 

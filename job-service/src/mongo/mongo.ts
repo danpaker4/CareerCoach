@@ -4,7 +4,7 @@ import type { Pipeline } from "../routes/MyPipline/pipeline.model";
 import type { PipelineJob } from "../routes/jobsInPipeline/pipeline-job.model";
 import type { SkillMatcher } from "../routes/skillMatcher/skill-matcher.model";
 import type { CareerRoadMap } from "../routes/careerRoadMap/career-roadmap.model";
-import type { EnrichedJob } from "../poller/job-poller/stages/enrich/types";
+import type { EnrichedJob } from "../poller/job-poller-api-stack/stages/enrich/types";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;

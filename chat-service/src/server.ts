@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
 
 import { MongoClient } from "./mongo/mongo"; 
-import { chatRouter } from "./routes/chat/chat.router";
+import { chatRouter } from "./routes/chat/chat/chat.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -35,11 +35,11 @@ export class Server {
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
 
-            await this.app.register(chatRouter(this.DBClient.chats));
+            await this.app.register(chatRouter(this.DBClient.conversations, this.config.chatConfig));
 
             const address = await this.app.listen({ 
                 port: this.config.port, 
-                host: process.env.HOST || "127.0.0.1" 
+                host: this.config.host
             });
             
             console.log(`🚀 Server running on ${address}`);

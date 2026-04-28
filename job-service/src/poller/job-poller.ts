@@ -1,9 +1,10 @@
 import type { Collection } from "mongodb";
-import { adaptResource } from "./stages/adapt/adapt-resource";
-import { enrichByGemini } from "./stages/enrich/enrich-by-gemini";
-import type { EnrichedJob } from "./stages/enrich/types";
-import { pollResource } from "./stages/polling/poll-resource";
-import { saveEnrichedJobs } from "./stages/save/save-enriched-jobs";
+import { adaptResource } from "./job-poller-api-stack/stages/adapt/adapt-resource";
+import { enrichByGemini } from "./job-poller-api-stack/stages/enrich/enrich-by-gemini";
+import type { EnrichedJob } from "./job-poller-api-stack/stages/enrich/types";
+import { pollResource } from "./job-poller-api-stack/stages/polling/poll-resource";
+import { saveEnrichedJobs } from "./job-poller-api-stack/stages/save/save-enriched-jobs";
+import { jobPollerMock } from "./job-poller-mock/job-poller";
 
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 
@@ -18,7 +19,8 @@ export const startJobPollerSchedule = (jobsCollection: Collection<EnrichedJob>) 
 
         runState.isRunning = true;
         try {
-            await jobPoller(jobsCollection);
+            // await jobPoller(jobsCollection);
+            // await jobPollerMock(jobsCollection);
         } catch (error) {
             console.error("🔥 Job poller failed:", error);
         } finally {

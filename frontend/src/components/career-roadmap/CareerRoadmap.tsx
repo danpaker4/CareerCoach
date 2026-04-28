@@ -99,7 +99,6 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   return (
     <div className="roadmap-page">
       <main className="roadmap-container">
-
         <div className="roadmap-header">
           <div>
             <h1 className="roadmap-title">Career Roadmap</h1>
@@ -300,7 +299,15 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               X
             </button>
           </div>
-          <ChatInterface userId={user?.id ?? 'guest'} userName={user?.firstName} />
+          <ChatInterface
+            userId={user?.id ?? 'guest'}
+            userProfile={{
+              firstName: user?.firstName,
+              lastName: user?.lastName,
+              currentJob: user?.currentJob,
+              achievements: user?.achievements,
+            }}
+          />
         </div>
       )}
     </div>
