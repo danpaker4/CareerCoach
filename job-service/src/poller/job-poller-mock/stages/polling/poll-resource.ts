@@ -1,7 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 const DEFAULT_MOCK_JOBS_COUNT = 8;
-const GEMINI_MODEL = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
+const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+const DEFAULT_MODEL = "llama3";
 
 export type MockGeneratedJob = {
   id: string;
@@ -106,16 +105,37 @@ Rules:
 `;
 
 export const pollResource = async (): Promise<MockGeneratedJob[]> => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is missing");
-  }
-
+  const llmProvider = (process.env.LLM_PROVIDER || "ollama").toLowerCase();
+  const modelName = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || DEFAULT_MODEL;
   const requestedCount = Number(process.env.MOCK_JOBS_COUNT || DEFAULT_MOCK_JOBS_COUNT);
   const jobsCount = Number.isFinite(requestedCount) && requestedCount > 0 ? Math.floor(requestedCount) : DEFAULT_MOCK_JOBS_COUNT;
-  const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: GEMINI_MODEL });
-  const result = await model.generateContent(buildMockJobsPrompt(jobsCount));
-  const rawText = result.response.text();
+  console.info(`[LLM] Mock poller generator provider=${llmProvider} model=${modelName}`);
+  const prompt = buildMockJobsPrompt(jobsCount);
+  const rawText = llmProvider === "ollama"
+    ? await (async (): Promise<string> => {
+      const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: modelName, prompt, stream: false }),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok || typeof payload !== "object" || payload === null || !("response" in payload)) {
+        throw new Error(`Mock poller ollama generation failed with status ${response.status}`);
+      }
+      const text = (payload as { response?: unknown }).response;
+      return typeof text === "string" ? text : "";
+    })()
+    : await (async (): Promise<string> => {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is missing");
+      }
+      const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    })();
   const parsed = parseMockPollResponse(rawText);
 
   return parsed.data;

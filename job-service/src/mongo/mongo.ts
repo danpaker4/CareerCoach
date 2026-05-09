@@ -5,6 +5,12 @@ import type { PipelineJob } from "../routes/jobsInPipeline/pipeline-job.model";
 import type { SkillMatcher } from "../routes/skillMatcher/skill-matcher.model";
 import type { CareerRoadMap } from "../routes/careerRoadMap/career-roadmap.model";
 import type { EnrichedJob } from "../poller/job-poller-api-stack/stages/enrich/types";
+import type {
+    CareerDirectionExample,
+    CareerPathProfile,
+    CareerRoleProfile,
+    CareerSkillProfile,
+} from "../routes/careerKnowledge/career-knowledge.types";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -15,6 +21,10 @@ export class MongoClient implements Service {
     private skillMatchersCollection: Collection<SkillMatcher> | null = null;
     private careerRoadMapsCollection: Collection<CareerRoadMap> | null = null;
     private jobsCollection: Collection<EnrichedJob> | null = null;
+    private careerRoleProfilesCollection: Collection<CareerRoleProfile> | null = null;
+    private careerSkillProfilesCollection: Collection<CareerSkillProfile> | null = null;
+    private careerPathProfilesCollection: Collection<CareerPathProfile> | null = null;
+    private careerDirectionExamplesCollection: Collection<CareerDirectionExample> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -34,6 +44,10 @@ export class MongoClient implements Service {
             this.skillMatchersCollection = this.db.collection<SkillMatcher>("skillMatchers");
             this.careerRoadMapsCollection = this.db.collection<CareerRoadMap>("careerRoadMaps");
             this.jobsCollection = this.db.collection<EnrichedJob>("jobs");
+            this.careerRoleProfilesCollection = this.db.collection<CareerRoleProfile>("career_role_profiles");
+            this.careerSkillProfilesCollection = this.db.collection<CareerSkillProfile>("career_skill_profiles");
+            this.careerPathProfilesCollection = this.db.collection<CareerPathProfile>("career_path_profiles");
+            this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("career_direction_examples");
             
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -50,6 +64,10 @@ export class MongoClient implements Service {
         this.skillMatchersCollection = null;
         this.careerRoadMapsCollection = null;
         this.jobsCollection = null;
+        this.careerRoleProfilesCollection = null;
+        this.careerSkillProfilesCollection = null;
+        this.careerPathProfilesCollection = null;
+        this.careerDirectionExamplesCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
@@ -86,6 +104,34 @@ export class MongoClient implements Service {
             throw new Error("Jobs collection is not initialized");
         }
         return this.jobsCollection;
+    }
+
+    get careerRoleProfiles(): Collection<CareerRoleProfile> {
+        if (!this.careerRoleProfilesCollection) {
+            throw new Error("Career role profiles collection is not initialized");
+        }
+        return this.careerRoleProfilesCollection;
+    }
+
+    get careerSkillProfiles(): Collection<CareerSkillProfile> {
+        if (!this.careerSkillProfilesCollection) {
+            throw new Error("Career skill profiles collection is not initialized");
+        }
+        return this.careerSkillProfilesCollection;
+    }
+
+    get careerPathProfiles(): Collection<CareerPathProfile> {
+        if (!this.careerPathProfilesCollection) {
+            throw new Error("Career path profiles collection is not initialized");
+        }
+        return this.careerPathProfilesCollection;
+    }
+
+    get careerDirectionExamples(): Collection<CareerDirectionExample> {
+        if (!this.careerDirectionExamplesCollection) {
+            throw new Error("Career direction examples collection is not initialized");
+        }
+        return this.careerDirectionExamplesCollection;
     }
 }
 

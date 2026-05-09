@@ -13,7 +13,10 @@ export class ChatController {
             reply.status(StatusCodes.OK).send(conversation);
         } catch (error) {
             request.log.error({ error }, "Failed loading conversation");
-            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Failed loading conversation" });
+            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({
+                error: "Failed loading conversation",
+                details: error instanceof Error ? error.message : String(error),
+            });
         }
     };
 
@@ -29,7 +32,10 @@ export class ChatController {
             }
 
             request.log.error({ error }, "Failed sending chat message");
-            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Failed sending chat message" });
+            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({
+                error: "Failed sending chat message",
+                details: error instanceof Error ? error.message : String(error),
+            });
         }
     };
 }

@@ -11,11 +11,43 @@ const createMessage = (role: Message['role'], content: string): Message => ({
 
 const readChatResponse = async (response: Response): Promise<ChatResponse> => {
     const payload: unknown = await response.json().catch(() => ({}));
-    if (typeof payload !== 'object' || payload === null || !('reply' in payload)) {
+    if (typeof payload !== 'object' || payload === null) {
         return {};
     }
-
-    return typeof payload.reply === 'string' ? { reply: payload.reply } : {};
+    const record = payload as Record<string, unknown>;
+    const parsedJobs = Array.isArray(record.jobs)
+        ? record.jobs.filter((item): item is NonNullable<ChatResponse['jobs']>[number] => {
+            if (typeof item !== 'object' || item === null) {
+                return false;
+            }
+            const job = item as Record<string, unknown>;
+            const companyOk = !('company' in job) || typeof job.company === 'string';
+            const salaryOk = !('salary' in job) || typeof job.salary === 'number';
+            return typeof job.jobId === 'string'
+                && typeof job.jobTitle === 'string'
+                && typeof job.url === 'string'
+                && typeof job.seniority === 'string'
+                && typeof job.description === 'string'
+                && companyOk
+                && salaryOk;
+        })
+        : [];
+    const parsedMatches = Array.isArray(record.jobMatches)
+        ? record.jobMatches.filter((item): item is NonNullable<ChatResponse['jobMatches']>[number] => {
+            if (typeof item !== 'object' || item === null) {
+                return false;
+            }
+            const match = item as Record<string, unknown>;
+            return typeof match.jobId === 'string'
+                && typeof match.title === 'string'
+                && typeof match.matchScore === 'number';
+        })
+        : [];
+    return {
+        reply: typeof record.reply === 'string' ? record.reply : undefined,
+        jobs: parsedJobs,
+        jobMatches: parsedMatches,
+    };
 };
 
 const readConversationResponse = async (response: Response): Promise<ConversationResponse | null> => {
@@ -54,11 +86,20 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
                 if (!conversation) {
                     return;
                 }
-                setMessages(conversation.messages.map((message) => ({
-                    id: crypto.randomUUID(),
-                    role: message.role,
-                    content: message.content,
-                })));
+                setMessages(conversation.messages.map((message) => {
+                    const jobsFromHistory = message.attachedJobs ?? [];
+                    const historyJobsSummary = jobsFromHistory.length > 0
+                        ? `\n\nReal jobs found:\n${jobsFromHistory.slice(0, 5).map((job) => {
+                            const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
+                            return `- ${job.jobTitle}${company} (${job.seniority})`;
+                        }).join('\n')}`
+                        : '';
+                    return {
+                        id: crypto.randomUUID(),
+                        role: message.role,
+                        content: `${message.content}${historyJobsSummary}`,
+                    };
+                }));
             } finally {
                 setIsLoading(false);
             }
@@ -106,8 +147,17 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
 
             const data = await readChatResponse(response);
             const assistantReply = data.reply;
+            const jobsFromResponse = data.jobs ?? [];
+            const jobsSummary = jobsFromResponse.length > 0
+                ? `\n\nReal jobs found:\n${jobsFromResponse.slice(0, 5).map((job) => {
+                    const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
+                    return `- ${job.jobTitle}${company} (${job.seniority})`;
+                }).join('\n')}`
+                : (data.jobMatches && data.jobMatches.length > 0
+                    ? `\n\nTop matches:\n${data.jobMatches.slice(0, 5).map((match) => `- ${match.title}`).join('\n')}`
+                    : '');
             if (assistantReply) {
-                setMessages(prev => [...prev, createMessage('assistant', assistantReply)]);
+                setMessages(prev => [...prev, createMessage('assistant', `${assistantReply}${jobsSummary}`)]);
             } else {
                 setMessages(prev => [...prev, createMessage('assistant', "I couldn't understand that.")]);
             }

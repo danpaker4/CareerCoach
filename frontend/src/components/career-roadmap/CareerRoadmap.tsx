@@ -306,6 +306,8 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               lastName: user?.lastName,
               currentJob: user?.currentJob,
               achievements: user?.achievements,
+              technologies: user?.technologies,
+              interests: user?.interests,
             }}
           />
         </div>

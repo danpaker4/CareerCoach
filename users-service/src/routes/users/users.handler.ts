@@ -35,6 +35,9 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                     id: randomUUID(),
                     ...userData,
                     achievements: userData.achievements ?? [],
+                    technologies: userData.technologies ?? [],
+                    interests: userData.interests ?? [],
+                    knownSkills: userData.knownSkills ?? [],
                 };
 
                 await usersCollection.insertOne(newUser);

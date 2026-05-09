@@ -37,6 +37,9 @@ export const createUserSchema = {
             name: z.string(),
             grade: z.number().min(1).max(100),
         })).default([]),
+        technologies: z.array(z.string()).optional(),
+        interests: z.array(z.string()).optional(),
+        knownSkills: z.array(z.string()).optional(),
     }),
 } satisfies FastifySchema;
 
@@ -68,6 +71,9 @@ export const updateUserSchema = {
             name: z.string(),
             grade: z.number().min(1).max(100),
         })).optional(),
+        technologies: z.array(z.string()).optional(),
+        interests: z.array(z.string()).optional(),
+        knownSkills: z.array(z.string()).optional(),
     }),
 } satisfies FastifySchema;
 

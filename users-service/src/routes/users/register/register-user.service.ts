@@ -12,6 +12,57 @@ import {
   validateCvBuffer,
 } from "./register-user.utils";
 
+const uniqueStrings = (values: readonly string[]): string[] =>
+  [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
+
+const inferTechnologiesFromText = (text: string): string[] => {
+  const normalized = text.toLowerCase();
+  const map: Record<string, string> = {
+    nodejs: "Node.js",
+    "node.js": "Node.js",
+    node: "Node.js",
+    mongo: "MongoDB",
+    mongodb: "MongoDB",
+    typescript: "TypeScript",
+    javascript: "JavaScript",
+    react: "React",
+    angular: "Angular",
+    redis: "Redis",
+    kafka: "Kafka",
+    cypress: "Cypress",
+    playwright: "Playwright",
+    docker: "Docker",
+    kubernetes: "Kubernetes",
+    aws: "AWS",
+  };
+
+  const found = new Set<string>();
+  for (const [needle, canonical] of Object.entries(map)) {
+    if (normalized.includes(needle)) {
+      found.add(canonical);
+    }
+  }
+  return [...found];
+};
+
+const inferInterestsFromText = (text: string): string[] => {
+  const normalized = text.toLowerCase();
+  const candidates = [
+    "automation",
+    "testing",
+    "backend",
+    "frontend",
+    "devops",
+    "data",
+    "analytics",
+    "security",
+    "reliability",
+    "scalability",
+    "product",
+  ];
+  return candidates.filter((candidate) => normalized.includes(candidate));
+};
+
 export const registerUser = async (
   usersCollection: Collection<User>,
   input: RegisterUserInput,
@@ -49,6 +100,10 @@ export const registerUser = async (
     : { cvS3Path: undefined, achievementsFromGemini: [] };
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const achievementTexts = achievementsFromGemini.map((achievement) => achievement.name);
+  const cvSignalText = [currentJob ?? "", ...achievementTexts].join(" | ");
+  const technologies = uniqueStrings(inferTechnologiesFromText(cvSignalText));
+  const interests = uniqueStrings(inferInterestsFromText(cvSignalText));
   const newUser: User = {
     id: userId,
     firstName,
@@ -65,6 +120,9 @@ export const registerUser = async (
       name: achievement.name,
       grade: achievement.grade,
     })),
+    technologies,
+    interests,
+    knownSkills: technologies,
   };
 
   await usersCollection.insertOne(newUser);

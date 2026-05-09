@@ -6,6 +6,9 @@ import { pollResource } from "./stages/polling/poll-resource";
 
 export const jobPollerMock = async (jobsCollection: Collection<EnrichedJob>) => {
   console.log("🔄 Starting Mock Job Poller...");
+  const provider = process.env.LLM_PROVIDER || "ollama";
+  const model = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || "llama3";
+  console.info(`[LLM] Mock job generation provider=${provider} model=${model}`);
   const generatedJobs = await pollResource();
   console.log(`✅ ${generatedJobs.length} mock jobs generated`);
 
@@ -18,6 +21,13 @@ export const jobPollerMock = async (jobsCollection: Collection<EnrichedJob>) => 
         : [];
       return {
         ...job,
+        languages: [],
+        frameworks: [],
+        databases: [],
+        platforms: [],
+        tools: [],
+        mustKnowSkills: job.requirements.slice(0, 8),
+        niceToHaveSkills: [],
         searchEmbedding,
       };
     }),

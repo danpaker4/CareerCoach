@@ -19,8 +19,11 @@ export const startJobPollerSchedule = (jobsCollection: Collection<EnrichedJob>) 
 
         runState.isRunning = true;
         try {
+            const provider = process.env.LLM_PROVIDER || "ollama";
+            const model = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || "llama3";
+            console.info(`[LLM] Poller run provider=${provider} model=${model}`);
             // await jobPoller(jobsCollection);
-            // await jobPollerMock(jobsCollection);
+            await jobPollerMock(jobsCollection);
         } catch (error) {
             console.error("🔥 Job poller failed:", error);
         } finally {
@@ -36,6 +39,9 @@ export const startJobPollerSchedule = (jobsCollection: Collection<EnrichedJob>) 
 
 export const jobPoller = async (jobsCollection: Collection<EnrichedJob>) => {
     console.log("🔄 Starting Job Poller...");
+    const provider = process.env.LLM_PROVIDER || "ollama";
+    const model = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || "llama3";
+    console.info(`[LLM] Job poller enrichment provider=${provider} model=${model}`);
     const resource = await pollResource();
     console.log(`✅ ${resource.length} jobs polled`);
     const adaptedJobs = adaptResource(resource);

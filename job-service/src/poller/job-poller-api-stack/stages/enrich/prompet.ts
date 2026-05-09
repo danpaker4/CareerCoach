@@ -6,14 +6,22 @@ Return ONLY valid JSON with this exact shape:
 {
   "salary": "number",
   "requirements": ["string"],
-  "benefits": ["string"]
+  "benefits": ["string"],
+  "languages": ["string"],
+  "frameworks": ["string"],
+  "databases": ["string"],
+  "platforms": ["string"],
+  "tools": ["string"],
+  "mustKnowSkills": ["string"],
+  "niceToHaveSkills": ["string"]
 }
 
 Rules:
 - salary must be numeric and represent dollars per hour.
-- If salary/requirements/benefits are explicitly written, use them.
-- If a value is missing, infer a realistic value from the role title, company and seniority.
+- Extract only values grounded in the job text. Do not invent technologies or benefits not implied by the description.
+- If a field is missing, return an empty array for that field.
 - Keep requirements and benefits short bullet-style phrases.
+- Use canonical skill names when possible (Node.js, MongoDB, TypeScript, AWS, Docker, Kubernetes).
 - All returned values must be in English.
 
 Job:

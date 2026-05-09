@@ -1,4 +1,4 @@
-import { DEFAULT_GEMINI_MODEL, DEFAULT_OPENAI_MODEL } from "./llm-config.consts";
+import { DEFAULT_GEMINI_MODEL, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_MODEL } from "./llm-config.consts";
 import type { LlmEnvInput, ResolvedLlmConfig } from "./llm-config.types";
 
 export const resolveLlmConfig = (env: LlmEnvInput): ResolvedLlmConfig => {
@@ -21,6 +21,12 @@ export const resolveLlmConfig = (env: LlmEnvInput): ResolvedLlmConfig => {
             env.llmModel?.trim() ||
             DEFAULT_OPENAI_MODEL;
         return { provider: "openai", apiKey, model };
+    }
+
+    if (env.llmProvider === "ollama") {
+        const endpointUrl = env.ollamaBaseUrl?.trim() || DEFAULT_OLLAMA_BASE_URL;
+        const model = env.ollamaModel?.trim() || env.llmModel?.trim() || DEFAULT_OLLAMA_MODEL;
+        return { provider: "ollama", endpointUrl, model };
     }
 
     const endpointUrl = env.customLlmUrl?.trim();

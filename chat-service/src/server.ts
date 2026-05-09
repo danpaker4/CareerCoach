@@ -35,7 +35,7 @@ export class Server {
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
 
-            await this.app.register(chatRouter(this.DBClient.conversations, this.config.chatConfig));
+            await this.app.register(chatRouter(this.DBClient, this.config.chatConfig));
 
             const address = await this.app.listen({ 
                 port: this.config.port, 

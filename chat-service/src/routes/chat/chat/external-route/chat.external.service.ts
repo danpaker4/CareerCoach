@@ -1,5 +1,5 @@
-import type { JobSearchRequest, JobSearchResultItem, UserAchievementResponse, UserProfileResponse } from "../../chat.types";
-import { isAchievement, isJobSearchResultItem, normalizeFilters, parseUserProfileResponse } from "../chat.utils";
+import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse, UserProfileResponse } from "../../chat.types";
+import { isAchievement, isJobSearchResultItem, normalizeFilters, normalizeJobSearchResultItem, normalizeSearchPlan, parseUserProfileResponse } from "../chat.utils";
 import { EXPERIENCE_HINTS } from "./chat.external.consts";
 
 const toAchievementFromMessage = (message: string): UserAchievementResponse | null => {
@@ -54,7 +54,32 @@ export class ChatExternalService {
         }
 
         const payload: unknown = await response.json().catch(() => []);
-        return Array.isArray(payload) ? payload.filter(isJobSearchResultItem).slice(0, 10) : [];
+        return Array.isArray(payload)
+            ? payload
+                .filter(isJobSearchResultItem)
+                .map(normalizeJobSearchResultItem)
+                .slice(0, 10)
+            : [];
+    };
+
+    searchJobsByPlan = async (plan: JobSearchPlanRequest): Promise<JobSearchResultItem[]> => {
+        const response = await fetch(`${this.jobServiceBaseUrl}/jobs/search`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(normalizeSearchPlan(plan)),
+        });
+
+        if (!response.ok) {
+            return [];
+        }
+
+        const payload: unknown = await response.json().catch(() => []);
+        return Array.isArray(payload)
+            ? payload
+                .filter(isJobSearchResultItem)
+                .map(normalizeJobSearchResultItem)
+                .slice(0, 30)
+            : [];
     };
 
     upsertAchievementFromUserMessage = async (
@@ -86,5 +111,17 @@ export class ChatExternalService {
         }
 
         return updatedAchievements;
+    };
+
+    upsertKnownSkills = async (userId: string, skills: readonly string[]): Promise<void> => {
+        const normalized = [...new Set(skills.map((item) => item.trim()).filter((item) => item.length > 0))];
+        if (normalized.length === 0) {
+            return;
+        }
+        await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ knownSkills: normalized }),
+        }).catch(() => null);
     };
 }
