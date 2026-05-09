@@ -17,6 +17,7 @@ interface LoginPageProps {
 
 export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
   const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
+  const isSignUpView = activeButton === Login.signUp
   const navigate = useNavigate();
   const [isLoadingGithub, setIsLoadingGithub] = useState(false);
 
@@ -79,7 +80,7 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
 
   return (
     <div className="login-container">
-      <Card>
+      <Card className={isSignUpView ? 'auth-card auth-card--signup' : 'auth-card'}>
         <div className="card-header">
           <h2 className="card-title">Welcome to CareerCoach</h2>
           <p className="card-subtitle">Your smart career management platform</p>
@@ -96,7 +97,7 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
 
         <div className="social-login-section">
           <div className="divider">
-            <span>Or continue with</span>
+            <span>OR</span>
           </div>
           <button
             type="button"

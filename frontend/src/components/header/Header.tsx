@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import iconRoadmap from '../../assets/icon-roadmap.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import iconKanban from '../../assets/icon-kanban.svg';
-import iconUser from '../../assets/icon-user.svg';
 import iconTarget from '../../assets/icon-target.svg';
 import iconSparkle from '../../assets/icon-sparkle.svg';
 import iconMenu from '../../assets/icon-menu.svg';
@@ -25,6 +24,7 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const homePath = userName ? '/dashboard' : '/';
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -44,9 +44,6 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
 
   const navLinks = (
     <>
-      <Link to={userName ? '/dashboard' : '/'} className={`nav-link${(isActive('/') || isActive('/dashboard')) ? ' nav-link--active' : ''}`}>
-        Home
-      </Link>
       {userName && (
         <>
           <Link to="/roadmap" className={`nav-link${isActive('/roadmap') ? ' nav-link--active' : ''}`}>
@@ -69,10 +66,6 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
             <img src={iconSparkle} alt="" aria-hidden="true" className="nav-icon" />
             Jobs
           </Link>
-          <Link to="/profile" className={`nav-link${isActive('/profile') ? ' nav-link--active' : ''}`}>
-            <img src={iconUser} alt="" aria-hidden="true" className="nav-icon" />
-            Profile
-          </Link>
         </>
       )}
     </>
@@ -81,7 +74,7 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
   return (
     <header className="navbar" ref={menuRef}>
       <div className="navbar-brand">
-        <Link to="/" className="brand-link">
+        <Link to={homePath} className="brand-link">
           <span className="brand-text">CareerCoach</span>
         </Link>
       </div>
@@ -91,8 +84,14 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
       <div className="navbar-auth">
         {userName ? (
           <div className="user-area">
-            <div className="user-avatar" aria-hidden="true">{getInitials(userName)}</div>
-            <span className="user-name">{userName}</span>
+            <Link
+              to="/profile"
+              className={`user-profile-link${isActive('/profile') ? ' user-profile-link--active' : ''}`}
+              aria-current={isActive('/profile') ? 'page' : undefined}
+            >
+              <div className="user-avatar" aria-hidden="true">{getInitials(userName)}</div>
+              <span className="user-name">{userName}</span>
+            </Link>
             <button type="button" className="btn-logout" onClick={onLogout}>Logout</button>
           </div>
         ) : (
@@ -118,10 +117,15 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
           <div className="mobile-auth">
             {userName ? (
               <>
-                <div className="mobile-user">
+                <Link
+                  to="/profile"
+                  className={`mobile-user user-profile-link${isActive('/profile') ? ' user-profile-link--active' : ''}`}
+                  aria-current={isActive('/profile') ? 'page' : undefined}
+                  onClick={() => setMenuOpen(false)}
+                >
                   <div className="user-avatar" aria-hidden="true">{getInitials(userName)}</div>
                   <span className="user-name">{userName}</span>
-                </div>
+                </Link>
                 <button type="button" className="btn-logout mobile-logout" onClick={onLogout}>
                   Logout
                 </button>

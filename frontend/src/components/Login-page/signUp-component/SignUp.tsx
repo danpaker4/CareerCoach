@@ -18,7 +18,6 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
     const [birthDate, setBirthDate] = useState('');
     const [currentJob, setCurrentJob] = useState('');
     const [linkedInUrl, setLinkedInUrl] = useState('');
-    const [githubUrl, setGithubUrl] = useState('');
     const [cvFile, setCvFile] = useState<File | null>(null);
     const [error, setError] = useState('');
 
@@ -35,7 +34,6 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
             formData.append('birthDate', birthDate);
             formData.append('currentJob', currentJob);
             formData.append('linkedInUrl', linkedInUrl);
-            formData.append('githubUrl', githubUrl);
             if (cvFile) {
                 formData.append('cv', cvFile);
             }
@@ -92,18 +90,17 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
             </div>
 
             <div className="input-group">
-                <label>GitHub URL</label>
-                <input type="url" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} />
-            </div>
-
-            <div className="input-group">
                 <label>CV (PDF, optional)</label>
-                <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
-                />
-                {cvFile && <p className="selected-file">Selected: {cvFile.name}</p>}
+                <label className="file-upload" htmlFor="signup-cv">
+                    <input
+                        id="signup-cv"
+                        className="file-upload-input"
+                        type="file"
+                        accept="application/pdf"
+                        onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
+                    />
+                    <span className="file-upload-label">{cvFile ? cvFile.name : 'Choose CV file'}</span>
+                </label>
             </div>
 
             <div className="input-group">
