@@ -16,7 +16,8 @@ import type {
     GithubUserEmail,
     GithubUserProfile,
 } from "./github.types";
-import type { User } from "../users/user.model";
+import type { User, UserDocument } from "../users/user.model";
+import { toUserDocument } from "../users/user.utils";
 import { buildAuthenticatedSession } from "../auth/auth.service";
 import type { AuthenticatedUserSession } from "../auth/auth.types";
 import { toSafeUser } from "../auth/auth.utils";
@@ -225,7 +226,7 @@ export const extractGithubSkills = async (accessToken: string): Promise<string[]
 };
 
 export const loginOrCreateGithubUser = async (
-    usersCollection: Collection<User>,
+    usersCollection: Collection<UserDocument>,
     accessToken: string,
     githubProfile: GithubUserProfile,
     emails: GithubUserEmail[]
@@ -247,24 +248,24 @@ export const loginOrCreateGithubUser = async (
     const lastName = lastNameParts.join(" ") || " ";
     const extractedSkills = await extractGithubSkills(accessToken);
     const finalUser = user
-        ? await (async (): Promise<User> => {
+        ? await (async (): Promise<UserDocument> => {
             const processedAvatarUrl = !user.avatarUrl && githubProfile.avatar_url
-                ? await processAvatar(user.id, githubProfile.avatar_url)
+                ? await processAvatar(user._id, githubProfile.avatar_url)
                 : undefined;
-            const updates: Partial<User> = {
+            const updates: Partial<Omit<UserDocument, "_id">> = {
                 githubId: githubProfile.id,
                 githubUrl: githubProfile.html_url,
                 avatarUrl: processedAvatarUrl || user.avatarUrl,
-                skills: extractedSkills.length > 0 ? extractedSkills : (user.skills ?? []),
+                githubSkills: extractedSkills.length > 0 ? extractedSkills : (user.githubSkills ?? []),
                 ...(githubProfile.bio && !user.bio ? { bio: githubProfile.bio } : {}),
                 ...(githubProfile.location && !user.location ? { location: githubProfile.location } : {}),
                 ...(githubProfile.company && !user.company ? { company: githubProfile.company } : {}),
             };
 
-            await usersCollection.updateOne({ id: user.id }, { $set: updates });
-            return { ...user, ...updates } as User;
+            await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+            return { ...user, ...updates };
         })()
-        : await (async (): Promise<User> => {
+        : await (async (): Promise<UserDocument> => {
             const userId = randomUUID();
             const avatarUrl = githubProfile.avatar_url
                 ? await processAvatar(userId, githubProfile.avatar_url)
@@ -275,7 +276,7 @@ export const loginOrCreateGithubUser = async (
                 lastName,
                 email: emailLower,
                 achievements: [],
-                skills: extractedSkills,
+                githubSkills: extractedSkills,
                 githubId: githubProfile.id,
                 githubUrl: githubProfile.html_url,
                 bio: githubProfile.bio || undefined,
@@ -284,8 +285,9 @@ export const loginOrCreateGithubUser = async (
                 avatarUrl,
             };
 
-            await usersCollection.insertOne(newUser);
-            return newUser;
+            const userDocument = toUserDocument(newUser);
+            await usersCollection.insertOne(userDocument);
+            return userDocument;
         })();
 
     return buildAuthenticatedSession(toSafeUser(finalUser));

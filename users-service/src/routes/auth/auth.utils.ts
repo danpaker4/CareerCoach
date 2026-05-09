@@ -9,7 +9,8 @@ import type {
   LoginBody,
   TokenErrorResponses,
 } from "./auth.types";
-import type { User } from "../users/user.model";
+import type { User, UserDocument } from "../users/user.model";
+import { toUser } from "../users/user.utils";
 import { getAuthConfig } from "./auth.config";
 
 export const isLoginBody = (body: unknown): body is LoginBody => {
@@ -136,7 +137,8 @@ export const readMultipartData = async (
   return readMultipartData(iterator, nextAcc);
 };
 
-export const toSafeUser = (user: User): Omit<User, "password"> => {
-  const { password: _password, ...safeUser } = user;
+export const toSafeUser = (user: User | UserDocument): Omit<User, "password"> => {
+  const normalizedUser = "_id" in user ? toUser(user) : user;
+  const { password: _password, ...safeUser } = normalizedUser;
   return safeUser;
 };

@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { Collection } from "mongodb";
-import type { User } from "../users/user.model";
+import type { UserDocument } from "../users/user.model";
 import { clearAuthCookies, setAuthCookies } from "./auth.cookies";
 import {
   loginUserSession,
@@ -18,7 +18,7 @@ import {
   sendKnownTokenError,
 } from "./auth.utils";
 
-export const registerUser = (usersCollection: Collection<User>): AuthRouteHandler =>
+export const registerUser = (usersCollection: Collection<UserDocument>): AuthRouteHandler =>
   async (request, reply) => {
     try {
       if (!request.isMultipart()) {
@@ -55,7 +55,7 @@ export const registerUser = (usersCollection: Collection<User>): AuthRouteHandle
     }
   };
 
-export const loginUser = (usersCollection: Collection<User>): AuthRouteHandler =>
+export const loginUser = (usersCollection: Collection<UserDocument>): AuthRouteHandler =>
   async (request, reply) => {
     try {
       if (!isLoginBody(request.body)) {
@@ -78,7 +78,7 @@ export const loginUser = (usersCollection: Collection<User>): AuthRouteHandler =
     }
   };
 
-export const refreshAccessToken = (usersCollection: Collection<User>): AuthRouteHandler =>
+export const refreshAccessToken = (usersCollection: Collection<UserDocument>): AuthRouteHandler =>
   async (request, reply) => {
     const refreshToken = request.cookies[getRefreshTokenCookie()];
     if (!refreshToken) {

@@ -5,10 +5,10 @@ import { SchematicRequest } from "../../types/fastify";
 import { githubCallbackSchema } from "./github.schema";
 import type { GithubHandlerType } from "./github.types";
 import { exchangeCodeForAccessToken, fetchGithubUserEmails, fetchGithubUserProfile, loginOrCreateGithubUser } from "./github.service";
-import type { User } from "../users/user.model";
+import type { UserDocument } from "../users/user.model";
 import { setAuthCookies } from "../auth/auth.cookies";
 
-export const GithubHandler = (usersCollection: Collection<User>): GithubHandlerType => {
+export const GithubHandler = (usersCollection: Collection<UserDocument>): GithubHandlerType => {
     return {
         githubCallback: async (request: SchematicRequest<typeof githubCallbackSchema>, reply: FastifyReply) => {
             try {
