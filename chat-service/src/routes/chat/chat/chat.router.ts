@@ -12,13 +12,15 @@ import { ChatExternalService } from "./external-route/chat.external.service";
 import { validateChatMessageBody, validateUserIdParam } from "./chat.middleware";
 import { ChatService } from "./chat.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
+import { createTextCompletionPort } from "../../../ai/text-completion.utils";
 
 export const chatRouter = (conversationsCollection: Collection<Conversation>, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(conversationsCollection);
     const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
-    const llmService = new ChatLlmService(chatConfig.geminiApiKey);
+    const textCompletion = createTextCompletionPort(chatConfig.llm);
+    const llmService = new ChatLlmService(textCompletion);
     const validationService = new ChatValidationService();
     const service = new ChatService(conversationService, stageService, externalService, llmService, validationService);
     const controller = new ChatController(service);

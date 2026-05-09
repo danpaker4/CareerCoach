@@ -1,96 +1,47 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { TextCompletionPort } from "../../../ai/ports/text-completion.types";
 import type { Conversation } from "../conversation/conversation.model";
 import type { ConversationStage } from "../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
-import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.builder";
-
-const EMPTY_FILTERS = {
-    skills: [],
-    interests: [],
-    experienceLevel: "",
-    keywords: [],
-};
-
-const parseDecision = (rawText: string): LlmDecision => {
-    const parsed: unknown = JSON.parse(rawText);
-    if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("LLM returned non-object decision payload");
-    }
-
-    const obj = parsed as Record<string, unknown>;
-    return {
-        reply: typeof obj.reply === "string" ? obj.reply : "I need a bit more information to guide you.",
-        shouldSearchJobs: obj.shouldSearchJobs === true,
-        recommendedJobIds: Array.isArray(obj.recommendedJobIds)
-            ? obj.recommendedJobIds.filter((jobId): jobId is string => typeof jobId === "string")
-            : [],
-        searchFilters: {
-            skills: Array.isArray(obj.searchFilters) ? [] : Array.isArray((obj.searchFilters as Record<string, unknown>)?.skills)
-                ? ((obj.searchFilters as Record<string, unknown>).skills as unknown[]).filter((value): value is string => typeof value === "string")
-                : [],
-            interests: Array.isArray(obj.searchFilters) ? [] : Array.isArray((obj.searchFilters as Record<string, unknown>)?.interests)
-                ? ((obj.searchFilters as Record<string, unknown>).interests as unknown[]).filter((value): value is string => typeof value === "string")
-                : [],
-            experienceLevel: Array.isArray(obj.searchFilters) ? "" : typeof (obj.searchFilters as Record<string, unknown>)?.experienceLevel === "string"
-                ? (obj.searchFilters as Record<string, unknown>).experienceLevel as string
-                : "",
-            keywords: Array.isArray(obj.searchFilters) ? [] : Array.isArray((obj.searchFilters as Record<string, unknown>)?.keywords)
-                ? ((obj.searchFilters as Record<string, unknown>).keywords as unknown[]).filter((value): value is string => typeof value === "string")
-                : [],
-        },
-    };
-};
-
-const parseStageDecision = (rawText: string): StageLlmDecision => {
-    const parsed: unknown = JSON.parse(rawText);
-    if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("LLM returned non-object stage payload");
-    }
-
-    const obj = parsed as Record<string, unknown>;
-    return {
-        reply: typeof obj.reply === "string" ? obj.reply : "Thanks. Tell me a bit more so I can guide you accurately.",
-        shouldAdvanceStage: obj.shouldAdvanceStage === true,
-    };
-};
+import {
+    EMPTY_LLM_SEARCH_FILTERS,
+    LLM_DECISION_PARSE_FALLBACK_REPLY,
+    LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
+    LLM_STAGE_PARSE_FALLBACK_REPLY,
+} from "./chat.llm.consts";
+import { parseLlmDecisionFromJson, parseStageLlmDecisionFromJson } from "./chat.llm.utils";
+import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
 
 export class ChatLlmService {
-    private readonly model;
-
-    constructor(geminiApiKey: string) {
-        const genAI = new GoogleGenerativeAI(geminiApiKey);
-        const modelName = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
-        this.model = genAI.getGenerativeModel({ model: modelName });
-    }
+    constructor(private readonly textCompletion: TextCompletionPort) { }
 
     decideNextStep = async (conversation: Conversation, latestUserMessage: string): Promise<LlmDecision> => {
-        const result = await this.model.generateContent(buildDecisionPrompt(conversation, latestUserMessage));
-        const rawText = result.response.text();
+        const rawText = await this.textCompletion.complete(buildDecisionPrompt(conversation, latestUserMessage));
 
         try {
-            return parseDecision(rawText);
+            return parseLlmDecisionFromJson(rawText);
         } catch {
             return {
-                reply: "Thanks, that helps. Could you share the type of role and tech stack you enjoy most?",
+                reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: [],
-                searchFilters: EMPTY_FILTERS,
+                searchFilters: EMPTY_LLM_SEARCH_FILTERS,
             };
         }
     };
 
     generateJobAwareReply = async (conversation: Conversation, latestUserMessage: string, jobs: readonly JobSearchResultItem[]): Promise<LlmDecision> => {
-        const result = await this.model.generateContent(buildRecommendationPrompt(conversation, latestUserMessage, jobs));
-        const rawText = result.response.text();
+        const rawText = await this.textCompletion.complete(
+            buildRecommendationPrompt(conversation, latestUserMessage, jobs)
+        );
 
         try {
-            return parseDecision(rawText);
+            return parseLlmDecisionFromJson(rawText);
         } catch {
             return {
-                reply: "I found relevant jobs. Tell me which one sounds closest to your goals, and I will help you refine it.",
+                reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: jobs.map((job) => job.jobId),
-                searchFilters: EMPTY_FILTERS,
+                searchFilters: EMPTY_LLM_SEARCH_FILTERS,
             };
         }
     };
@@ -100,13 +51,12 @@ export class ChatLlmService {
         latestUserMessage: string,
         stage: ConversationStage
     ): Promise<StageLlmDecision> => {
-        const result = await this.model.generateContent(buildStagePrompt(conversation, latestUserMessage, stage));
-        const rawText = result.response.text();
+        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage));
         try {
-            return parseStageDecision(rawText);
+            return parseStageLlmDecisionFromJson(rawText);
         } catch {
             return {
-                reply: "Got it. Can you share a bit more detail so I can guide you better?",
+                reply: LLM_STAGE_PARSE_FALLBACK_REPLY,
                 shouldAdvanceStage: false,
             };
         }

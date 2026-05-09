@@ -1,3 +1,5 @@
+import type { ResolvedLlmConfig } from "./ai/llm-config.types";
+
 export interface ServerConfig {
     port: number;
     host: string;
@@ -8,6 +10,6 @@ export interface ServerConfig {
     chatConfig: {
         usersServiceBaseUrl: string;
         jobServiceBaseUrl: string;
-        geminiApiKey: string;
-    }
+        llm: ResolvedLlmConfig;
+    };
 }
