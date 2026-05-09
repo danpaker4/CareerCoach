@@ -103,11 +103,13 @@ export const sendAuthError = (reply: FastifyReply, error: unknown): void => {
   reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Internal Server Error" });
 };
 
-export const appendPart = (
+export const appendPart = async (
   current: RegisterMultipartData,
   part: MultipartIteratorPart,
-): RegisterMultipartData => {
+): Promise<RegisterMultipartData> => {
   if (part?.type === "file" && part.fieldname === "cv") {
+    const buffer = await part.toBuffer();
+    part.toBuffer = async () => buffer;
     return { ...current, cvFile: part };
   }
   if (part?.type === "field") {
@@ -130,7 +132,8 @@ export const readMultipartData = async (
   if (next.done) {
     return acc;
   }
-  return readMultipartData(iterator, appendPart(acc, next.value));
+  const nextAcc = await appendPart(acc, next.value);
+  return readMultipartData(iterator, nextAcc);
 };
 
 export const toSafeUser = (user: User): Omit<User, "password"> => {
