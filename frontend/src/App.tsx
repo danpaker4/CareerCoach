@@ -120,7 +120,7 @@ export const App = () => {
   return (
     <Router>
       <div className="App">
-        <Header userName={userDisplayName} onLogout={handleLogout} />
+        <Header userName={userDisplayName} />
 
         <PageTransition>
           <Routes>
@@ -174,7 +174,7 @@ export const App = () => {
               element={
                 <ProtectedRoute user={currentUser}>
                   {currentUser
-                    ? <Profile user={currentUser} onUserUpdated={(u) => setCurrentUser(u)} />
+                    ? <Profile user={currentUser} onUserUpdated={(u) => setCurrentUser(u)} onLogout={handleLogout} />
                     : null}
                 </ProtectedRoute>
               }

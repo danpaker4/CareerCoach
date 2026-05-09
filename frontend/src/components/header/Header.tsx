@@ -11,7 +11,6 @@ import './Header.css';
 
 interface HeaderProps {
   userName?: string;
-  onLogout: () => void;
 }
 
 const getInitials = (name: string): string => {
@@ -20,7 +19,7 @@ const getInitials = (name: string): string => {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-export const Header = ({ userName, onLogout }: HeaderProps) => {
+export const Header = ({ userName }: HeaderProps) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -92,7 +91,6 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
               <div className="user-avatar" aria-hidden="true">{getInitials(userName)}</div>
               <span className="user-name">{userName}</span>
             </Link>
-            <button type="button" className="btn-logout" onClick={onLogout}>Logout</button>
           </div>
         ) : (
           <Link to="/login" className="btn-login-cta">Log In / Sign Up</Link>
@@ -126,9 +124,6 @@ export const Header = ({ userName, onLogout }: HeaderProps) => {
                   <div className="user-avatar" aria-hidden="true">{getInitials(userName)}</div>
                   <span className="user-name">{userName}</span>
                 </Link>
-                <button type="button" className="btn-logout mobile-logout" onClick={onLogout}>
-                  Logout
-                </button>
               </>
             ) : (
               <Link to="/login" className="btn-login-cta mobile-login-cta" onClick={() => setMenuOpen(false)}>

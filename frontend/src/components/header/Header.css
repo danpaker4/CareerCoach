@@ -150,25 +150,6 @@
   white-space: nowrap;
 }
 
-.btn-logout {
-  padding: 7px 16px;
-  border: 1.5px solid var(--clr-slate-300);
-  border-radius: var(--r-full);
-  background: transparent;
-  color: var(--clr-slate-600);
-  font-size: var(--fz-xs);
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all var(--t-fast);
-}
-
-.btn-logout:hover {
-  border-color: var(--clr-error);
-  color: var(--clr-error);
-  background: var(--clr-error-bg);
-}
-
 /* Hamburger — hidden on desktop */
 .hamburger {
   display: none;
@@ -252,10 +233,6 @@
     display: flex;
     align-items: center;
     gap: 10px;
-  }
-
-  .mobile-logout {
-    padding: 8px 18px;
   }
 
   .mobile-login-cta {
