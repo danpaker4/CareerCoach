@@ -6,6 +6,24 @@ import { ChatService } from "./chat.service";
 export class ChatController {
     constructor(private readonly chatService: ChatService) {}
 
+    getUnifiedUserProfile = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        try {
+            const { userId } = request.params as { userId: string };
+            const payload = await this.chatService.getUnifiedUserProfile(userId);
+            if (!payload.user) {
+                reply.status(StatusCodes.NOT_FOUND).send({ error: "User not found" });
+                return;
+            }
+            reply.status(StatusCodes.OK).send(payload);
+        } catch (error) {
+            request.log.error({ error }, "Failed loading unified user profile");
+            reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({
+                error: "Failed loading unified user profile",
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
+    };
+
     getConversation = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const { userId } = request.params as { userId: string };

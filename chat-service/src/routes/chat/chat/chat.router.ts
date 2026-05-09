@@ -25,6 +25,8 @@ import { CareerKnowledgeService } from "../knowledge/career-knowledge.service";
 import { JobFollowUpIntentService } from "../job-context/job-follow-up-intent.service";
 import { JobSelectionResolverService } from "../job-context/job-selection-resolver.service";
 import { JobFollowUpAnswerService } from "../job-context/job-follow-up-answer.service";
+import { PipelineIntentService } from "../pipeline/pipeline-intent.service";
+import { PipelineService } from "../pipeline/pipeline.service";
 import type { MongoClient } from "../../../mongo/mongo";
 
 export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
@@ -38,7 +40,9 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     const validationService = new ChatValidationService();
     const profileRepository = new CareerProfileRepository(dbClient.careerProfiles);
     const memoryRepository = new ConversationMemoryRepository(dbClient.conversationMemories);
-    const profileService = new CareerProfileService(profileRepository, embedding);
+    const profileService = new CareerProfileService(profileRepository, embedding, {
+        notifyProfileMaterialized: (userId) => externalService.notifyCoachProfileMaterialized(userId),
+    });
     const memoryService = new ConversationMemoryService(memoryRepository, embedding, chatConfig.conversationMemoryVectorIndexName);
     const confidenceService = new CareerConfidenceService();
     const modeService = new ConversationModeService();
@@ -49,6 +53,8 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     const followUpIntentService = new JobFollowUpIntentService();
     const selectionResolverService = new JobSelectionResolverService();
     const followUpAnswerService = new JobFollowUpAnswerService();
+    const pipelineIntentService = new PipelineIntentService();
+    const pipelineService = new PipelineService(chatConfig.jobServiceBaseUrl);
     const knowledgeService = new CareerKnowledgeService(
         dbClient.careerDirectionExamples,
         embedding,
@@ -71,10 +77,13 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         knowledgeService,
         followUpIntentService,
         selectionResolverService,
-        followUpAnswerService
+        followUpAnswerService,
+        pipelineIntentService,
+        pipelineService
     );
     const controller = new ChatController(service);
 
+    app.get("/chat/users/:userId/profile", { preHandler: validateUserIdParam }, controller.getUnifiedUserProfile);
     app.get("/chat/:userId", { preHandler: validateUserIdParam }, controller.getConversation);
     app.post("/chat/message", { preHandler: validateChatMessageBody }, controller.sendMessage);
 };

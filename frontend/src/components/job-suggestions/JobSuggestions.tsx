@@ -85,13 +85,49 @@ const MatchRing = ({ pct }: { pct: number }) => {
   );
 };
 
+const parsePipelineJobHashes = (data: unknown): Set<number> => {
+  if (!Array.isArray(data)) {
+    return new Set();
+  }
+  const ids = new Set<number>();
+  data.forEach((item) => {
+    if (typeof item !== 'object' || item === null) {
+      return;
+    }
+    const jobId = (item as Record<string, unknown>).jobId;
+    if (typeof jobId === 'number') {
+      ids.add(jobId);
+    }
+  });
+  return ids;
+};
+
 export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [jobs, setJobs] = useState<JobResult[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
+  const [pipelineJobHashes, setPipelineJobHashes] = useState(() => new Set<number>());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadPipelineJobHashes = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+    const res = await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${user.id}`, {
+      credentials: 'include',
+    });
+    if (res.status === 404) {
+      setPipelineJobHashes(new Set());
+      return;
+    }
+    if (!res.ok) {
+      return;
+    }
+    const data: unknown = await res.json().catch(() => []);
+    setPipelineJobHashes(parsePipelineJobHashes(data));
+  }, [user?.id]);
 
   const fetchJobs = useCallback((query: string) => {
     if (!user?.id) return;
@@ -114,6 +150,10 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   }, [user?.id]);
 
   useEffect(() => {
+    void loadPipelineJobHashes();
+  }, [loadPipelineJobHashes]);
+
+  useEffect(() => {
     fetchJobs('');
   }, [fetchJobs]);
 
@@ -128,9 +168,13 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const addToPipeline = async (job: JobResult) => {
     if (!user?.id) return;
+    const numericId = hashStringToNumber(job.id);
+    if (pipelineJobHashes.has(numericId)) {
+      return;
+    }
     setAddingJob(job.id);
     try {
-      await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
+      const res = await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -138,9 +182,12 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
           userId: user.id,
           description: `${job.jobTitle} at ${job.company}`,
           jobStage: 'wishlist',
-          jobId: hashStringToNumber(job.id),
+          jobId: numericId,
         }),
       });
+      if (res.status === 201 || res.status === 409) {
+        setPipelineJobHashes((prev) => new Set([...prev, numericId]));
+      }
     } catch {
       // silently fail
     } finally {
@@ -206,6 +253,8 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                   const reqs = job.requirements ?? [];
                   const firstTwo = reqs.slice(0, 2);
                   const isAdding = addingJob === job.id;
+                  const jobHash = hashStringToNumber(job.id);
+                  const alreadyInPipeline = pipelineJobHashes.has(jobHash);
                   return (
                     <div key={job.id} className="job-card surface-card">
                       <div className="job-card-top">
@@ -243,10 +292,11 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                           type="button"
                           className="btn-primary job-pipeline-btn"
                           onClick={() => addToPipeline(job)}
-                          disabled={isAdding}
+                          disabled={isAdding || alreadyInPipeline}
+                          aria-label={alreadyInPipeline ? 'Already in pipeline' : 'Add to pipeline'}
                         >
                           <img src={iconPlus} alt="" aria-hidden="true" className="job-btn-icon job-btn-icon--white" />
-                          {isAdding ? 'Adding...' : 'Add to Pipeline'}
+                          {alreadyInPipeline ? 'In pipeline' : isAdding ? 'Adding...' : 'Add to Pipeline'}
                         </button>
                       </div>
                     </div>

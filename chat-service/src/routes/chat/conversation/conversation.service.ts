@@ -6,7 +6,7 @@ import { ConversationRepository } from "./conversation.repository";
 import { profileToSeedAchievements, toConversationResponse } from "./conversation.utils";
 import { ConversationStageService } from "./conversation.stage.service";
 import type { JobSearchResultItem } from "../chat.types";
-import type { ConversationJobContext, SanitizedJob } from "../job-context/job-context.types";
+import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../job-context/job-context.types";
 
 const toAttachedJobSnapshots = (jobs: readonly JobSearchResultItem[]): AttachedJobSnapshot[] =>
     jobs.map((job) => ({
@@ -126,6 +126,10 @@ export class ChatConversationService {
         await this.repository.updateStageProgress(userId, stageProgress);
     };
 
+    saveJobContext = async (userId: string, jobContext: ConversationJobContext): Promise<void> => {
+        await this.repository.updateJobContext(userId, jobContext);
+    };
+
     setJobContextAfterSearch = async (
         userId: string,
         jobs: readonly JobSearchResultItem[],
@@ -134,9 +138,38 @@ export class ChatConversationService {
         lastSearchIntent: string | null
     ): Promise<void> => {
         const now = new Date();
-        const sanitizedJobs = jobs.map(toSanitizedJob);
-        const selectedJobSnapshot = selection ? toSanitizedJob(selection) : null;
+        const conversation = await this.getConversationOrThrow(userId);
+        const prevRec = conversation.jobContext?.jobRecommendationContext;
+        const mergedRejected = [...new Set([...(prevRec?.rejectedJobIds ?? [])])];
+        const mergedAccepted = [...new Set([...(prevRec?.acceptedJobIds ?? [])])];
+        const excluded = new Set([...mergedRejected, ...mergedAccepted]);
+        const jobPoolForPersist = jobs.filter((job) => !excluded.has(job.jobId));
+        const poolToUse = jobPoolForPersist.length > 0 ? jobPoolForPersist : [];
+        const resolveSelected = (): JobSearchResultItem | null => {
+            if (poolToUse.length === 0) {
+                return null;
+            }
+            if (selection && poolToUse.some((job) => job.jobId === selection.jobId)) {
+                return selection;
+            }
+            return poolToUse[0] ?? null;
+        };
+        const resolved = resolveSelected();
+        const sanitizedJobs = poolToUse.map(toSanitizedJob);
+        const selectedJobSnapshot = resolved ? toSanitizedJob(resolved) : null;
         const selectedJobId = selectedJobSnapshot?.id ?? null;
+        const jobRecommendationContext: JobRecommendationContextState | null =
+            selectedJobSnapshot && poolToUse.length > 0
+                ? {
+                      selectedJobId,
+                      selectedJob: selectedJobSnapshot,
+                      recommendedJobIds: poolToUse.map((job) => job.jobId),
+                      rejectedJobIds: mergedRejected,
+                      acceptedJobIds: mergedAccepted,
+                      lastRecommendationAt: now,
+                      awaitingPipelineDecision: true,
+                  }
+                : null;
         const jobContext: ConversationJobContext = {
             lastReturnedJobs: sanitizedJobs,
             selectedJobId,
@@ -145,6 +178,7 @@ export class ChatConversationService {
             lastSearchIntent,
             lastSearchAt: now,
             updatedAt: now,
+            jobRecommendationContext,
         };
         await this.repository.updateJobContext(userId, jobContext);
     };
@@ -156,11 +190,21 @@ export class ChatConversationService {
             return;
         }
         const now = new Date();
+        const rec = existingJobContext.jobRecommendationContext;
         const updatedContext: ConversationJobContext = {
             ...existingJobContext,
             selectedJobId: selectedJob.id,
             selectedJobSnapshot: selectedJob,
             updatedAt: now,
+            ...(rec
+                ? {
+                      jobRecommendationContext: {
+                          ...rec,
+                          selectedJobId: selectedJob.id,
+                          selectedJob: selectedJob,
+                      },
+                  }
+                : {}),
         };
         await this.repository.updateJobContext(userId, updatedContext);
     };

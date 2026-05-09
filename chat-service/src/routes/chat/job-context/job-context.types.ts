@@ -13,6 +13,16 @@ export type SanitizedJob = {
     url: string;
 };
 
+export type JobRecommendationContextState = {
+    selectedJobId: string | null;
+    selectedJob: SanitizedJob | null;
+    recommendedJobIds: string[];
+    rejectedJobIds: string[];
+    acceptedJobIds: string[];
+    lastRecommendationAt: Date | null;
+    awaitingPipelineDecision: boolean;
+};
+
 export type ConversationJobContext = {
     lastReturnedJobs: SanitizedJob[];
     selectedJobId: string | null;
@@ -21,6 +31,7 @@ export type ConversationJobContext = {
     lastSearchIntent: string | null;
     lastSearchAt: Date | null;
     updatedAt: Date;
+    jobRecommendationContext?: JobRecommendationContextState | null;
 };
 
 export type JobFollowUpField =

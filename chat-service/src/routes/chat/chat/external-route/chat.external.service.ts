@@ -113,6 +113,29 @@ export class ChatExternalService {
         return updatedAchievements;
     };
 
+    readUserPublicProfile = async (userId: string): Promise<Record<string, unknown> | null> => {
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
+        if (!response.ok) {
+            return null;
+        }
+        const payload: unknown = await response.json().catch(() => null);
+        if (typeof payload !== "object" || payload === null) {
+            return null;
+        }
+        const record = { ...(payload as Record<string, unknown>) };
+        delete record.password;
+        return record;
+    };
+
+    /** Links users `id` to chat career profile by setting `coachProfileMaterializedAt` on the user document. */
+    notifyCoachProfileMaterialized = async (userId: string): Promise<void> => {
+        await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ coachProfileMaterializedAt: new Date().toISOString() }),
+        }).catch(() => null);
+    };
+
     upsertKnownSkills = async (userId: string, skills: readonly string[]): Promise<void> => {
         const normalized = [...new Set(skills.map((item) => item.trim()).filter((item) => item.length > 0))];
         if (normalized.length === 0) {

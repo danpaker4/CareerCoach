@@ -1,7 +1,15 @@
+import type { PublicCareerProfileView } from "./career-profile/career-profile.types";
 import type { ProfileInput } from "./conversation/conversation.types";
 import type { ConversationMode } from "./coach/conversation-mode.types";
 import type { CareerConfidenceSummary } from "./coach/career-confidence.types";
 import type { JobSearchPlanItem } from "./search/job-search-plan.types";
+
+/** Single response joining users-service account with chat-service career profile (`userId` === users `id`). */
+export type UnifiedUserProfileResponse = {
+    userId: string;
+    user: Record<string, unknown> | null;
+    careerProfile: PublicCareerProfileView | null;
+};
 
 export type ChatMessageRequestBody = {
     userId: string;

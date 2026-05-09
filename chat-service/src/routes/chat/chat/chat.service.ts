@@ -1,5 +1,6 @@
 import type { ProfileInput } from "../conversation/conversation.types";
-import type { ChatMessageResponse } from "../chat.types";
+import type { Conversation } from "../conversation/conversation.model";
+import type { ChatMessageResponse, UnifiedUserProfileResponse } from "../chat.types";
 import { ChatConversationService } from "../conversation/conversation.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
 import { ChatLlmService } from "../llm/chat.llm.service";
@@ -13,13 +14,18 @@ import { AchievementInferenceService } from "../inference/achievement-inference.
 import { WorkStyleInferenceService } from "../inference/work-style-inference.service";
 import { JobSearchPlanService } from "../search/job-search-plan.service";
 import { JobRankingService } from "../ranking/job-ranking.service";
+import { toPublicCareerProfileView } from "../career-profile/career-profile.utils";
 import { CareerKnowledgeService } from "../knowledge/career-knowledge.service";
-import type { CareerProfileSignalUpdate, CareerSignal } from "../career-profile/career-profile.types";
+import type { CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "../career-profile/career-profile.types";
+import type { CareerConfidenceSummary } from "../coach/career-confidence.types";
 import type { ConversationMode } from "../coach/conversation-mode.types";
 import type { JobSearchRequest, JobSearchResultItem } from "../chat.types";
 import { JobFollowUpIntentService } from "../job-context/job-follow-up-intent.service";
 import { JobSelectionResolverService } from "../job-context/job-selection-resolver.service";
 import { JobFollowUpAnswerService } from "../job-context/job-follow-up-answer.service";
+import { PipelineIntentService } from "../pipeline/pipeline-intent.service";
+import { PipelineService } from "../pipeline/pipeline.service";
+import type { SanitizedJob } from "../job-context/job-context.types";
 
 type DomainExplorationTarget = {
     domain: string;
@@ -125,10 +131,24 @@ export class ChatService {
         private readonly knowledgeService: CareerKnowledgeService,
         private readonly followUpIntentService: JobFollowUpIntentService,
         private readonly selectionResolverService: JobSelectionResolverService,
-        private readonly followUpAnswerService: JobFollowUpAnswerService
+        private readonly followUpAnswerService: JobFollowUpAnswerService,
+        private readonly pipelineIntentService: PipelineIntentService,
+        private readonly pipelineService: PipelineService
     ) { }
 
     getConversation = async (userId: string) => this.conversationService.getConversationResponse(userId);
+
+    getUnifiedUserProfile = async (userId: string): Promise<UnifiedUserProfileResponse> => {
+        const [user, careerProfile] = await Promise.all([
+            this.externalService.readUserPublicProfile(userId),
+            this.profileService.findByUserId(userId),
+        ]);
+        return {
+            userId,
+            user,
+            careerProfile: careerProfile ? toPublicCareerProfileView(careerProfile) : null,
+        };
+    };
 
     private isStageSkipRequested = (message: string): boolean => {
         const normalized = message.toLowerCase();
@@ -358,6 +378,258 @@ export class ChatService {
         return null;
     };
 
+    private withPipelineClosing = (reply: string): string => {
+        const trimmed = reply.trim();
+        const lowered = trimmed.toLowerCase();
+        if (lowered.includes("pipeline") && lowered.includes("?")) {
+            return trimmed;
+        }
+        return `${trimmed}\n\nWould you like to move forward with this role and add it to your pipeline?`;
+    };
+
+    private sanitizedJobToSearchItem = (job: SanitizedJob): JobSearchResultItem => ({
+        jobId: job.id,
+        jobTitle: job.title,
+        company: job.company,
+        seniority: job.seniority,
+        description: job.description,
+        url: job.url,
+        salary: typeof job.salary === "number" ? job.salary : undefined,
+        requirements: job.requirements,
+        mustKnowSkills: job.mustKnowSkills,
+        niceToHaveSkills: job.niceToHaveSkills,
+        benefits: job.benefits,
+        location: job.location,
+    });
+
+    private buildFocusedDeterministicJobReply = (
+        job: { jobTitle: string; company?: string; seniority: string },
+        directionHint?: string
+    ): string => {
+        const companyPart = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : "";
+        const direction = directionHint ? `For ${directionHint}, ` : "";
+        return `${direction}here is a strong match:\n${job.jobTitle}${companyPart}\nSeniority: ${job.seniority}`;
+    };
+
+    private buildBroaderJobSearchFilters = (jobContext: Conversation["jobContext"], profile: UserCareerProfile): JobSearchRequest => {
+        const query = jobContext?.lastSearchQuery?.trim();
+        if (query && query.length > 0) {
+            const base = this.buildWorkDirectionFilters(query);
+            return {
+                ...base,
+                keywords: [...new Set([...base.keywords, "entry level", "junior", "associate", "related"])],
+                interests: [...new Set([...base.interests, "adjacent roles"])],
+            };
+        }
+        const tech = profile.technologies.slice(0, 6).map((item) => item.value);
+        const interests = profile.interests.slice(0, 4).map((item) => item.value);
+        const roles = profile.preferredRoles.slice(0, 3).map((item) => item.value);
+        return {
+            skills: tech,
+            interests: interests.length > 0 ? interests : ["career exploration"],
+            experienceLevel: "",
+            keywords: [...new Set([...roles, "junior", "entry level", "related"])],
+        };
+    };
+
+    private handlePipelineAccept = async (params: {
+        userId: string;
+        jobContext: NonNullable<Conversation["jobContext"]>;
+        mode: ConversationMode;
+        confidenceSummary: CareerConfidenceSummary;
+    }): Promise<ChatMessageResponse> => {
+        const { userId, jobContext, mode, confidenceSummary } = params;
+        const job = jobContext.selectedJobSnapshot;
+        const rec = jobContext.jobRecommendationContext;
+        if (!job || !rec) {
+            const reply = "I do not have an active job recommendation to add yet. Ask me for roles and I will suggest one.";
+            await this.conversationService.appendAssistantMessage(userId, reply);
+            return { reply, mode, confidenceSummary };
+        }
+        const result = await this.pipelineService.addJobToPipeline(userId, job);
+        if (result.status === "error") {
+            const reply =
+                "I could not add that role to your pipeline from here. You can add it from the Jobs page, or tell me if you want to keep exploring other roles.";
+            await this.conversationService.appendAssistantMessage(userId, reply);
+            return { reply, mode, confidenceSummary };
+        }
+        const acceptedIds = rec.acceptedJobIds.includes(job.id) ? rec.acceptedJobIds : [...rec.acceptedJobIds, job.id];
+        const companyPart = job.company.trim().length > 0 ? ` at ${job.company.trim()}` : "";
+        const reply =
+            result.status === "already_in_pipeline"
+                ? `${job.title}${companyPart} is already in your pipeline — you can track it from My Pipeline. Want to explore another opportunity or prepare for interviews?`
+                : `Done — I added the ${job.title} role${companyPart} to your pipeline.\n\nYou can now track it from My Pipeline. Want help preparing for interviews, strengthening a missing skill, or exploring more roles?`;
+        const now = new Date();
+        const nextContext = {
+            ...jobContext,
+            jobRecommendationContext: {
+                ...rec,
+                acceptedJobIds: acceptedIds,
+                awaitingPipelineDecision: false,
+                lastRecommendationAt: now,
+            },
+            updatedAt: now,
+        };
+        await this.conversationService.saveJobContext(userId, nextContext);
+        await this.conversationService.appendAssistantMessage(userId, reply);
+        return { reply, mode, confidenceSummary };
+    };
+
+    private handlePipelineReject = async (params: {
+        userId: string;
+        normalizedMessage: string;
+        conversation: Conversation;
+        jobContext: NonNullable<Conversation["jobContext"]>;
+        userCareerProfile: UserCareerProfile;
+        mode: ConversationMode;
+        confidenceSummary: CareerConfidenceSummary;
+    }): Promise<ChatMessageResponse> => {
+        const { userId, normalizedMessage, conversation, jobContext, userCareerProfile, mode, confidenceSummary } = params;
+        const memories = await this.memoryService.getRelevantMemories(userId, normalizedMessage);
+        const job = jobContext.selectedJobSnapshot;
+        const rec = jobContext.jobRecommendationContext;
+        if (!job || !rec) {
+            const reply = "I do not have an active job recommendation to skip. Ask me for roles and I will suggest one.";
+            await this.conversationService.appendAssistantMessage(userId, reply);
+            return { reply, mode, confidenceSummary };
+        }
+        const rejectedIds = rec.rejectedJobIds.includes(job.id) ? rec.rejectedJobIds : [...rec.rejectedJobIds, job.id];
+        const excluded = new Set([...rejectedIds, ...rec.acceptedJobIds]);
+        const nextJobId = rec.recommendedJobIds.find((id) => !excluded.has(id));
+        const nextSanitized = nextJobId ? jobContext.lastReturnedJobs.find((j) => j.id === nextJobId) ?? null : null;
+
+        if (nextSanitized) {
+            const nextItem = this.sanitizedJobToSearchItem(nextSanitized);
+            const ranked = this.rankingService.rankJobs(userCareerProfile, [nextItem]);
+            const top = ranked[0];
+            const reasonsText = top.reasons.join(" ");
+            const reply = this.withPipelineClosing(
+                `No problem. Another role that may fit is:\n${nextSanitized.title} — ${nextSanitized.company}\n\n${reasonsText}`
+            );
+            const now = new Date();
+            const nextContext = {
+                ...jobContext,
+                selectedJobId: nextSanitized.id,
+                selectedJobSnapshot: nextSanitized,
+                jobRecommendationContext: {
+                    ...rec,
+                    rejectedJobIds: rejectedIds,
+                    selectedJobId: nextSanitized.id,
+                    selectedJob: nextSanitized,
+                    awaitingPipelineDecision: true,
+                    lastRecommendationAt: now,
+                },
+                updatedAt: now,
+            };
+            await this.conversationService.saveJobContext(userId, nextContext);
+            const jobMatches = [
+                {
+                    jobId: top.jobId,
+                    title: top.job.jobTitle,
+                    matchScore: top.finalScore,
+                    matchReasons: top.reasons,
+                    possibleConcerns: top.concerns,
+                    missingSkills: top.missingSkills,
+                    growthPotential:
+                        top.scoreBreakdown.growthPotentialScore >= 60
+                            ? "Good growth potential based on role trajectory."
+                            : "Moderate growth potential. Might require clearer progression steps.",
+                    whyThisFitsUser: top.reasons.join(" "),
+                    nextStepSuggestion:
+                        top.missingSkills.length > 0
+                            ? `Strengthen ${top.missingSkills[0]} and then apply.`
+                            : "Apply and tailor your resume to the highlighted responsibilities.",
+                },
+            ];
+            await this.conversationService.appendAssistantMessage(userId, reply, [nextItem]);
+            return { reply, jobs: [nextItem], jobMatches, mode, confidenceSummary };
+        }
+
+        const broaderFilters = this.buildBroaderJobSearchFilters(jobContext, userCareerProfile);
+        const broaderPlan = this.searchPlanService.buildBroaderPlan(userCareerProfile, broaderFilters);
+        const searchedJobs = await this.externalService.searchJobsByPlan(broaderPlan);
+        const filteredJobs = searchedJobs.filter((j) => !excluded.has(j.jobId));
+        if (filteredJobs.length === 0) {
+            const reply =
+                "I do not have another stored match right now, and a broader search did not surface a new role yet. Try naming a nearby title or domain you are curious about, and I will search again.";
+            const now = new Date();
+            const nextContext = {
+                ...jobContext,
+                jobRecommendationContext: {
+                    ...rec,
+                    rejectedJobIds: rejectedIds,
+                    awaitingPipelineDecision: false,
+                    lastRecommendationAt: now,
+                },
+                updatedAt: now,
+            };
+            await this.conversationService.saveJobContext(userId, nextContext);
+            await this.conversationService.appendAssistantMessage(userId, reply);
+            return { reply, mode, confidenceSummary };
+        }
+        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, filteredJobs);
+        const orderedPool = rankedJobs.slice(0, 15).map((item) => item.job);
+        const focusJob = orderedPool[0] ?? null;
+        if (!focusJob) {
+            const reply = "I could not find another role to suggest yet. Tell me a role family or skill area to lean into, and I will search again.";
+            await this.conversationService.appendAssistantMessage(userId, reply);
+            return { reply, mode, confidenceSummary };
+        }
+        const jobAwareDecision = await this.llmService.generateJobAwareReply(conversation, "Show another role", [focusJob], memories);
+        const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, filteredJobs);
+        let validatedJobs = orderedPool.filter((j) => validJobIds.includes(j.jobId)).slice(0, 10);
+        let sanitizedReply = this.validationService.sanitizeReply(jobAwareDecision.reply);
+        if (validatedJobs.length === 0) {
+            validatedJobs = [focusJob];
+            sanitizedReply = this.buildFocusedDeterministicJobReply(focusJob);
+        }
+        const selectedJob = validatedJobs[0] ?? focusJob;
+        const queryLabel = jobContext.lastSearchQuery ?? "your direction";
+        await this.conversationService.saveJobContext(userId, {
+            ...jobContext,
+            jobRecommendationContext: {
+                ...rec,
+                rejectedJobIds: rejectedIds,
+            },
+            updatedAt: new Date(),
+        });
+        await this.conversationService.setJobContextAfterSearch(
+            userId,
+            orderedPool,
+            selectedJob,
+            queryLabel,
+            "BROADER_PIPELINE_REFILL"
+        );
+        const presentationJobs = [selectedJob];
+        const rankedForMatches = this.rankingService.rankJobs(userCareerProfile, presentationJobs);
+        const jobMatches = rankedForMatches.map((item) => ({
+            jobId: item.jobId,
+            title: item.job.jobTitle,
+            matchScore: item.finalScore,
+            matchReasons: item.reasons,
+            possibleConcerns: item.concerns,
+            missingSkills: item.missingSkills,
+            growthPotential:
+                item.scoreBreakdown.growthPotentialScore >= 60
+                    ? "Good growth potential based on role trajectory."
+                    : "Moderate growth potential. Might require clearer progression steps.",
+            whyThisFitsUser: item.reasons.join(" "),
+            nextStepSuggestion:
+                item.missingSkills.length > 0
+                    ? `Strengthen ${item.missingSkills[0]} and then apply.`
+                    : "Apply and tailor your resume to the highlighted responsibilities.",
+        }));
+        const reply = this.withPipelineClosing(sanitizedReply);
+        await this.conversationService.appendAssistantMessage(userId, reply, presentationJobs);
+        return {
+            reply,
+            jobs: presentationJobs,
+            jobMatches,
+            mode,
+            confidenceSummary,
+        };
+    };
+
     sendMessage = async (userId: string, message: string, profile?: ProfileInput): Promise<ChatMessageResponse> => {
         const normalizedMessage = message.trim();
         if (normalizedMessage.length === 0) {
@@ -393,6 +665,24 @@ export class ChatService {
         const mode = this.modeService.detectMode(normalizedMessage, userCareerProfile, confidenceSummary);
         const followUpIntent = this.followUpIntentService.detect(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
+        const awaitingPipelineDecision =
+            jobContext?.jobRecommendationContext?.awaitingPipelineDecision === true &&
+            Boolean(jobContext.selectedJobSnapshot && jobContext.jobRecommendationContext);
+        const pipelineIntent = awaitingPipelineDecision ? this.pipelineIntentService.detect(normalizedMessage) : null;
+        if (pipelineIntent === "PIPELINE_ACCEPT" && jobContext) {
+            return await this.handlePipelineAccept({ userId, jobContext, mode, confidenceSummary });
+        }
+        if (pipelineIntent === "PIPELINE_REJECT" && jobContext) {
+            return await this.handlePipelineReject({
+                userId,
+                normalizedMessage,
+                conversation: conversationAfterUserMessage,
+                jobContext,
+                userCareerProfile,
+                mode,
+                confidenceSummary,
+            });
+        }
         const hasStoredJobs = (jobContext?.lastReturnedJobs.length ?? 0) > 0;
         if (hasStoredJobs && followUpIntent.isFollowUp && !followUpIntent.isExplicitNewSearch && jobContext) {
             const resolution = this.selectionResolverService.resolve(
@@ -447,27 +737,48 @@ export class ChatService {
                 return { reply: fallback, mode, confidenceSummary };
             }
 
+            const rejectedIds = new Set(conversationAfterUserMessage.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
+            const acceptedIds = new Set(conversationAfterUserMessage.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
             const rankedJobs = this.rankingService.rankJobs(userCareerProfile, jobs);
-            const topRankedJobs = rankedJobs.slice(0, 10).map((item) => item.job);
-            const jobAwareDecision = await this.llmService.generateJobAwareReply(conversationAfterUserMessage, normalizedMessage, topRankedJobs, memories);
+            const eligibleRanked = rankedJobs.filter(
+                (item) => !rejectedIds.has(item.job.jobId) && !acceptedIds.has(item.job.jobId)
+            );
+            const orderedRankedPool = eligibleRanked.slice(0, 15);
+            if (orderedRankedPool.length === 0) {
+                const exhaustedReply =
+                    "Every match in the current list was already skipped or saved. Tell me a nearby title, skill, or domain to lean into and I will run a broader search.";
+                await this.conversationService.appendAssistantMessage(userId, exhaustedReply);
+                return { reply: exhaustedReply, mode, confidenceSummary };
+            }
+            const topRankedJobs = orderedRankedPool.map((item) => item.job);
+            const focusJob = topRankedJobs[0] ?? null;
+            const jobsForLlm = focusJob ? [focusJob] : topRankedJobs;
+            const jobAwareDecision = await this.llmService.generateJobAwareReply(
+                conversationAfterUserMessage,
+                normalizedMessage,
+                jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
+                memories
+            );
             const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
             let validatedJobs = topRankedJobs.filter((job) => validJobIds.includes(job.jobId)).slice(0, 10);
             let sanitizedReply = this.validationService.sanitizeReply(jobAwareDecision.reply);
-            if (validatedJobs.length === 0) {
-                validatedJobs = topRankedJobs.slice(0, 6);
-                sanitizedReply = this.buildDeterministicJobsReply(validatedJobs, normalizedQuery);
+            if (validatedJobs.length === 0 && focusJob) {
+                validatedJobs = [focusJob];
+                sanitizedReply = this.buildFocusedDeterministicJobReply(focusJob, normalizedQuery);
             }
-            const selectedJob = this.resolveSelectedJobFromRecommendations(validatedJobs, validJobIds);
+            sanitizedReply = this.withPipelineClosing(sanitizedReply);
+            const selectedJob = this.resolveSelectedJobFromRecommendations(validatedJobs, validJobIds) ?? focusJob;
             await this.conversationService.setJobContextAfterSearch(
                 userId,
-                validatedJobs,
+                topRankedJobs,
                 selectedJob,
                 normalizedQuery,
                 "WORK_DIRECTION_INTENT"
             );
+            const presentationJobs = validatedJobs.slice(0, 1);
+            const primaryJobId = presentationJobs[0]?.jobId;
             const jobMatches = rankedJobs
-                .filter((item) => validatedJobs.some((job) => job.jobId === item.jobId))
-                .slice(0, 10)
+                .filter((item) => item.jobId === primaryJobId)
                 .map((item) => ({
                     jobId: item.jobId,
                     title: item.job.jobTitle,
@@ -475,14 +786,20 @@ export class ChatService {
                     matchReasons: item.reasons,
                     possibleConcerns: item.concerns,
                     missingSkills: item.missingSkills,
-                    growthPotential: item.scoreBreakdown.growthPotentialScore >= 60 ? "Good growth potential based on role trajectory." : "Moderate growth potential. Might require clearer progression steps.",
+                    growthPotential:
+                        item.scoreBreakdown.growthPotentialScore >= 60
+                            ? "Good growth potential based on role trajectory."
+                            : "Moderate growth potential. Might require clearer progression steps.",
                     whyThisFitsUser: item.reasons.join(" "),
-                    nextStepSuggestion: item.missingSkills.length > 0 ? `Strengthen ${item.missingSkills[0]} and then apply.` : "Apply and tailor your resume to the highlighted responsibilities.",
+                    nextStepSuggestion:
+                        item.missingSkills.length > 0
+                            ? `Strengthen ${item.missingSkills[0]} and then apply.`
+                            : "Apply and tailor your resume to the highlighted responsibilities.",
                 }));
-            await this.conversationService.appendAssistantMessage(userId, sanitizedReply, validatedJobs);
+            await this.conversationService.appendAssistantMessage(userId, sanitizedReply, presentationJobs);
             return {
                 reply: sanitizedReply,
-                jobs: validatedJobs,
+                jobs: presentationJobs.length > 0 ? presentationJobs : validatedJobs,
                 jobMatches,
                 mode,
                 confidenceSummary,
@@ -571,21 +888,41 @@ export class ChatService {
             await this.conversationService.appendAssistantMessage(userId, noJobsReply);
             return { reply: noJobsReply, mode, confidenceSummary };
         }
+        const rejectedIds = new Set(conversationForDecision.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
+        const acceptedIds = new Set(conversationForDecision.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
         const rankedJobs = this.rankingService.rankJobs(userCareerProfile, jobs);
-        const topRankedJobs = rankedJobs.slice(0, 10).map((item) => item.job);
-        const jobAwareDecision = await this.llmService.generateJobAwareReply(conversationForDecision, normalizedMessage, topRankedJobs, memories);
+        const eligibleRanked = rankedJobs.filter(
+            (item) => !rejectedIds.has(item.job.jobId) && !acceptedIds.has(item.job.jobId)
+        );
+        const orderedRankedPool = eligibleRanked.slice(0, 15);
+        if (orderedRankedPool.length === 0) {
+            const exhaustedReply =
+                "Every match in the current list was already skipped or saved. Tell me a nearby title, skill, or domain to lean into and I will run a broader search.";
+            await this.conversationService.appendAssistantMessage(userId, exhaustedReply);
+            return { reply: exhaustedReply, mode, confidenceSummary };
+        }
+        const topRankedJobs = orderedRankedPool.map((item) => item.job);
+        const focusJob = topRankedJobs[0] ?? null;
+        const jobsForLlm = focusJob ? [focusJob] : topRankedJobs;
+        const jobAwareDecision = await this.llmService.generateJobAwareReply(
+            conversationForDecision,
+            normalizedMessage,
+            jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
+            memories
+        );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
         let validatedJobs = topRankedJobs.filter((job) => validJobIds.includes(job.jobId)).slice(0, 10);
         const recommendedDirections = await this.knowledgeService.suggestDirections(userCareerProfile);
         let sanitizedReply = this.validationService.sanitizeReply(jobAwareDecision.reply);
-        if (validatedJobs.length === 0) {
-            validatedJobs = topRankedJobs.slice(0, 6);
-            sanitizedReply = this.buildDeterministicJobsReply(validatedJobs);
+        if (validatedJobs.length === 0 && focusJob) {
+            validatedJobs = [focusJob];
+            sanitizedReply = this.buildFocusedDeterministicJobReply(focusJob);
         }
-        const selectedJob = this.resolveSelectedJobFromRecommendations(validatedJobs, validJobIds);
+        sanitizedReply = this.withPipelineClosing(sanitizedReply);
+        const selectedJob = this.resolveSelectedJobFromRecommendations(validatedJobs, validJobIds) ?? focusJob;
         await this.conversationService.setJobContextAfterSearch(
             userId,
-            validatedJobs,
+            topRankedJobs,
             selectedJob,
             normalizedMessage,
             domainExplorationTarget ? "DOMAIN_EXPLORATION" : "SEARCH_PLAN"
@@ -593,9 +930,10 @@ export class ChatService {
         const replyWithDomainContext = domainExplorationTarget
             ? `${domainExplorationTarget.intro}\n${sanitizedReply}`
             : sanitizedReply;
+        const presentationJobs = validatedJobs.slice(0, 1);
+        const primaryJobId = presentationJobs[0]?.jobId;
         const jobMatches = rankedJobs
-            .filter((item) => validatedJobs.some((job) => job.jobId === item.jobId))
-            .slice(0, 10)
+            .filter((item) => item.jobId === primaryJobId)
             .map((item) => ({
                 jobId: item.jobId,
                 title: item.job.jobTitle,
@@ -603,16 +941,22 @@ export class ChatService {
                 matchReasons: item.reasons,
                 possibleConcerns: item.concerns,
                 missingSkills: item.missingSkills,
-                growthPotential: item.scoreBreakdown.growthPotentialScore >= 60 ? "Good growth potential based on role trajectory." : "Moderate growth potential. Might require clearer progression steps.",
+                growthPotential:
+                    item.scoreBreakdown.growthPotentialScore >= 60
+                        ? "Good growth potential based on role trajectory."
+                        : "Moderate growth potential. Might require clearer progression steps.",
                 whyThisFitsUser: item.reasons.join(" "),
-                nextStepSuggestion: item.missingSkills.length > 0 ? `Strengthen ${item.missingSkills[0]} and then apply.` : "Apply and tailor your resume to the highlighted responsibilities.",
+                nextStepSuggestion:
+                    item.missingSkills.length > 0
+                        ? `Strengthen ${item.missingSkills[0]} and then apply.`
+                        : "Apply and tailor your resume to the highlighted responsibilities.",
             }));
 
-        await this.conversationService.appendAssistantMessage(userId, replyWithDomainContext, validatedJobs);
+        await this.conversationService.appendAssistantMessage(userId, replyWithDomainContext, presentationJobs);
 
         return {
             reply: replyWithDomainContext,
-            jobs: validatedJobs,
+            jobs: presentationJobs.length > 0 ? presentationJobs : validatedJobs,
             jobMatches,
             recommendedDirections,
             mode,

@@ -6,6 +6,8 @@ export const PipelineJobSchema = z.object({
     jobId: z.number(),
     jobStage: z.string(),
     description: z.string(),
+    source: z.string().optional(),
+    createdAt: z.coerce.date().optional(),
 });
 
 export type PipelineJob = z.infer<typeof PipelineJobSchema>;

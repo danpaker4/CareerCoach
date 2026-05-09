@@ -45,4 +45,36 @@ export class JobSearchPlanService {
             ],
         };
     };
+
+    buildBroaderPlan = (profile: UserCareerProfile, baseFilters: JobSearchRequest): JobSearchPlan => {
+        const basePlan = this.buildPlan(profile, baseFilters);
+        const adjacentKeywords = [
+            ...baseFilters.keywords,
+            "entry level",
+            "junior",
+            "associate",
+            "beginner-friendly",
+            "adjacent",
+            "related",
+            "alternative",
+        ];
+        const adjacentFilters: JobSearchRequest = {
+            ...baseFilters,
+            keywords: [...new Set(adjacentKeywords.map((keyword) => keyword.trim()).filter((keyword) => keyword.length > 0))],
+            interests: [...new Set([...baseFilters.interests, "career exploration", "adjacent roles"])],
+            skills: baseFilters.skills,
+            experienceLevel: baseFilters.experienceLevel,
+        };
+        const adjacentQuery = `Entry-friendly and adjacent roles related to: ${baseFilters.keywords.join(" ")}`.trim();
+        return {
+            searches: [
+                {
+                    type: "ADJACENT",
+                    query: adjacentQuery.length > 0 ? adjacentQuery : "Related roles and adjacent career paths",
+                    filters: adjacentFilters,
+                },
+                ...basePlan.searches,
+            ],
+        };
+    };
 }

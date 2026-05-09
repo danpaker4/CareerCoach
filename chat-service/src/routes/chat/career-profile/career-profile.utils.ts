@@ -1,4 +1,4 @@
-import type { CareerProfileSignalBucketKey, CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "./career-profile.types";
+import type { CareerProfileSignalBucketKey, CareerProfileSignalUpdate, CareerSignal, PublicCareerProfileView, UserCareerProfile } from "./career-profile.types";
 import { CAREER_PROFILE_SIGNAL_BUCKETS, SIGNAL_CONFIDENCE_WEAK_OVERRIDE_GAP } from "./career-profile.consts";
 
 const normalizeSignalValue = (value: string): string => value.trim().toLowerCase();
@@ -109,4 +109,12 @@ export const toProfileSummaryText = (profile: UserCareerProfile): string => {
         `Location preference: ${profile.locationPreference ?? "unknown"}`,
         `Remote preference: ${profile.remotePreference ?? "unknown"}`,
     ].join("\n");
+};
+
+export const toPublicCareerProfileView = (profile: UserCareerProfile): PublicCareerProfileView => {
+    const { profileSummaryEmbedding, ...rest } = profile;
+    return {
+        ...rest,
+        profileSummaryEmbeddingLength: profileSummaryEmbedding.length,
+    };
 };
