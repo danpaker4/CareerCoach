@@ -13,6 +13,7 @@ export interface User {
   currentJob?: string;
   linkedInUrl?: string;
   githubUrl?: string;
+  skills?: string[];
   cv?: string;
   achievements?: Achievement[];
   githubId?: number;

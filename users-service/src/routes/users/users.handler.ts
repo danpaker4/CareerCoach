@@ -34,6 +34,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                 const newUser: User = {
                     id: randomUUID(),
                     ...userData,
+                    skills: userData.skills ?? [],
                     achievements: userData.achievements ?? [],
                 };
 

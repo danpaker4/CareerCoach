@@ -19,7 +19,7 @@ export const GithubHandler = (usersCollection: Collection<User>): GithubHandlerT
                     fetchGithubUserEmails(accessToken)
                 ]);
 
-                const session = await loginOrCreateGithubUser(usersCollection, profile, emails);
+                const session = await loginOrCreateGithubUser(usersCollection, accessToken, profile, emails);
 
                 setAuthCookies(reply, {
                     accessToken: session.accessToken,

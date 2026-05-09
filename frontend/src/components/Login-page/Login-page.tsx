@@ -30,7 +30,7 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     const top = window.screenY + (window.innerHeight - height) / 2;
 
     window.open(
-      `https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/github/callback')}&scope=read:user%20user:email&prompt=select_account`,
+      `https://github.com/login/oauth/authorize?client_id=${ENV.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/github/callback')}&scope=read:user%20user:email%20repo&prompt=select_account`,
       'github-oauth',
       `width=${width},height=${height},left=${left},top=${top}`
     );

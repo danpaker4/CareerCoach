@@ -15,6 +15,7 @@ export const UserSchema = z.object({
     currentJob: z.string().nullish(),
     linkedInUrl: z.string().nullish(),
     githubUrl: z.string().nullish(),
+    skills: z.array(z.string()).default([]),
     cv: z.string().nullish(),
     githubId: z.number().nullish(),
     avatarUrl: z.string().nullish(),

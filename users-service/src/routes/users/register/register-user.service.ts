@@ -49,21 +49,22 @@ export const registerUser = async (
     : { cvS3Path: undefined, achievementsFromGemini: [] };
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser: User = {
-    id: userId,
-    firstName,
-    lastName,
-    email,
+    const newUser: User = {
+      id: userId,
+      firstName,
+      lastName,
+      email,
     password: hashedPassword,
     birthDate: new Date(birthDate),
     currentJob: currentJob || undefined,
-    linkedInUrl: linkedInUrl || undefined,
-    githubUrl: githubUrl || undefined,
-    cv: cvS3Path,
-    achievements: achievementsFromGemini.map((achievement) => ({
-      id: randomUUID(),
-      name: achievement.name,
-      grade: achievement.grade,
+      linkedInUrl: linkedInUrl || undefined,
+      githubUrl: githubUrl || undefined,
+      skills: [],
+      cv: cvS3Path,
+      achievements: achievementsFromGemini.map((achievement) => ({
+        id: randomUUID(),
+        name: achievement.name,
+        grade: achievement.grade,
     })),
   };
 
