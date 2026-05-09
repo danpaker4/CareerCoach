@@ -9,6 +9,7 @@ import './Profile.css';
 interface ProfileProps {
   user: User;
   onUserUpdated: (updated: User) => void;
+  onLogout: () => void;
 }
 
 interface ProfileForm {
@@ -25,7 +26,7 @@ const USERS_URL = (userId: string) => `${ENV.USERS_SERVICE_BASE_URL}/users/${use
 const getInitials = (firstName: string, lastName: string): string =>
   (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
 
-export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
+export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
   const [form, setForm] = useState<ProfileForm>({
     firstName: user.firstName,
     lastName: user.lastName,
@@ -112,6 +113,9 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
             <h1 className="profile-title">My Profile</h1>
             <p className="profile-subtitle">Manage your personal information</p>
           </div>
+          <button type="button" className="profile-logout-button" onClick={onLogout}>
+            Logout
+          </button>
         </div>
 
         <div className="profile-layout">

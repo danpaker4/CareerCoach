@@ -1,12 +1,12 @@
 import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClientOptions } from "mongodb";
 import { Service } from "../types/service";
-import type { User } from "../routes/users/user.model";
+import type { UserDocument } from "../routes/users/user.model";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
     private db: Db | null = null;
-    private usersCollection: Collection<User> | null = null;
+    private usersCollection: Collection<UserDocument> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -21,7 +21,7 @@ export class MongoClient implements Service {
             await this.mongoClient.connect();
             this.db = this.mongoClient.db();
             
-            this.usersCollection = this.db.collection<User>("users");
+            this.usersCollection = this.db.collection<UserDocument>("users");
             
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -37,7 +37,7 @@ export class MongoClient implements Service {
         console.log('MongoDb Connection Closed');
     };
 
-    get users(): Collection<User> {
+    get users(): Collection<UserDocument> {
         if (!this.usersCollection) {
             throw new Error("Users collection is not initialized");
         }

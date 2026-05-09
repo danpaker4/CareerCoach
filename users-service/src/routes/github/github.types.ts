@@ -8,6 +8,11 @@ export type GithubTokenResponse = {
   scope: string;
 };
 
+export type GithubTokenErrorResponse = {
+  error?: string;
+  error_description?: string;
+};
+
 export type GithubUserProfile = {
   id: number;
   login: string;
@@ -24,6 +29,45 @@ export type GithubUserEmail = {
   primary: boolean;
   verified: boolean;
   visibility: string | null;
+};
+
+export type GithubRepository = {
+  name: string;
+  description: string | null;
+  fork: boolean;
+  archived: boolean;
+  language: string | null;
+  languages_url: string;
+  topics: string[];
+  stargazers_count: number;
+  pushed_at: string;
+  owner: {
+    login: string;
+  };
+};
+
+export type GithubRepositoryLanguages = Record<string, number>;
+
+export type GithubContentFileResponse = {
+  content?: string;
+  encoding?: string;
+  type?: string;
+};
+
+export type GithubContentListItem = {
+  name: string;
+  path: string;
+  type: "file" | "dir" | "symlink" | "submodule";
+};
+
+export type GithubTreeEntry = {
+  path: string;
+  type: "blob" | "tree" | "commit";
+};
+
+export type GithubTreeResponse = {
+  tree?: GithubTreeEntry[];
+  truncated?: boolean;
 };
 
 export type GithubHandlerType = {

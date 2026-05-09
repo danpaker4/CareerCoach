@@ -1,4 +1,4 @@
-# AI Rules for TypeScript, React, and Angular
+# AI Rules for TypeScript and React
 
 ## General Principles
 - Follow existing project patterns before introducing new ones.
@@ -106,61 +106,6 @@
 - Memoize only when it solves a real problem.
 - Avoid recreating large objects/functions in hot render paths if it causes issues.
 - Use keys correctly in lists; never use array index as key when stable IDs exist.
-
----
-
-# Angular Rules
-
-## Angular Architecture
-- Follow Angular best practices and existing project structure.
-- Prefer standalone components if the project uses them.
-- Keep components focused and small.
-- Put business logic in services when appropriate.
-- Keep templates readable; avoid large amounts of logic in templates.
-- Prefer smart separation between container logic and UI rendering when helpful.
-
-## TypeScript in Angular
-- Fully type inputs, outputs, services, models, and observables/signals.
-- Use `const` only (no `let`, no `var`).
-- No `any`; use explicit types, `unknown`, or typed interfaces.
-- Expose only what the template needs.
-
-## Components and Templates
-- Use clear naming for components, inputs, outputs, and methods.
-- Prefer `computed` values or class-level derived state over repeated logic in templates.
-- Avoid calling expensive methods directly from templates.
-- Keep templates declarative.
-- Use semantic HTML and accessibility-friendly markup.
-- Prefer built-in Angular control flow/features if the project already uses them.
-
-## Signals and RxJS
-- Prefer project-consistent state patterns.
-- If the project uses Signals, prefer Signals for local reactive state.
-- If the project uses RxJS heavily, integrate cleanly instead of mixing patterns randomly.
-- Do not subscribe manually unless necessary.
-- Prefer `async` pipe or framework-friendly reactive patterns.
-- Clean up subscriptions properly when manual subscription is required.
-- Avoid unnecessary conversions between Signals and Observables.
-
-## Services
-- Services should have a clear responsibility.
-- Do not place UI concerns inside data/services unless intentional.
-- Keep API interaction logic separate from presentation logic.
-- Type HTTP requests and responses explicitly.
-- Handle loading and error states intentionally.
-
-## Forms
-- Prefer reactive forms for complex forms.
-- Type form models where possible.
-- Keep validation explicit and centralized.
-- Show clear validation messages.
-- Do not duplicate validation logic across template and component without reason.
-
-## Angular Performance
-- Prefer `OnPush` change detection when aligned with the project.
-- Avoid unnecessary recomputation in templates.
-- Track list items properly in loops.
-- Lazy load feature areas when appropriate.
 
 ---
 

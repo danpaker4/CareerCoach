@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import type { Collection } from "mongodb";
-import type { User } from "../user.model";
+import type { User, UserDocument } from "../user.model";
+import { toUserDocument } from "../user.utils";
 import { extractTextFromCv } from "../../cv/cv-parser.service";
 import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemini.service";
 import { uploadCvToS3 } from "../../cv/s3-upload/s3-upload.service";
@@ -13,7 +14,7 @@ import {
 } from "./register-user.utils";
 
 export const registerUser = async (
-  usersCollection: Collection<User>,
+  usersCollection: Collection<UserDocument>,
   input: RegisterUserInput,
 ): Promise<Omit<User, "password">> => {
   const { firstName, lastName, email, password, birthDate, currentJob, linkedInUrl, githubUrl } = input;
@@ -49,25 +50,26 @@ export const registerUser = async (
     : { cvS3Path: undefined, achievementsFromGemini: [] };
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser: User = {
-    id: userId,
-    firstName,
-    lastName,
-    email,
+    const newUser: User = {
+      id: userId,
+      firstName,
+      lastName,
+      email,
     password: hashedPassword,
     birthDate: new Date(birthDate),
     currentJob: currentJob || undefined,
-    linkedInUrl: linkedInUrl || undefined,
-    githubUrl: githubUrl || undefined,
-    cv: cvS3Path,
-    achievements: achievementsFromGemini.map((achievement) => ({
-      id: randomUUID(),
-      name: achievement.name,
-      grade: achievement.grade,
+      linkedInUrl: linkedInUrl || undefined,
+      githubUrl: githubUrl || undefined,
+      githubSkills: [],
+      cv: cvS3Path,
+      achievements: achievementsFromGemini.map((achievement) => ({
+        id: randomUUID(),
+        name: achievement.name,
+        grade: achievement.grade,
     })),
   };
 
-  await usersCollection.insertOne(newUser);
+  await usersCollection.insertOne(toUserDocument(newUser));
 
   const { password: _password, ...safeUser } = newUser;
   return safeUser;

@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { mockUser, testServerConfig } from "./users-mocks";
 import { authHeadersForUser, dropLegacyUsernameIndex } from "./users-test-utils";
+import { toUserDocument } from "../user.utils";
 
 describe("Users Router - GET /users/:userId", () => {
     const config: ServerConfig = testServerConfig;
@@ -17,16 +18,16 @@ describe("Users Router - GET /users/:userId", () => {
     });
 
     afterAll(async () => {
-        await server.DBClient.users.deleteMany({ id: testUserId });
+        await server.DBClient.users.deleteMany({ _id: testUserId });
         await server.stop();
     });
 
     beforeEach(async () => {
-        await server.DBClient.users.insertOne(mockUser);
+        await server.DBClient.users.insertOne(toUserDocument(mockUser));
     });
 
     afterEach(async () => {
-        await server.DBClient.users.deleteMany({ id: testUserId });
+        await server.DBClient.users.deleteMany({ _id: testUserId });
     });
 
     describe("GET /users/:userId", () => {
@@ -60,7 +61,7 @@ describe("Users Router - GET /users/:userId", () => {
         });
 
         it("should return user from database", async () => {
-            const dbUser = await server.DBClient.users.findOne({ id: testUserId });
+            const dbUser = await server.DBClient.users.findOne({ _id: testUserId });
             expect(dbUser).toBeDefined();
 
             const response = await server.app.inject({
@@ -71,7 +72,7 @@ describe("Users Router - GET /users/:userId", () => {
 
             expect(response.statusCode).toBe(StatusCodes.OK);
             const responseUser = response.json();
-            expect(responseUser.id).toBe(dbUser?.id);
+            expect(responseUser.id).toBe(dbUser?._id);
             expect(responseUser.firstName).toBe(dbUser?.firstName);
             expect(responseUser.lastName).toBe(dbUser?.lastName);
         });

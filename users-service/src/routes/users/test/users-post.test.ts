@@ -43,7 +43,7 @@ describe("Users Router - POST /users", () => {
 
             const dbUser = await server.DBClient.users.findOne({ email: mockUserData.email });
             expect(dbUser).toBeDefined();
-            expect(dbUser?.id).toBe(createdUser.id);
+            expect(dbUser?._id).toBe(createdUser.id);
         });
 
         it("should create a new user without optional currentJob field", async () => {
@@ -107,7 +107,7 @@ describe("Users Router - POST /users", () => {
             expect(response.statusCode).toBe(StatusCodes.CREATED);
             const createdUser = response.json();
 
-            const dbUser = await server.DBClient.users.findOne({ id: createdUser.id });
+            const dbUser = await server.DBClient.users.findOne({ _id: createdUser.id });
             expect(dbUser).toBeDefined();
             expect(dbUser?.firstName).toBe(mockUserData.firstName);
             expect(dbUser?.lastName).toBe(mockUserData.lastName);

@@ -14,6 +14,15 @@
   max-width: 480px;
 }
 
+.auth-card {
+  max-width: 440px;
+}
+
+.auth-card--signup {
+  max-width: 420px;
+  padding: 32px 28px;
+}
+
 .card-header {
   text-align: center;
   margin-bottom: 28px;
@@ -35,6 +44,14 @@
 
 .form-wrapper {
   margin-bottom: 8px;
+}
+
+.auth-card--signup .form-wrapper {
+  margin-bottom: 4px;
+}
+
+.auth-card--signup .card-header {
+  margin-bottom: 24px;
 }
 
 /* Divider */
@@ -98,4 +115,11 @@
   color: var(--clr-slate-400);
   text-align: center;
   margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .auth-card,
+  .auth-card--signup {
+    max-width: 100%;
+  }
 }
