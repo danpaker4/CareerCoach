@@ -12,6 +12,8 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { MySkills } from './components/my-skills/MySkills';
 import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { GithubCallback } from './components/github-callback/GithubCallback';
+import { LinkedInCallback } from './components/linkedin-callback/LinkedInCallback';
+import { ChatPage } from './components/chat-page/ChatPage';
 import { NotFound } from './components/not-found/NotFound';
 import { PageTransition } from './components/page-transition/PageTransition';
 import { apiFetch, refreshAccessToken } from './lib/apiClient';
@@ -199,8 +201,22 @@ export const App = () => {
             />
 
             <Route
+              path="/chat"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  {currentUser ? <ChatPage user={currentUser} /> : null}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/auth/github/callback"
               element={<GithubCallback onLoginSuccess={handleLoginSuccess} />}
+            />
+
+            <Route
+              path="/auth/linkedin/callback"
+              element={<LinkedInCallback onLoginSuccess={handleLoginSuccess} />}
             />
 
             <Route path="/signup" element={<Navigate to="/login" replace />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChatInterface } from '../chat-component/Chat';
+import { useNavigate } from 'react-router-dom';
 import { CreateRoadmapModal } from './CreateRoadmapModal';
 import { ENV } from '../../config';
 import iconChart from '../../assets/icon-chart.svg';
@@ -56,7 +56,7 @@ const STEP_CONTENT = [
 ];
 
 export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [roadmaps, setRoadmaps] = useState<CareerRoadmapData[]>([]);
@@ -116,7 +116,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
             <button
               type="button"
               className="btn-ai-guide"
-              onClick={() => setIsChatOpen(!isChatOpen)}
+              onClick={() => navigate('/chat')}
             >
               <img src={iconMessage} alt="" aria-hidden="true" className="btn-icon btn-icon--white" />
               AI Career Guide
@@ -177,7 +177,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                 <img src={iconPlus} alt="" className="btn-icon btn-icon--white" aria-hidden="true" />
                 Create Roadmap
               </button>
-              <button type="button" className="btn-outline" onClick={() => setIsChatOpen(true)}>
+              <button type="button" className="btn-outline" onClick={() => navigate('/chat')}>
                 <img src={iconMessage} alt="" className="btn-icon" aria-hidden="true" />
                 AI Career Guide
               </button>
@@ -291,25 +291,6 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
         />
       )}
 
-      {isChatOpen && (
-        <div className="floating-chat-wrapper">
-          <div className="chat-header-bar">
-            <span>CareerCoach AI</span>
-            <button type="button" className="close-chat" onClick={() => setIsChatOpen(false)} aria-label="Close chat">
-              X
-            </button>
-          </div>
-          <ChatInterface
-            userId={user?.id ?? 'guest'}
-            userProfile={{
-              firstName: user?.firstName,
-              lastName: user?.lastName,
-              currentJob: user?.currentJob,
-              achievements: user?.achievements,
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 };

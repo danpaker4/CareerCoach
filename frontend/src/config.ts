@@ -25,6 +25,7 @@ const normalizeLocalServiceUrl = (rawUrl: string | undefined): string => {
 
 export const ENV = {
   GITHUB_CLIENT_ID: import.meta.env.VITE_CLIENT_ID,
+  GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY as string | undefined,
   USERS_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_USERS_SERVICE_BASE_URL) || "",
   CHAT_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_CHAT_SERVICE_BASE_URL) || "",
   JOB_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_JOB_SERVICE_BASE_URL) || "",
