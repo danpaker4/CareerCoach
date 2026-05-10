@@ -1,5 +1,5 @@
 .myskills-page {
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   min-height: calc(100vh - 64px);
   padding-bottom: 60px;
 }
@@ -37,14 +37,14 @@
 }
 
 .myskills-stat-card {
-  background: white;
+  background: var(--surface-base);
   padding: 20px;
   border-radius: var(--r-lg);
   display: flex;
   align-items: center;
   gap: 14px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
 }
 
 .myskills-stat-icon-wrap {
@@ -258,7 +258,7 @@
   height: 20px;
   border-radius: var(--r-sm);
   border: 2px solid var(--clr-slate-300);
-  background: white;
+  background: var(--surface-base);
   display: flex;
   align-items: center;
   justify-content: center;

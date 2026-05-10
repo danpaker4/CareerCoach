@@ -7,10 +7,15 @@ import iconTarget from '../../assets/icon-target.svg';
 import iconSparkle from '../../assets/icon-sparkle.svg';
 import iconMenu from '../../assets/icon-menu.svg';
 import iconX from '../../assets/icon-x.svg';
+import iconSun from '../../assets/icon-sun.svg';
+import iconMoon from '../../assets/icon-moon.svg';
 import './Header.css';
+import type { ThemeMode } from '../../lib/theme';
 
 interface HeaderProps {
   userName?: string;
+  theme: ThemeMode;
+  onToggleTheme: () => void;
 }
 
 const getInitials = (name: string): string => {
@@ -19,7 +24,7 @@ const getInitials = (name: string): string => {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-export const Header = ({ userName }: HeaderProps) => {
+export const Header = ({ userName, theme, onToggleTheme }: HeaderProps) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -70,6 +75,24 @@ export const Header = ({ userName }: HeaderProps) => {
     </>
   );
 
+  const renderThemeToggle = () => (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={onToggleTheme}
+      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+      title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+    >
+      <img
+        src={theme === 'light' ? iconMoon : iconSun}
+        alt=""
+        aria-hidden="true"
+        className="theme-toggle-icon"
+      />
+      <span className="theme-toggle-label">{theme === 'light' ? 'Dark' : 'Light'}</span>
+    </button>
+  );
+
   return (
     <header className="navbar" ref={menuRef}>
       <div className="navbar-brand">
@@ -83,6 +106,7 @@ export const Header = ({ userName }: HeaderProps) => {
       <div className="navbar-auth">
         {userName ? (
           <div className="user-area">
+            {renderThemeToggle()}
             <Link
               to="/profile"
               className={`user-profile-link${isActive('/profile') ? ' user-profile-link--active' : ''}`}
@@ -93,7 +117,10 @@ export const Header = ({ userName }: HeaderProps) => {
             </Link>
           </div>
         ) : (
-          <Link to="/login" className="btn-login-cta">Log In / Sign Up</Link>
+          <div className="guest-actions">
+            {renderThemeToggle()}
+            <Link to="/login" className="btn-login-cta">Log In / Sign Up</Link>
+          </div>
         )}
       </div>
 
@@ -113,6 +140,7 @@ export const Header = ({ userName }: HeaderProps) => {
             {navLinks}
           </nav>
           <div className="mobile-auth">
+            {renderThemeToggle()}
             {userName ? (
               <>
                 <Link

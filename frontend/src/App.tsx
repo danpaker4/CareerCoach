@@ -19,6 +19,7 @@ import { ENV } from './config';
 import type { User } from './types/user';
 import { isUser } from './lib/authResponse';
 import { clearStoredAccessToken } from './lib/authSession';
+import { applyTheme, readInitialTheme, type ThemeMode } from './lib/theme';
 
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
 const AUTH_USER_STORAGE_KEY = 'career_coach_current_user';
@@ -60,6 +61,7 @@ const AppLoader = () => (
 );
 
 export const App = () => {
+  const [theme, setTheme] = useState<ThemeMode>(() => readInitialTheme());
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       return readStoredUser();
@@ -73,6 +75,10 @@ export const App = () => {
     : undefined;
 
   const bootstrapRan = useRef(false);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     if (bootstrapRan.current) {
@@ -120,7 +126,7 @@ export const App = () => {
   return (
     <Router>
       <div className="App">
-        <Header userName={userDisplayName} />
+        <Header userName={userDisplayName} theme={theme} onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')} />
 
         <PageTransition>
           <Routes>

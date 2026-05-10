@@ -87,17 +87,18 @@
   color: white;
   padding: 12px;
   border-radius: var(--r-lg);
-  border: none;
+  border: 1px solid transparent;
   font-weight: 600;
   font-size: var(--fz-sm);
   font-family: inherit;
   cursor: pointer;
-  transition: background-color var(--t-fast), box-shadow var(--t-fast);
+  transition: background-color var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
 }
 
 .github-btn-styled:hover {
   background-color: #1a1f24;
   box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .github-icon {
@@ -108,6 +109,23 @@
 .github-btn-styled:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+:root[data-theme='dark'] .github-btn-styled {
+  background: linear-gradient(180deg, #f8fbff 0%, #d8dfec 100%);
+  color: #0f172a;
+  border-color: rgba(216, 223, 236, 0.28);
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.22);
+}
+
+:root[data-theme='dark'] .github-btn-styled:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffffff 0%, #edf2fb 100%);
+  border-color: rgba(248, 251, 255, 0.42);
+  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.28);
+}
+
+:root[data-theme='dark'] .github-icon {
+  filter: brightness(0) saturate(100%);
 }
 
 .oauth-hint {
