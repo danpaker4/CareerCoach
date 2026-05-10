@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreateRoadmapModal } from './CreateRoadmapModal';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconChart from '../../assets/icon-chart.svg';
 import iconTrophy from '../../assets/icon-trophy.svg';
 import iconList from '../../assets/icon-list.svg';
@@ -66,7 +67,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const loadData = useCallback(() => {
     if (!user?.id) return;
     setFetchState('loading');
-    fetch(ROADMAP_URL(user.id), { credentials: 'include' })
+    apiFetch(ROADMAP_URL(user.id), { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) { setRoadmaps([]); setFetchState('success'); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);

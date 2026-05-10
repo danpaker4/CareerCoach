@@ -90,13 +90,15 @@ export const loginUserSession = async (
 export const refreshUserAccessToken = async (
   usersCollection: Collection<UserDocument>,
   refreshToken: string,
-): Promise<{ accessToken: string; user: SafeUser }> => {
+): Promise<{ accessToken: string; refreshToken: string; user: SafeUser }> => {
   const payload = verifyRefreshToken(refreshToken);
   const user = await findUserById(usersCollection, payload.userId);
   const safeUser = toSafeUser(user);
+  const tokenSubject = buildTokenSubject(safeUser);
 
   return {
-    accessToken: generateAccessToken(buildTokenSubject(safeUser)),
+    accessToken: generateAccessToken(tokenSubject),
+    refreshToken: generateRefreshToken(tokenSubject),
     user: safeUser,
   };
 };

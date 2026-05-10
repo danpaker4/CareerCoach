@@ -2,7 +2,8 @@ import type { Collection } from "mongodb";
 import { randomUUID } from "crypto";
 import { getLinkedInConfig } from "./linkedin.config";
 import type { LinkedInUserProfile } from "./linkedin.types";
-import type { User } from "../users/user.model";
+import type { User, UserDocument } from "../users/user.model";
+import { toUser, toUserDocument } from "../users/user.utils";
 import { buildAuthenticatedSession } from "../auth/auth.service";
 import type { AuthenticatedUserSession } from "../auth/auth.types";
 import { toSafeUser } from "../auth/auth.utils";
@@ -49,22 +50,22 @@ export const fetchLinkedInUserProfile = async (accessToken: string): Promise<Lin
 };
 
 export const loginOrCreateLinkedInUser = async (
-    usersCollection: Collection<User>,
+    usersCollection: Collection<UserDocument>,
     profile: LinkedInUserProfile,
 ): Promise<AuthenticatedUserSession> => {
     const emailLower = profile.email.toLowerCase();
 
-    let user = await usersCollection.findOne({ email: emailLower });
+    const user = await usersCollection.findOne({ email: emailLower });
 
-    let finalUser: User;
+    let finalUser: UserDocument;
 
     if (user) {
-        const updates: Partial<User> = {
+        const updates: Partial<Omit<UserDocument, "_id">> = {
             linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
             avatarUrl: user.avatarUrl ?? profile.picture,
         };
-        await usersCollection.updateOne({ id: user.id }, { $set: updates });
-        finalUser = { ...user, ...updates } as User;
+        await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+        finalUser = { ...user, ...updates };
     } else {
         const newUser: User = {
             id: randomUUID(),
@@ -74,10 +75,11 @@ export const loginOrCreateLinkedInUser = async (
             achievements: [],
             linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
             avatarUrl: profile.picture,
+            githubSkills: [],
         };
-        await usersCollection.insertOne(newUser);
-        finalUser = newUser;
+        finalUser = toUserDocument(newUser);
+        await usersCollection.insertOne(finalUser);
     }
 
-    return buildAuthenticatedSession(toSafeUser(finalUser));
+    return buildAuthenticatedSession(toSafeUser(toUser(finalUser)));
 };

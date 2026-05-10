@@ -19,30 +19,9 @@ import { PageTransition } from './components/page-transition/PageTransition';
 import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
-import { isUser } from './lib/authResponse';
 import { clearStoredAccessToken } from './lib/authSession';
 
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
-const AUTH_USER_STORAGE_KEY = 'career_coach_current_user';
-
-const readStoredUser = (): User | null => {
-  const raw = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-
-  const parsed: unknown = JSON.parse(raw);
-  return isUser(parsed) ? parsed : null;
-};
-
-const persistUser = (user: User | null): void => {
-  if (!user) {
-    window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-    return;
-  }
-
-  window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
-};
 
 interface ProtectedRouteProps {
   user: User | null | undefined;
@@ -62,14 +41,7 @@ const AppLoader = () => (
 );
 
 export const App = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      return readStoredUser();
-    } catch {
-      window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);
   const userDisplayName = currentUser
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ')
     : undefined;
@@ -83,35 +55,30 @@ export const App = () => {
     bootstrapRan.current = true;
 
     const loadCurrentUser = async () => {
-      const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
-
       const user = await refreshAccessToken();
-      if (!user || isAuthPage) {
+      if (!user) {
+        clearStoredAccessToken();
         setCurrentUser(null);
-        persistUser(null);
         return;
       }
 
       setCurrentUser(user);
-      persistUser(user);
     };
 
     loadCurrentUser().catch(() => {
+      clearStoredAccessToken();
       setCurrentUser(null);
-      persistUser(null);
     });
   }, []);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
-    persistUser(user);
   };
 
   const handleLogout = async () => {
     await apiFetch(AUTH_LOGOUT_PATH, { method: 'POST' });
     clearStoredAccessToken();
     setCurrentUser(null);
-    persistUser(null);
     window.location.assign('/login');
   };
 

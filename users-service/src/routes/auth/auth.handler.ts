@@ -1,4 +1,3 @@
-import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { Collection } from "mongodb";
 import type { UserDocument } from "../users/user.model";
@@ -92,6 +91,10 @@ export const refreshAccessToken = (usersCollection: Collection<UserDocument>): A
 
     try {
       const session = await refreshUserAccessToken(usersCollection, refreshToken);
+      setAuthCookies(reply, {
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+      });
       reply.send({
         success: true,
         accessToken: session.accessToken,
