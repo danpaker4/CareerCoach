@@ -11,6 +11,7 @@ import './Profile.css';
 interface ProfileProps {
   user: User;
   onUserUpdated: (updated: User) => void;
+  onLogout: () => void;
 }
 
 interface ProfileForm {
@@ -111,7 +112,7 @@ const extractSkillsFromPdf = async (file: File): Promise<ExtractedAchievement[]>
     }));
 };
 
-export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
+export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
   const [form, setForm] = useState<ProfileForm>({
     firstName: user.firstName,
     lastName: user.lastName,
@@ -235,6 +236,9 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
             <h1 className="profile-title">My Profile</h1>
             <p className="profile-subtitle">Manage your personal information</p>
           </div>
+          <button type="button" className="profile-logout-button" onClick={onLogout}>
+            Logout
+          </button>
         </div>
 
         <div className="profile-layout">

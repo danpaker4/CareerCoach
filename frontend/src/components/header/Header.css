@@ -106,6 +106,25 @@
   gap: 10px;
 }
 
+.user-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--r-full);
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--t-fast);
+}
+
+.user-profile-link:hover {
+  background: var(--clr-primary-50);
+}
+
+.user-profile-link--active {
+  background: var(--clr-primary-50);
+}
+
 .user-avatar {
   width: 34px;
   height: 34px;
@@ -129,25 +148,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.btn-logout {
-  padding: 7px 16px;
-  border: 1.5px solid var(--clr-slate-300);
-  border-radius: var(--r-full);
-  background: transparent;
-  color: var(--clr-slate-600);
-  font-size: var(--fz-xs);
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all var(--t-fast);
-}
-
-.btn-logout:hover {
-  border-color: var(--clr-error);
-  color: var(--clr-error);
-  background: var(--clr-error-bg);
 }
 
 /* Hamburger — hidden on desktop */
@@ -233,10 +233,6 @@
     display: flex;
     align-items: center;
     gap: 10px;
-  }
-
-  .mobile-logout {
-    padding: 8px 18px;
   }
 
   .mobile-login-cta {

@@ -1,7 +1,7 @@
 services:
   minio:
     image: minio/minio:latest
-    container_name: minio
+    container_name: minio-careercoach
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -20,7 +20,7 @@ services:
 
   minio-setup:
     image: minio/mc:latest
-    container_name: minio-setup
+    container_name: minio-setup-careercoach
     depends_on:
       minio:
         condition: service_healthy

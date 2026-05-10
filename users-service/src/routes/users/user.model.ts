@@ -15,6 +15,7 @@ export const UserSchema = z.object({
     currentJob: z.string().nullish(),
     linkedInUrl: z.string().nullish(),
     githubUrl: z.string().nullish(),
+    githubSkills: z.array(z.string()).default([]),
     cv: z.string().nullish(),
     githubId: z.number().nullish(),
     avatarUrl: z.string().nullish(),
@@ -24,3 +25,4 @@ export const UserSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+export type UserDocument = Omit<User, "id"> & { _id: string };

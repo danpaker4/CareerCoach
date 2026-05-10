@@ -9,7 +9,8 @@ import type {
   LoginBody,
   TokenErrorResponses,
 } from "./auth.types";
-import type { User } from "../users/user.model";
+import type { User, UserDocument } from "../users/user.model";
+import { toUser } from "../users/user.utils";
 import { getAuthConfig } from "./auth.config";
 
 export const isLoginBody = (body: unknown): body is LoginBody => {
@@ -103,11 +104,13 @@ export const sendAuthError = (reply: FastifyReply, error: unknown): void => {
   reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({ error: "Internal Server Error" });
 };
 
-export const appendPart = (
+export const appendPart = async (
   current: RegisterMultipartData,
   part: MultipartIteratorPart,
-): RegisterMultipartData => {
+): Promise<RegisterMultipartData> => {
   if (part?.type === "file" && part.fieldname === "cv") {
+    const buffer = await part.toBuffer();
+    part.toBuffer = async () => buffer;
     return { ...current, cvFile: part };
   }
   if (part?.type === "field") {
@@ -130,10 +133,12 @@ export const readMultipartData = async (
   if (next.done) {
     return acc;
   }
-  return readMultipartData(iterator, appendPart(acc, next.value));
+  const nextAcc = await appendPart(acc, next.value);
+  return readMultipartData(iterator, nextAcc);
 };
 
-export const toSafeUser = (user: User): Omit<User, "password"> => {
-  const { password: _password, ...safeUser } = user;
+export const toSafeUser = (user: User | UserDocument): Omit<User, "password"> => {
+  const normalizedUser = "_id" in user ? toUser(user) : user;
+  const { password: _password, ...safeUser } = normalizedUser;
   return safeUser;
 };

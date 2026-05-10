@@ -1,4 +1,13 @@
+.route-transition-active,
+.route-transition-active body {
+  overflow-y: clip;
+}
+
 .page-transition {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   animation: pageEnter 0.3s ease both;
 }
 
