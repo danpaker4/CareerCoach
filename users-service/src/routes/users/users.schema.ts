@@ -80,3 +80,18 @@ export const updateUserSchema = {
     }),
 } satisfies FastifySchema;
 
+export const uploadUserCvSchema = {
+    response: {
+        [StatusCodes.OK]: UserSchema.omit({ password: true }),
+        [StatusCodes.BAD_REQUEST]: z.object({
+            error: z.string(),
+        }),
+        [StatusCodes.NOT_FOUND]: z.object({
+            error: z.string(),
+        }),
+    },
+    params: z.object({
+        userId: z.string().min(1, "userId cannot be empty"),
+    }),
+} satisfies FastifySchema;
+

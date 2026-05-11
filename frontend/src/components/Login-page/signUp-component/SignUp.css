@@ -67,6 +67,13 @@
   transform: translateY(-1px);
 }
 
+.auth-btn:disabled {
+  background: var(--clr-slate-300);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .input-row {
   display: flex;
   gap: 12px;

@@ -31,15 +31,6 @@ export const ChatPage = ({ user }: ChatPageProps) => {
             </p>
           </div>
         </div>
-
-        <div className="chat-sidebar-user">
-          <p className="chat-sidebar-label">Chatting as</p>
-          <p className="chat-sidebar-username">{user.firstName} {user.lastName}</p>
-          {user.currentJob && (
-            <p className="chat-sidebar-job">{user.currentJob}</p>
-          )}
-        </div>
-
         <div className="chat-quick-prompts">
           <p className="chat-sidebar-label">Quick prompts</p>
           <div className="chat-prompt-list">
