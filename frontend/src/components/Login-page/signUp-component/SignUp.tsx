@@ -20,10 +20,16 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
     const [linkedInUrl, setLinkedInUrl] = useState('');
     const [cvFile, setCvFile] = useState<File | null>(null);
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) {
+            return;
+        }
+
         setError('');
+        setIsSubmitting(true);
 
         try {
             const formData = new FormData();
@@ -53,6 +59,8 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
             }
         } catch {
             setError('Server connection failed. Is the backend running?');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -110,7 +118,9 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
 
             {error && <p className="form-error">{error}</p>}
             
-            <button type="submit" className="auth-btn">Create Account</button>
+            <button type="submit" className="auth-btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
+            </button>
         </form>
     );
 };
