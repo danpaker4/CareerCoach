@@ -11,6 +11,7 @@ export interface ServerConfig {
         usersServiceBaseUrl: string;
         jobServiceBaseUrl: string;
         llm: ResolvedLlmConfig;
+        llmTextCompletionChain: readonly ResolvedLlmConfig[];
         embeddingModel?: string;
         customEmbeddingUrl?: string;
         conversationMemoryVectorIndexName: string;
