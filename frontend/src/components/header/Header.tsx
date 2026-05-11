@@ -5,6 +5,7 @@ import iconZap from '../../assets/icon-zap.svg';
 import iconKanban from '../../assets/icon-kanban.svg';
 import iconTarget from '../../assets/icon-target.svg';
 import iconSparkle from '../../assets/icon-sparkle.svg';
+import iconMessage from '../../assets/icon-message.svg';
 import iconMenu from '../../assets/icon-menu.svg';
 import iconX from '../../assets/icon-x.svg';
 import iconSun from '../../assets/icon-sun.svg';
@@ -50,6 +51,10 @@ export const Header = ({ userName, theme, onToggleTheme }: HeaderProps) => {
     <>
       {userName && (
         <>
+          <Link to="/chat" className={`nav-link${isActive('/chat') ? ' nav-link--active' : ''}`}>
+            <img src={iconMessage} alt="" aria-hidden="true" className="nav-icon" />
+            AI Coach
+          </Link>
           <Link to="/roadmap" className={`nav-link${isActive('/roadmap') ? ' nav-link--active' : ''}`}>
             <img src={iconRoadmap} alt="" aria-hidden="true" className="nav-icon" />
             My Roadmap

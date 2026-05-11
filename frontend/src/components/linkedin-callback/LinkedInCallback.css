@@ -1,0 +1,64 @@
+.linkedin-callback-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+  background: linear-gradient(160deg, #003d5c 0%, #005582 100%);
+  padding: 40px 20px;
+}
+
+.linkedin-callback-card {
+  background: white;
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 48px 40px;
+  max-width: 440px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  animation: fadeInUp 0.3s ease both;
+}
+
+.linkedin-callback-spinner {
+  width: 40px;
+  height: 40px;
+  border-width: 4px;
+  margin-bottom: 4px;
+}
+
+.linkedin-callback-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fz-xl);
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.linkedin-callback-icon--error {
+  background: var(--clr-error-bg);
+  color: var(--clr-error);
+}
+
+.linkedin-callback-title {
+  font-size: var(--fz-xl);
+  font-weight: 700;
+  color: var(--clr-slate-900);
+}
+
+.linkedin-callback-message {
+  font-size: var(--fz-sm);
+  color: var(--clr-slate-500);
+  line-height: 1.6;
+}
+
+.linkedin-callback-back {
+  margin-top: 8px;
+  text-decoration: none;
+}

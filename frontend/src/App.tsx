@@ -12,6 +12,8 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { MySkills } from './components/my-skills/MySkills';
 import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { GithubCallback } from './components/github-callback/GithubCallback';
+import { LinkedInCallback } from './components/linkedin-callback/LinkedInCallback';
+import { ChatPage } from './components/chat-page/ChatPage';
 import { NotFound } from './components/not-found/NotFound';
 import { PageTransition } from './components/page-transition/PageTransition';
 import { apiFetch, refreshAccessToken } from './lib/apiClient';
@@ -62,12 +64,12 @@ const AppLoader = () => (
 
 export const App = () => {
   const [theme, setTheme] = useState<ThemeMode>(() => readInitialTheme());
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  const [currentUser, setCurrentUser] = useState<User | null | undefined>(() => {
     try {
-      return readStoredUser();
+      return readStoredUser() ?? undefined;
     } catch {
       window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
-      return null;
+      return undefined;
     }
   });
   const userDisplayName = currentUser
@@ -87,35 +89,35 @@ export const App = () => {
     bootstrapRan.current = true;
 
     const loadCurrentUser = async () => {
-      const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
-
       const user = await refreshAccessToken();
-      if (!user || isAuthPage) {
-        setCurrentUser(null);
+      if (!user) {
+        clearStoredAccessToken();
         persistUser(null);
+        setCurrentUser(null);
         return;
       }
 
-      setCurrentUser(user);
       persistUser(user);
+      setCurrentUser(user);
     };
 
     loadCurrentUser().catch(() => {
-      setCurrentUser(null);
+      clearStoredAccessToken();
       persistUser(null);
+      setCurrentUser(null);
     });
   }, []);
 
   const handleLoginSuccess = (user: User) => {
-    setCurrentUser(user);
     persistUser(user);
+    setCurrentUser(user);
   };
 
   const handleLogout = async () => {
     await apiFetch(AUTH_LOGOUT_PATH, { method: 'POST' });
     clearStoredAccessToken();
-    setCurrentUser(null);
     persistUser(null);
+    setCurrentUser(null);
     window.location.assign('/login');
   };
 
@@ -180,7 +182,10 @@ export const App = () => {
               element={
                 <ProtectedRoute user={currentUser}>
                   {currentUser
-                    ? <Profile user={currentUser} onUserUpdated={(u) => setCurrentUser(u)} onLogout={handleLogout} />
+                    ? <Profile user={currentUser} onUserUpdated={(u) => {
+                      persistUser(u);
+                      setCurrentUser(u);
+                    }} onLogout={handleLogout} />
                     : null}
                 </ProtectedRoute>
               }
@@ -205,8 +210,22 @@ export const App = () => {
             />
 
             <Route
+              path="/chat"
+              element={
+                <ProtectedRoute user={currentUser}>
+                  {currentUser ? <ChatPage user={currentUser} /> : null}
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/auth/github/callback"
               element={<GithubCallback onLoginSuccess={handleLoginSuccess} />}
+            />
+
+            <Route
+              path="/auth/linkedin/callback"
+              element={<LinkedInCallback onLoginSuccess={handleLoginSuccess} />}
             />
 
             <Route path="/signup" element={<Navigate to="/login" replace />} />

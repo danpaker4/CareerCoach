@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
@@ -99,7 +100,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     const url = query.trim()
       ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}`
       : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}`;
-    fetch(url, { credentials: 'include' })
+    apiFetch(url, { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) { setJobs([]); setFetchState('success'); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -130,7 +131,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     if (!user?.id) return;
     setAddingJob(job.id);
     try {
-      await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
+      await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

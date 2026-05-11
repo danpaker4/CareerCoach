@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import iconPlus from '../../assets/icon-plus.svg';
@@ -59,7 +60,7 @@ export const SkillMatcher = ({ user }: SkillMatcherProps) => {
   const loadData = useCallback(() => {
     if (!user?.id) return;
     setFetchState('loading');
-    fetch(SKILL_MATCHER_URL(user.id), { credentials: 'include' })
+    apiFetch(SKILL_MATCHER_URL(user.id), { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) { setDatasets([]); setFetchState('success'); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -79,7 +80,7 @@ export const SkillMatcher = ({ user }: SkillMatcherProps) => {
     const key = `${dataset.id}-${skill}`;
     setTogglingSkill(key);
     try {
-      await fetch(
+      await apiFetch(
         `${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${dataset.userId}/${dataset.jobId}/${encodeURIComponent(skill)}`,
         {
           method: 'PATCH',
@@ -114,7 +115,7 @@ export const SkillMatcher = ({ user }: SkillMatcherProps) => {
     if (duplicate) return;
     setSavingSkill(dataset.id);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${dataset.id}/skill`,
         {
           method: 'POST',

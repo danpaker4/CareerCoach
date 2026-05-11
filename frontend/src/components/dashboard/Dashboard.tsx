@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconRoadmap from '../../assets/icon-roadmap.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import iconKanban from '../../assets/icon-kanban.svg';
@@ -107,7 +108,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
   useEffect(() => {
     const headers = { credentials: 'include' as const };
 
-    const fetchRoadmaps = fetch(
+    const fetchRoadmaps = apiFetch(
       `${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${user.id}`, headers
     ).then(async (r) => {
       if (r.status === 404) return 0;
@@ -116,7 +117,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
       return Array.isArray(d) ? d.length : null;
     }).catch(() => null);
 
-    const fetchSkills = fetch(
+    const fetchSkills = apiFetch(
       `${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, headers
     ).then(async (r) => {
       if (r.status === 404) return { total: 0, done: 0 };
@@ -127,7 +128,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
       return { total: allSkills.length, done: allSkills.filter((s) => s.isDone).length };
     }).catch(() => null);
 
-    const fetchJobs = fetch(
+    const fetchJobs = apiFetch(
       `${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${user.id}`, headers
     ).then(async (r) => {
       if (r.status === 404) return 0;

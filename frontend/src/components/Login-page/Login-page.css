@@ -135,6 +135,42 @@
   margin-top: 6px;
 }
 
+/* LinkedIn button */
+.linkedin-btn-styled {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  background-color: #0077B5;
+  color: white;
+  padding: 12px;
+  border-radius: var(--r-lg);
+  border: none;
+  font-weight: 600;
+  font-size: var(--fz-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color var(--t-fast), box-shadow var(--t-fast);
+  margin-top: 10px;
+}
+
+.linkedin-btn-styled:hover {
+  background-color: #005e93;
+  box-shadow: var(--shadow-md);
+}
+
+.linkedin-btn-styled:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.linkedin-icon {
+  width: 18px;
+  height: 18px;
+  filter: brightness(0) invert(1);
+}
+
 @media (max-width: 640px) {
   .auth-card,
   .auth-card--signup {
