@@ -111,7 +111,6 @@ export const Dashboard = ({ user }: DashboardProps) => {
     const fetchRoadmaps = apiFetch(
       `${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${user.id}`, headers
     ).then(async (r) => {
-      if (r.status === 404) return 0;
       if (!r.ok) return null;
       const d = await r.json() as unknown[];
       return Array.isArray(d) ? d.length : null;
@@ -120,7 +119,6 @@ export const Dashboard = ({ user }: DashboardProps) => {
     const fetchSkills = apiFetch(
       `${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, headers
     ).then(async (r) => {
-      if (r.status === 404) return { total: 0, done: 0 };
       if (!r.ok) return null;
       const d = await r.json() as Array<{ skillToImprove: Array<{ isDone: boolean }> }>;
       if (!Array.isArray(d)) return null;

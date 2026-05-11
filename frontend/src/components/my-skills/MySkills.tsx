@@ -61,11 +61,6 @@ export const MySkills = ({ user }: MySkillsProps) => {
     setSkillState('loading');
     apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, { credentials: 'include' })
       .then(async (res) => {
-        if (res.status === 404) {
-          setDatasets([]);
-          setSkillState('success');
-          return;
-        }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
         setDatasets(parseSkillDatasets(data));

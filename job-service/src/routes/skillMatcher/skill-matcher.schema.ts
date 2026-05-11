@@ -6,9 +6,6 @@ import { SkillMatcherSchema, SkillToImproveSchema } from "./skill-matcher.model"
 export const getSkillMatcherByUserIdSchema = {
     response: {
         [StatusCodes.OK]: z.array(SkillMatcherSchema),
-        [StatusCodes.NOT_FOUND]: z.object({
-            error: z.string(),
-        }),
     },
     params: z.object({
         userId: z.string().uuid("userId must be a valid UUID"),

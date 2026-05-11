@@ -71,7 +71,6 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
     setFetchState('loading');
     apiFetch(ROADMAP_URL(user.id), { credentials: 'include' })
       .then(async (res) => {
-        if (res.status === 404) { setRoadmaps([]); setFetchState('success'); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
         setRoadmaps(parseRoadmapResponse(data));

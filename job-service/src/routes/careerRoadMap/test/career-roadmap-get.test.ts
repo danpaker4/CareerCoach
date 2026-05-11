@@ -39,17 +39,15 @@ describe("Career Road Map Router - GET /career-roadmap/:userId", () => {
         expect(roadMaps[1].userId).toBe(mockUserId);
     });
 
-    it("should return 404 when no career road maps exist for the user", async () => {
+    it("should return 200 with an empty array when no career road maps exist for the user", async () => {
         const randomUserId = uuidv4();
         const response = await server.app.inject({
             method: "GET",
             url: `/career-roadmap/${randomUserId}`,
         });
 
-        expect(response.statusCode).toBe(StatusCodes.NOT_FOUND);
-        expect(response.json()).toEqual({
-            error: "No career road maps found for this user",
-        });
+        expect(response.statusCode).toBe(StatusCodes.OK);
+        expect(response.json()).toEqual([]);
     });
 
     it("should return 400 for invalid userId (not UUID)", async () => {
