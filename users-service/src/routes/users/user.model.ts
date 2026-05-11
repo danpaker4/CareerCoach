@@ -12,6 +12,9 @@ export const UserSchema = z.object({
         name: z.string(),
         grade: z.number().min(1).max(100),
     })).default([]),
+    technologies: z.array(z.string()).default([]),
+    interests: z.array(z.string()).default([]),
+    knownSkills: z.array(z.string()).default([]),
     currentJob: z.string().nullish(),
     linkedInUrl: z.string().nullish(),
     githubUrl: z.string().nullish(),
@@ -22,6 +25,8 @@ export const UserSchema = z.object({
     bio: z.string().nullish(),
     location: z.string().nullish(),
     company: z.string().nullish(),
+    /** Set when chat-service first creates the linked `userCareerProfiles` document for this `id`. */
+    coachProfileMaterializedAt: z.coerce.date().optional(),
 });
 
 export type User = z.infer<typeof UserSchema>;

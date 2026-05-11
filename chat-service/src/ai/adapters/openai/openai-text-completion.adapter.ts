@@ -9,6 +9,7 @@ export class OpenAiTextCompletionAdapter implements TextCompletionPort {
     ) { }
 
     readonly complete = async (prompt: string): Promise<string> => {
+        console.info(`[LLM] Sending request provider=openai model=${this.model}`);
         const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
             method: "POST",
             headers: {

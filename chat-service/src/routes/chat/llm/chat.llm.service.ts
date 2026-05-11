@@ -2,6 +2,8 @@ import type { TextCompletionPort } from "../../../ai/ports/text-completion.types
 import type { Conversation } from "../conversation/conversation.model";
 import type { ConversationStage } from "../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
+import type { ConversationMode } from "../coach/conversation-mode.types";
+import type { ConversationMemory } from "../memory/conversation-memory.types";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,
@@ -14,8 +16,13 @@ import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from
 export class ChatLlmService {
     constructor(private readonly textCompletion: TextCompletionPort) { }
 
-    decideNextStep = async (conversation: Conversation, latestUserMessage: string): Promise<LlmDecision> => {
-        const rawText = await this.textCompletion.complete(buildDecisionPrompt(conversation, latestUserMessage));
+    decideNextStep = async (
+        conversation: Conversation,
+        latestUserMessage: string,
+        memories: readonly ConversationMemory[] = [],
+        mode: ConversationMode = "GUIDED"
+    ): Promise<LlmDecision> => {
+        const rawText = await this.textCompletion.complete(buildDecisionPrompt(conversation, latestUserMessage, memories, mode));
 
         try {
             return parseLlmDecisionFromJson(rawText);
@@ -29,9 +36,14 @@ export class ChatLlmService {
         }
     };
 
-    generateJobAwareReply = async (conversation: Conversation, latestUserMessage: string, jobs: readonly JobSearchResultItem[]): Promise<LlmDecision> => {
+    generateJobAwareReply = async (
+        conversation: Conversation,
+        latestUserMessage: string,
+        jobs: readonly JobSearchResultItem[],
+        memories: readonly ConversationMemory[] = []
+    ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildRecommendationPrompt(conversation, latestUserMessage, jobs)
+            buildRecommendationPrompt(conversation, latestUserMessage, jobs, memories)
         );
 
         try {
@@ -49,9 +61,10 @@ export class ChatLlmService {
     generateStageReply = async (
         conversation: Conversation,
         latestUserMessage: string,
-        stage: ConversationStage
+        stage: ConversationStage,
+        mode: ConversationMode = "GUIDED"
     ): Promise<StageLlmDecision> => {
-        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage));
+        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage, mode));
         try {
             return parseStageLlmDecisionFromJson(rawText);
         } catch {

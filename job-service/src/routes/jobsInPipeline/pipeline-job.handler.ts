@@ -42,9 +42,18 @@ export const PipelineJobHandler = (pipelineJobsCollection: Collection<PipelineJo
         createPipelineJobHandler: async (request: SchematicRequest<typeof createPipelineJobSchema>, reply: FastifyReply) => {
             try {
                 const jobData = request.body;
+                const existing = await pipelineJobsCollection.findOne({
+                    userId: jobData.userId,
+                    jobId: jobData.jobId,
+                });
+                if (existing) {
+                    reply.code(StatusCodes.CONFLICT).send({ error: "This job is already in your pipeline." });
+                    return;
+                }
                 const newJob: PipelineJob = {
                     id: uuidv4(),
                     ...jobData,
+                    createdAt: jobData.createdAt ?? new Date(),
                 };
 
                 await pipelineJobsCollection.insertOne(newJob);

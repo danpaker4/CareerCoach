@@ -37,6 +37,9 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     ...userData,
                     githubSkills: userData.githubSkills ?? [],
                     achievements: userData.achievements ?? [],
+                    technologies: userData.technologies ?? [],
+                    interests: userData.interests ?? [],
+                    knownSkills: userData.knownSkills ?? [],
                 };
 
                 await usersCollection.insertOne(toUserDocument(newUser));

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreateRoadmapModal } from './CreateRoadmapModal';
+import { ChatInterface } from '../chat-component/Chat';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import iconChart from '../../assets/icon-chart.svg';
@@ -63,6 +64,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const [roadmaps, setRoadmaps] = useState<CareerRoadmapData[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [activeTab, setActiveTab] = useState(0);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const loadData = useCallback(() => {
     if (!user?.id) return;
@@ -292,6 +294,37 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
         />
       )}
 
+      {!isChatOpen && user?.id && (
+        <button
+          type="button"
+          className="roadmap-chat-fab"
+          onClick={() => setIsChatOpen(true)}
+          aria-label="Open AI career coach chat"
+        >
+          <img src={iconMessage} alt="" aria-hidden="true" className="roadmap-chat-fab-icon" />
+        </button>
+      )}
+      {isChatOpen && (
+        <div className="floating-chat-wrapper">
+          <div className="chat-header-bar">
+            <span>CareerCoach AI</span>
+            <button type="button" className="close-chat" onClick={() => setIsChatOpen(false)} aria-label="Close chat">
+              X
+            </button>
+          </div>
+          <ChatInterface
+            userId={user?.id ?? 'guest'}
+            userProfile={{
+              firstName: user?.firstName,
+              lastName: user?.lastName,
+              currentJob: user?.currentJob,
+              achievements: user?.achievements,
+              technologies: user?.technologies,
+              interests: user?.interests,
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 };

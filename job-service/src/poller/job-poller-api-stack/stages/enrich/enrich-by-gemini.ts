@@ -8,20 +8,62 @@ import { buildSearchableText, createEmbedding, createEmbeddingClient, type Embed
 
 const MAX_GEMINI_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
+const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+const DEFAULT_LLM_MODEL = "llama3";
 
 const sleep = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
 };
+
+const normalizeTechnologyValue = (value: string): string => {
+  const normalized = value.trim().toLowerCase();
+  const map: Record<string, string> = {
+    node: "Node.js",
+    nodejs: "Node.js",
+    "node.js": "Node.js",
+    mongo: "MongoDB",
+    mongodb: "MongoDB",
+    js: "JavaScript",
+    javascript: "JavaScript",
+    ts: "TypeScript",
+    typescript: "TypeScript",
+    k8s: "Kubernetes",
+  };
+  return map[normalized] ?? value.trim();
+};
+
+const normalizeArray = (items: readonly string[]): string[] =>
+  [...new Set(items.map((item) => normalizeTechnologyValue(item)).filter((item) => item.length > 0))];
 
 const shouldRetryGeminiError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("503") || message.toLowerCase().includes("service unavailable");
 };
 
+const generateWithOllama = async (prompt: string, modelName: string): Promise<string> => {
+  const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: modelName, prompt, stream: false }),
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok || typeof payload !== "object" || payload === null || !("response" in payload)) {
+    throw new Error(`Ollama enrichment failed with status ${response.status}`);
+  }
+  const text = (payload as { response?: unknown }).response;
+  if (typeof text !== "string") {
+    throw new Error("Ollama enrichment returned invalid response");
+  }
+  return text;
+};
+
 const enrichSingleJob = async (
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   embeddingModel: EmbeddingClient | null,
   job: AdaptedJob,
+  llmProvider: "gemini" | "ollama",
+  llmModel: string,
   attempt = 1,
 ): Promise<EnrichedJob> => {
   if (!job.description.trim()) {
@@ -31,6 +73,13 @@ const enrichSingleJob = async (
       description: job.description,
       requirements: fallback.requirements,
       benefits: fallback.benefits,
+      languages: fallback.languages,
+      frameworks: fallback.frameworks,
+      databases: fallback.databases,
+      platforms: fallback.platforms,
+      tools: fallback.tools,
+      mustKnowSkills: fallback.mustKnowSkills,
+      niceToHaveSkills: fallback.niceToHaveSkills,
     });
     const searchEmbedding = embeddingModel
       ? await createEmbedding(embeddingModel, searchableText).catch(() => [])
@@ -41,8 +90,12 @@ const enrichSingleJob = async (
   const prompt = buildEnrichmentPrompt(job);
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = llmProvider === "ollama"
+      ? await generateWithOllama(prompt, llmModel)
+      : await (async (): Promise<string> => {
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+      })();
     const parsed = parseGeminiJson(text);
     const fallback = inferFallback(job);
     if (!parsed) {
@@ -51,6 +104,13 @@ const enrichSingleJob = async (
         description: job.description,
         requirements: fallback.requirements,
         benefits: fallback.benefits,
+        languages: fallback.languages,
+        frameworks: fallback.frameworks,
+        databases: fallback.databases,
+        platforms: fallback.platforms,
+        tools: fallback.tools,
+        mustKnowSkills: fallback.mustKnowSkills,
+        niceToHaveSkills: fallback.niceToHaveSkills,
       });
       const searchEmbedding = embeddingModel
         ? await createEmbedding(embeddingModel, searchableText).catch(() => [])
@@ -61,13 +121,34 @@ const enrichSingleJob = async (
     const salary = typeof parsed.salary === "number" ? parsed.salary : fallback.salary;
     const requirements = cleanStringArray(parsed.requirements);
     const benefits = cleanStringArray(parsed.benefits);
+    const languages = normalizeArray(cleanStringArray(parsed.languages));
+    const frameworks = normalizeArray(cleanStringArray(parsed.frameworks));
+    const databases = normalizeArray(cleanStringArray(parsed.databases));
+    const platforms = normalizeArray(cleanStringArray(parsed.platforms));
+    const tools = normalizeArray(cleanStringArray(parsed.tools));
+    const mustKnowSkills = normalizeArray(cleanStringArray(parsed.mustKnowSkills));
+    const niceToHaveSkills = normalizeArray(cleanStringArray(parsed.niceToHaveSkills));
     const finalRequirements = requirements.length > 0 ? requirements : fallback.requirements;
     const finalBenefits = benefits.length > 0 ? benefits : fallback.benefits;
+    const finalLanguages = languages.length > 0 ? languages : fallback.languages;
+    const finalFrameworks = frameworks.length > 0 ? frameworks : fallback.frameworks;
+    const finalDatabases = databases.length > 0 ? databases : fallback.databases;
+    const finalPlatforms = platforms.length > 0 ? platforms : fallback.platforms;
+    const finalTools = tools.length > 0 ? tools : fallback.tools;
+    const finalMustKnowSkills = mustKnowSkills.length > 0 ? mustKnowSkills : fallback.mustKnowSkills;
+    const finalNiceToHaveSkills = niceToHaveSkills.length > 0 ? niceToHaveSkills : fallback.niceToHaveSkills;
     const searchableText = buildSearchableText({
       jobTitle: job.jobTitle,
       description: job.description,
       requirements: finalRequirements,
       benefits: finalBenefits,
+      languages: finalLanguages,
+      frameworks: finalFrameworks,
+      databases: finalDatabases,
+      platforms: finalPlatforms,
+      tools: finalTools,
+      mustKnowSkills: finalMustKnowSkills,
+      niceToHaveSkills: finalNiceToHaveSkills,
     });
     const searchEmbedding = embeddingModel
       ? await createEmbedding(embeddingModel, searchableText).catch(() => [])
@@ -78,6 +159,13 @@ const enrichSingleJob = async (
       salary,
       requirements: finalRequirements,
       benefits: finalBenefits,
+      languages: finalLanguages,
+      frameworks: finalFrameworks,
+      databases: finalDatabases,
+      platforms: finalPlatforms,
+      tools: finalTools,
+      mustKnowSkills: finalMustKnowSkills,
+      niceToHaveSkills: finalNiceToHaveSkills,
       searchableText,
       searchEmbedding,
     };
@@ -89,7 +177,7 @@ const enrichSingleJob = async (
         `Gemini request failed with service unavailability for job ${job.id}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_GEMINI_RETRIES})`,
       );
       await sleep(delay);
-      return enrichSingleJob(model, embeddingModel, job, attempt + 1);
+      return enrichSingleJob(model, embeddingModel, job, llmProvider, llmModel, attempt + 1);
     }
 
     console.warn(`Gemini enrichment failed for job ${job.id}. Using fallback values.`);
@@ -99,6 +187,13 @@ const enrichSingleJob = async (
       description: job.description,
       requirements: fallback.requirements,
       benefits: fallback.benefits,
+      languages: fallback.languages,
+      frameworks: fallback.frameworks,
+      databases: fallback.databases,
+      platforms: fallback.platforms,
+      tools: fallback.tools,
+      mustKnowSkills: fallback.mustKnowSkills,
+      niceToHaveSkills: fallback.niceToHaveSkills,
     });
     const searchEmbedding = embeddingModel
       ? await createEmbedding(embeddingModel, searchableText).catch(() => [])
@@ -108,8 +203,11 @@ const enrichSingleJob = async (
 };
 
 export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]> => {
+  const llmProvider = (process.env.LLM_PROVIDER || "ollama").toLowerCase() === "gemini" ? "gemini" : "ollama";
+  const llmModel = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || DEFAULT_LLM_MODEL;
+  console.info(`[LLM] Job enrichment generator provider=${llmProvider} model=${llmModel}`);
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (llmProvider === "gemini" && !apiKey) {
     return jobs.map((job) => {
       const fallback = inferFallback(job);
       const searchableText = buildSearchableText({
@@ -117,15 +215,28 @@ export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]>
         description: job.description,
         requirements: fallback.requirements,
         benefits: fallback.benefits,
+        languages: fallback.languages,
+        frameworks: fallback.frameworks,
+        databases: fallback.databases,
+        platforms: fallback.platforms,
+        tools: fallback.tools,
+        mustKnowSkills: fallback.mustKnowSkills,
+        niceToHaveSkills: fallback.niceToHaveSkills,
       });
       return { ...job, ...fallback, searchableText, searchEmbedding: [] };
     });
   }
 
-  const modelName = process.env.LLM_MODEL || "gemini-3.1-flash-lite-preview";
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: modelName });
-  const embeddingModel = createEmbeddingClient(apiKey);
+  const model = llmProvider === "gemini" && apiKey
+    ? new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: llmModel })
+    : null;
+  const embeddingModel = apiKey ? createEmbeddingClient(apiKey) : null;
 
-  return Promise.all(jobs.map((job) => enrichSingleJob(model, embeddingModel, job)));
+  return Promise.all(jobs.map((job) => enrichSingleJob(
+    model as ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+    embeddingModel,
+    job,
+    llmProvider,
+    llmModel
+  )));
 };

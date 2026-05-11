@@ -15,11 +15,25 @@ export const buildSearchableText = (input: {
   description: string;
   requirements: readonly string[];
   benefits: readonly string[];
+  languages: readonly string[];
+  frameworks: readonly string[];
+  databases: readonly string[];
+  platforms: readonly string[];
+  tools: readonly string[];
+  mustKnowSkills: readonly string[];
+  niceToHaveSkills: readonly string[];
 }): string => [
   `Job title: ${input.jobTitle}`,
   `Description: ${input.description}`,
   `Requirements: ${normalizeList(input.requirements)}`,
   `Benefits: ${normalizeList(input.benefits)}`,
+  `Languages: ${normalizeList(input.languages)}`,
+  `Frameworks: ${normalizeList(input.frameworks)}`,
+  `Databases: ${normalizeList(input.databases)}`,
+  `Platforms: ${normalizeList(input.platforms)}`,
+  `Tools: ${normalizeList(input.tools)}`,
+  `Must know skills: ${normalizeList(input.mustKnowSkills)}`,
+  `Nice to have skills: ${normalizeList(input.niceToHaveSkills)}`,
 ].join("\n");
 
 export const createEmbeddingClient = (apiKey: string): EmbeddingClient => {

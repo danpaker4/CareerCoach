@@ -16,6 +16,8 @@ export interface User {
   githubSkills?: string[];
   cv?: string;
   achievements?: Achievement[];
+  technologies?: string[];
+  interests?: string[];
   githubId?: number;
   avatarUrl?: string;
   bio?: string;

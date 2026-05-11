@@ -1,10 +1,38 @@
+import type { AttachedJobSnapshot } from "../chat/chat.model";
 import type { Conversation } from "../conversation/conversation.model";
 import type { ConversationStage } from "../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
+import type { ConversationMemory } from "../memory/conversation-memory.types";
+import type { ConversationMode } from "../coach/conversation-mode.types";
+
+const MAX_JOB_DESCRIPTION_CHARS = 1200;
+
+const formatAttachedJobsForHistory = (jobs: readonly AttachedJobSnapshot[]): string =>
+    `\nATTACHED_JOBS_JSON: ${JSON.stringify(
+        jobs.map((job) => ({
+            jobId: job.jobId,
+            jobTitle: job.jobTitle,
+            company: job.company,
+            salary: job.salary,
+            seniority: job.seniority,
+            url: job.url,
+            description:
+                job.description.length > MAX_JOB_DESCRIPTION_CHARS
+                    ? `${job.description.slice(0, MAX_JOB_DESCRIPTION_CHARS)}…`
+                    : job.description,
+        }))
+    )}`;
 
 const buildHistory = (conversation: Conversation): string =>
     conversation.messages
-        .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
+        .map((message) => {
+            const base = `${message.role.toUpperCase()}: ${message.content}`;
+            const jobsExtra =
+                message.role === "assistant" && message.attachedJobs && message.attachedJobs.length > 0
+                    ? formatAttachedJobsForHistory(message.attachedJobs)
+                    : "";
+            return base + jobsExtra;
+        })
         .join("\n");
 
 const achievementsText = (conversation: Conversation): string =>
@@ -12,7 +40,17 @@ const achievementsText = (conversation: Conversation): string =>
         ? "No achievements available yet."
         : conversation.achievements.map((achievement) => `- ${achievement.name}`).join("\n");
 
-export const buildDecisionPrompt = (conversation: Conversation, latestUserMessage: string): string => `
+const memoryText = (memories: readonly ConversationMemory[]): string =>
+    memories.length === 0
+        ? "No memory snippets available."
+        : memories.map((memory) => `- [${memory.type}] ${memory.text}`).join("\n");
+
+export const buildDecisionPrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+    memories: readonly ConversationMemory[] = [],
+    mode: ConversationMode = "GUIDED"
+): string => `
 You are CareerCoach AI.
 Respond ONLY with valid JSON in this exact structure:
 {
@@ -35,15 +73,28 @@ Rules:
   (2) Discovery path: user is unsure what they want next—still set shouldSearchJobs=true once the conversation gives enough signal from what they love, enjoy, care about, or want in the future; then fill searchFilters.interests and searchFilters.keywords richly from their words (and skills when mentioned). A specific job title is not required for this path.
 - Only trigger shouldSearchJobs=true when enough details exist for one of the paths above.
 - If there are no jobs in context yet, recommendedJobIds must be [].
-- Do not mention salary, company details, or requirements unless explicitly provided in supplied jobs context.
+- Do not invent salary, company names, or requirements. If the user asks about salary or company for jobs from earlier turns, use ONLY values from ATTACHED_JOBS_JSON blocks in the conversation history when present; if a field is missing or zero, say you do not have a reliable value instead of guessing.
 - Never disclose internal achievement scores/grades to the user.
 - Keep replies concise: maximum 1-2 short lines.
 - Do not ask about remote/hybrid/on-site preferences.
 - Do not ask the user to describe day-to-day job duties unless it is strictly required to resolve ambiguity.
 - Never ask questions like "Do you want to explore options or pick a role?" or any explicit fork—infer from what they say.
+- If the user explicitly asks what roles/opportunities exist in a domain (for example cybersecurity, AI, backend, DevOps, data, frontend, cloud), treat as DOMAIN_EXPLORATION:
+  - Do not continue generic discovery questions first.
+  - Do not block on certifications or deep experience checks.
+  - Set shouldSearchJobs=true immediately.
+  - Populate searchFilters keywords/interests around that domain.
+  - For cybersecurity, prioritize and reference roles like SOC Analyst, Security Analyst, Application Security, Penetration Tester, GRC Analyst, IAM Engineer, Cloud Security, DevSecOps, Security Automation, Threat Intelligence, Incident Response.
+  - If the user background includes QA/testing signals, favor transition-friendly security roles such as Security QA, Application Security Testing, Security Automation, SOC Analyst, Junior Cybersecurity Analyst.
 
 User achievements:
 ${achievementsText(conversation)}
+
+Conversation mode:
+${mode}
+
+Relevant user memory snippets:
+${memoryText(memories)}
 
 Conversation so far:
 ${buildHistory(conversation)}
@@ -55,7 +106,8 @@ ${latestUserMessage}
 export const buildRecommendationPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
-    jobs: readonly JobSearchResultItem[]
+    jobs: readonly JobSearchResultItem[],
+    memories: readonly ConversationMemory[] = []
 ): string => `
 You are CareerCoach AI.
 Respond ONLY with valid JSON in this exact structure:
@@ -72,13 +124,18 @@ Respond ONLY with valid JSON in this exact structure:
 }
 
 You can recommend ONLY from these jobs:
-${jobs.map((job) => `- jobId: ${job.jobId}, title: ${job.jobTitle}, seniority: ${job.seniority}, description: ${job.description}`).join("\n")}
+${jobs.map((job) => `- jobId: ${job.jobId}, title: ${job.jobTitle}, company: ${job.company ?? ""}, salary: ${typeof job.salary === "number" ? job.salary : "n/a"}, seniority: ${job.seniority}, description: ${job.description}`).join("\n")}
 
 Strict rules:
 - Every recommendedJobIds value must match a listed jobId.
-- Mention jobId in reply when recommending jobs.
+- Never expose internal job IDs in the reply.
+- When recommending a real job from this list, explain the role briefly, then end by asking whether the user wants to move forward with it and add it to their pipeline for interview tracking (one short question). Do not skip that question when jobs are listed.
+- If the user accepts adding a role to the pipeline, acknowledge success conversationally without exposing internal IDs.
+- If the user declines a role, do not recommend that same role again in this conversation; pivot to another listed role when available.
+- Prefer one focused recommendation at a time unless the user explicitly asks for multiple roles.
 - If the user arrived via the discovery path (unclear target role), frame suggestions around what they said they enjoy or want—not around "since you didn't know what to pick."
-- Never invent salary, company details, or extra requirements.
+- If the user asked explicit domain exploration (e.g., "what can I do in cybersecurity?"), explain role options in that domain first, then map recommendations to their background.
+- Never invent salary, company names, or extra requirements beyond the listed fields and descriptions.
 - Never disclose internal achievement scores/grades to the user.
 - Keep replies concise: maximum 1-2 short lines.
 - Do not ask about remote/hybrid/on-site preferences.
@@ -86,6 +143,9 @@ Strict rules:
 
 User achievements:
 ${achievementsText(conversation)}
+
+Relevant user memory snippets:
+${memoryText(memories)}
 
 Conversation so far:
 ${buildHistory(conversation)}
@@ -97,13 +157,17 @@ ${latestUserMessage}
 export const buildStagePrompt = (
     conversation: Conversation,
     latestUserMessage: string,
-    stage: ConversationStage
+    stage: ConversationStage,
+    mode: ConversationMode = "GUIDED"
 ): string => `
 You are a career data extractor and guide.
 Your goal is NOT to have a long conversation.
 Your goal is to quickly extract enough structured data about the user to perform a job search.
 You are currently in a guided conversation stage with this objective:
 "${stage.objective}"
+
+Active conversation mode:
+${mode}
 
 Respond ONLY with valid JSON:
 {

@@ -1,4 +1,4 @@
-import type { UserAchievement } from "../chat/chat.model";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
 
 export type ConversationResponse = {
     userId: string;
@@ -7,6 +7,7 @@ export type ConversationResponse = {
         role: "system" | "user" | "assistant";
         content: string;
         timestamp: string;
+        attachedJobs?: AttachedJobSnapshot[];
     }[];
 };
 
@@ -15,4 +16,6 @@ export type ProfileInput = {
     lastName?: string;
     currentJob?: string;
     achievements?: UserAchievement[];
+    technologies?: string[];
+    interests?: string[];
 };

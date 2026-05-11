@@ -1,6 +1,7 @@
 import type { Collection } from "mongodb";
 import type { ChatMessage, UserAchievement } from "../chat/chat.model";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { ConversationJobContext } from "../job-context/job-context.types";
 
 export class ConversationRepository {
     constructor(private readonly conversationsCollection: Collection<Conversation>) {}
@@ -56,6 +57,18 @@ export class ConversationRepository {
             {
                 $set: {
                     stageProgress,
+                    updatedAt: new Date(),
+                },
+            }
+        );
+    };
+
+    updateJobContext = async (userId: string, jobContext: ConversationJobContext): Promise<void> => {
+        await this.conversationsCollection.updateOne(
+            { userId },
+            {
+                $set: {
+                    jobContext,
                     updatedAt: new Date(),
                 },
             }

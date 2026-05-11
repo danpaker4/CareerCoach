@@ -21,6 +21,9 @@ export const createPipelineJobSchema = {
         [StatusCodes.BAD_REQUEST]: z.object({
             error: z.string(),
         }),
+        [StatusCodes.CONFLICT]: z.object({
+            error: z.string(),
+        }),
     },
     body: PipelineJobSchema.omit({ id: true }),
 } satisfies FastifySchema;

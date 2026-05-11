@@ -9,6 +9,9 @@ export const mockUser: User = {
     password: "hashedpassword",
     birthDate: new Date("1990-01-01"),
     achievements: [],
+    technologies: [],
+    interests: [],
+    knownSkills: [],
     githubSkills: [],
     currentJob: "Developer",
 };
