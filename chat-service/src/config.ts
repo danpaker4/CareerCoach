@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ServerConfig } from "./server.types";
 import { resolveLlmConfig } from "./ai/llm-config.utils";
+import { buildTextCompletionLlmChain } from "./ai/llm-text-completion-chain.utils";
 
 const envString = (name: string) => z.string().min(1, `${name} is required`);
 
@@ -29,38 +30,54 @@ const EnvSchema = z
         CAREER_DIRECTION_VECTOR_INDEX_NAME: z.string().default("career_direction_vector_index"),
     })
     .superRefine((data, ctx) => {
-        if (data.LLM_PROVIDER === "gemini" && (!data.GEMINI_API_KEY || data.GEMINI_API_KEY.trim().length === 0)) {
+        const chain = buildTextCompletionLlmChain({
+            llmProvider: data.LLM_PROVIDER,
+            geminiApiKey: data.GEMINI_API_KEY,
+            openaiApiKey: data.OPENAI_API_KEY,
+            llmModel: data.LLM_MODEL,
+            openaiModel: data.OPENAI_MODEL,
+            customLlmUrl: data.CUSTOM_LLM_URL,
+            ollamaBaseUrl: data.OLLAMA_BASE_URL,
+            ollamaModel: data.OLLAMA_MODEL,
+        });
+        if (chain.length === 0) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "GEMINI_API_KEY is required when LLM_PROVIDER=gemini",
-                path: ["GEMINI_API_KEY"],
-            });
-        }
-        if (data.LLM_PROVIDER === "openai" && (!data.OPENAI_API_KEY || data.OPENAI_API_KEY.trim().length === 0)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "OPENAI_API_KEY is required when LLM_PROVIDER=openai",
-                path: ["OPENAI_API_KEY"],
-            });
-        }
-        if (data.LLM_PROVIDER === "custom" && (!data.CUSTOM_LLM_URL || data.CUSTOM_LLM_URL.trim().length === 0)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "CUSTOM_LLM_URL is required when LLM_PROVIDER=custom",
-                path: ["CUSTOM_LLM_URL"],
-            });
-        }
-        if (data.LLM_PROVIDER === "ollama" && (!data.OLLAMA_BASE_URL || data.OLLAMA_BASE_URL.trim().length === 0)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "OLLAMA_BASE_URL is required when LLM_PROVIDER=ollama",
-                path: ["OLLAMA_BASE_URL"],
+                message: "No usable LLM provider configured. Configure at least one provider for text completion fallback.",
+                path: ["LLM_PROVIDER"],
             });
         }
     });
 
 export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
     const parsed = EnvSchema.parse(env);
+    const llmTextCompletionChain = buildTextCompletionLlmChain({
+        llmProvider: parsed.LLM_PROVIDER,
+        geminiApiKey: parsed.GEMINI_API_KEY,
+        openaiApiKey: parsed.OPENAI_API_KEY,
+        llmModel: parsed.LLM_MODEL,
+        openaiModel: parsed.OPENAI_MODEL,
+        customLlmUrl: parsed.CUSTOM_LLM_URL,
+        ollamaBaseUrl: parsed.OLLAMA_BASE_URL,
+        ollamaModel: parsed.OLLAMA_MODEL,
+    });
+    const llm = (() => {
+        try {
+            return resolveLlmConfig({
+                llmProvider: parsed.LLM_PROVIDER,
+                geminiApiKey: parsed.GEMINI_API_KEY,
+                openaiApiKey: parsed.OPENAI_API_KEY,
+                llmModel: parsed.LLM_MODEL,
+                openaiModel: parsed.OPENAI_MODEL,
+                customLlmUrl: parsed.CUSTOM_LLM_URL,
+                ollamaBaseUrl: parsed.OLLAMA_BASE_URL,
+                ollamaModel: parsed.OLLAMA_MODEL,
+            });
+        } catch {
+            return llmTextCompletionChain[0];
+        }
+    })();
+
     return {
         port: parsed.PORT,
         host: parsed.HOST,
@@ -71,16 +88,8 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
         chatConfig: {
             usersServiceBaseUrl: parsed.USERS_SERVICE_BASE_URL,
             jobServiceBaseUrl: parsed.JOB_SERVICE_BASE_URL,
-            llm: resolveLlmConfig({
-                llmProvider: parsed.LLM_PROVIDER,
-                geminiApiKey: parsed.GEMINI_API_KEY,
-                openaiApiKey: parsed.OPENAI_API_KEY,
-                llmModel: parsed.LLM_MODEL,
-                openaiModel: parsed.OPENAI_MODEL,
-                customLlmUrl: parsed.CUSTOM_LLM_URL,
-                ollamaBaseUrl: parsed.OLLAMA_BASE_URL,
-                ollamaModel: parsed.OLLAMA_MODEL,
-            }),
+            llm,
+            llmTextCompletionChain,
             embeddingModel: parsed.EMBEDDING_MODEL,
             customEmbeddingUrl: parsed.CUSTOM_EMBEDDING_URL,
             conversationMemoryVectorIndexName: parsed.CONVERSATION_MEMORY_VECTOR_INDEX_NAME,

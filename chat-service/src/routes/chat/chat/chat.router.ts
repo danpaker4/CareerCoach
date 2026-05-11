@@ -9,7 +9,7 @@ import { ChatExternalService } from "./external-route/chat.external.service";
 import { validateChatMessageBody, validateUserIdParam } from "./chat.middleware";
 import { ChatService } from "./chat.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
-import { createTextCompletionPort } from "../../../ai/text-completion.utils";
+import { createTextCompletionPortFromChain } from "../../../ai/text-completion.utils";
 import { createEmbeddingPort } from "../../../ai/embedding.utils";
 import { CareerProfileRepository } from "../career-profile/career-profile.repository";
 import { CareerProfileService } from "../career-profile/career-profile.service";
@@ -34,7 +34,7 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
-    const textCompletion = createTextCompletionPort(chatConfig.llm);
+    const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain);
     const embedding = createEmbeddingPort(chatConfig.llm, chatConfig.embeddingModel, chatConfig.customEmbeddingUrl);
     const llmService = new ChatLlmService(textCompletion);
     const validationService = new ChatValidationService();
