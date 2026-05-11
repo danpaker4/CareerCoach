@@ -1,5 +1,5 @@
 .matcher-page {
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   min-height: calc(100vh - 64px);
   padding-bottom: 60px;
 }
@@ -118,7 +118,7 @@
 }
 
 .skill-item:hover {
-  background: var(--clr-slate-50);
+  background: var(--surface-muted);
 }
 
 .skill-item--done .skill-name {
@@ -132,7 +132,7 @@
   height: 22px;
   border-radius: var(--r-sm);
   border: 2px solid var(--clr-slate-300);
-  background: white;
+  background: var(--surface-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -212,9 +212,9 @@
 }
 
 .matcher-stat-card {
-  background: white;
+  background: var(--surface-base);
   border-radius: var(--r-lg);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
   padding: 16px 18px;
   display: flex;
@@ -338,13 +338,14 @@
   font-size: var(--fz-sm);
   font-family: inherit;
   color: var(--clr-slate-800);
-  background: white;
+  background: var(--input-bg);
   outline: none;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 
 .add-skill-input:focus {
   border-color: var(--clr-primary);
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px var(--clr-primary-100);
 }
 

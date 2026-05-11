@@ -1,16 +1,15 @@
 .chat-page {
   display: flex;
   height: calc(100vh - 64px);
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   overflow: hidden;
 }
 
-/* ── Sidebar ── */
 .chat-sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: white;
-  border-right: 1px solid var(--clr-slate-200);
+  background: var(--surface-base);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -41,13 +40,13 @@
   margin: 0;
   font-weight: 700;
   font-size: var(--fz-sm);
-  color: var(--clr-slate-900);
+  color: var(--text-heading);
 }
 
 .chat-coach-status {
   margin: 2px 0 0;
   font-size: var(--fz-xs);
-  color: var(--clr-slate-500);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -62,10 +61,10 @@
 }
 
 .chat-sidebar-user {
-  background: var(--clr-slate-50);
+  background: var(--surface-muted);
   border-radius: var(--r-lg);
   padding: 12px 14px;
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
 }
 
 .chat-sidebar-label {
@@ -74,20 +73,20 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--clr-slate-400);
+  color: var(--text-placeholder);
 }
 
 .chat-sidebar-username {
   margin: 0;
   font-weight: 700;
   font-size: var(--fz-sm);
-  color: var(--clr-slate-900);
+  color: var(--text-heading);
 }
 
 .chat-sidebar-job {
   margin: 2px 0 0;
   font-size: var(--fz-xs);
-  color: var(--clr-slate-500);
+  color: var(--text-muted);
 }
 
 .chat-quick-prompts {
@@ -106,12 +105,12 @@
 .chat-prompt-btn {
   width: 100%;
   text-align: left;
-  background: var(--clr-slate-50);
-  border: 1px solid var(--clr-slate-200);
+  background: var(--surface-muted);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-lg);
   padding: 9px 12px;
   font-size: var(--fz-xs);
-  color: var(--clr-slate-700);
+  color: var(--text-secondary);
   cursor: pointer;
   font-family: inherit;
   transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
@@ -119,12 +118,11 @@
 }
 
 .chat-prompt-btn:hover {
-  background: var(--clr-primary-50, #eff6ff);
+  background: var(--clr-primary-50);
   border-color: var(--clr-primary);
   color: var(--clr-primary);
 }
 
-/* ── Main area ── */
 .chat-main {
   flex: 1;
   display: flex;
@@ -134,8 +132,8 @@
 
 .chat-main-header {
   padding: 16px 24px;
-  background: white;
-  border-bottom: 1px solid var(--clr-slate-200);
+  background: var(--surface-base);
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -154,13 +152,13 @@
   margin: 0;
   font-size: var(--fz-lg);
   font-weight: 800;
-  color: var(--clr-slate-900);
+  color: var(--text-heading);
 }
 
 .chat-main-sub {
   margin: 2px 0 0;
   font-size: var(--fz-xs);
-  color: var(--clr-slate-500);
+  color: var(--text-muted);
 }
 
 .chat-interface-wrap {
@@ -170,7 +168,6 @@
   flex-direction: column;
 }
 
-/* ── Responsive ── */
 @media (max-width: 768px) {
   .chat-sidebar {
     display: none;

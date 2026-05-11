@@ -12,6 +12,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   z-index: 9999;
 }

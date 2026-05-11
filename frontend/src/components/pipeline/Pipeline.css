@@ -2,13 +2,13 @@
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 64px);
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
 }
 
 /* Header bar */
 .pipeline-header-bar {
-  background: white;
-  border-bottom: 1px solid var(--clr-slate-200);
+  background: var(--surface-base);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 0 24px;
   flex-shrink: 0;
 }
@@ -69,9 +69,9 @@
 
 /* Column */
 .kanban-column {
-  background: white;
+  background: var(--surface-base);
   border-radius: var(--r-xl);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
@@ -83,7 +83,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--clr-slate-100);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .kanban-column-label {
@@ -212,8 +212,8 @@
   position: absolute;
   right: 0;
   bottom: calc(100% + 6px);
-  background: white;
-  border: 1px solid var(--clr-slate-200);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-lg);
   z-index: 50;
@@ -237,7 +237,7 @@
 }
 
 .stage-menu-item:hover {
-  background: var(--clr-slate-50);
+  background: var(--surface-muted);
   color: var(--clr-primary);
 }
 
@@ -316,7 +316,7 @@
 }
 
 .modal-card {
-  background: white;
+  background: var(--surface-elevated);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-xl);
   width: 100%;
@@ -329,7 +329,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 22px 24px 18px;
-  border-bottom: 1px solid var(--clr-slate-100);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .modal-title {
@@ -383,14 +383,14 @@
   font-size: var(--fz-base);
   font-family: inherit;
   color: var(--clr-slate-800);
-  background: var(--clr-slate-50);
+  background: var(--input-bg);
   outline: none;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 
 .modal-input:focus {
   border-color: var(--clr-primary);
-  background: white;
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px var(--clr-primary-100);
 }
 
@@ -399,7 +399,7 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 16px 24px 22px;
-  border-top: 1px solid var(--clr-slate-100);
+  border-top: 1px solid var(--border-soft);
 }
 
 .form-error {

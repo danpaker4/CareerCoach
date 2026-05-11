@@ -1,5 +1,5 @@
 .dashboard-page {
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   min-height: calc(100dvh - 64px);
 }
 
@@ -80,9 +80,9 @@
 .dashboard-stats-bar {
   display: flex;
   gap: 2px;
-  background: white;
+  background: var(--surface-base);
   border-radius: var(--r-lg);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
   margin-bottom: 18px;
   overflow: hidden;
@@ -96,7 +96,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  border-right: 1px solid var(--clr-slate-100);
+  border-right: 1px solid var(--border-soft);
 }
 
 .dash-stat:last-child {
@@ -152,8 +152,8 @@
   padding: 20px 20px;
   min-height: 188px;
   height: 100%;
-  background: white;
-  border: 1.5px solid var(--clr-slate-200);
+  background: var(--surface-base);
+  border: 1.5px solid var(--border-subtle);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-sm);
   cursor: pointer;

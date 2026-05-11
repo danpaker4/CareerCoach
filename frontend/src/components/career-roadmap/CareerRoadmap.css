@@ -1,5 +1,5 @@
 .roadmap-page {
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   min-height: calc(100vh - 64px);
   padding-bottom: 60px;
 }
@@ -93,14 +93,14 @@
 }
 
 .stat-card {
-  background: white;
+  background: var(--surface-base);
   padding: 20px 22px;
   border-radius: var(--r-lg);
   display: flex;
   align-items: center;
   gap: 16px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
 }
 
 .stat-icon-wrap {
@@ -146,10 +146,10 @@
 
 /* Main Roadmap Card */
 .main-roadmap-card {
-  background: white;
+  background: var(--surface-base);
   padding: 32px;
   border-radius: var(--r-xl);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
 }
 
@@ -220,7 +220,7 @@
   display: flex;
   gap: 16px;
   padding: 14px 0;
-  border-bottom: 1px solid var(--clr-slate-100);
+  border-bottom: 1px solid var(--border-soft);
   position: relative;
 }
 
@@ -314,13 +314,13 @@
   right: 24px;
   width: 400px;
   height: 580px;
-  background: white;
+  background: var(--surface-elevated);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-xl);
   z-index: 200;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
   overflow: hidden;
   animation: fadeInUp 0.25s ease both;
 }
@@ -478,7 +478,7 @@
 }
 
 .roadmap-tab--active {
-  background: white;
+  background: var(--surface-base);
   color: var(--clr-slate-900);
   box-shadow: 0 -2px 0 0 var(--clr-primary) inset;
   z-index: 1;

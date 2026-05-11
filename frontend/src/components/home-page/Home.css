@@ -144,7 +144,7 @@
 /* ===== FEATURES ===== */
 .features-section {
   padding: 96px 0;
-  background: white;
+  background: var(--surface-base);
 }
 
 .section-label {
@@ -217,7 +217,7 @@
 /* ===== HOW IT WORKS ===== */
 .how-section {
   padding: 96px 0;
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
 }
 
 .how-grid {
@@ -228,10 +228,10 @@
 
 .how-card {
   padding: 36px 28px;
-  background: white;
+  background: var(--surface-base);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--clr-slate-200);
+  border: 1px solid var(--border-subtle);
   position: relative;
 }
 
@@ -260,7 +260,7 @@
 /* ===== CTA ===== */
 .cta-section {
   padding: 80px 0;
-  background: white;
+  background: var(--surface-base);
 }
 
 .cta-card {

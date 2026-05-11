@@ -16,7 +16,7 @@
   height: 32px;
   border-radius: 50%;
   border: 2px solid var(--clr-slate-300);
-  background: white;
+  background: var(--surface-base);
   color: var(--clr-slate-400);
   font-size: var(--fz-sm);
   font-weight: 700;
@@ -98,7 +98,7 @@
   padding: 6px 14px;
   border: 1.5px solid var(--clr-slate-200);
   border-radius: var(--r-full);
-  background: white;
+  background: var(--surface-base);
   font-size: var(--fz-xs);
   font-weight: 600;
   font-family: inherit;
@@ -133,7 +133,7 @@
   height: 40px;
   border-radius: 50%;
   border: 2px solid var(--clr-slate-300);
-  background: white;
+  background: var(--surface-base);
   font-size: var(--fz-xl);
   font-family: inherit;
   color: var(--clr-slate-600);
