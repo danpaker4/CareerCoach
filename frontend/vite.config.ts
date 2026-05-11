@@ -13,6 +13,10 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
+      '/users': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
       '/api/github': {
         target: 'http://localhost:3001',
         changeOrigin: true,

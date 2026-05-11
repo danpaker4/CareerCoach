@@ -25,6 +25,7 @@ interface MySkillsProps {
 }
 
 type FetchState = 'idle' | 'loading' | 'success' | 'error';
+const GITHUB_PROJECT_COUNT_SKILL_SUFFIX = ' github projects';
 
 const parseSkillDatasets = (data: unknown): SkillDataset[] => {
   if (!Array.isArray(data)) return [];
@@ -40,40 +41,19 @@ const parseSkillDatasets = (data: unknown): SkillDataset[] => {
   });
 };
 
-const extractGithubUsername = (githubUrl: string | undefined): string | null => {
-  if (!githubUrl) return null;
-  try {
-    const url = new URL(githubUrl);
-    const parts = url.pathname.split('/').filter(Boolean);
-    return parts[0] ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const parseGithubLanguages = (repos: unknown): Record<string, number> => {
-  if (!Array.isArray(repos)) return {};
-  const counts: Record<string, number> = {};
-  for (const repo of repos) {
-    if (typeof repo !== 'object' || repo === null) continue;
-    const r = repo as Record<string, unknown>;
-    if (typeof r.language === 'string' && r.language) {
-      counts[r.language] = (counts[r.language] ?? 0) + 1;
-    }
-  }
-  return counts;
-};
-
 export const MySkills = ({ user }: MySkillsProps) => {
   const [skillState, setSkillState] = useState<FetchState>('idle');
   const [datasets, setDatasets] = useState<SkillDataset[]>([]);
   const [skillError, setSkillError] = useState('');
-  const [githubLanguages, setGithubLanguages] = useState<Record<string, number>>({});
-  const [githubState, setGithubState] = useState<FetchState>('idle');
 
   // Achievements from CV extraction (Gemini) - stored on user object at registration
   const achievements = user.achievements ?? [];
   const cvSkills = achievements.map((a) => a.name);
+  const githubSkills = [...new Set((user.githubSkills ?? []).filter((skill) => {
+    const normalizedSkill = skill.trim();
+    return normalizedSkill.length > 0 && !normalizedSkill.toLowerCase().endsWith(GITHUB_PROJECT_COUNT_SKILL_SUFFIX);
+  }))];
+  const hasGithubProfile = Boolean(user.githubUrl) || githubSkills.length > 0;
 
   const loadSkills = useCallback(() => {
     if (!user?.id) return;
@@ -94,24 +74,10 @@ export const MySkills = ({ user }: MySkillsProps) => {
 
   useEffect(() => {
     loadSkills();
-    const username = extractGithubUsername(user.githubUrl);
-    if (username) {
-      setGithubState('loading');
-      fetch(`https://api.github.com/users/${username}/repos?per_page=100&sort=pushed`)
-        .then(async (res) => {
-          if (!res.ok) throw new Error('GitHub API error');
-          const data: unknown = await res.json();
-          setGithubLanguages(parseGithubLanguages(data));
-          setGithubState('success');
-        })
-        .catch(() => setGithubState('error'));
-    }
-  }, [loadSkills, user.githubUrl]);
+  }, [loadSkills]);
 
   const allSkills = datasets.flatMap((d) => d.skillToImprove);
   const skillsCompleted = allSkills.filter((s) => s.isDone).length;
-
-  const sortedLanguages = Object.entries(githubLanguages).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="myskills-page">
@@ -149,36 +115,25 @@ export const MySkills = ({ user }: MySkillsProps) => {
         </section>
 
         {/* GitHub Skills */}
-        {user.githubUrl && (
+        {hasGithubProfile && (
           <section className="myskills-section">
             <div className="myskills-section-header">
               <img src={iconUser} alt="" aria-hidden="true" className="section-icon section-icon--purple" />
               <h2 className="myskills-section-title">Skills from GitHub</h2>
-              {sortedLanguages.length > 0 && <span className="myskills-section-count">{sortedLanguages.length}</span>}
+              {githubSkills.length > 0 && <span className="myskills-section-count">{githubSkills.length}</span>}
             </div>
 
-            {githubState === 'loading' && (
-              <div className="page-loading"><div className="spinner" /><p>Fetching GitHub repos...</p></div>
-            )}
-
-            {githubState === 'error' && (
+            {githubSkills.length === 0 && (
               <div className="surface-card myskills-empty">
-                <p>Could not load GitHub data - profile may be private.</p>
+                <p>No GitHub skills found yet. Reconnect GitHub or refresh your imported profile data.</p>
               </div>
             )}
 
-            {githubState === 'success' && sortedLanguages.length === 0 && (
-              <div className="surface-card myskills-empty">
-                <p>No public repos found on GitHub.</p>
-              </div>
-            )}
-
-            {githubState === 'success' && sortedLanguages.length > 0 && (
+            {githubSkills.length > 0 && (
               <div className="skill-chips-wrap surface-card">
-                {sortedLanguages.map(([lang, count]) => (
-                  <span key={lang} className="skill-chip skill-chip--purple">
-                    {lang}
-                    <span className="skill-chip-count">{count}</span>
+                {githubSkills.map((skill) => (
+                  <span key={skill} className="skill-chip skill-chip--purple">
+                    {skill}
                   </span>
                 ))}
               </div>
