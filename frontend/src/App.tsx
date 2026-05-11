@@ -19,9 +19,31 @@ import { PageTransition } from './components/page-transition/PageTransition';
 import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
+import { isUser } from './lib/authResponse';
 import { clearStoredAccessToken } from './lib/authSession';
+import { applyTheme, readInitialTheme, type ThemeMode } from './lib/theme';
 
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
+const AUTH_USER_STORAGE_KEY = 'career_coach_current_user';
+
+const readStoredUser = (): User | null => {
+  const raw = window.localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  const parsed: unknown = JSON.parse(raw);
+  return isUser(parsed) ? parsed : null;
+};
+
+const persistUser = (user: User | null): void => {
+  if (!user) {
+    window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+};
 
 interface ProtectedRouteProps {
   user: User | null | undefined;
@@ -41,12 +63,24 @@ const AppLoader = () => (
 );
 
 export const App = () => {
-  const [currentUser, setCurrentUser] = useState<User | null | undefined>(undefined);
+  const [theme, setTheme] = useState<ThemeMode>(() => readInitialTheme());
+  const [currentUser, setCurrentUser] = useState<User | null | undefined>(() => {
+    try {
+      return readStoredUser() ?? undefined;
+    } catch {
+      window.localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+      return undefined;
+    }
+  });
   const userDisplayName = currentUser
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ')
     : undefined;
 
   const bootstrapRan = useRef(false);
+
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     if (bootstrapRan.current) {
@@ -58,26 +92,31 @@ export const App = () => {
       const user = await refreshAccessToken();
       if (!user) {
         clearStoredAccessToken();
+        persistUser(null);
         setCurrentUser(null);
         return;
       }
 
+      persistUser(user);
       setCurrentUser(user);
     };
 
     loadCurrentUser().catch(() => {
       clearStoredAccessToken();
+      persistUser(null);
       setCurrentUser(null);
     });
   }, []);
 
   const handleLoginSuccess = (user: User) => {
+    persistUser(user);
     setCurrentUser(user);
   };
 
   const handleLogout = async () => {
     await apiFetch(AUTH_LOGOUT_PATH, { method: 'POST' });
     clearStoredAccessToken();
+    persistUser(null);
     setCurrentUser(null);
     window.location.assign('/login');
   };
@@ -89,7 +128,7 @@ export const App = () => {
   return (
     <Router>
       <div className="App">
-        <Header userName={userDisplayName} />
+        <Header userName={userDisplayName} theme={theme} onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')} />
 
         <PageTransition>
           <Routes>
@@ -143,7 +182,10 @@ export const App = () => {
               element={
                 <ProtectedRoute user={currentUser}>
                   {currentUser
-                    ? <Profile user={currentUser} onUserUpdated={(u) => setCurrentUser(u)} onLogout={handleLogout} />
+                    ? <Profile user={currentUser} onUserUpdated={(u) => {
+                      persistUser(u);
+                      setCurrentUser(u);
+                    }} onLogout={handleLogout} />
                     : null}
                 </ProtectedRoute>
               }

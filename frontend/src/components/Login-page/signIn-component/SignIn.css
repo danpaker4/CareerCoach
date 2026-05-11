@@ -24,8 +24,7 @@
   font-size: var(--fz-base);
   font-family: inherit;
   color: var(--clr-slate-800);
-  background-color: var(--clr-slate-50);
-  color-scheme: light;
+  background-color: var(--input-bg);
   box-sizing: border-box;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
   outline: none;
@@ -37,7 +36,7 @@
 
 .input-group input:focus {
   border-color: var(--clr-primary);
-  background: white;
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px var(--clr-primary-100);
 }
 
@@ -45,7 +44,7 @@
 .input-group input:-webkit-autofill:hover,
 .input-group input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--clr-slate-800);
-  -webkit-box-shadow: 0 0 0 1000px var(--clr-slate-50) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset;
 }
 
 .auth-btn {

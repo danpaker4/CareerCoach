@@ -8,7 +8,7 @@
 }
 
 .github-callback-card {
-  background: white;
+  background: var(--surface-elevated);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow-xl);
   padding: 48px 40px;

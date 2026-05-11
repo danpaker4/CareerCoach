@@ -1,5 +1,5 @@
 .jobs-page {
-  background: var(--clr-slate-50);
+  background: var(--page-bg);
   min-height: calc(100vh - 64px);
   padding-bottom: 60px;
 }
@@ -43,7 +43,7 @@
   font-size: var(--fz-sm);
   font-family: inherit;
   color: var(--clr-slate-800);
-  background: white;
+  background: var(--input-bg);
   border: 1.5px solid var(--clr-slate-200);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-xs);
@@ -53,6 +53,7 @@
 
 .jobs-search-input:focus {
   border-color: var(--clr-primary);
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px var(--clr-primary-100);
 }
 
