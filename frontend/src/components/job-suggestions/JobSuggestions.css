@@ -184,8 +184,33 @@
 
 .job-pipeline-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-size: var(--fz-sm);
+  font-weight: 600;
+  font-family: inherit;
   padding: 9px 16px;
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.job-pipeline-btn--in-pipeline {
+  background: var(--surface-base);
+  border: 1.5px solid var(--clr-slate-300);
+  color: var(--clr-slate-700);
+}
+
+.job-pipeline-btn--in-pipeline:hover:not(:disabled) {
+  border-color: var(--clr-error);
+  color: var(--clr-error);
+  background: var(--clr-error-bg);
+}
+
+.job-pipeline-btn--in-pipeline:hover:not(:disabled) .job-btn-icon {
+  filter: invert(27%) sepia(85%) saturate(2000%) hue-rotate(340deg) brightness(95%);
 }
 
 .job-btn-icon {
