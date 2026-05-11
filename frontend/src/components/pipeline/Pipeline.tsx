@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconKanban from '../../assets/icon-kanban.svg';
 import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconPlus from '../../assets/icon-plus.svg';
@@ -108,7 +109,7 @@ export const Pipeline = ({ user }: PipelineProps) => {
   const loadData = useCallback(() => {
     if (!user?.id) return;
     setFetchState('loading');
-    fetch(JOBS_URL(user.id), { credentials: 'include' })
+    apiFetch(JOBS_URL(user.id), { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) { setJobs([]); setFetchState('success'); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
@@ -128,7 +129,7 @@ export const Pipeline = ({ user }: PipelineProps) => {
     if (!user?.id || !form.description.trim()) return;
     setAdding(true);
     try {
-      const res = await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -156,7 +157,7 @@ export const Pipeline = ({ user }: PipelineProps) => {
   const handleMoveJob = async (id: string, stage: PipelineStage) => {
     setMovingId(id);
     try {
-      const res = await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${id}/stage`, {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${id}/stage`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -174,7 +175,7 @@ export const Pipeline = ({ user }: PipelineProps) => {
   const handleDeleteJob = async (id: string) => {
     setDeletingId(id);
     try {
-      await fetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${id}`, {
+      await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });

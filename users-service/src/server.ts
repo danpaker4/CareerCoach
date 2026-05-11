@@ -8,6 +8,7 @@ import { AUTH_ROUTE_PREFIX } from "./routes/auth/auth.consts";
 import { authRouter } from "./routes/auth/auth.router";
 import { usersRouter } from "./routes/users/users.router";
 import { githubRouter } from "./routes/github/github.router";
+import { linkedInRouter } from "./routes/linkedin/linkedin.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -51,6 +52,9 @@ export class Server {
             });
             await this.app.register(usersRouter(this.DBClient.users));
             await this.app.register(githubRouter(this.DBClient.users), {
+                prefix: AUTH_ROUTE_PREFIX,
+            });
+            await this.app.register(linkedInRouter(this.DBClient.users), {
                 prefix: AUTH_ROUTE_PREFIX,
             });
 

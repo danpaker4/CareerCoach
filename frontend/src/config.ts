@@ -7,6 +7,10 @@ const normalizeLocalServiceUrl = (rawUrl: string | undefined): string => {
 
   try {
     const parsedUrl = new URL(rawUrl);
+    if (import.meta.env.DEV && LOOPBACK_HOSTS.has(parsedUrl.hostname)) {
+      return "";
+    }
+
     const appHost = window.location.hostname;
     const shouldNormalizeHost =
       LOOPBACK_HOSTS.has(parsedUrl.hostname) &&
@@ -25,6 +29,7 @@ const normalizeLocalServiceUrl = (rawUrl: string | undefined): string => {
 
 export const ENV = {
   GITHUB_CLIENT_ID: import.meta.env.VITE_CLIENT_ID,
+  GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY as string | undefined,
   USERS_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_USERS_SERVICE_BASE_URL) || "",
   CHAT_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_CHAT_SERVICE_BASE_URL) || "",
   JOB_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_JOB_SERVICE_BASE_URL) || "",
