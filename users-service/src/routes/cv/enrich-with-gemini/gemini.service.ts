@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AchievementDraft, GeminiAchievementsPayload } from "./gemini.types";
-const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
-const DEFAULT_LLM_MODEL = "llama3";
+
+const DEFAULT_GEMINI_MODEL = "gemini-3.0-flash";
 
 const buildPrompt = (input: {
   cvText: string;
@@ -95,7 +95,8 @@ Also enforce:
 
 const parseGeminiResponse = (raw: string): GeminiAchievementsPayload | null => {
   try {
-    const payload: unknown = JSON.parse(raw);
+    const cleaned = raw.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+    const payload: unknown = JSON.parse(cleaned);
     if (typeof payload !== "object" || payload === null || !("achievements" in payload)) {
       return null;
     }
@@ -112,41 +113,20 @@ export const extractAchievementsWithGemini = async (input: {
   linkedInUrl?: string;
   githubUrl?: string;
 }): Promise<AchievementDraft[]> => {
-  const llmProvider = (process.env.LLM_PROVIDER || "ollama").toLowerCase();
-  const modelName = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || DEFAULT_LLM_MODEL;
-  console.info(`[LLM] CV achievements generator provider=${llmProvider} model=${modelName}`);
+  const modelName = process.env.GEMINI_MODEL || process.env.LLM_MODEL || DEFAULT_GEMINI_MODEL;
+  console.info(`[LLM] CV achievements generator provider=gemini model=${modelName}`);
 
   try {
     const prompt = buildPrompt(input);
-    const responseText = llmProvider === "ollama"
-      ? await (async (): Promise<string> => {
-        const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
-        const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: modelName,
-            prompt,
-            stream: false,
-          }),
-        });
-        const payload: unknown = await response.json().catch(() => null);
-        if (!response.ok || typeof payload !== "object" || payload === null || !("response" in payload)) {
-          throw new Error(`Ollama CV enrichment failed with status ${response.status}`);
-        }
-        const text = (payload as { response?: unknown }).response;
-        return typeof text === "string" ? text : "";
-      })()
-      : await (async (): Promise<string> => {
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-          throw new Error("GEMINI_API_KEY is missing");
-        }
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-      })();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is missing");
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
     const parsed = parseGeminiResponse(responseText);
 
     if (!parsed || !Array.isArray(parsed.achievements)) {
