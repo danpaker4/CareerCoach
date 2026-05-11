@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import './Chat.css';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import type { ChatProps, ChatResponse, ConversationResponse, Message } from './chat.types';
 
 const createMessage = (role: Message['role'], content: string): Message => ({
@@ -78,7 +79,7 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
         const loadConversation = async () => {
             setIsLoading(true);
             try {
-                const response = await fetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/${userId}`);
+                const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/${userId}`);
                 if (!response.ok) {
                     return;
                 }
@@ -139,11 +140,15 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/message`, {
+            const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, message: input, userProfile })
             });
+            if (!response.ok) {
+                setMessages(prev => [...prev, createMessage('assistant', 'I could not reach the chat service. Please try again.')]);
+                return;
+            }
 
             const data = await readChatResponse(response);
             const assistantReply = data.reply;

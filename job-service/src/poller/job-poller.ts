@@ -23,7 +23,7 @@ export const startJobPollerSchedule = (jobsCollection: Collection<EnrichedJob>) 
             const model = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || "llama3";
             console.info(`[LLM] Poller run provider=${provider} model=${model}`);
             // await jobPoller(jobsCollection);
-            await jobPollerMock(jobsCollection);
+            // await jobPollerMock(jobsCollection);
         } catch (error) {
             console.error("🔥 Job poller failed:", error);
         } finally {
