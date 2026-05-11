@@ -32,12 +32,6 @@ export const CareerRoadMapHandler = (careerRoadMapsCollection: Collection<Career
 
             try {
                 const roadMaps = await careerRoadMapsCollection.find({ userId }).toArray();
-
-                if (!roadMaps || roadMaps.length === 0) {
-                    reply.code(StatusCodes.NOT_FOUND).send({ error: "No career road maps found for this user" });
-                    return;
-                }
-
                 reply.code(StatusCodes.OK).send(roadMaps);
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });

@@ -39,17 +39,15 @@ describe("Skill Matcher Router - GET /skill-matcher/:userId", () => {
         expect(skillMatchers[1].userId).toBe(mockUserId);
     });
 
-    it("should return 404 when no skill matchers exist for the user", async () => {
+    it("should return 200 with an empty array when no skill matchers exist for the user", async () => {
         const randomUserId = uuidv4();
         const response = await server.app.inject({
             method: "GET",
             url: `/skill-matcher/${randomUserId}`,
         });
 
-        expect(response.statusCode).toBe(StatusCodes.NOT_FOUND);
-        expect(response.json()).toEqual({
-            error: "No skill matchers found for this user",
-        });
+        expect(response.statusCode).toBe(StatusCodes.OK);
+        expect(response.json()).toEqual([]);
     });
 
     it("should return 400 for invalid userId (not UUID)", async () => {

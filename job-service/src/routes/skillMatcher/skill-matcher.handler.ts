@@ -18,12 +18,6 @@ export const SkillMatcherHandler = (skillMatchersCollection: Collection<SkillMat
 
             try {
                 const skillMatchers = await skillMatchersCollection.find({ userId }).toArray();
-
-                if (!skillMatchers || skillMatchers.length === 0) {
-                    reply.code(StatusCodes.NOT_FOUND).send({ error: "No skill matchers found for this user" });
-                    return;
-                }
-
                 reply.code(StatusCodes.OK).send(skillMatchers);
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });

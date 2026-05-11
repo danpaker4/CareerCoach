@@ -6,9 +6,6 @@ import { CareerRoadMapSchema, StageToDreamJobSchema } from "./career-roadmap.mod
 export const getCareerRoadMapByUserIdSchema = {
     response: {
         [StatusCodes.OK]: z.array(CareerRoadMapSchema),
-        [StatusCodes.NOT_FOUND]: z.object({
-            error: z.string(),
-        }),
     },
     params: z.object({
         userId: z.string().uuid("userId must be a valid UUID"),
