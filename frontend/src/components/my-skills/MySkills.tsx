@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { connectGithubAccount } from '../../lib/githubAuth';
 import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import iconUser from '../../assets/icon-user.svg';
@@ -112,6 +113,7 @@ export const MySkills = ({ user }: MySkillsProps) => {
   const skillsCompleted = allSkills.filter((s) => s.isDone).length;
 
   const sortedLanguages = Object.entries(githubLanguages).sort((a, b) => b[1] - a[1]);
+  const githubOauthConfigured = Boolean(ENV.GITHUB_CLIENT_ID);
 
   return (
     <div className="myskills-page">
@@ -149,42 +151,57 @@ export const MySkills = ({ user }: MySkillsProps) => {
         </section>
 
         {/* GitHub Skills */}
-        {user.githubUrl && (
-          <section className="myskills-section">
-            <div className="myskills-section-header">
-              <img src={iconUser} alt="" aria-hidden="true" className="section-icon section-icon--purple" />
-              <h2 className="myskills-section-title">Skills from GitHub</h2>
-              {sortedLanguages.length > 0 && <span className="myskills-section-count">{sortedLanguages.length}</span>}
+        <section className="myskills-section">
+          <div className="myskills-section-header">
+            <img src={iconUser} alt="" aria-hidden="true" className="section-icon section-icon--purple" />
+            <h2 className="myskills-section-title">Skills from GitHub</h2>
+            {sortedLanguages.length > 0 && <span className="myskills-section-count">{sortedLanguages.length}</span>}
+          </div>
+
+          {!user.githubUrl && (
+            <div className="surface-card myskills-empty">
+              <p>Connect your GitHub account to extract programming skills from your repositories.</p>
+              <button
+                type="button"
+                className="btn-outline myskills-connect-btn"
+                onClick={connectGithubAccount}
+                disabled={!githubOauthConfigured}
+              >
+                Connect GitHub
+              </button>
+              {!githubOauthConfigured && (
+                <p className="myskills-connect-note">GitHub OAuth is not configured. Set `VITE_CLIENT_ID` in `frontend/.env`.</p>
+              )}
             </div>
+          )}
 
-            {githubState === 'loading' && (
-              <div className="page-loading"><div className="spinner" /><p>Fetching GitHub repos...</p></div>
-            )}
+          {user.githubUrl && githubState === 'loading' && (
+            <div className="page-loading"><div className="spinner" /><p>Fetching GitHub repos...</p></div>
+          )}
 
-            {githubState === 'error' && (
-              <div className="surface-card myskills-empty">
-                <p>Could not load GitHub data - profile may be private.</p>
-              </div>
-            )}
+          {user.githubUrl && githubState === 'error' && (
+            <div className="surface-card myskills-empty">
+              <p>Could not load GitHub data - profile may be private.</p>
+            </div>
+          )}
 
-            {githubState === 'success' && sortedLanguages.length === 0 && (
-              <div className="surface-card myskills-empty">
-                <p>No public repos found on GitHub.</p>
-              </div>
-            )}
+          {user.githubUrl && githubState === 'success' && sortedLanguages.length === 0 && (
+            <div className="surface-card myskills-empty">
+              <p>No public repos found on GitHub.</p>
+            </div>
+          )}
 
-            {githubState === 'success' && sortedLanguages.length > 0 && (
-              <div className="skill-chips-wrap surface-card">
-                {sortedLanguages.map(([lang, count]) => (
-                  <span key={lang} className="skill-chip skill-chip--purple">
-                    {lang}
-                    <span className="skill-chip-count">{count}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+          {user.githubUrl && githubState === 'success' && sortedLanguages.length > 0 && (
+            <div className="skill-chips-wrap surface-card">
+              {sortedLanguages.map(([lang, count]) => (
+                <span key={lang} className="skill-chip skill-chip--purple">
+                  {lang}
+                  <span className="skill-chip-count">{count}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Assigned Skills from Skill Tracker */}
         <section className="myskills-section">

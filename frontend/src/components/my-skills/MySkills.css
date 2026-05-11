@@ -403,6 +403,14 @@
   color: var(--clr-slate-500);
 }
 
+.myskills-connect-btn {
+  margin-top: 6px;
+}
+
+.myskills-connect-note {
+  font-size: var(--fz-xs);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .myskills-stats-row {

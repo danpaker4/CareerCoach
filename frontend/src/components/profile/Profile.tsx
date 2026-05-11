@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { connectGithubAccount } from '../../lib/githubAuth';
 import iconUser from '../../assets/icon-user.svg';
 import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
+import githubIcon from '../../assets/github-icon.svg';
 import type { User } from '../../types/user';
 import './Profile.css';
 
@@ -33,6 +35,19 @@ const USERS_URL = (userId: string) => `${ENV.USERS_SERVICE_BASE_URL}/users/${use
 
 const getInitials = (firstName: string, lastName: string): string =>
   (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+
+const getGithubUsername = (githubUrl: string | undefined): string | null => {
+  if (!githubUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(githubUrl.startsWith('http') ? githubUrl : `https://${githubUrl}`);
+    return parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+  } catch {
+    return null;
+  }
+};
 
 const GEMINI_PROMPT = `
 You are analyzing a CV. Extract professional skills and achievements.
@@ -226,6 +241,9 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
 
   const initials = getInitials(form.firstName || user.firstName, form.lastName || user.lastName);
   const displayName = `${form.firstName || user.firstName} ${form.lastName || user.lastName}`.trim();
+  const githubUrlTrimmed = (form.githubUrl || user.githubUrl || '').trim();
+  const isGithubConnected = githubUrlTrimmed.length > 0;
+  const githubUsername = getGithubUsername(githubUrlTrimmed || undefined);
 
   return (
     <div className="profile-page">
@@ -331,6 +349,42 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
               >
                 {cvExtracting ? 'Extracting...' : 'Extract Skills'}
               </button>
+            </div>
+
+            <div className="cv-card surface-card">
+              <div className="cv-card-header">
+                <img src={githubIcon} alt="" aria-hidden="true" className="cv-card-icon profile-github-card-icon" />
+                <h3 className="cv-card-title">Skills from GitHub</h3>
+              </div>
+              {isGithubConnected ? (
+                <>
+                  <p className="cv-card-sub">
+                    Your GitHub profile is linked. Programming languages from your public repositories appear on the
+                    Skills page.
+                  </p>
+                  <p className="cv-card-current">
+                    {githubUsername ? `Connected as @${githubUsername}` : 'GitHub profile connected'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="cv-card-sub">
+                    Connect your GitHub account to extract technologies from your repositories into the Skills page.
+                  </p>
+                  <p className="profile-github-pending">Not connected yet.</p>
+                  <button
+                    type="button"
+                    className="btn-primary cv-extract-btn"
+                    onClick={connectGithubAccount}
+                    disabled={!ENV.GITHUB_CLIENT_ID}
+                  >
+                    Connect GitHub
+                  </button>
+                  {!ENV.GITHUB_CLIENT_ID && (
+                    <p className="cv-error">GitHub OAuth is not configured. Set `VITE_CLIENT_ID` in `frontend/.env`.</p>
+                  )}
+                </>
+              )}
             </div>
           </aside>
 
