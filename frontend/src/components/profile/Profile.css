@@ -282,6 +282,10 @@
   filter: invert(32%) sepia(96%) saturate(1250%) hue-rotate(210deg) brightness(90%);
 }
 
+.profile-github-card-icon {
+  filter: none;
+}
+
 .cv-card-title {
   font-size: var(--fz-base);
   font-weight: 700;
@@ -352,4 +356,9 @@
   width: 14px;
   height: 14px;
   filter: invert(37%) sepia(76%) saturate(500%) hue-rotate(100deg) brightness(85%);
+}
+
+.profile-github-pending {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-500);
 }

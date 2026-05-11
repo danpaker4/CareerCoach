@@ -33,5 +33,6 @@ export const toConversationResponse = (conversation: Conversation): Conversation
         role: message.role,
         content: message.content,
         timestamp: message.timestamp.toISOString(),
+        ...(message.attachedJobs && message.attachedJobs.length > 0 ? { attachedJobs: message.attachedJobs } : {}),
     })),
 });

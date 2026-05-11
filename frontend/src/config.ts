@@ -7,9 +7,6 @@ const normalizeLocalServiceUrl = (rawUrl: string | undefined): string => {
 
   try {
     const parsedUrl = new URL(rawUrl);
-    if (import.meta.env.DEV && LOOPBACK_HOSTS.has(parsedUrl.hostname)) {
-      return "";
-    }
 
     const appHost = window.location.hostname;
     const shouldNormalizeHost =

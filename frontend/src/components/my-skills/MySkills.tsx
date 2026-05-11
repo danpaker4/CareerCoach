@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { connectGithubAccount } from '../../lib/githubAuth';
 import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import iconUser from '../../assets/icon-user.svg';
@@ -46,21 +47,25 @@ export const MySkills = ({ user }: MySkillsProps) => {
   const [datasets, setDatasets] = useState<SkillDataset[]>([]);
   const [skillError, setSkillError] = useState('');
 
-  // Achievements from CV extraction (Gemini) - stored on user object at registration
   const achievements = user.achievements ?? [];
-  const cvSkills = achievements.map((a) => a.name);
+  const cvSkills = achievements.map((achievement) => achievement.name);
   const githubSkills = [...new Set((user.githubSkills ?? []).filter((skill) => {
     const normalizedSkill = skill.trim();
     return normalizedSkill.length > 0 && !normalizedSkill.toLowerCase().endsWith(GITHUB_PROJECT_COUNT_SKILL_SUFFIX);
   }))];
   const hasGithubProfile = Boolean(user.githubUrl) || githubSkills.length > 0;
+  const githubOauthConfigured = Boolean(ENV.GITHUB_CLIENT_ID);
 
   const loadSkills = useCallback(() => {
     if (!user?.id) return;
     setSkillState('loading');
     apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, { credentials: 'include' })
       .then(async (res) => {
-        if (res.status === 404) { setDatasets([]); setSkillState('success'); return; }
+        if (res.status === 404) {
+          setDatasets([]);
+          setSkillState('success');
+          return;
+        }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
         setDatasets(parseSkillDatasets(data));
@@ -76,19 +81,17 @@ export const MySkills = ({ user }: MySkillsProps) => {
     loadSkills();
   }, [loadSkills]);
 
-  const allSkills = datasets.flatMap((d) => d.skillToImprove);
-  const skillsCompleted = allSkills.filter((s) => s.isDone).length;
+  const allSkills = datasets.flatMap((dataset) => dataset.skillToImprove);
+  const skillsCompleted = allSkills.filter((skill) => skill.isDone).length;
 
   return (
     <div className="myskills-page">
       <div className="myskills-container">
-
         <div className="myskills-header">
           <h1 className="myskills-title">My Skills</h1>
           <p className="myskills-subtitle">Skills from your CV, GitHub and assigned tracker</p>
         </div>
 
-        {/* CV Skills */}
         <section className="myskills-section">
           <div className="myskills-section-header">
             <img src={iconZap} alt="" aria-hidden="true" className="section-icon section-icon--blue" />
@@ -114,34 +117,47 @@ export const MySkills = ({ user }: MySkillsProps) => {
           )}
         </section>
 
-        {/* GitHub Skills */}
-        {hasGithubProfile && (
-          <section className="myskills-section">
-            <div className="myskills-section-header">
-              <img src={iconUser} alt="" aria-hidden="true" className="section-icon section-icon--purple" />
-              <h2 className="myskills-section-title">Skills from GitHub</h2>
-              {githubSkills.length > 0 && <span className="myskills-section-count">{githubSkills.length}</span>}
+        <section className="myskills-section">
+          <div className="myskills-section-header">
+            <img src={iconUser} alt="" aria-hidden="true" className="section-icon section-icon--purple" />
+            <h2 className="myskills-section-title">Skills from GitHub</h2>
+            {githubSkills.length > 0 && <span className="myskills-section-count">{githubSkills.length}</span>}
+          </div>
+
+          {!hasGithubProfile && (
+            <div className="surface-card myskills-empty">
+              <p>Connect your GitHub account to extract programming skills from your repositories.</p>
+              <button
+                type="button"
+                className="btn-outline myskills-connect-btn"
+                onClick={connectGithubAccount}
+                disabled={!githubOauthConfigured}
+              >
+                Connect GitHub
+              </button>
+              {!githubOauthConfigured && (
+                <p className="myskills-connect-note">GitHub OAuth is not configured. Set `VITE_CLIENT_ID` in `frontend/.env`.</p>
+              )}
             </div>
+          )}
 
-            {githubSkills.length === 0 && (
-              <div className="surface-card myskills-empty">
-                <p>No GitHub skills found yet. Reconnect GitHub or refresh your imported profile data.</p>
-              </div>
-            )}
+          {hasGithubProfile && githubSkills.length === 0 && (
+            <div className="surface-card myskills-empty">
+              <p>No GitHub skills found yet. Reconnect GitHub or refresh your imported profile data.</p>
+            </div>
+          )}
 
-            {githubSkills.length > 0 && (
-              <div className="skill-chips-wrap surface-card">
-                {githubSkills.map((skill) => (
-                  <span key={skill} className="skill-chip skill-chip--purple">
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+          {hasGithubProfile && githubSkills.length > 0 && (
+            <div className="skill-chips-wrap surface-card">
+              {githubSkills.map((skill) => (
+                <span key={skill} className="skill-chip skill-chip--purple">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
 
-        {/* Assigned Skills from Skill Tracker */}
         <section className="myskills-section">
           <div className="myskills-section-header">
             <img src={iconTarget} alt="" aria-hidden="true" className="section-icon section-icon--green" />
@@ -174,9 +190,10 @@ export const MySkills = ({ user }: MySkillsProps) => {
           {skillState === 'success' && datasets.length > 0 && (
             <div className="skillsets-list">
               {datasets.map((dataset) => {
-                const done = dataset.skillToImprove.filter((s) => s.isDone).length;
+                const done = dataset.skillToImprove.filter((skill) => skill.isDone).length;
                 const total = dataset.skillToImprove.length;
                 const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
                 return (
                   <div key={dataset.id} className="skillset-card surface-card">
                     <div className="skillset-header">
@@ -192,13 +209,13 @@ export const MySkills = ({ user }: MySkillsProps) => {
                       </div>
                     </div>
                     <ul className="skillset-checklist">
-                      {dataset.skillToImprove.map((s) => (
-                        <li key={s.skill} className={`skillset-item${s.isDone ? ' skillset-item--done' : ''}`}>
-                          <span className={`skillset-checkbox${s.isDone ? ' skillset-checkbox--checked' : ''}`}>
-                            {s.isDone && <img src={iconCheck} alt="" aria-hidden="true" className="skillset-check-img" />}
+                      {dataset.skillToImprove.map((skill) => (
+                        <li key={skill.skill} className={`skillset-item${skill.isDone ? ' skillset-item--done' : ''}`}>
+                          <span className={`skillset-checkbox${skill.isDone ? ' skillset-checkbox--checked' : ''}`}>
+                            {skill.isDone && <img src={iconCheck} alt="" aria-hidden="true" className="skillset-check-img" />}
                           </span>
-                          <span className="skillset-skill-name">{s.skill}</span>
-                          {s.isDone
+                          <span className="skillset-skill-name">{skill.skill}</span>
+                          {skill.isDone
                             ? <span className="badge badge-green">Done</span>
                             : <span className="badge badge-blue">To Do</span>}
                         </li>
@@ -210,7 +227,6 @@ export const MySkills = ({ user }: MySkillsProps) => {
             </div>
           )}
         </section>
-
       </div>
     </div>
   );

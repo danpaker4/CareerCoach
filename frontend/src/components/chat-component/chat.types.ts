@@ -9,8 +9,20 @@ export interface ChatProps {
             name: string;
             grade: number;
         }[];
+        technologies?: string[];
+        interests?: string[];
     };
 }
+
+export type AttachedJobSnapshot = {
+    jobId: string;
+    jobTitle: string;
+    url: string;
+    seniority: string;
+    description: string;
+    company: string;
+    salary: number;
+};
 
 export interface Message {
     id: string;
@@ -29,9 +41,24 @@ export interface ConversationResponse {
         role: 'system' | 'user' | 'assistant';
         content: string;
         timestamp: string;
+        attachedJobs?: AttachedJobSnapshot[];
     }[];
 }
 
 export interface ChatResponse {
     reply?: string;
+    jobs?: Array<{
+        jobId: string;
+        jobTitle: string;
+        url: string;
+        seniority: string;
+        description: string;
+        company?: string;
+        salary?: number;
+    }>;
+    jobMatches?: Array<{
+        jobId: string;
+        title: string;
+        matchScore: number;
+    }>;
 }

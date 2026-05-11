@@ -11,5 +11,10 @@ export interface ServerConfig {
         usersServiceBaseUrl: string;
         jobServiceBaseUrl: string;
         llm: ResolvedLlmConfig;
+        embeddingModel?: string;
+        customEmbeddingUrl?: string;
+        conversationMemoryVectorIndexName: string;
+        careerProfileVectorIndexName: string;
+        careerDirectionVectorIndexName: string;
     };
 }

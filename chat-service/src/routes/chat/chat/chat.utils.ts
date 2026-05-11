@@ -1,5 +1,6 @@
 import type {
     ChatMessageRequestBody,
+    JobSearchPlanRequest,
     JobSearchRequest,
     JobSearchResultItem,
     UserAchievementResponse,
@@ -48,24 +49,61 @@ export const normalizeFilters = (filters: JobSearchRequest): JobSearchRequest =>
     keywords: toStringArray(filters.keywords),
 });
 
+export const normalizeSearchPlan = (plan: JobSearchPlanRequest): JobSearchPlanRequest => ({
+    searches: Array.isArray(plan.searches)
+        ? plan.searches
+            .map((search) => ({
+                type: search.type,
+                query: typeof search.query === "string" ? search.query : "",
+                filters: normalizeFilters(search.filters),
+            }))
+            .filter((search) => search.query.trim().length > 0 || search.filters.skills.length > 0 || search.filters.interests.length > 0)
+        : [],
+});
+
 export const isJobSearchResultItem = (value: unknown): value is JobSearchResultItem => {
     if (typeof value !== "object" || value === null) {
         return false;
     }
 
+    const record = value as Record<string, unknown>;
+    const companyOk = !("company" in record) || typeof record.company === "string";
+    const salaryOk = !("salary" in record) || typeof record.salary === "number";
+    const requirementsOk = !("requirements" in record) || Array.isArray(record.requirements);
+    const mustKnowSkillsOk = !("mustKnowSkills" in record) || Array.isArray(record.mustKnowSkills);
+    const niceToHaveSkillsOk = !("niceToHaveSkills" in record) || Array.isArray(record.niceToHaveSkills);
+    const benefitsOk = !("benefits" in record) || Array.isArray(record.benefits);
+    const locationOk = !("location" in record) || typeof record.location === "string" || record.location === null;
+
     return (
-        "jobId" in value &&
-        "jobTitle" in value &&
-        "url" in value &&
-        "seniority" in value &&
-        "description" in value &&
-        typeof value.jobId === "string" &&
-        typeof value.jobTitle === "string" &&
-        typeof value.url === "string" &&
-        typeof value.seniority === "string" &&
-        typeof value.description === "string"
+        "jobId" in record &&
+        "jobTitle" in record &&
+        "url" in record &&
+        "seniority" in record &&
+        "description" in record &&
+        typeof record.jobId === "string" &&
+        typeof record.jobTitle === "string" &&
+        typeof record.url === "string" &&
+        typeof record.seniority === "string" &&
+        typeof record.description === "string" &&
+        companyOk &&
+        salaryOk &&
+        requirementsOk &&
+        mustKnowSkillsOk &&
+        niceToHaveSkillsOk &&
+        benefitsOk &&
+        locationOk
     );
 };
+
+export const normalizeJobSearchResultItem = (job: JobSearchResultItem): JobSearchResultItem => ({
+    ...job,
+    requirements: toStringArray(job.requirements),
+    mustKnowSkills: toStringArray(job.mustKnowSkills),
+    niceToHaveSkills: toStringArray(job.niceToHaveSkills),
+    benefits: toStringArray(job.benefits),
+    location: typeof job.location === "string" ? job.location : null,
+});
 
 const userAchievementResponseSchema = z.object({
     id: z.string(),

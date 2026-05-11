@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { connectGithubAccount } from '../../lib/githubAuth';
 import iconUser from '../../assets/icon-user.svg';
 import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
+import githubIcon from '../../assets/github-icon.svg';
 import type { User } from '../../types/user';
 import './Profile.css';
 
@@ -28,6 +30,19 @@ const USERS_CV_URL = (userId: string) => `${ENV.USERS_SERVICE_BASE_URL}/users/${
 
 const getInitials = (firstName: string, lastName: string): string =>
   (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+
+const getGithubUsername = (githubUrl: string | undefined): string | null => {
+  if (!githubUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(githubUrl.startsWith('http') ? githubUrl : `https://${githubUrl}`);
+    return parsed.pathname.split('/').filter(Boolean)[0] ?? null;
+  } catch {
+    return null;
+  }
+};
 
 export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
   const [form, setForm] = useState<ProfileForm>({
@@ -81,14 +96,17 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
       setError('First name, last name, and email are required.');
       return;
     }
+
     setSaving(true);
     setError('');
+
     try {
       const body: Record<string, string> = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
       };
+
       if (form.currentJob.trim()) body.currentJob = form.currentJob.trim();
       if (form.linkedInUrl.trim()) body.linkedInUrl = form.linkedInUrl.trim();
       if (form.githubUrl.trim()) body.githubUrl = form.githubUrl.trim();
@@ -99,7 +117,11 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
         credentials: 'include',
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Failed to save changes');
+
+      if (!res.ok) {
+        throw new Error('Failed to save changes');
+      }
+
       onUserUpdated({ ...user, ...body });
       setSaveSuccess(true);
       setIsDirty(false);
@@ -113,9 +135,11 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
 
   const handleCvExtract = async () => {
     if (!cvFile) return;
+
     setCvExtracting(true);
     setCvError('');
     setCvSuccess(false);
+
     try {
       const formData = new FormData();
       formData.append('cv', cvFile);
@@ -127,6 +151,7 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
         method: 'POST',
         body: formData,
       });
+
       if (!res.ok) {
         const payload = await res.json().catch(() => null) as { error?: string } | null;
         throw new Error(payload?.error ?? 'Failed to process CV');
@@ -148,11 +173,13 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
 
   const initials = getInitials(form.firstName || user.firstName, form.lastName || user.lastName);
   const displayName = `${form.firstName || user.firstName} ${form.lastName || user.lastName}`.trim();
+  const githubUrlTrimmed = (form.githubUrl || user.githubUrl || '').trim();
+  const isGithubConnected = githubUrlTrimmed.length > 0;
+  const githubUsername = getGithubUsername(githubUrlTrimmed || undefined);
 
   return (
     <div className="profile-page">
       <main className="profile-container">
-
         <div className="profile-header">
           <div>
             <h1 className="profile-title">My Profile</h1>
@@ -164,8 +191,6 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
         </div>
 
         <div className="profile-layout">
-
-          {/* Left - Avatar card */}
           <aside className="profile-sidebar">
             <div className="avatar-card surface-card">
               <div className="profile-avatar-lg">{initials}</div>
@@ -205,7 +230,6 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
               )}
             </div>
 
-            {/* CV Upload Card */}
             <div className="cv-card surface-card">
               <div className="cv-card-header">
                 <img src={iconZap} alt="" aria-hidden="true" className="cv-card-icon" />
@@ -257,9 +281,44 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
                 {cvExtracting ? 'Extracting...' : 'Extract Skills'}
               </button>
             </div>
+
+            <div className="cv-card surface-card">
+              <div className="cv-card-header">
+                <img src={githubIcon} alt="" aria-hidden="true" className="cv-card-icon profile-github-card-icon" />
+                <h3 className="cv-card-title">Skills from GitHub</h3>
+              </div>
+              {isGithubConnected ? (
+                <>
+                  <p className="cv-card-sub">
+                    Your GitHub profile is linked. Programming languages from your public repositories appear on the
+                    Skills page.
+                  </p>
+                  <p className="cv-card-current">
+                    {githubUsername ? `Connected as @${githubUsername}` : 'GitHub profile connected'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="cv-card-sub">
+                    Connect your GitHub account to extract technologies from your repositories into the Skills page.
+                  </p>
+                  <p className="profile-github-pending">Not connected yet.</p>
+                  <button
+                    type="button"
+                    className="btn-primary cv-extract-btn"
+                    onClick={connectGithubAccount}
+                    disabled={!ENV.GITHUB_CLIENT_ID}
+                  >
+                    Connect GitHub
+                  </button>
+                  {!ENV.GITHUB_CLIENT_ID && (
+                    <p className="cv-error">GitHub OAuth is not configured. Set `VITE_CLIENT_ID` in `frontend/.env`.</p>
+                  )}
+                </>
+              )}
+            </div>
           </aside>
 
-          {/* Right - Edit form */}
           <section className="profile-form-section surface-card">
             <div className="form-section-header">
               <img src={iconUser} alt="" aria-hidden="true" className="form-section-icon" />
@@ -354,7 +413,6 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
               </button>
             </div>
           </section>
-
         </div>
       </main>
     </div>

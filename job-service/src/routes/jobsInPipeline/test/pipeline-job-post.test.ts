@@ -54,5 +54,30 @@ describe("Pipeline Job Router - POST /jobs-in-pipeline", () => {
 
         expect(response.statusCode).toBe(StatusCodes.BAD_REQUEST);
     });
+
+    it("should return 409 when the same user and jobId is added twice", async () => {
+        const newJobData = {
+            userId: mockUserId,
+            jobId: 909090,
+            jobStage: "wishlist",
+            description: "Test Role at TestCo",
+        };
+
+        const first = await server.app.inject({
+            method: "POST",
+            url: "/jobs-in-pipeline",
+            payload: newJobData,
+        });
+        expect(first.statusCode).toBe(StatusCodes.CREATED);
+
+        const second = await server.app.inject({
+            method: "POST",
+            url: "/jobs-in-pipeline",
+            payload: newJobData,
+        });
+        expect(second.statusCode).toBe(StatusCodes.CONFLICT);
+        const body = second.json() as { error?: string };
+        expect(body.error).toContain("already");
+    });
 });
 

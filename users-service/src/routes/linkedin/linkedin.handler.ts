@@ -5,10 +5,10 @@ import { SchematicRequest } from "../../types/fastify";
 import { linkedInCallbackSchema } from "./linkedin.schema";
 import type { LinkedInHandlerType } from "./linkedin.types";
 import { exchangeLinkedInCodeForToken, fetchLinkedInUserProfile, loginOrCreateLinkedInUser } from "./linkedin.service";
-import type { User } from "../users/user.model";
+import type { UserDocument } from "../users/user.model";
 import { setAuthCookies } from "../auth/auth.cookies";
 
-export const LinkedInHandler = (usersCollection: Collection<User>): LinkedInHandlerType => {
+export const LinkedInHandler = (usersCollection: Collection<UserDocument>): LinkedInHandlerType => {
     return {
         linkedInCallback: async (request: SchematicRequest<typeof linkedInCallbackSchema>, reply: FastifyReply) => {
             try {
