@@ -76,6 +76,13 @@
   display: flex;
   flex-direction: column;
   min-height: 420px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+}
+
+.kanban-column--drag-over {
+  border-color: var(--clr-primary);
+  box-shadow: 0 0 0 3px var(--clr-primary-100);
+  background: var(--clr-primary-50);
 }
 
 .kanban-column-header {
@@ -99,6 +106,11 @@
   flex-direction: column;
   gap: 8px;
   flex: 1;
+  transition: background var(--t-fast);
+}
+
+.kanban-cards--drag-over {
+  background: rgba(37, 99, 235, 0.06);
 }
 
 /* Job card */
@@ -108,15 +120,82 @@
   border-radius: var(--r-lg);
   padding: 12px;
   transition: box-shadow var(--t-fast), opacity var(--t-fast);
+  cursor: grab;
 }
 
 .job-card:hover {
   box-shadow: var(--shadow-md);
 }
 
+.job-card:active {
+  cursor: grabbing;
+}
+
 .job-card--deleting {
   opacity: 0.4;
   pointer-events: none;
+}
+
+.job-card--dragging {
+  opacity: 0.42;
+  box-shadow: none;
+}
+
+.job-card-overlay-preview {
+  position: fixed;
+  z-index: 500;
+  top: 0;
+  left: 0;
+  width: min(280px, calc(100vw - 32px));
+  pointer-events: none;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(96, 165, 250, 0.78);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96));
+  box-shadow:
+    0 28px 60px rgba(15, 23, 42, 0.42),
+    0 0 0 1px rgba(191, 219, 254, 0.12);
+  backdrop-filter: blur(10px);
+  will-change: transform;
+}
+
+.job-card-overlay-preview-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.job-card-overlay-preview-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  filter: brightness(1.4) saturate(1.15);
+  opacity: 0.95;
+}
+
+.job-card-overlay-preview-description {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fz-sm);
+  font-weight: 700;
+  line-height: 1.4;
+  color: #f8fafc;
+  word-break: break-word;
+}
+
+.job-card-overlay-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.job-card-overlay-preview-ref {
+  font-size: var(--fz-xs);
+  color: rgba(191, 219, 254, 0.95);
 }
 
 .job-card-top {
