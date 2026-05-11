@@ -189,14 +189,17 @@
   display: none;
   margin-left: auto;
   background: none;
-  border: none;
+  border: 1px solid transparent;
   padding: 6px;
   border-radius: var(--r-md);
   cursor: pointer;
-  transition: background var(--t-fast);
+  transition: background var(--t-fast), border-color var(--t-fast);
 }
 
-.hamburger:hover { background: var(--clr-slate-100); }
+.hamburger:hover {
+  background: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
 
 .hamburger-icon {
   width: 22px;

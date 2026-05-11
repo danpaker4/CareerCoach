@@ -171,6 +171,14 @@
   filter: brightness(0) invert(1);
 }
 
+:root[data-theme='dark'] .linkedin-btn-styled {
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.22);
+}
+
+:root[data-theme='dark'] .linkedin-btn-styled:hover:not(:disabled) {
+  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.28);
+}
+
 @media (max-width: 640px) {
   .auth-card,
   .auth-card--signup {
