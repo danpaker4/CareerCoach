@@ -6,8 +6,19 @@ export interface PipelineJob {
   id: string;
   userId: string;
   jobId: number;
-  jobStage: string;
+  jobStage: PipelineStage;
   description: string;
+}
+
+export interface PipelineDragState {
+  jobId: string;
+  pointerId: number;
+  sourceStage: PipelineStage;
+}
+
+export interface PipelineDragPosition {
+  x: number;
+  y: number;
 }
 
 export interface PipelineColumn {

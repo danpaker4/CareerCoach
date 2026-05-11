@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import iconKanban from '../../assets/icon-kanban.svg';
@@ -6,7 +7,16 @@ import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconX from '../../assets/icon-x.svg';
 import './Pipeline.css';
-import type { PipelineJob, PipelineColumn, PipelineProps, PipelineStage, NewJobForm, FetchState } from './pipeline.types';
+import type {
+  PipelineJob,
+  PipelineColumn,
+  PipelineProps,
+  PipelineStage,
+  NewJobForm,
+  FetchState,
+  PipelineDragState,
+  PipelineDragPosition,
+} from './pipeline.types';
 
 const JOBS_URL = (userId: string) =>
   `${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${userId}`;
@@ -21,6 +31,14 @@ const COLUMNS: PipelineColumn[] = [
 
 const STAGE_ORDER: PipelineStage[] = ['wishlist', 'applied', 'interview', 'offer', 'rejected'];
 
+const isPipelineStage = (value: unknown): value is PipelineStage =>
+  typeof value === 'string' && STAGE_ORDER.some((stage) => stage === value);
+
+const getStageFromElement = (element: Element | null): PipelineStage | null => {
+  const stage = element?.closest<HTMLElement>('[data-pipeline-stage]')?.dataset.pipelineStage;
+  return isPipelineStage(stage) ? stage : null;
+};
+
 const parseJobs = (data: unknown): PipelineJob[] => {
   if (!Array.isArray(data)) return [];
   return data.filter((item): item is PipelineJob => {
@@ -30,7 +48,7 @@ const parseJobs = (data: unknown): PipelineJob[] => {
       typeof obj.id === 'string' &&
       typeof obj.userId === 'string' &&
       typeof obj.jobId === 'number' &&
-      typeof obj.jobStage === 'string' &&
+      isPipelineStage(obj.jobStage) &&
       typeof obj.description === 'string'
     );
   });
@@ -42,15 +60,21 @@ interface JobCardProps {
   job: PipelineJob;
   onMove: (id: string, stage: PipelineStage) => void;
   onDelete: (id: string) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>, job: PipelineJob) => void;
   moving: boolean;
   deleting: boolean;
+  isDragging: boolean;
 }
 
-const JobCard = ({ job, onMove, onDelete, moving, deleting }: JobCardProps) => {
+const JobCard = ({ job, onMove, onDelete, onPointerDown, moving, deleting, isDragging }: JobCardProps) => {
   const [showStageMenu, setShowStageMenu] = useState(false);
 
   return (
-    <div className={`job-card${deleting ? ' job-card--deleting' : ''}`}>
+    <div
+      className={`job-card${deleting ? ' job-card--deleting' : ''}${isDragging ? ' job-card--dragging' : ''}`}
+      onPointerDown={(event) => onPointerDown(event, job)}
+      aria-grabbed={isDragging}
+    >
       <div className="job-card-top">
         <img src={iconBriefcase} alt="" aria-hidden="true" className="job-card-icon" />
         <p className="job-description">{job.description || `Job #${job.jobId}`}</p>
@@ -96,6 +120,30 @@ const JobCard = ({ job, onMove, onDelete, moving, deleting }: JobCardProps) => {
   );
 };
 
+interface DragPreviewCardProps {
+  job: PipelineJob;
+  previewRef: (element: HTMLDivElement | null) => void;
+}
+
+const DragPreviewCard = ({ job, previewRef }: DragPreviewCardProps) => (
+  <div
+    className="job-card-overlay-preview"
+    ref={previewRef}
+    aria-hidden="true"
+  >
+    <div className="job-card-overlay-preview-top">
+      <img src={iconBriefcase} alt="" aria-hidden="true" className="job-card-overlay-preview-icon" />
+      <p className="job-card-overlay-preview-description">{job.description || `Job #${job.jobId}`}</p>
+    </div>
+    <div className="job-card-overlay-preview-footer">
+      <span className="job-card-overlay-preview-ref">Job #{job.jobId}</span>
+    </div>
+  </div>
+);
+
+const DEFAULT_DRAG_POSITION: PipelineDragPosition = { x: 0, y: 0 };
+const DRAG_PREVIEW_TRANSFORM_SUFFIX = 'translate(0, -54px) scale(1.03)';
+
 export const Pipeline = ({ user }: PipelineProps) => {
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [jobs, setJobs] = useState<PipelineJob[]>([]);
@@ -105,6 +153,14 @@ export const Pipeline = ({ user }: PipelineProps) => {
   const [adding, setAdding] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [dragState, setDragState] = useState<PipelineDragState | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<PipelineStage | null>(null);
+  const dragPositionRef = useRef<PipelineDragPosition>(DEFAULT_DRAG_POSITION);
+  const dragPreviewElementRef = useRef<HTMLDivElement | null>(null);
+  const dragSourceElementRef = useRef<HTMLDivElement | null>(null);
+  const dragOverStageRef = useRef<PipelineStage | null>(null);
+  const pendingPointerPositionRef = useRef<PipelineDragPosition | null>(null);
+  const dragAnimationFrameRef = useRef<number | null>(null);
 
   const loadData = useCallback(() => {
     if (!user?.id) return;
@@ -124,6 +180,148 @@ export const Pipeline = ({ user }: PipelineProps) => {
   }, [user?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const applyDragPreviewPosition = useCallback((position: PipelineDragPosition) => {
+    dragPositionRef.current = position;
+
+    if (!dragPreviewElementRef.current) {
+      return;
+    }
+
+    dragPreviewElementRef.current.style.transform =
+      `translate3d(${position.x}px, ${position.y}px, 0) ${DRAG_PREVIEW_TRANSFORM_SUFFIX}`;
+  }, []);
+
+  const bindDragPreviewRef = useCallback((element: HTMLDivElement | null) => {
+    dragPreviewElementRef.current = element;
+
+    if (!element) {
+      return;
+    }
+
+    applyDragPreviewPosition(dragPositionRef.current);
+  }, [applyDragPreviewPosition]);
+
+  const applyQueuedDragPosition = useCallback(() => {
+    dragAnimationFrameRef.current = null;
+
+    const nextPosition = pendingPointerPositionRef.current;
+
+    if (!nextPosition) {
+      return;
+    }
+
+    const nextStage = getStageFromElement(document.elementFromPoint(nextPosition.x, nextPosition.y));
+
+    if (dragOverStageRef.current === nextStage) {
+      return;
+    }
+
+    dragOverStageRef.current = nextStage;
+    setDragOverStage(nextStage);
+  }, [applyDragPreviewPosition]);
+
+  const queueDragPositionUpdate = useCallback((position: PipelineDragPosition) => {
+    pendingPointerPositionRef.current = position;
+
+    if (dragAnimationFrameRef.current !== null) {
+      return;
+    }
+
+    dragAnimationFrameRef.current = window.requestAnimationFrame(applyQueuedDragPosition);
+  }, [applyQueuedDragPosition]);
+
+  useEffect(() => {
+    if (!dragState) {
+      return;
+    }
+
+    document.body.style.userSelect = 'none';
+
+    const handleWindowPointerMove = (event: PointerEvent) => {
+      if (dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const nextPosition: PipelineDragPosition = {
+        x: event.clientX,
+        y: event.clientY,
+      };
+
+      applyDragPreviewPosition(nextPosition);
+      queueDragPositionUpdate(nextPosition);
+    };
+
+    const finishWindowPointerDrag = (event: PointerEvent) => {
+      if (dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const sourceElement = dragSourceElementRef.current;
+
+      if (sourceElement?.hasPointerCapture(event.pointerId)) {
+        sourceElement.releasePointerCapture(event.pointerId);
+      }
+
+      const targetStage = getStageFromElement(document.elementFromPoint(event.clientX, event.clientY));
+      const activeDragState = dragState;
+
+      setDragState(null);
+      setDragOverStage(null);
+      dragOverStageRef.current = null;
+      pendingPointerPositionRef.current = null;
+      if (dragAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragAnimationFrameRef.current);
+        dragAnimationFrameRef.current = null;
+      }
+      dragPositionRef.current = DEFAULT_DRAG_POSITION;
+
+      if (!targetStage || targetStage === activeDragState.sourceStage) {
+        return;
+      }
+
+      void handleMoveJob(activeDragState.jobId, targetStage);
+    };
+
+    const cancelWindowPointerDrag = (event: PointerEvent) => {
+      if (dragState.pointerId !== event.pointerId) {
+        return;
+      }
+
+      const sourceElement = dragSourceElementRef.current;
+
+      if (sourceElement?.hasPointerCapture(event.pointerId)) {
+        sourceElement.releasePointerCapture(event.pointerId);
+      }
+
+      setDragState(null);
+      setDragOverStage(null);
+      dragOverStageRef.current = null;
+      pendingPointerPositionRef.current = null;
+      if (dragAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragAnimationFrameRef.current);
+        dragAnimationFrameRef.current = null;
+      }
+      dragPositionRef.current = DEFAULT_DRAG_POSITION;
+    };
+
+    window.addEventListener('pointermove', handleWindowPointerMove, { passive: true });
+    window.addEventListener('pointerup', finishWindowPointerDrag);
+    window.addEventListener('pointercancel', cancelWindowPointerDrag);
+
+    return () => {
+      document.body.style.userSelect = '';
+      dragOverStageRef.current = null;
+      pendingPointerPositionRef.current = null;
+      if (dragAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragAnimationFrameRef.current);
+        dragAnimationFrameRef.current = null;
+      }
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', finishWindowPointerDrag);
+      window.removeEventListener('pointercancel', cancelWindowPointerDrag);
+    };
+  }, [applyDragPreviewPosition, dragState, queueDragPositionUpdate]);
 
   const handleAddJob = async () => {
     if (!user?.id || !form.description.trim()) return;
@@ -187,8 +385,36 @@ export const Pipeline = ({ user }: PipelineProps) => {
     }
   };
 
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>, job: PipelineJob) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target instanceof HTMLElement && event.target.closest('button')) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragSourceElementRef.current = event.currentTarget;
+    applyDragPreviewPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+    flushSync(() => {
+      dragOverStageRef.current = job.jobStage;
+      setDragOverStage(job.jobStage);
+      setDragState({
+        jobId: job.id,
+        pointerId: event.pointerId,
+        sourceStage: job.jobStage,
+      });
+    });
+  }, [applyDragPreviewPosition]);
+
   const jobsByStage = (stage: PipelineStage) =>
     jobs.filter((j) => j.jobStage === stage);
+  const draggedJob = dragState ? jobs.find((job) => job.id === dragState.jobId) ?? null : null;
 
   if (!user) {
     return (
@@ -203,6 +429,7 @@ export const Pipeline = ({ user }: PipelineProps) => {
 
   return (
     <div className="pipeline-page">
+      {draggedJob && <DragPreviewCard job={draggedJob} previewRef={bindDragPreviewRef} />}
       <div className="pipeline-header-bar">
         <div className="pipeline-header-inner">
           <div>
@@ -237,13 +464,18 @@ export const Pipeline = ({ user }: PipelineProps) => {
           <div className="kanban-board">
             {COLUMNS.map((col) => {
               const colJobs = jobsByStage(col.id);
+              const isDragTarget = dragOverStage === col.id && dragState?.sourceStage !== col.id;
               return (
-                <div key={col.id} className="kanban-column">
+                <div
+                  key={col.id}
+                  data-pipeline-stage={col.id}
+                  className={`kanban-column${isDragTarget ? ' kanban-column--drag-over' : ''}`}
+                >
                   <div className="kanban-column-header">
                     <span className="kanban-column-label">{col.label}</span>
                     <span className={`badge ${col.badgeClass}`}>{colJobs.length}</span>
                   </div>
-                  <div className="kanban-cards">
+                  <div className={`kanban-cards${isDragTarget ? ' kanban-cards--drag-over' : ''}`}>
                     {colJobs.length > 0
                       ? colJobs.map((job) => (
                           <JobCard
@@ -251,8 +483,10 @@ export const Pipeline = ({ user }: PipelineProps) => {
                             job={job}
                             onMove={handleMoveJob}
                             onDelete={handleDeleteJob}
+                            onPointerDown={handlePointerDown}
                             moving={movingId === job.id}
                             deleting={deletingId === job.id}
+                            isDragging={dragState?.jobId === job.id}
                           />
                         ))
                       : (
