@@ -1,6 +1,6 @@
 import type { Collection } from "mongodb";
 import { generateAccessToken } from "../../auth/auth-tokens.service";
-import type { User } from "../user.model";
+import type { User, UserDocument } from "../user.model";
 
 const TEST_JWT_ACCESS_SECRET = "test-access-secret";
 const TEST_JWT_REFRESH_SECRET = "test-refresh-secret";
@@ -17,6 +17,6 @@ export const authHeadersForUser = (user: Pick<User, "id" | "email">): Record<str
     };
 };
 
-export const dropLegacyUsernameIndex = async (usersCollection: Collection<User>): Promise<void> => {
+export const dropLegacyUsernameIndex = async (usersCollection: Collection<UserDocument>): Promise<void> => {
     await usersCollection.dropIndex("username_1").catch(() => undefined);
 };

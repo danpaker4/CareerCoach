@@ -3,25 +3,26 @@ import { FastifyReply } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { SchematicRequest } from "../../types/fastify";
-import type { User } from "./user.model";
+import type { User, UserDocument } from "./user.model";
+import { toUser, toUserDocument } from "./user.utils";
 import { createUserSchema, getUserSchema, updateUserSchema } from "./users.schema";
 import type { UsersHandlerType } from "./users.types";
 import { serializeRouteError } from "./users.utils";
 
-export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerType => {
+export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHandlerType => {
     return {
         getUserHandler: async (request: SchematicRequest<typeof getUserSchema>, reply: FastifyReply) => {
             const { userId } = request.params;
 
             try {
-                const user = await usersCollection.findOne({ id: userId });
+                const user = await usersCollection.findOne({ _id: userId });
 
                 if (!user) {
                     reply.code(StatusCodes.NOT_FOUND).send({ error: "User not found" });
                     return;
                 }
 
-                reply.code(StatusCodes.OK).send(user);
+                reply.code(StatusCodes.OK).send(toUser(user));
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }
@@ -34,13 +35,14 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
                 const newUser: User = {
                     id: randomUUID(),
                     ...userData,
+                    githubSkills: userData.githubSkills ?? [],
                     achievements: userData.achievements ?? [],
                     technologies: userData.technologies ?? [],
                     interests: userData.interests ?? [],
                     knownSkills: userData.knownSkills ?? [],
                 };
 
-                await usersCollection.insertOne(newUser);
+                await usersCollection.insertOne(toUserDocument(newUser));
                 reply.code(StatusCodes.CREATED).send(newUser);
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
@@ -53,7 +55,7 @@ export const UsersHandler = (usersCollection: Collection<User>): UsersHandlerTyp
 
             try {
                 await usersCollection.updateOne(
-                    { id: userId },
+                    { _id: userId },
                     {
                         $set: updateData,
                     },

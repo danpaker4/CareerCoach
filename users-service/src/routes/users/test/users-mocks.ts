@@ -12,6 +12,7 @@ export const mockUser: User = {
     technologies: [],
     interests: [],
     knownSkills: [],
+    githubSkills: [],
     currentJob: "Developer",
 };
 

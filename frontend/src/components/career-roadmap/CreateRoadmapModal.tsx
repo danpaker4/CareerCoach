@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconX from '../../assets/icon-x.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
@@ -45,7 +46,7 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
     setError('');
     try {
       const stages = Array.from({ length: stageCount }, (_, i) => ({ jobId: i + 1, isDone: false }));
-      const res = await fetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap`, {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

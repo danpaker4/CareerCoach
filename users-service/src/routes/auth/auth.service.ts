@@ -3,7 +3,7 @@ import { StatusCodes } from "http-status-codes";
 import type { Collection } from "mongodb";
 import { registerUser } from "../users/register/register-user.service";
 import type { RegisterUserInput } from "../users/register/register-user.types";
-import type { User } from "../users/user.model";
+import type { User, UserDocument } from "../users/user.model";
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "./auth-tokens.service";
 import { AuthRouteError } from "./auth.types";
 import type { AuthTokenSubject, AuthenticatedUser, AuthenticatedUserSession, LoginBody, SafeUser } from "./auth.types";
@@ -36,8 +36,8 @@ export const buildAuthenticatedSession = (user: SafeUser): AuthenticatedUserSess
   };
 };
 
-const findUserById = async (usersCollection: Collection<User>, userId: string): Promise<User> => {
-  const user = await usersCollection.findOne({ id: userId });
+const findUserById = async (usersCollection: Collection<UserDocument>, userId: string): Promise<UserDocument> => {
+  const user = await usersCollection.findOne({ _id: userId });
   if (!user) {
     throw new AuthRouteError(StatusCodes.UNAUTHORIZED, "User not found", "ACCESS_TOKEN_INVALID");
   }
@@ -48,7 +48,7 @@ const findUserById = async (usersCollection: Collection<User>, userId: string): 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
 export const registerUserSession = async (
-  usersCollection: Collection<User>,
+  usersCollection: Collection<UserDocument>,
   input: RegisterUserInput,
 ): Promise<AuthenticatedUserSession> => {
   try {
@@ -67,7 +67,7 @@ export const registerUserSession = async (
 };
 
 export const loginUserSession = async (
-  usersCollection: Collection<User>,
+  usersCollection: Collection<UserDocument>,
   credentials: LoginBody,
 ): Promise<AuthenticatedUserSession> => {
   const authenticatedUser = await usersCollection.findOne({ email: normalizeEmail(credentials.email) });
@@ -88,15 +88,17 @@ export const loginUserSession = async (
 };
 
 export const refreshUserAccessToken = async (
-  usersCollection: Collection<User>,
+  usersCollection: Collection<UserDocument>,
   refreshToken: string,
-): Promise<{ accessToken: string; user: SafeUser }> => {
+): Promise<{ accessToken: string; refreshToken: string; user: SafeUser }> => {
   const payload = verifyRefreshToken(refreshToken);
   const user = await findUserById(usersCollection, payload.userId);
   const safeUser = toSafeUser(user);
+  const tokenSubject = buildTokenSubject(safeUser);
 
   return {
-    accessToken: generateAccessToken(buildTokenSubject(safeUser)),
+    accessToken: generateAccessToken(tokenSubject),
+    refreshToken: generateRefreshToken(tokenSubject),
     user: safeUser,
   };
 };

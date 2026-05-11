@@ -307,6 +307,37 @@
   line-height: 1.5;
 }
 
+/* Floating chat launcher (full chat still at /chat via header buttons) */
+.roadmap-chat-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 150;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: var(--clr-primary);
+  color: white;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+
+.roadmap-chat-fab:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-xl);
+}
+
+.roadmap-chat-fab-icon {
+  width: 26px;
+  height: 26px;
+  filter: brightness(0) invert(1);
+}
+
 /* Floating Chat */
 .floating-chat-wrapper {
   position: fixed;

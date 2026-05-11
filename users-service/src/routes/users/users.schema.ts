@@ -31,6 +31,7 @@ export const createUserSchema = {
         currentJob: z.string().optional(),
         linkedInUrl: z.string().optional(),
         githubUrl: z.string().optional(),
+        githubSkills: z.array(z.string()).optional(),
         cv: z.string().optional(),
         achievements: z.array(z.object({
             id: z.uuid(),
@@ -65,6 +66,7 @@ export const updateUserSchema = {
         currentJob: z.string().optional(),
         linkedInUrl: z.string().optional(),
         githubUrl: z.string().optional(),
+        githubSkills: z.array(z.string()).optional(),
         cv: z.string().optional(),
         achievements: z.array(z.object({
             id: z.uuid(),

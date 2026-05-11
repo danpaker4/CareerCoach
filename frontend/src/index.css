@@ -79,6 +79,11 @@
   --fz-6xl: 3.75rem;
 }
 
+html {
+  min-height: 100%;
+  scrollbar-gutter: stable;
+}
+
 /* Global base */
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -86,13 +91,14 @@ body {
   color: var(--clr-slate-800);
   background: var(--clr-slate-50);
   line-height: 1.5;
-  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }

@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ENV } from '../../config';
+import { apiFetch } from '../../lib/apiClient';
 import iconUser from '../../assets/icon-user.svg';
 import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconCheck from '../../assets/icon-check.svg';
+import iconZap from '../../assets/icon-zap.svg';
 import type { User } from '../../types/user';
 import './Profile.css';
 
 interface ProfileProps {
   user: User;
   onUserUpdated: (updated: User) => void;
+  onLogout: () => void;
 }
 
 interface ProfileForm {
@@ -20,12 +23,96 @@ interface ProfileForm {
   githubUrl: string;
 }
 
+interface ExtractedAchievement {
+  id: string;
+  name: string;
+  grade: number;
+}
+
 const USERS_URL = (userId: string) => `${ENV.USERS_SERVICE_BASE_URL}/users/${userId}`;
 
 const getInitials = (firstName: string, lastName: string): string =>
   (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
 
-export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
+const GEMINI_PROMPT = `
+You are analyzing a CV. Extract professional skills and achievements.
+Return ONLY valid JSON with no markdown, no explanation.
+
+Format:
+{
+  "achievements": [
+    { "name": "skill or achievement name (short, max 6 words)", "grade": <number 1-100> }
+  ]
+}
+
+Rules:
+- Extract technical skills, tools, frameworks, languages the candidate has used
+- Extract measurable achievements (led X, built X, reduced X by Y%)
+- grade = proficiency estimate: 90+ for primary/expert skills, 70-89 for intermediate, 50-69 for basic, below 50 for mentioned only
+- Return 5 to 20 items
+- Names must be in English
+`.trim();
+
+const extractSkillsFromPdf = async (file: File): Promise<ExtractedAchievement[]> => {
+  const apiKey = ENV.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('VITE_GEMINI_API_KEY not set in .env');
+
+  // Step 1: upload file to Gemini Files API
+  const uploadRes = await fetch(
+    `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=multipart&key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'X-Goog-Upload-Protocol': 'multipart' },
+      body: (() => {
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify({ file: { mimeType: 'application/pdf' } })], { type: 'application/json' }));
+        form.append('file', file, file.name);
+        return form;
+      })(),
+    }
+  );
+
+  if (!uploadRes.ok) throw new Error('Failed to upload PDF to Gemini');
+  const uploadData = await uploadRes.json() as { file?: { uri?: string } };
+  const fileUri = uploadData?.file?.uri;
+  if (!fileUri) throw new Error('Gemini did not return a file URI');
+
+  // Step 2: ask Gemini to extract skills
+  const genRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: GEMINI_PROMPT },
+            { fileData: { mimeType: 'application/pdf', fileUri } },
+          ],
+        }],
+        generationConfig: { temperature: 0.1 },
+      }),
+    }
+  );
+
+  if (!genRes.ok) throw new Error('Gemini extraction failed');
+  const genData = await genRes.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const raw = genData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+  // Strip possible markdown code fences
+  const cleaned = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  const parsed = JSON.parse(cleaned) as { achievements?: Array<{ name?: string; grade?: number }> };
+
+  return (parsed.achievements ?? [])
+    .filter((a) => typeof a.name === 'string' && typeof a.grade === 'number')
+    .map((a) => ({
+      id: crypto.randomUUID(),
+      name: a.name as string,
+      grade: Math.min(100, Math.max(1, Math.round(a.grade as number))),
+    }));
+};
+
+export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
   const [form, setForm] = useState<ProfileForm>({
     firstName: user.firstName,
     lastName: user.lastName,
@@ -39,8 +126,15 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
   const [error, setError] = useState('');
   const [isDirty, setIsDirty] = useState(false);
 
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [cvExtracting, setCvExtracting] = useState(false);
+  const [cvSuccess, setCvSuccess] = useState(false);
+  const [cvError, setCvError] = useState('');
+  const [cvSkillCount, setCvSkillCount] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const loadProfile = useCallback(() => {
-    fetch(USERS_URL(user.id), { credentials: 'include' })
+    apiFetch(USERS_URL(user.id), { credentials: 'include' })
       .then(async (res) => {
         if (!res.ok) return;
         const data = await res.json() as User;
@@ -82,7 +176,7 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
       if (form.linkedInUrl.trim()) body.linkedInUrl = form.linkedInUrl.trim();
       if (form.githubUrl.trim()) body.githubUrl = form.githubUrl.trim();
 
-      const res = await fetch(USERS_URL(user.id), {
+      const res = await apiFetch(USERS_URL(user.id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -100,6 +194,36 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
     }
   };
 
+  const handleCvExtract = async () => {
+    if (!cvFile) return;
+    setCvExtracting(true);
+    setCvError('');
+    setCvSuccess(false);
+    try {
+      const achievements = await extractSkillsFromPdf(cvFile);
+      if (achievements.length === 0) throw new Error('No skills could be extracted from this PDF');
+
+      // Patch the user with extracted achievements
+      const res = await apiFetch(USERS_URL(user.id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ achievements }),
+      });
+      if (!res.ok) throw new Error('Failed to save skills');
+
+      onUserUpdated({ ...user, achievements });
+      setCvSkillCount(achievements.length);
+      setCvSuccess(true);
+      setCvFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err: unknown) {
+      setCvError(err instanceof Error ? err.message : 'Extraction failed');
+    } finally {
+      setCvExtracting(false);
+    }
+  };
+
   const initials = getInitials(form.firstName || user.firstName, form.lastName || user.lastName);
   const displayName = `${form.firstName || user.firstName} ${form.lastName || user.lastName}`.trim();
 
@@ -112,11 +236,14 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
             <h1 className="profile-title">My Profile</h1>
             <p className="profile-subtitle">Manage your personal information</p>
           </div>
+          <button type="button" className="profile-logout-button" onClick={onLogout}>
+            Logout
+          </button>
         </div>
 
         <div className="profile-layout">
 
-          {/* Left — Avatar card */}
+          {/* Left - Avatar card */}
           <aside className="profile-sidebar">
             <div className="avatar-card surface-card">
               <div className="profile-avatar-lg">{initials}</div>
@@ -155,9 +282,59 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
                 </div>
               )}
             </div>
+
+            {/* CV Upload Card */}
+            <div className="cv-card surface-card">
+              <div className="cv-card-header">
+                <img src={iconZap} alt="" aria-hidden="true" className="cv-card-icon" />
+                <h3 className="cv-card-title">Skills from CV</h3>
+              </div>
+              <p className="cv-card-sub">
+                Upload your CV to automatically extract your skills and achievements using AI.
+              </p>
+
+              {user.achievements && user.achievements.length > 0 && (
+                <p className="cv-card-current">
+                  {user.achievements.length} skills currently extracted
+                </p>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                className="cv-file-input"
+                id="cv-upload"
+                onChange={(e) => {
+                  setCvFile(e.target.files?.[0] ?? null);
+                  setCvSuccess(false);
+                  setCvError('');
+                }}
+              />
+              <label htmlFor="cv-upload" className="cv-file-label">
+                {cvFile ? cvFile.name : 'Choose PDF file'}
+              </label>
+
+              {cvError && <p className="cv-error">{cvError}</p>}
+              {cvSuccess && (
+                <p className="cv-success">
+                  <img src={iconCheck} alt="" aria-hidden="true" />
+                  {cvSkillCount} skills extracted successfully!
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="btn-primary cv-extract-btn"
+                onClick={handleCvExtract}
+                disabled={!cvFile || cvExtracting}
+              >
+                {cvExtracting ? 'Extracting...' : 'Extract Skills'}
+              </button>
+            </div>
           </aside>
 
-          {/* Right — Edit form */}
+          {/* Right - Edit form */}
           <section className="profile-form-section surface-card">
             <div className="form-section-header">
               <img src={iconUser} alt="" aria-hidden="true" className="form-section-icon" />
@@ -248,7 +425,7 @@ export const Profile = ({ user, onUserUpdated }: ProfileProps) => {
                 onClick={handleSave}
                 disabled={saving || !isDirty}
               >
-                {saving ? 'Saving…' : 'Save Changes'}
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </section>

@@ -5,4 +5,5 @@
   padding: 40px 36px;
   width: 100%;
   max-width: 480px;
+  box-sizing: border-box;
 }

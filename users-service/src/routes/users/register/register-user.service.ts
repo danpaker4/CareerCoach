@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import type { Collection } from "mongodb";
-import type { User } from "../user.model";
+import type { User, UserDocument } from "../user.model";
+import { toUserDocument } from "../user.utils";
 import { extractTextFromCv } from "../../cv/cv-parser.service";
 import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemini.service";
 import { uploadCvToS3 } from "../../cv/s3-upload/s3-upload.service";
@@ -64,7 +65,7 @@ const inferInterestsFromText = (text: string): string[] => {
 };
 
 export const registerUser = async (
-  usersCollection: Collection<User>,
+  usersCollection: Collection<UserDocument>,
   input: RegisterUserInput,
 ): Promise<Omit<User, "password">> => {
   const { firstName, lastName, email, password, birthDate, currentJob, linkedInUrl, githubUrl } = input;
@@ -114,6 +115,7 @@ export const registerUser = async (
     currentJob: currentJob || undefined,
     linkedInUrl: linkedInUrl || undefined,
     githubUrl: githubUrl || undefined,
+    githubSkills: [],
     cv: cvS3Path,
     achievements: achievementsFromGemini.map((achievement) => ({
       id: randomUUID(),
@@ -125,7 +127,7 @@ export const registerUser = async (
     knownSkills: technologies,
   };
 
-  await usersCollection.insertOne(newUser);
+  await usersCollection.insertOne(toUserDocument(newUser));
 
   const { password: _password, ...safeUser } = newUser;
   return safeUser;

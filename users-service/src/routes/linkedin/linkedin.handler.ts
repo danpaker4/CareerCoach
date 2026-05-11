@@ -2,24 +2,20 @@ import { FastifyReply } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { Collection } from "mongodb";
 import { SchematicRequest } from "../../types/fastify";
-import { githubCallbackSchema } from "./github.schema";
-import type { GithubHandlerType } from "./github.types";
-import { exchangeCodeForAccessToken, fetchGithubUserEmails, fetchGithubUserProfile, loginOrCreateGithubUser } from "./github.service";
+import { linkedInCallbackSchema } from "./linkedin.schema";
+import type { LinkedInHandlerType } from "./linkedin.types";
+import { exchangeLinkedInCodeForToken, fetchLinkedInUserProfile, loginOrCreateLinkedInUser } from "./linkedin.service";
 import type { UserDocument } from "../users/user.model";
 import { setAuthCookies } from "../auth/auth.cookies";
 
-export const GithubHandler = (usersCollection: Collection<UserDocument>): GithubHandlerType => {
+export const LinkedInHandler = (usersCollection: Collection<UserDocument>): LinkedInHandlerType => {
     return {
-        githubCallback: async (request: SchematicRequest<typeof githubCallbackSchema>, reply: FastifyReply) => {
+        linkedInCallback: async (request: SchematicRequest<typeof linkedInCallbackSchema>, reply: FastifyReply) => {
             try {
                 const { code, redirectUri } = request.query;
-                const accessToken = await exchangeCodeForAccessToken(code, redirectUri);
-                const [profile, emails] = await Promise.all([
-                    fetchGithubUserProfile(accessToken),
-                    fetchGithubUserEmails(accessToken)
-                ]);
-
-                const session = await loginOrCreateGithubUser(usersCollection, accessToken, profile, emails);
+                const accessToken = await exchangeLinkedInCodeForToken(code, redirectUri);
+                const profile = await fetchLinkedInUserProfile(accessToken);
+                const session = await loginOrCreateLinkedInUser(usersCollection, profile);
 
                 setAuthCookies(reply, {
                     accessToken: session.accessToken,
@@ -34,7 +30,7 @@ export const GithubHandler = (usersCollection: Collection<UserDocument>): Github
             } catch (error) {
                 console.error(error);
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
-                    error: error instanceof Error ? error.message : "Internal server error"
+                    error: error instanceof Error ? error.message : "Internal server error",
                 });
             }
         },

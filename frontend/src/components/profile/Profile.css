@@ -11,7 +11,30 @@
 }
 
 .profile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 32px;
+}
+
+.profile-logout-button {
+  padding: 10px 18px;
+  border: 1.5px solid var(--clr-slate-300);
+  border-radius: var(--r-full);
+  background: white;
+  color: var(--clr-slate-700);
+  font-size: var(--fz-sm);
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.profile-logout-button:hover {
+  border-color: var(--clr-error);
+  color: var(--clr-error);
+  background: var(--clr-error-bg);
 }
 
 .profile-title {
@@ -36,6 +59,16 @@
 }
 
 @media (max-width: 768px) {
+  .profile-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profile-logout-button {
+    width: 100%;
+    justify-content: center;
+  }
+
   .profile-layout {
     grid-template-columns: 1fr;
   }
@@ -209,6 +242,98 @@
 }
 
 .save-success-icon {
+  width: 14px;
+  height: 14px;
+  filter: invert(37%) sepia(76%) saturate(500%) hue-rotate(100deg) brightness(85%);
+}
+
+/* CV Upload Card */
+.cv-card {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cv-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cv-card-icon {
+  width: 18px;
+  height: 18px;
+  filter: invert(32%) sepia(96%) saturate(1250%) hue-rotate(210deg) brightness(90%);
+}
+
+.cv-card-title {
+  font-size: var(--fz-base);
+  font-weight: 700;
+  color: var(--clr-slate-900);
+}
+
+.cv-card-sub {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-500);
+  line-height: 1.5;
+}
+
+.cv-card-current {
+  font-size: var(--fz-xs);
+  font-weight: 600;
+  color: var(--clr-success);
+  background: var(--clr-success-bg);
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  align-self: flex-start;
+}
+
+.cv-file-input {
+  display: none;
+}
+
+.cv-file-label {
+  display: block;
+  padding: 10px 14px;
+  border: 2px dashed var(--clr-slate-300);
+  border-radius: var(--r-md);
+  font-size: var(--fz-sm);
+  color: var(--clr-slate-500);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--t-fast), color var(--t-fast);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-file-label:hover {
+  border-color: var(--clr-primary);
+  color: var(--clr-primary);
+}
+
+.cv-extract-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.cv-error {
+  font-size: var(--fz-xs);
+  color: var(--clr-error);
+  font-weight: 500;
+}
+
+.cv-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fz-xs);
+  font-weight: 600;
+  color: var(--clr-success);
+}
+
+.cv-success img {
   width: 14px;
   height: 14px;
   filter: invert(37%) sepia(76%) saturate(500%) hue-rotate(100deg) brightness(85%);
