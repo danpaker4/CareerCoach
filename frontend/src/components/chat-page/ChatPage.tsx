@@ -2,6 +2,8 @@ import { ChatInterface } from '../chat-component/Chat';
 import type { User } from '../../types/user';
 import './ChatPage.css';
 
+const MAX_CV_EXCERPT_CHARS = 4000;
+
 interface ChatPageProps {
   user: User;
 }
@@ -76,6 +78,14 @@ export const ChatPage = ({ user }: ChatPageProps) => {
               lastName: user.lastName,
               currentJob: user.currentJob,
               achievements: user.achievements,
+              technologies: user.technologies,
+              interests: user.interests,
+              githubSkills: user.githubSkills,
+              knownSkills: user.knownSkills,
+              cvExcerpt:
+                typeof user.cv === 'string' && user.cv.trim().length > 0
+                  ? user.cv.trim().slice(0, MAX_CV_EXCERPT_CHARS)
+                  : undefined,
             }}
           />
         </div>

@@ -14,6 +14,7 @@ export interface User {
   linkedInUrl?: string;
   githubUrl?: string;
   githubSkills?: string[];
+  knownSkills?: string[];
   cv?: string;
   achievements?: Achievement[];
   technologies?: string[];

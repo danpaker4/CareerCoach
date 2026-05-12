@@ -320,6 +320,12 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               achievements: user?.achievements,
               technologies: user?.technologies,
               interests: user?.interests,
+              githubSkills: user?.githubSkills,
+              knownSkills: user?.knownSkills,
+              cvExcerpt:
+                user?.cv && typeof user.cv === 'string' && user.cv.trim().length > 0
+                  ? user.cv.trim().slice(0, 4000)
+                  : undefined,
             }}
           />
         </div>

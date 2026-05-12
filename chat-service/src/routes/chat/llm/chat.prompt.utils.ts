@@ -45,11 +45,15 @@ const memoryText = (memories: readonly ConversationMemory[]): string =>
         ? "No memory snippets available."
         : memories.map((memory) => `- [${memory.type}] ${memory.text}`).join("\n");
 
+const DEFAULT_USER_ACCOUNT_CONTEXT =
+    "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
+
 export const buildDecisionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     memories: readonly ConversationMemory[] = [],
-    mode: ConversationMode = "GUIDED"
+    mode: ConversationMode = "GUIDED",
+    userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are CareerCoach AI.
 Respond ONLY with valid JSON in this exact structure:
@@ -86,9 +90,13 @@ Rules:
   - Populate searchFilters keywords/interests around that domain.
   - For cybersecurity, prioritize and reference roles like SOC Analyst, Security Analyst, Application Security, Penetration Tester, GRC Analyst, IAM Engineer, Cloud Security, DevSecOps, Security Automation, Threat Intelligence, Incident Response.
   - If the user background includes QA/testing signals, favor transition-friendly security roles such as Security QA, Application Security Testing, Security Automation, SOC Analyst, Junior Cybersecurity Analyst.
+- When Known account context lists CV text, technologies, interests, or GitHub skills, use them to personalize replies and searchFilters; do not ask the user to repeat that entire background unless you need one missing clarification.
 
 User achievements:
 ${achievementsText(conversation)}
+
+Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
+${userAccountContext}
 
 Conversation mode:
 ${mode}
@@ -107,7 +115,8 @@ export const buildRecommendationPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     jobs: readonly JobSearchResultItem[],
-    memories: readonly ConversationMemory[] = []
+    memories: readonly ConversationMemory[] = [],
+    userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are CareerCoach AI.
 Respond ONLY with valid JSON in this exact structure:
@@ -144,6 +153,9 @@ Strict rules:
 User achievements:
 ${achievementsText(conversation)}
 
+Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
+${userAccountContext}
+
 Relevant user memory snippets:
 ${memoryText(memories)}
 
@@ -158,7 +170,8 @@ export const buildStagePrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     stage: ConversationStage,
-    mode: ConversationMode = "GUIDED"
+    mode: ConversationMode = "GUIDED",
+    userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are a career data extractor and guide.
 Your goal is NOT to have a long conversation.
@@ -190,6 +203,7 @@ Rules:
 - Ask only high-impact questions.
 - Never repeat a question.
 - Never ask about things the user already answered.
+- When Known account context lists skills, CV signals, GitHub skills, or current role, treat that as already-known background for this session—ask only for gaps relative to the stage objective.
 - If the user gives short answers (like "no"), move forward.
 - Do not dig into irrelevant topics (like load testing if not mentioned).
 - Do not ask for explanations unless critical.
@@ -210,6 +224,9 @@ Conversation strategy (apply the branch that fits the user):
 
 User achievements:
 ${achievementsText(conversation)}
+
+Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
+${userAccountContext}
 
 Conversation so far:
 ${buildHistory(conversation)}

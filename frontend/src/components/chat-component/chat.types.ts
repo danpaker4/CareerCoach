@@ -11,6 +11,10 @@ export interface ChatProps {
         }[];
         technologies?: string[];
         interests?: string[];
+        githubSkills?: string[];
+        knownSkills?: string[];
+        /** Plain-text CV snippet for the coach (keep reasonably short). */
+        cvExcerpt?: string;
     };
 }
 

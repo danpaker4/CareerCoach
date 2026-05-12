@@ -20,9 +20,12 @@ export class ChatLlmService {
         conversation: Conversation,
         latestUserMessage: string,
         memories: readonly ConversationMemory[] = [],
-        mode: ConversationMode = "GUIDED"
+        mode: ConversationMode = "GUIDED",
+        userAccountContext?: string
     ): Promise<LlmDecision> => {
-        const rawText = await this.textCompletion.complete(buildDecisionPrompt(conversation, latestUserMessage, memories, mode));
+        const rawText = await this.textCompletion.complete(
+            buildDecisionPrompt(conversation, latestUserMessage, memories, mode, userAccountContext)
+        );
 
         try {
             return parseLlmDecisionFromJson(rawText);
@@ -40,10 +43,11 @@ export class ChatLlmService {
         conversation: Conversation,
         latestUserMessage: string,
         jobs: readonly JobSearchResultItem[],
-        memories: readonly ConversationMemory[] = []
+        memories: readonly ConversationMemory[] = [],
+        userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildRecommendationPrompt(conversation, latestUserMessage, jobs, memories)
+            buildRecommendationPrompt(conversation, latestUserMessage, jobs, memories, userAccountContext)
         );
 
         try {
@@ -62,9 +66,10 @@ export class ChatLlmService {
         conversation: Conversation,
         latestUserMessage: string,
         stage: ConversationStage,
-        mode: ConversationMode = "GUIDED"
+        mode: ConversationMode = "GUIDED",
+        userAccountContext?: string
     ): Promise<StageLlmDecision> => {
-        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage, mode));
+        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage, mode, userAccountContext));
         try {
             return parseStageLlmDecisionFromJson(rawText);
         } catch {

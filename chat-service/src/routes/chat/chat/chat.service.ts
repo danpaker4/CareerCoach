@@ -15,6 +15,7 @@ import { WorkStyleInferenceService } from "../inference/work-style-inference.ser
 import { JobSearchPlanService } from "../search/job-search-plan.service";
 import { JobRankingService } from "../ranking/job-ranking.service";
 import { toPublicCareerProfileView } from "../career-profile/career-profile.utils";
+import { buildUserAccountContext } from "../llm/chat.user-account-context.utils";
 import { CareerKnowledgeService } from "../knowledge/career-knowledge.service";
 import type { CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "../career-profile/career-profile.types";
 import type { CareerConfidenceSummary } from "../coach/career-confidence.types";
@@ -483,8 +484,9 @@ export class ChatService {
         userCareerProfile: UserCareerProfile;
         mode: ConversationMode;
         confidenceSummary: CareerConfidenceSummary;
+        userAccountContext: string;
     }): Promise<ChatMessageResponse> => {
-        const { userId, normalizedMessage, conversation, jobContext, userCareerProfile, mode, confidenceSummary } = params;
+        const { userId, normalizedMessage, conversation, jobContext, userCareerProfile, mode, confidenceSummary, userAccountContext } = params;
         const memories = await this.memoryService.getRelevantMemories(userId, normalizedMessage);
         const job = jobContext.selectedJobSnapshot;
         const rec = jobContext.jobRecommendationContext;
@@ -575,7 +577,13 @@ export class ChatService {
             await this.conversationService.appendAssistantMessage(userId, reply);
             return { reply, mode, confidenceSummary };
         }
-        const jobAwareDecision = await this.llmService.generateJobAwareReply(conversation, "Show another role", [focusJob], memories);
+        const jobAwareDecision = await this.llmService.generateJobAwareReply(
+            conversation,
+            "Show another role",
+            [focusJob],
+            memories,
+            userAccountContext
+        );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, filteredJobs);
         let validatedJobs = orderedPool.filter((j) => validJobIds.includes(j.jobId)).slice(0, 10);
         let sanitizedReply = this.validationService.sanitizeReply(jobAwareDecision.reply);
@@ -644,6 +652,9 @@ export class ChatService {
         await this.profileService.updateProfileFromInput(userId, profile);
         await this.conversationService.appendUserMessage(userId, normalizedMessage);
 
+        const serverUser = await this.externalService.readUserPublicProfile(userId).catch(() => null);
+        const userAccountContext = buildUserAccountContext({ serverUser, profile });
+
         // get conversation after user message
         const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(userId);
         const memories = await this.memoryService.getRelevantMemories(userId, normalizedMessage);
@@ -681,6 +692,7 @@ export class ChatService {
                 userCareerProfile,
                 mode,
                 confidenceSummary,
+                userAccountContext,
             });
         }
         const hasStoredJobs = (jobContext?.lastReturnedJobs.length ?? 0) > 0;
@@ -757,7 +769,8 @@ export class ChatService {
                 conversationAfterUserMessage,
                 normalizedMessage,
                 jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
-                memories
+                memories,
+                userAccountContext
             );
             const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
             let validatedJobs = topRankedJobs.filter((job) => validJobIds.includes(job.jobId)).slice(0, 10);
@@ -816,7 +829,13 @@ export class ChatService {
             : stageProgressWithNote;
 
         if (currentStage && !shouldSkipStages && mode !== "FAST_SEARCH") {
-            const stageReply = await this.llmService.generateStageReply(conversationAfterUserMessage, normalizedMessage, currentStage, mode);
+            const stageReply = await this.llmService.generateStageReply(
+                conversationAfterUserMessage,
+                normalizedMessage,
+                currentStage,
+                mode,
+                userAccountContext
+            );
             const nextStageProgress = this.stageService.applyStageAdvance(stageProgressWithNote, currentStage.id, stageReply.shouldAdvanceStage);
             await this.conversationService.updateStageProgress(userId, nextStageProgress);
             stageProgressForNextFlow = nextStageProgress;
@@ -850,7 +869,13 @@ export class ChatService {
             await this.conversationService.updateAchievements(userId, updatedAchievements);
         }
 
-        const llmDecision = await this.llmService.decideNextStep(conversationForDecision, normalizedMessage, memories, mode);
+        const llmDecision = await this.llmService.decideNextStep(
+            conversationForDecision,
+            normalizedMessage,
+            memories,
+            mode,
+            userAccountContext
+        );
         const effectiveSearchFilters = domainExplorationTarget
             ? this.buildDomainExplorationFilters(domainExplorationTarget, llmDecision.searchFilters, userCareerProfile.technologies)
             : llmDecision.searchFilters;
@@ -908,7 +933,8 @@ export class ChatService {
             conversationForDecision,
             normalizedMessage,
             jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
-            memories
+            memories,
+            userAccountContext
         );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
         let validatedJobs = topRankedJobs.filter((job) => validJobIds.includes(job.jobId)).slice(0, 10);
