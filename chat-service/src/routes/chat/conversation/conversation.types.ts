@@ -1,8 +1,10 @@
 import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
+import type { CareerHorizon } from "./conversation.model";
 
 export type ConversationResponse = {
     userId: string;
     achievements: UserAchievement[];
+    careerHorizon?: CareerHorizon;
     messages: {
         role: "system" | "user" | "assistant";
         content: string;

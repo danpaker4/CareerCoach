@@ -163,8 +163,10 @@ export const Dashboard = ({ user }: DashboardProps) => {
           <div className="welcome-text">
             <p className="welcome-greeting">{getTimeGreeting()},</p>
             <h1 className="welcome-name">{user.firstName} {user.lastName}</h1>
-            {user.currentJob && (
-              <p className="welcome-role">{user.currentJob}</p>
+            {user.dreamJob && String(user.dreamJob).trim().length > 0 && (
+              <p className="welcome-dream-job" title="Saved from career coach">
+                Dream focus: <strong>{String(user.dreamJob).trim()}</strong>
+              </p>
             )}
           </div>
         </div>

@@ -77,6 +77,7 @@ export const updateUserSchema = {
         interests: z.array(z.string()).optional(),
         knownSkills: z.array(z.string()).optional(),
         coachProfileMaterializedAt: z.coerce.date().optional(),
+        dreamJob: z.string().nullable().optional(),
     }),
 } satisfies FastifySchema;
 

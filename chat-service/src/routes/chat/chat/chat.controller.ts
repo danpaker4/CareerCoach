@@ -3,13 +3,22 @@ import { StatusCodes } from "http-status-codes";
 import type { ChatMessageRequestBody } from "../chat.types";
 import { ChatService } from "./chat.service";
 
+const extractAccessTokenFromRequest = (request: FastifyRequest): string | null => {
+    const raw = request.headers.authorization;
+    if (typeof raw !== "string" || !raw.startsWith("Bearer ")) {
+        return null;
+    }
+    const token = raw.slice("Bearer ".length).trim();
+    return token.length > 0 ? token : null;
+};
+
 export class ChatController {
     constructor(private readonly chatService: ChatService) {}
 
     getUnifiedUserProfile = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const { userId } = request.params as { userId: string };
-            const payload = await this.chatService.getUnifiedUserProfile(userId);
+            const payload = await this.chatService.getUnifiedUserProfile(userId, extractAccessTokenFromRequest(request));
             if (!payload.user) {
                 reply.status(StatusCodes.NOT_FOUND).send({ error: "User not found" });
                 return;
@@ -27,7 +36,7 @@ export class ChatController {
     getConversation = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const { userId } = request.params as { userId: string };
-            const conversation = await this.chatService.getConversation(userId);
+            const conversation = await this.chatService.getConversation(userId, extractAccessTokenFromRequest(request));
             reply.status(StatusCodes.OK).send(conversation);
         } catch (error) {
             request.log.error({ error }, "Failed loading conversation");
@@ -41,7 +50,12 @@ export class ChatController {
     sendMessage = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const body = request.body as ChatMessageRequestBody;
-            const response = await this.chatService.sendMessage(body.userId, body.message, body.userProfile);
+            const response = await this.chatService.sendMessage(
+                body.userId,
+                body.message,
+                body.userProfile,
+                extractAccessTokenFromRequest(request)
+            );
             reply.status(StatusCodes.OK).send(response);
         } catch (error) {
             if (error instanceof Error && error.message === "Message is required") {

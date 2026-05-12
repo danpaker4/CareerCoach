@@ -27,6 +27,8 @@ export const UserSchema = z.object({
     company: z.string().nullish(),
     /** Set when chat-service first creates the linked `userCareerProfiles` document for this `id`. */
     coachProfileMaterializedAt: z.coerce.date().optional(),
+    /** Long-term aspiration title saved from career coach (optional). */
+    dreamJob: z.string().nullable().optional(),
 });
 
 export type User = z.infer<typeof UserSchema>;

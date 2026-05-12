@@ -1,6 +1,6 @@
 import type { Collection } from "mongodb";
 import type { ChatMessage, UserAchievement } from "../chat/chat.model";
-import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { CareerHorizon, Conversation, ConversationStageProgress } from "./conversation.model";
 import type { ConversationJobContext } from "../job-context/job-context.types";
 
 export class ConversationRepository {
@@ -69,6 +69,30 @@ export class ConversationRepository {
             {
                 $set: {
                     jobContext,
+                    updatedAt: new Date(),
+                },
+            }
+        );
+    };
+
+    updateCareerHorizon = async (userId: string, careerHorizon: CareerHorizon): Promise<void> => {
+        await this.conversationsCollection.updateOne(
+            { userId },
+            {
+                $set: {
+                    careerHorizon,
+                    updatedAt: new Date(),
+                },
+            }
+        );
+    };
+
+    setLongTermCapturedDreamJobTitle = async (userId: string, title: string): Promise<void> => {
+        await this.conversationsCollection.updateOne(
+            { userId },
+            {
+                $set: {
+                    longTermCapturedDreamJobTitle: title,
                     updatedAt: new Date(),
                 },
             }

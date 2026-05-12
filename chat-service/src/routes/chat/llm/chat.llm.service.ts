@@ -1,5 +1,5 @@
 import type { TextCompletionPort } from "../../../ai/ports/text-completion.types";
-import type { Conversation } from "../conversation/conversation.model";
+import type { CareerHorizon, Conversation } from "../conversation/conversation.model";
 import type { ConversationStage } from "../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
 import type { ConversationMode } from "../coach/conversation-mode.types";
@@ -11,7 +11,11 @@ import {
     LLM_STAGE_PARSE_FALLBACK_REPLY,
 } from "./chat.llm.consts";
 import { parseLlmDecisionFromJson, parseStageLlmDecisionFromJson } from "./chat.llm.utils";
-import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
+import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt, DEFAULT_USER_ACCOUNT_CONTEXT } from "./chat.prompt.utils";
+import {
+    buildLongTermCareerDecisionPrompt,
+    buildLongTermPostDreamJobPrompt,
+} from "./chat.long-term-career-decision.prompt.utils";
 
 export class ChatLlmService {
     constructor(private readonly textCompletion: TextCompletionPort) { }
@@ -21,20 +25,35 @@ export class ChatLlmService {
         latestUserMessage: string,
         memories: readonly ConversationMemory[] = [],
         mode: ConversationMode = "GUIDED",
-        userAccountContext?: string
+        userAccountContext?: string,
+        careerHorizon: CareerHorizon = "UNSET",
+        closedLongTermDreamJobTitle: string | null = null
     ): Promise<LlmDecision> => {
-        const rawText = await this.textCompletion.complete(
-            buildDecisionPrompt(conversation, latestUserMessage, memories, mode, userAccountContext)
-        );
+        const account = userAccountContext ?? DEFAULT_USER_ACCOUNT_CONTEXT;
+        const lockedTitle = closedLongTermDreamJobTitle !== null && closedLongTermDreamJobTitle.trim().length > 0
+            ? closedLongTermDreamJobTitle.trim()
+            : null;
+        const prompt =
+            careerHorizon === "LONG_TERM"
+                ? lockedTitle !== null
+                    ? buildLongTermPostDreamJobPrompt(conversation, latestUserMessage, lockedTitle, memories, mode, account)
+                    : buildLongTermCareerDecisionPrompt(conversation, latestUserMessage, memories, mode, account)
+                : buildDecisionPrompt(conversation, latestUserMessage, memories, mode, account);
+        const rawText = await this.textCompletion.complete(prompt);
 
         try {
-            return parseLlmDecisionFromJson(rawText);
+            const parsed = parseLlmDecisionFromJson(rawText);
+            if (careerHorizon === "LONG_TERM") {
+                return { ...parsed, shouldSearchJobs: false };
+            }
+            return parsed;
         } catch {
             return {
                 reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: [],
                 searchFilters: EMPTY_LLM_SEARCH_FILTERS,
+                dreamJobToPersist: null,
             };
         }
     };
@@ -47,7 +66,13 @@ export class ChatLlmService {
         userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildRecommendationPrompt(conversation, latestUserMessage, jobs, memories, userAccountContext)
+            buildRecommendationPrompt(
+                conversation,
+                latestUserMessage,
+                jobs,
+                memories,
+                userAccountContext ?? DEFAULT_USER_ACCOUNT_CONTEXT
+            )
         );
 
         try {
@@ -69,7 +94,15 @@ export class ChatLlmService {
         mode: ConversationMode = "GUIDED",
         userAccountContext?: string
     ): Promise<StageLlmDecision> => {
-        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage, mode, userAccountContext));
+        const rawText = await this.textCompletion.complete(
+            buildStagePrompt(
+                conversation,
+                latestUserMessage,
+                stage,
+                mode,
+                userAccountContext ?? DEFAULT_USER_ACCOUNT_CONTEXT
+            )
+        );
         try {
             return parseStageLlmDecisionFromJson(rawText);
         } catch {

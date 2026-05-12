@@ -81,6 +81,8 @@ export type LlmDecision = {
     shouldSearchJobs: boolean;
     recommendedJobIds: string[];
     searchFilters: JobSearchRequest;
+    /** Populated in long-term career mode when the model extracts a dream role to save on the user profile. */
+    dreamJobToPersist?: string | null;
 };
 
 export type { ProfileInput } from "./conversation/conversation.types";

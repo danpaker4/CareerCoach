@@ -23,7 +23,7 @@ const formatAttachedJobsForHistory = (jobs: readonly AttachedJobSnapshot[]): str
         }))
     )}`;
 
-const buildHistory = (conversation: Conversation): string =>
+export const buildHistory = (conversation: Conversation): string =>
     conversation.messages
         .map((message) => {
             const base = `${message.role.toUpperCase()}: ${message.content}`;
@@ -35,17 +35,17 @@ const buildHistory = (conversation: Conversation): string =>
         })
         .join("\n");
 
-const achievementsText = (conversation: Conversation): string =>
+export const achievementsText = (conversation: Conversation): string =>
     conversation.achievements.length === 0
         ? "No achievements available yet."
         : conversation.achievements.map((achievement) => `- ${achievement.name}`).join("\n");
 
-const memoryText = (memories: readonly ConversationMemory[]): string =>
+export const memoryText = (memories: readonly ConversationMemory[]): string =>
     memories.length === 0
         ? "No memory snippets available."
         : memories.map((memory) => `- [${memory.type}] ${memory.text}`).join("\n");
 
-const DEFAULT_USER_ACCOUNT_CONTEXT =
+export const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
 
 export const buildDecisionPrompt = (
@@ -66,7 +66,8 @@ Respond ONLY with valid JSON in this exact structure:
     "interests": ["string"],
     "experienceLevel": "string",
     "keywords": ["string"]
-  }
+  },
+  "dreamJobToPersist": null
 }
 
 Rules:
@@ -91,6 +92,7 @@ Rules:
   - For cybersecurity, prioritize and reference roles like SOC Analyst, Security Analyst, Application Security, Penetration Tester, GRC Analyst, IAM Engineer, Cloud Security, DevSecOps, Security Automation, Threat Intelligence, Incident Response.
   - If the user background includes QA/testing signals, favor transition-friendly security roles such as Security QA, Application Security Testing, Security Automation, SOC Analyst, Junior Cybersecurity Analyst.
 - When Known account context lists CV text, technologies, interests, or GitHub skills, use them to personalize replies and searchFilters; do not ask the user to repeat that entire background unless you need one missing clarification.
+- dreamJobToPersist: JSON null unless the user clearly states a single north-star job title they want saved to their profile (for example a dream role or long-term target). Use a short string (about 3–120 characters), Title Case or natural phrasing. If they are only browsing listings or have not named a stable dream title, use JSON null (not the string "null").
 
 User achievements:
 ${achievementsText(conversation)}

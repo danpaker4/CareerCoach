@@ -31,6 +31,17 @@ export const parseLlmDecisionFromJson = (rawText: string): LlmDecision => {
             ? obj.recommendedJobIds.filter((jobId): jobId is string => typeof jobId === "string")
             : [],
         searchFilters: parseSearchFiltersFromUnknown(obj.searchFilters),
+        dreamJobToPersist: (() => {
+            const raw = obj.dreamJobToPersist;
+            if (typeof raw !== "string") {
+                return null;
+            }
+            const trimmed = raw.trim();
+            if (trimmed.length < 3 || trimmed.length > 120) {
+                return null;
+            }
+            return trimmed;
+        })(),
     };
 };
 

@@ -29,6 +29,7 @@ export const profileToSeedAchievements = (profile?: ProfileInput): { id: string;
 export const toConversationResponse = (conversation: Conversation): ConversationResponse => ({
     userId: conversation.userId,
     achievements: conversation.achievements,
+    ...(conversation.careerHorizon !== undefined ? { careerHorizon: conversation.careerHorizon } : {}),
     messages: conversation.messages.map((message) => ({
         role: message.role,
         content: message.content,

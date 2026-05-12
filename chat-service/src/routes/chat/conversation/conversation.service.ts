@@ -1,5 +1,5 @@
 import type { AttachedJobSnapshot } from "../chat/chat.model";
-import type { Conversation } from "./conversation.model";
+import type { CareerHorizon, Conversation } from "./conversation.model";
 import type { ConversationResponse, ProfileInput } from "./conversation.types";
 import { ChatExternalService } from "../chat/external-route/chat.external.service";
 import { ConversationRepository } from "./conversation.repository";
@@ -44,7 +44,11 @@ export class ChatConversationService {
     getProfileAchievements = (profile?: ProfileInput): { id: string; name: string; grade: number }[] =>
         profileToSeedAchievements(profile);
 
-    ensureConversationExists = async (userId: string, profileAchievements?: readonly { id: string; name: string; grade: number }[]): Promise<void> => {
+    ensureConversationExists = async (
+        userId: string,
+        profileAchievements?: readonly { id: string; name: string; grade: number }[],
+        accessToken?: string | null
+    ): Promise<void> => {
         const existingConversation = await this.repository.findConversationByUserId(userId);
         
         if (existingConversation) {
@@ -57,7 +61,7 @@ export class ChatConversationService {
 
         const achievements = profileAchievements && profileAchievements.length > 0
             ? [...profileAchievements]
-            : await this.chatExternalService.readUserAchievements(userId);
+            : await this.chatExternalService.readUserAchievements(userId, accessToken);
         const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
         
         await this.repository.createConversation(
@@ -83,8 +87,8 @@ export class ChatConversationService {
         return conversation;
     };
 
-    getConversationResponse = async (userId: string): Promise<ConversationResponse> => {
-        await this.ensureConversationExists(userId);
+    getConversationResponse = async (userId: string, accessToken?: string | null): Promise<ConversationResponse> => {
+        await this.ensureConversationExists(userId, undefined, accessToken);
         const conversation = await this.getConversationOrThrow(userId);
         return toConversationResponse(conversation);
     };
@@ -207,5 +211,13 @@ export class ChatConversationService {
                 : {}),
         };
         await this.repository.updateJobContext(userId, updatedContext);
+    };
+
+    updateCareerHorizon = async (userId: string, careerHorizon: CareerHorizon): Promise<void> => {
+        await this.repository.updateCareerHorizon(userId, careerHorizon);
+    };
+
+    setLongTermCapturedDreamJobTitle = async (userId: string, title: string): Promise<void> => {
+        await this.repository.setLongTermCapturedDreamJobTitle(userId, title);
     };
 }

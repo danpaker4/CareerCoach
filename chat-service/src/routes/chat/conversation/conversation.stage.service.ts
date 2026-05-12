@@ -23,7 +23,7 @@ const appendStageNote = (stageProgress: ConversationStageProgress, stageId: stri
 
 export class ConversationStageService {
     getInitialAssistantMessage = (): string =>
-        "Hey! Great to meet you. Tell me a bit about your background—or what you're drawn to lately if you're still figuring out the next step.";
+        "Hey! Great to meet you. Tell me a bit about your background—or what you're drawn to lately. Say long-term planning (or that you're thinking in the future) if you want to shape a future dream role without job listings yet; say find jobs when you want live matches.";
 
     private getCompletedStageIds = (stageProgress: ConversationStageProgress): string[] =>
         stageProgress.completedStageIds ?? [];

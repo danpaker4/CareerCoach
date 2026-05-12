@@ -76,6 +76,19 @@
   color: rgba(255,255,255,0.5);
 }
 
+.welcome-dream-job {
+  font-size: var(--fz-sm);
+  color: rgba(255,255,255,0.75);
+  margin-top: 6px;
+  max-width: 36rem;
+  line-height: 1.35;
+}
+
+.welcome-dream-job strong {
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+}
+
 /* Stats bar */
 .dashboard-stats-bar {
   display: flex;

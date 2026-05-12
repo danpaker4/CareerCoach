@@ -1,5 +1,6 @@
 import type { ProfileInput } from "../conversation/conversation.types";
-import type { Conversation } from "../conversation/conversation.model";
+import type { CareerHorizon, Conversation } from "../conversation/conversation.model";
+import { inferCareerHorizonTransition } from "../conversation/career-horizon.utils";
 import type { ChatMessageResponse, UnifiedUserProfileResponse } from "../chat.types";
 import { ChatConversationService } from "../conversation/conversation.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
@@ -45,6 +46,26 @@ const DOMAIN_EXPLORATION_PHRASES = [
     "what can i become",
     "what are the directions",
 ];
+
+const readDreamJobFromServerUser = (serverUser: Record<string, unknown> | null): string | null => {
+    if (serverUser === null) {
+        return null;
+    }
+    const raw = serverUser.dreamJob;
+    if (typeof raw !== "string") {
+        return null;
+    }
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+};
+
+const resolveClosedLongTermDreamJobTitle = (conversation: Conversation, profileDreamJob: string | null): string | null => {
+    const fromConversation = conversation.longTermCapturedDreamJobTitle;
+    if (typeof fromConversation === "string" && fromConversation.trim().length > 0) {
+        return fromConversation.trim();
+    }
+    return profileDreamJob;
+};
 
 const WORK_DIRECTION_PHRASES = [
     "i want to work in",
@@ -137,11 +158,12 @@ export class ChatService {
         private readonly pipelineService: PipelineService
     ) { }
 
-    getConversation = async (userId: string) => this.conversationService.getConversationResponse(userId);
+    getConversation = async (userId: string, accessToken?: string | null) =>
+        this.conversationService.getConversationResponse(userId, accessToken);
 
-    getUnifiedUserProfile = async (userId: string): Promise<UnifiedUserProfileResponse> => {
+    getUnifiedUserProfile = async (userId: string, accessToken?: string | null): Promise<UnifiedUserProfileResponse> => {
         const [user, careerProfile] = await Promise.all([
-            this.externalService.readUserPublicProfile(userId),
+            this.externalService.readUserPublicProfile(userId, accessToken),
             this.profileService.findByUserId(userId),
         ]);
         return {
@@ -638,7 +660,12 @@ export class ChatService {
         };
     };
 
-    sendMessage = async (userId: string, message: string, profile?: ProfileInput): Promise<ChatMessageResponse> => {
+    sendMessage = async (
+        userId: string,
+        message: string,
+        profile?: ProfileInput,
+        accessToken?: string | null
+    ): Promise<ChatMessageResponse> => {
         const normalizedMessage = message.trim();
         if (normalizedMessage.length === 0) {
             throw new Error("Message is required");
@@ -648,15 +675,23 @@ export class ChatService {
         // get profile achievements
         const profileAchievements = this.conversationService.getProfileAchievements(profile);
         // ensure conversation exists
-        await this.conversationService.ensureConversationExists(userId, profileAchievements);
+        await this.conversationService.ensureConversationExists(userId, profileAchievements, accessToken);
         await this.profileService.updateProfileFromInput(userId, profile);
         await this.conversationService.appendUserMessage(userId, normalizedMessage);
 
-        const serverUser = await this.externalService.readUserPublicProfile(userId).catch(() => null);
+        const serverUser = await this.externalService.readUserPublicProfile(userId, accessToken).catch(() => null);
+        const profileDreamJob = readDreamJobFromServerUser(serverUser);
         const userAccountContext = buildUserAccountContext({ serverUser, profile });
 
         // get conversation after user message
-        const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(userId);
+        const conversationLoaded = await this.conversationService.getConversationOrThrow(userId);
+        const horizonTransition = inferCareerHorizonTransition(normalizedMessage, conversationLoaded.careerHorizon);
+        let conversationAfterUserMessage = conversationLoaded;
+        if (horizonTransition !== null) {
+            await this.conversationService.updateCareerHorizon(userId, horizonTransition);
+            conversationAfterUserMessage = { ...conversationLoaded, careerHorizon: horizonTransition };
+        }
+        const careerHorizon: CareerHorizon = conversationAfterUserMessage.careerHorizon ?? "UNSET";
         const memories = await this.memoryService.getRelevantMemories(userId, normalizedMessage);
         let userCareerProfile = await this.profileService.getOrCreateProfile(userId);
         const achievementInference = this.achievementInferenceService.inferFromMessage(normalizedMessage);
@@ -671,7 +706,7 @@ export class ChatService {
         );
         userCareerProfile = await this.profileService.mergeProfileSignals(userCareerProfile, inferredSignalUpdate);
         await this.memoryService.saveSignalsAsMemories(userId, conversationAfterUserMessage, inferredSignalUpdate);
-        await this.externalService.upsertKnownSkills(userId, aggregatedExplicitSkills).catch(() => null);
+        await this.externalService.upsertKnownSkills(userId, aggregatedExplicitSkills, accessToken).catch(() => null);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile);
         const mode = this.modeService.detectMode(normalizedMessage, userCareerProfile, confidenceSummary);
         const followUpIntent = this.followUpIntentService.detect(normalizedMessage);
@@ -724,15 +759,16 @@ export class ChatService {
             return { reply: followUpReply, mode, confidenceSummary };
         }
 
-        const workDirectionIntent = this.isWorkDirectionIntent(normalizedMessage);
+        const allowJobApi = careerHorizon !== "LONG_TERM";
+        const workDirectionIntent = allowJobApi && this.isWorkDirectionIntent(normalizedMessage);
         const extractedWorkDirection = this.extractWorkDirectionQuery(normalizedMessage);
-        const domainExplorationTarget = this.detectDomainExplorationTarget(normalizedMessage);
-        const forceDomainExplorationSearch = domainExplorationTarget !== null || workDirectionIntent;
+        const domainExplorationTarget = allowJobApi ? this.detectDomainExplorationTarget(normalizedMessage) : null;
+        const forceDomainExplorationSearch = allowJobApi && (domainExplorationTarget !== null || workDirectionIntent);
         console.info(
             `[CHAT][INTENT] userId=${userId} mode=${mode} workDirectionIntent=${workDirectionIntent} domainExploration=${domainExplorationTarget?.domain ?? "none"} extractedWorkDirection=${extractedWorkDirection ?? "none"} forceSearch=${forceDomainExplorationSearch}`
         );
 
-        if (workDirectionIntent) {
+        if (allowJobApi && workDirectionIntent) {
             const normalizedQuery = extractedWorkDirection ?? domainExplorationTarget?.domain ?? normalizedMessage;
             const workDirectionFilters = this.buildWorkDirectionFilters(normalizedQuery);
             const searchPlan = this.searchPlanService.buildPlan(userCareerProfile, workDirectionFilters);
@@ -823,7 +859,8 @@ export class ChatService {
         const stageProgressWithNote = currentStage
             ? this.stageService.recordStageMessage(conversationAfterUserMessage, normalizedMessage, currentStage.id)
             : conversationAfterUserMessage.stageProgress;
-        const shouldSkipStages = this.isStageSkipRequested(normalizedMessage) || forceDomainExplorationSearch;
+        const shouldSkipStages =
+            this.isStageSkipRequested(normalizedMessage) || forceDomainExplorationSearch || careerHorizon === "LONG_TERM";
         let stageProgressForNextFlow = shouldSkipStages
             ? this.stageService.completeAllStages(stageProgressWithNote)
             : stageProgressWithNote;
@@ -862,7 +899,8 @@ export class ChatService {
         const updatedAchievements = await this.externalService.upsertAchievementFromUserMessage(
             userId,
             normalizedMessage,
-            conversationForDecision.achievements
+            conversationForDecision.achievements,
+            accessToken
         ).catch(() => null);
 
         if (updatedAchievements) {
@@ -874,21 +912,41 @@ export class ChatService {
             normalizedMessage,
             memories,
             mode,
-            userAccountContext
+            userAccountContext,
+            careerHorizon,
+            resolveClosedLongTermDreamJobTitle(conversationForDecision, profileDreamJob)
         );
         const effectiveSearchFilters = domainExplorationTarget
             ? this.buildDomainExplorationFilters(domainExplorationTarget, llmDecision.searchFilters, userCareerProfile.technologies)
             : llmDecision.searchFilters;
-        const shouldSearchJobs = this.shouldRunJobSearch(
-            mode,
-            llmDecision.shouldSearchJobs,
-            confidenceSummary.searchReadinessConfidence,
-            confidenceSummary.discoveryConfidence,
-            forceDomainExplorationSearch
-        );
+        const shouldSearchJobs =
+            careerHorizon === "LONG_TERM"
+                ? false
+                : this.shouldRunJobSearch(
+                      mode,
+                      llmDecision.shouldSearchJobs,
+                      confidenceSummary.searchReadinessConfidence,
+                      confidenceSummary.discoveryConfidence,
+                      forceDomainExplorationSearch
+                  );
         console.info(
             `[CHAT][SEARCH] userId=${userId} trigger=LLM_OR_RULE shouldSearchJobs=${shouldSearchJobs} llmShouldSearch=${llmDecision.shouldSearchJobs} mode=${mode} filters=${JSON.stringify(effectiveSearchFilters)}`
         );
+
+        const rawDreamJob = llmDecision.dreamJobToPersist;
+        if (typeof rawDreamJob === "string") {
+            const dreamTitle = rawDreamJob.trim();
+            if (dreamTitle.length >= 3 && dreamTitle.length <= 120) {
+                try {
+                    await this.externalService.patchUserDreamJob(userId, dreamTitle, accessToken);
+                    if (careerHorizon === "LONG_TERM") {
+                        await this.conversationService.setLongTermCapturedDreamJobTitle(userId, dreamTitle);
+                    }
+                } catch {
+                    // Users PATCH failed (e.g. auth); reply still proceeds.
+                }
+            }
+        }
 
         if (mode === "DEEP_DISCOVERY" && !shouldSearchJobs && confidenceSummary.discoveryConfidence < 65) {
             const question = this.buildDiscoveryQuestion(normalizedMessage);

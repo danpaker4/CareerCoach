@@ -24,4 +24,5 @@ export interface User {
   bio?: string;
   location?: string;
   company?: string;
+  dreamJob?: string | null;
 }
