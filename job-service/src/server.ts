@@ -48,9 +48,9 @@ export class Server {
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
             await this.app.register(jobsRouter(this.DBClient.jobs, this.DBClient.skillMatchers));
 
-            const address = await this.app.listen({ 
-                port: this.config.port, 
-                host: process.env.HOST || "127.0.0.1" 
+            const address = await this.app.listen({
+                port: this.config.port,
+                host: process.env.HOST || "127.0.0.1"
             });
             startJobPollerSchedule(this.DBClient.jobs);
             console.log(`🚀 Server running on ${address}`);
