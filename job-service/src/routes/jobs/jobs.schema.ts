@@ -20,5 +20,6 @@ export const getJobsSchema = {
   querystring: z.object({
     search: z.string().optional(),
     userId: z.string().uuid().optional(),
+    skills: z.string().optional(),
   }),
 } satisfies FastifySchema;

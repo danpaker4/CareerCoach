@@ -3,20 +3,9 @@ import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
+import { computeJobScore } from "../jobScores/job-score.service";
 
-type GetJobsQuery = { search?: string; userId?: string };
-
-const computeMatchPct = (
-  requirements: string[] | undefined,
-  userSkills: string[]
-): number => {
-  if (!requirements || requirements.length === 0) return 0;
-  const lower = userSkills.map((s) => s.toLowerCase());
-  const matched = requirements.filter((req) =>
-    lower.some((skill) => req.toLowerCase().includes(skill) || skill.includes(req.toLowerCase()))
-  ).length;
-  return Math.round((matched / requirements.length) * 100);
-};
+type GetJobsQuery = { search?: string; userId?: string; skills?: string };
 
 export const JobsHandler = (
   jobsCollection: Collection<EnrichedJob>,
@@ -27,7 +16,7 @@ export const JobsHandler = (
     reply: FastifyReply
   ) => {
     try {
-      const { search, userId } = request.query;
+      const { search, userId, skills } = request.query;
 
       const filter: Record<string, unknown> = {};
       if (search && search.trim()) {
@@ -41,10 +30,12 @@ export const JobsHandler = (
 
       const jobs = await jobsCollection.find(filter).limit(50).toArray();
 
-      let userSkills: string[] = [];
+      let allSkills: string[] = [];
       if (userId) {
         const matchers = await skillMatchersCollection.find({ userId }).toArray();
-        userSkills = matchers.flatMap((m) => m.skillToImprove.map((s) => s.skill));
+        const matcherSkills = matchers.flatMap((m) => m.skillToImprove.map((s) => s.skill));
+        const profileSkills = skills ? skills.split(",").map((s) => s.trim()).filter(Boolean) : [];
+        allSkills = [...new Set([...matcherSkills, ...profileSkills])];
       }
 
       const result = jobs.map((job) => ({
@@ -57,7 +48,9 @@ export const JobsHandler = (
         salary: job.salary,
         requirements: job.requirements,
         benefits: job.benefits,
-        matchPct: userId ? computeMatchPct(job.requirements, userSkills) : undefined,
+        matchPct: userId && allSkills.length > 0
+          ? computeJobScore(job, allSkills).overallScore
+          : undefined,
       }));
 
       // Sort by match % descending when userId provided

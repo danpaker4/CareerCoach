@@ -1,0 +1,57 @@
+{
+  "categories": [
+    {
+      "name": "Core Requirements",
+      "weight": 0.40,
+      "jobFields": ["requirements", "mustKnowSkills"]
+    },
+    {
+      "name": "Languages & Frameworks",
+      "weight": 0.25,
+      "jobFields": ["languages", "frameworks"]
+    },
+    {
+      "name": "Tools & Infrastructure",
+      "weight": 0.20,
+      "jobFields": ["databases", "platforms", "tools"]
+    },
+    {
+      "name": "Nice-to-Have",
+      "weight": 0.15,
+      "jobFields": ["niceToHaveSkills"]
+    }
+  ],
+  "aliases": [
+    ["javascript", "js"],
+    ["typescript", "ts"],
+    ["python", "py"],
+    ["csharp", "c#"],
+    ["cplusplus", "c++"],
+    ["golang", "go"],
+    ["postgresql", "postgres"],
+    ["mongodb", "mongo"],
+    ["kubernetes", "k8s"],
+    ["react.js", "react"],
+    ["reactjs", "react"],
+    ["node.js", "node"],
+    ["nodejs", "node"],
+    ["vue.js", "vue"],
+    ["vuejs", "vue"],
+    ["next.js", "next"],
+    ["nextjs", "next"],
+    ["express.js", "express"],
+    ["expressjs", "express"],
+    ["amazon web services", "aws"],
+    ["google cloud platform", "gcp"],
+    ["microsoft azure", "azure"],
+    ["ci/cd", "cicd"],
+    ["graphql", "gql"],
+    ["restful", "rest"],
+    ["rest api", "rest"],
+    ["machine learning", "ml"],
+    ["artificial intelligence", "ai"],
+    ["natural language processing", "nlp"],
+    ["object oriented programming", "oop"],
+    ["test driven development", "tdd"]
+  ]
+}

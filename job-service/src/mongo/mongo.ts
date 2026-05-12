@@ -11,7 +11,6 @@ import type {
     CareerRoleProfile,
     CareerSkillProfile,
 } from "../routes/careerKnowledge/career-knowledge.types";
-
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
@@ -48,7 +47,7 @@ export class MongoClient implements Service {
             this.careerSkillProfilesCollection = this.db.collection<CareerSkillProfile>("career_skill_profiles");
             this.careerPathProfilesCollection = this.db.collection<CareerPathProfile>("career_path_profiles");
             this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("career_direction_examples");
-            
+
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
             console.error('Failed To Connect MongoDb', err);
@@ -133,6 +132,7 @@ export class MongoClient implements Service {
         }
         return this.careerDirectionExamplesCollection;
     }
+
 }
 
 export type DatabaseConfig = {
