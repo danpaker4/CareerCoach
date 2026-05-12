@@ -1,5 +1,6 @@
 import { ObjectId } from "mongodb";
 import type { ChatMessage, UserAchievement } from "../chat/chat.model";
+import type { CareerPlanningMode } from "../career-planning/career-planning.types";
 import type { ConversationJobContext } from "../job-context/job-context.types";
 
 export interface ConversationStageProgress {
@@ -18,6 +19,9 @@ export interface Conversation {
     messages: ChatMessage[];
     jobContext?: ConversationJobContext;
     stageProgress: ConversationStageProgress;
+    /** When unset, legacy conversations behave as IMMEDIATE for job search. */
+    careerPlanningMode?: CareerPlanningMode;
+    careerPlanningDistinctionAskedAt?: Date;
     createdAt: Date;
     updatedAt: Date;
 }

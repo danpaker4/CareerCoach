@@ -9,7 +9,8 @@ export class ChatController {
     getUnifiedUserProfile = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const { userId } = request.params as { userId: string };
-            const payload = await this.chatService.getUnifiedUserProfile(userId);
+            const authHeader = typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
+            const payload = await this.chatService.getUnifiedUserProfile(userId, authHeader);
             if (!payload.user) {
                 reply.status(StatusCodes.NOT_FOUND).send({ error: "User not found" });
                 return;
@@ -41,7 +42,8 @@ export class ChatController {
     sendMessage = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const body = request.body as ChatMessageRequestBody;
-            const response = await this.chatService.sendMessage(body.userId, body.message, body.userProfile);
+            const authHeader = typeof request.headers.authorization === "string" ? request.headers.authorization : undefined;
+            const response = await this.chatService.sendMessage(body.userId, body.message, body.userProfile, authHeader);
             reply.status(StatusCodes.OK).send(response);
         } catch (error) {
             if (error instanceof Error && error.message === "Message is required") {

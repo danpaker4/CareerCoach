@@ -5,19 +5,33 @@ import type { RankedJobResult } from "./job-ranking.types";
 const toLowerSet = (items: readonly string[]): Set<string> => new Set(items.map((item) => item.toLowerCase()));
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
 
+const dreamTitleTokens = (dreamJobTitle: string): string[] =>
+    dreamJobTitle
+        .toLowerCase()
+        .split(/[^a-z0-9+]+/i)
+        .map((token) => token.trim())
+        .filter((token) => token.length > 2);
+
 export class JobRankingService {
-    rankJobs = (profile: UserCareerProfile, jobs: readonly JobSearchResultItem[]): RankedJobResult[] => {
+    rankJobs = (
+        profile: UserCareerProfile,
+        jobs: readonly JobSearchResultItem[],
+        dreamJobTitle?: string | null
+    ): RankedJobResult[] => {
         const skills = toLowerSet(profile.technologies.map((item) => item.value));
         const preferences = toLowerSet(profile.interests.map((item) => item.value));
         const workStyle = toLowerSet(profile.workStyle.map((item) => item.value));
+        const dreamTokens = dreamJobTitle && dreamJobTitle.trim().length > 0 ? dreamTitleTokens(dreamJobTitle) : [];
 
         const scored = jobs.map((job) => {
             const corpus = `${job.jobTitle} ${job.description}`.toLowerCase();
             const skillHits = [...skills].filter((skill) => corpus.includes(skill)).length;
             const prefHits = [...preferences].filter((pref) => corpus.includes(pref)).length;
             const styleHits = [...workStyle].filter((style) => corpus.includes(style)).length;
+            const dreamHits = dreamTokens.filter((token) => corpus.includes(token)).length;
             const skillMatchScore = clamp(skillHits * 20);
-            const semanticSimilarityScore = clamp((prefHits * 18) + (skillHits * 8));
+            const dreamBoost = clamp(dreamHits * 12);
+            const semanticSimilarityScore = clamp((prefHits * 18) + (skillHits * 8) + dreamBoost);
             const preferenceFitScore = clamp(prefHits * 22);
             const growthPotentialScore = clamp(job.seniority.toLowerCase().includes("junior") ? 65 : 55);
             const workStyleFitScore = clamp(styleHits * 25);
@@ -32,7 +46,7 @@ export class JobRankingService {
             );
             const missingSkills = [...skills].filter((skill) => !corpus.includes(skill)).slice(0, 4);
             const reasons = [
-                skillHits > 0 ? "Matches your known technologies." : "Aligned with your general profile.",
+                dreamHits > 0 ? "Aligns with your stated dream direction." : skillHits > 0 ? "Matches your known technologies." : "Aligned with your general profile.",
                 prefHits > 0 ? "Reflects your stated interests." : "Could broaden your direction options.",
             ];
             const concerns = missingSkills.length > 0 ? ["Some core skills are not explicit in this role description."] : [];

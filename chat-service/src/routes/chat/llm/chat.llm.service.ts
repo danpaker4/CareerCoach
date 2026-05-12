@@ -11,7 +11,15 @@ import {
     LLM_STAGE_PARSE_FALLBACK_REPLY,
 } from "./chat.llm.consts";
 import { parseLlmDecisionFromJson, parseStageLlmDecisionFromJson } from "./chat.llm.utils";
+import { extractJsonObjectFromModelText } from "../dream-job/dream-job.llm.utils";
+import {
+    buildFuturePlanningClosingPrompt,
+    buildFuturePlanningReplyPrompt,
+    type FuturePlanningClosingParams,
+    type FuturePlanningUserSnapshot,
+} from "./chat.future-planning.prompt.utils";
 import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
+import type { UserCareerProfile } from "../career-profile/career-profile.types";
 
 export class ChatLlmService {
     constructor(private readonly textCompletion: TextCompletionPort) { }
@@ -71,6 +79,63 @@ export class ChatLlmService {
             return {
                 reply: LLM_STAGE_PARSE_FALLBACK_REPLY,
                 shouldAdvanceStage: false,
+            };
+        }
+    };
+
+    generateFuturePlanningReply = async (
+        conversation: Conversation,
+        latestUserMessage: string,
+        memories: readonly ConversationMemory[],
+        profile: UserCareerProfile,
+        userFutureSnapshot: FuturePlanningUserSnapshot
+    ): Promise<{ reply: string }> => {
+        const rawText = await this.textCompletion.complete(
+            buildFuturePlanningReplyPrompt(conversation, latestUserMessage, memories, profile, userFutureSnapshot)
+        );
+        try {
+            const parsed: unknown = JSON.parse(extractJsonObjectFromModelText(rawText));
+            if (typeof parsed !== "object" || parsed === null) {
+                throw new Error("invalid");
+            }
+            const reply = (parsed as Record<string, unknown>).reply;
+            if (typeof reply !== "string" || reply.trim().length === 0) {
+                throw new Error("invalid reply");
+            }
+            return { reply: reply.trim() };
+        } catch {
+            return {
+                reply: "Looking ahead a few years, do you already picture a specific kind of role—like leading a team, owning a product area, going deep as a specialist, or starting something of your own—or are you still weighing a few directions?",
+            };
+        }
+    };
+
+    generateFuturePlanningClosingReply = async (params: FuturePlanningClosingParams): Promise<{ reply: string }> => {
+        const rawText = await this.textCompletion.complete(buildFuturePlanningClosingPrompt(params));
+        try {
+            const parsed: unknown = JSON.parse(extractJsonObjectFromModelText(rawText));
+            if (typeof parsed !== "object" || parsed === null) {
+                throw new Error("invalid");
+            }
+            const reply = (parsed as Record<string, unknown>).reply;
+            if (typeof reply !== "string" || reply.trim().length === 0) {
+                throw new Error("invalid reply");
+            }
+            return { reply: reply.trim() };
+        } catch {
+            const label = params.normalizedDreamJob.trim();
+            if (params.persistedToProfile) {
+                return {
+                    reply: `That makes sense. Moving toward ${label} is a clear direction. I saved this as your current long-term goal, and we can refine it later whenever you want.`,
+                };
+            }
+            if (params.profileUpdateFailed) {
+                return {
+                    reply: `I heard you on ${label}. I could not update your saved profile just now—try refreshing the app or signing in again, then tell me once more if you want it saved. We can keep working from what you shared either way.`,
+                };
+            }
+            return {
+                reply: `That makes sense—${label} is a strong direction to aim for. If something else is already saved on your profile with higher confidence, we kept that for now; say the word any time you want to update it.`,
             };
         }
     };

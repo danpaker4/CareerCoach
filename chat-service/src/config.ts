@@ -14,6 +14,7 @@ const EnvSchema = z
         MONGO_CONNECTION_STRING: envString("MONGO_CONNECTION_STRING"),
         MONGO_KEY_PATH: z.string().optional(),
         USERS_SERVICE_BASE_URL: envString("USERS_SERVICE_BASE_URL"),
+        USERS_SERVICE_INTERNAL_API_KEY: z.string().optional(),
         JOB_SERVICE_BASE_URL: envString("JOB_SERVICE_BASE_URL"),
         LLM_PROVIDER: LlmProviderSchema.default("gemini"),
         GEMINI_API_KEY: z.string().optional(),
@@ -87,6 +88,7 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
         },
         chatConfig: {
             usersServiceBaseUrl: parsed.USERS_SERVICE_BASE_URL,
+            usersServiceInternalApiKey: parsed.USERS_SERVICE_INTERNAL_API_KEY?.trim() || undefined,
             jobServiceBaseUrl: parsed.JOB_SERVICE_BASE_URL,
             llm,
             llmTextCompletionChain,

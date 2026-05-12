@@ -9,6 +9,7 @@ export interface ServerConfig {
     };
     chatConfig: {
         usersServiceBaseUrl: string;
+        usersServiceInternalApiKey?: string;
         jobServiceBaseUrl: string;
         llm: ResolvedLlmConfig;
         llmTextCompletionChain: readonly ResolvedLlmConfig[];

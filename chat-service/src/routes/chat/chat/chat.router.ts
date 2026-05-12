@@ -27,11 +27,18 @@ import { JobSelectionResolverService } from "../job-context/job-selection-resolv
 import { JobFollowUpAnswerService } from "../job-context/job-follow-up-answer.service";
 import { PipelineIntentService } from "../pipeline/pipeline-intent.service";
 import { PipelineService } from "../pipeline/pipeline.service";
+import { CareerPlanningModeService } from "../career-planning/career-planning-mode.service";
+import { DreamJobService } from "../dream-job/dream-job.service";
+import { ChatSearchIntentService } from "../intent/chat-search-intent.service";
 import type { MongoClient } from "../../../mongo/mongo";
 
 export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
-    const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
+    const externalService = new ChatExternalService(
+        chatConfig.usersServiceBaseUrl,
+        chatConfig.jobServiceBaseUrl,
+        chatConfig.usersServiceInternalApiKey
+    );
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
     const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain);
@@ -60,6 +67,9 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         embedding,
         chatConfig.careerDirectionVectorIndexName
     );
+    const careerPlanningModeService = new CareerPlanningModeService();
+    const dreamJobService = new DreamJobService(textCompletion, externalService);
+    const chatSearchIntentService = new ChatSearchIntentService();
     const service = new ChatService(
         conversationService,
         stageService,
@@ -79,7 +89,10 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         selectionResolverService,
         followUpAnswerService,
         pipelineIntentService,
-        pipelineService
+        pipelineService,
+        careerPlanningModeService,
+        dreamJobService,
+        chatSearchIntentService
     );
     const controller = new ChatController(service);
 

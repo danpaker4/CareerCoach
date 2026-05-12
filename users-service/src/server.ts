@@ -37,7 +37,7 @@ export class Server {
                 origin: true,
                 credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-                allowedHeaders: ['Content-Type', 'Authorization']
+                allowedHeaders: ['Content-Type', 'Authorization', 'X-Career-Coach-Internal-Key']
             });
             await this.app.register(cookie);
             await this.app.register(multipart, {

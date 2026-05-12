@@ -6,6 +6,7 @@ import { ConversationRepository } from "./conversation.repository";
 import { profileToSeedAchievements, toConversationResponse } from "./conversation.utils";
 import { ConversationStageService } from "./conversation.stage.service";
 import type { JobSearchResultItem } from "../chat.types";
+import type { CareerPlanningMode } from "../career-planning/career-planning.types";
 import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../job-context/job-context.types";
 
 const toAttachedJobSnapshots = (jobs: readonly JobSearchResultItem[]): AttachedJobSnapshot[] =>
@@ -181,6 +182,19 @@ export class ChatConversationService {
             jobRecommendationContext,
         };
         await this.repository.updateJobContext(userId, jobContext);
+    };
+
+    updateCareerPlanningState = async (
+        userId: string,
+        updates: {
+            careerPlanningMode?: CareerPlanningMode;
+            careerPlanningDistinctionAskedAt?: Date | null;
+        }
+    ): Promise<void> => {
+        if (updates.careerPlanningMode === undefined && updates.careerPlanningDistinctionAskedAt === undefined) {
+            return;
+        }
+        await this.repository.updateCareerPlanningState(userId, updates);
     };
 
     setSelectedJob = async (userId: string, selectedJob: SanitizedJob): Promise<void> => {

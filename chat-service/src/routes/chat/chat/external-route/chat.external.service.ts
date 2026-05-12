@@ -23,10 +23,29 @@ const toAchievementFromMessage = (message: string): UserAchievementResponse | nu
 };
 
 export class ChatExternalService {
-    constructor(private readonly usersServiceBaseUrl: string, private readonly jobServiceBaseUrl: string) { }
+    constructor(
+        private readonly usersServiceBaseUrl: string,
+        private readonly jobServiceBaseUrl: string,
+        private readonly usersServiceInternalApiKey?: string | null
+    ) {}
 
-    readUserAchievements = async (userId: string): Promise<UserAchievementResponse[]> => {
-        const achievementsResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/achievements`);
+    private readonly usersJsonHeaders = (usersAuthHeader?: string | null): Record<string, string> => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const authTrimmed = usersAuthHeader?.trim() ?? "";
+        if (authTrimmed.length > 0) {
+            headers.Authorization = authTrimmed;
+        }
+        const internal = this.usersServiceInternalApiKey?.trim() ?? "";
+        if (internal.length > 0) {
+            headers["X-Career-Coach-Internal-Key"] = internal;
+        }
+        return headers;
+    };
+
+    readUserAchievements = async (userId: string, usersAuthHeader?: string | null): Promise<UserAchievementResponse[]> => {
+        const achievementsResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/achievements`, {
+            headers: this.usersJsonHeaders(usersAuthHeader),
+        });
         if (achievementsResponse.ok) {
             const payload: unknown = await achievementsResponse.json().catch(() => []);
             if (Array.isArray(payload)) {
@@ -34,7 +53,9 @@ export class ChatExternalService {
             }
         }
 
-        const profileResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
+        const profileResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            headers: this.usersJsonHeaders(usersAuthHeader),
+        });
         if (!profileResponse.ok) { return []; }
         const payload: unknown = await profileResponse.json().catch(() => null);
         const parsedProfile: UserProfileResponse | null = parseUserProfileResponse(payload);
@@ -85,7 +106,8 @@ export class ChatExternalService {
     upsertAchievementFromUserMessage = async (
         userId: string,
         message: string,
-        currentAchievements: readonly UserAchievementResponse[]
+        currentAchievements: readonly UserAchievementResponse[],
+        usersAuthHeader?: string | null
     ): Promise<UserAchievementResponse[] | null> => {
         const nextAchievement = toAchievementFromMessage(message);
         if (!nextAchievement) {
@@ -102,7 +124,7 @@ export class ChatExternalService {
         const updatedAchievements = [...currentAchievements, nextAchievement];
         const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: this.usersJsonHeaders(usersAuthHeader),
             body: JSON.stringify({ achievements: updatedAchievements }),
         });
 
@@ -113,8 +135,10 @@ export class ChatExternalService {
         return updatedAchievements;
     };
 
-    readUserPublicProfile = async (userId: string): Promise<Record<string, unknown> | null> => {
-        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
+    readUserPublicProfile = async (userId: string, usersAuthHeader?: string | null): Promise<Record<string, unknown> | null> => {
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            headers: this.usersJsonHeaders(usersAuthHeader),
+        });
         if (!response.ok) {
             return null;
         }
@@ -128,23 +152,54 @@ export class ChatExternalService {
     };
 
     /** Links users `id` to chat career profile by setting `coachProfileMaterializedAt` on the user document. */
-    notifyCoachProfileMaterialized = async (userId: string): Promise<void> => {
+    notifyCoachProfileMaterialized = async (userId: string, usersAuthHeader?: string | null): Promise<void> => {
         await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: this.usersJsonHeaders(usersAuthHeader),
             body: JSON.stringify({ coachProfileMaterializedAt: new Date().toISOString() }),
         }).catch(() => null);
     };
 
-    upsertKnownSkills = async (userId: string, skills: readonly string[]): Promise<void> => {
+    upsertKnownSkills = async (userId: string, skills: readonly string[], usersAuthHeader?: string | null): Promise<void> => {
         const normalized = [...new Set(skills.map((item) => item.trim()).filter((item) => item.length > 0))];
         if (normalized.length === 0) {
             return;
         }
         await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: this.usersJsonHeaders(usersAuthHeader),
             body: JSON.stringify({ knownSkills: normalized }),
         }).catch(() => null);
+    };
+
+    patchDreamJobFields = async (
+        userId: string,
+        payload: {
+            dreamJob: string | null;
+            dreamJobConfidence: number;
+            dreamJobReasoning: readonly string[];
+        },
+        usersAuthHeader?: string | null
+    ): Promise<void> => {
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            method: "PATCH",
+            headers: this.usersJsonHeaders(usersAuthHeader),
+            body: JSON.stringify({
+                dreamJob: payload.dreamJob,
+                dreamJobConfidence: payload.dreamJobConfidence,
+                dreamJobReasoning: [...payload.dreamJobReasoning],
+            }),
+        }).catch(() => null);
+        let errorPreview: string | undefined;
+        if (response !== null && !response.ok) {
+            errorPreview = (await response.text().catch(() => "")).slice(0, 200);
+        }
+        if (response === null) {
+            throw new Error("dreamJob PATCH network failure");
+        }
+        if (!response.ok) {
+            const detail = errorPreview && errorPreview.trim().length > 0 ? ` — ${errorPreview.trim()}` : "";
+            throw new Error(`dreamJob PATCH failed: ${response.status}${detail}`);
+        }
     };
 }

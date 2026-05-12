@@ -1,6 +1,7 @@
 import type { Collection } from "mongodb";
 import type { ChatMessage, UserAchievement } from "../chat/chat.model";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { CareerPlanningMode } from "../career-planning/career-planning.types";
 import type { ConversationJobContext } from "../job-context/job-context.types";
 
 export class ConversationRepository {
@@ -21,6 +22,7 @@ export class ConversationRepository {
             achievements,
             messages: [{ role: "assistant", content: firstAssistantMessage, timestamp: now }],
             stageProgress,
+            careerPlanningMode: "UNKNOWN",
             createdAt: now,
             updatedAt: now,
         };
@@ -73,5 +75,29 @@ export class ConversationRepository {
                 },
             }
         );
+    };
+
+    updateCareerPlanningState = async (
+        userId: string,
+        updates: {
+            careerPlanningMode?: CareerPlanningMode;
+            careerPlanningDistinctionAskedAt?: Date | null;
+        }
+    ): Promise<void> => {
+        const setDoc: Record<string, unknown> = { updatedAt: new Date() };
+        if (updates.careerPlanningMode !== undefined) {
+            setDoc.careerPlanningMode = updates.careerPlanningMode;
+        }
+        if (updates.careerPlanningDistinctionAskedAt !== undefined) {
+            if (updates.careerPlanningDistinctionAskedAt === null) {
+                setDoc.careerPlanningDistinctionAskedAt = null;
+            } else {
+                setDoc.careerPlanningDistinctionAskedAt = updates.careerPlanningDistinctionAskedAt;
+            }
+        }
+        if (Object.keys(setDoc).length <= 1) {
+            return;
+        }
+        await this.conversationsCollection.updateOne({ userId }, { $set: setDoc });
     };
 }
