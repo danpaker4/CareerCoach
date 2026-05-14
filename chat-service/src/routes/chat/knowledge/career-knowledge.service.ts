@@ -1,6 +1,6 @@
 import type { Collection } from "mongodb";
 import type { EmbeddingPort } from "../../../ai/ports/embedding.types";
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { CareerDirectionExample, CareerDirectionSuggestion } from "./career-knowledge.types";
 
 export class CareerKnowledgeService {

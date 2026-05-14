@@ -1,33 +1,33 @@
 import type { FastifyInstance } from "fastify";
-import type { ServerConfig } from "../../../server.types";
-import { ChatConversationService } from "../conversation/conversation.service";
-import { ConversationRepository } from "../conversation/conversation.repository";
-import { ChatLlmService } from "../llm/chat.llm.service";
-import { ChatValidationService } from "../llm/chat.validation.service";
+import type { ServerConfig } from "../../server.types";
+import { ChatConversationService } from "./conversation/conversation.service";
+import { ConversationRepository } from "./conversation/conversation.repository";
+import { ChatLlmService } from "./llm/chat.llm.service";
+import { ChatValidationService } from "./llm/chat.validation.service";
 import { ChatController } from "./chat.controller";
-import { ChatExternalService } from "./external-route/chat.external.service";
-import { validateChatMessageBody, validateUserIdParam } from "./chat.middleware";
+import { ChatExternalService } from "../external-chat/chat.external.service";
+import { validateChatMessageBody, validateUserIdParam, validateUserIdAndConversationIdParams } from "./chat.middleware";
 import { ChatService } from "./chat.service";
-import { ConversationStageService } from "../conversation/conversation.stage.service";
-import { createTextCompletionPortFromChain } from "../../../ai/text-completion.utils";
-import { createEmbeddingPort } from "../../../ai/embedding.utils";
+import { ConversationStageService } from "./conversation/conversation.stage.service";
+import { createTextCompletionPortFromChain } from "../../ai/text-completion.utils";
+import { createEmbeddingPort } from "../../ai/embedding.utils";
 import { CareerProfileRepository } from "../career-profile/career-profile.repository";
 import { CareerProfileService } from "../career-profile/career-profile.service";
-import { ConversationMemoryRepository } from "../memory/conversation-memory.repository";
-import { ConversationMemoryService } from "../memory/conversation-memory.service";
-import { CareerConfidenceService } from "../coach/career-confidence.service";
-import { ConversationModeService } from "../coach/conversation-mode.service";
-import { AchievementInferenceService } from "../inference/achievement-inference.service";
-import { WorkStyleInferenceService } from "../inference/work-style-inference.service";
-import { JobSearchPlanService } from "../search/job-search-plan.service";
-import { JobRankingService } from "../ranking/job-ranking.service";
-import { CareerKnowledgeService } from "../knowledge/career-knowledge.service";
-import { JobFollowUpIntentService } from "../job-context/job-follow-up-intent.service";
-import { JobSelectionResolverService } from "../job-context/job-selection-resolver.service";
-import { JobFollowUpAnswerService } from "../job-context/job-follow-up-answer.service";
-import { PipelineIntentService } from "../pipeline/pipeline-intent.service";
-import { PipelineService } from "../pipeline/pipeline.service";
-import type { MongoClient } from "../../../mongo/mongo";
+import { ConversationMemoryRepository } from "./memory/conversation-memory.repository";
+import { ConversationMemoryService } from "./memory/conversation-memory.service";
+import { CareerConfidenceService } from "./coach/career-confidence.service";
+import { ConversationModeService } from "./coach/conversation-mode.service";
+import { AchievementInferenceService } from "./inference/achievement-inference.service";
+import { WorkStyleInferenceService } from "./inference/work-style-inference.service";
+import { JobSearchPlanService } from "./search/job-search-plan.service";
+import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
+import { JobFollowUpIntentService } from "./job-context/job-follow-up-intent.service";
+import { JobSelectionResolverService } from "./job-context/job-selection-resolver.service";
+import { JobFollowUpAnswerService } from "./job-context/job-follow-up-answer.service";
+import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
+import { PipelineService } from "./pipeline/pipeline.service";
+import type { MongoClient } from "../../mongo/mongo";
+import { JobRankingService } from "./ranking/job-ranking.service";
 
 export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
@@ -83,7 +83,13 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     );
     const controller = new ChatController(service);
 
-    app.get("/chat/users/:userId/profile", { preHandler: validateUserIdParam }, controller.getUnifiedUserProfile);
+    app.get("/chat/users/:userId/conversations", { preHandler: validateUserIdParam }, controller.listConversations);
+    app.post("/chat/users/:userId/conversations", { preHandler: validateUserIdParam }, controller.createConversation);
+    app.delete(
+        "/chat/users/:userId/conversations/:conversationId",
+        { preHandler: validateUserIdAndConversationIdParams },
+        controller.deleteConversation
+    );
     app.get("/chat/:userId", { preHandler: validateUserIdParam }, controller.getConversation);
     app.post("/chat/message", { preHandler: validateChatMessageBody }, controller.sendMessage);
 };

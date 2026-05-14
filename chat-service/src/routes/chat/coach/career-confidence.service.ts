@@ -1,4 +1,4 @@
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { CareerConfidenceSummary } from "./career-confidence.types";
 
 const toPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));

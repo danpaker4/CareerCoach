@@ -1,6 +1,6 @@
 import type { EmbeddingPort } from "../../../ai/ports/embedding.types";
 import type { Conversation } from "../conversation/conversation.model";
-import type { CareerProfileSignalUpdate, CareerSignal } from "../career-profile/career-profile.types";
+import type { CareerProfileSignalUpdate, CareerSignal } from "../../career-profile/career-profile.types";
 import { ConversationMemoryRepository } from "./conversation-memory.repository";
 import type { ConversationMemory, ConversationMemoryType } from "./conversation-memory.types";
 
@@ -48,7 +48,7 @@ export class ConversationMemoryService {
                 const embedding = await this.embedding.embedUserMemory(signal.value).catch(() => []);
                 const memory: ConversationMemory = {
                     userId,
-                    conversationId: conversation.userId,
+                    conversationId: conversation._id?.toHexString() ?? userId,
                     type: memoryType,
                     text: signal.value,
                     confidence: signal.confidence,

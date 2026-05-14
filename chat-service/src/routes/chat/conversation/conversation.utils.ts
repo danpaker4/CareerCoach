@@ -26,13 +26,17 @@ export const profileToSeedAchievements = (profile?: ProfileInput): { id: string;
     return [];
 };
 
-export const toConversationResponse = (conversation: Conversation): ConversationResponse => ({
-    userId: conversation.userId,
-    achievements: conversation.achievements,
-    messages: conversation.messages.map((message) => ({
-        role: message.role,
-        content: message.content,
-        timestamp: message.timestamp.toISOString(),
-        ...(message.attachedJobs && message.attachedJobs.length > 0 ? { attachedJobs: message.attachedJobs } : {}),
-    })),
-});
+export const toConversationResponse = (conversation: Conversation): ConversationResponse => {
+    const conversationId = conversation._id?.toHexString() ?? "";
+    return {
+        conversationId,
+        userId: conversation.userId,
+        achievements: conversation.achievements,
+        messages: conversation.messages.map((message) => ({
+            role: message.role,
+            content: message.content,
+            timestamp: message.timestamp.toISOString(),
+            ...(message.attachedJobs && message.attachedJobs.length > 0 ? { attachedJobs: message.attachedJobs } : {}),
+        })),
+    };
+};

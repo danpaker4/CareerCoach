@@ -1,8 +1,6 @@
 /** Matches `hashStringToNumber` in `frontend/src/components/job-suggestions/JobSuggestions.tsx`. */
-export const hashStringToNumber = (str: string): number => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
-    }
-    return hash;
-};
+export const hashStringToNumber = (str: string): number =>
+    Array.from({ length: str.length }, (_, index) => str.charCodeAt(index)).reduce(
+        (hash, code) => ((hash * 31 + code) >>> 0),
+        0
+    );

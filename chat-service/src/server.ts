@@ -3,7 +3,7 @@ import cors from "@fastify/cors";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
 
 import { MongoClient } from "./mongo/mongo"; 
-import { chatRouter } from "./routes/chat/chat/chat.router";
+import { chatRouter } from "./routes/chat/chat.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";

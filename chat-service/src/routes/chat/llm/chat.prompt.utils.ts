@@ -1,4 +1,4 @@
-import type { AttachedJobSnapshot } from "../chat/chat.model";
+import type { AttachedJobSnapshot } from "../chat.model";
 import type { Conversation } from "../conversation/conversation.model";
 import type { ConversationStage } from "../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";

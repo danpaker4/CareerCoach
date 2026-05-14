@@ -1,4 +1,4 @@
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { JobSearchResultItem } from "../chat.types";
 import type { RankedJobResult } from "./job-ranking.types";
 
