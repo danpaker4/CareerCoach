@@ -1,10 +1,13 @@
 import { z } from "zod";
 
+export const UserRoleSchema = z.enum(["user", "admin"]);
+
 export const UserSchema = z.object({
     id: z.uuid(),
     firstName: z.string(),
     lastName: z.string(),
     email: z.email(),
+    role: UserRoleSchema.default("user"),
     password: z.string().optional(),
     birthDate: z.date().optional(),
     achievements: z.array(z.object({
@@ -29,5 +32,6 @@ export const UserSchema = z.object({
     coachProfileMaterializedAt: z.coerce.date().optional(),
 });
 
+export type UserRole = z.infer<typeof UserRoleSchema>;
 export type User = z.infer<typeof UserSchema>;
-export type UserDocument = Omit<User, "id"> & { _id: string };
+export type UserDocument = Omit<User, "id" | "role"> & { _id: string; role?: UserRole };

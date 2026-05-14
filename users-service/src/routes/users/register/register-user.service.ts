@@ -110,6 +110,7 @@ export const registerUser = async (
     firstName,
     lastName,
     email,
+    role: "user",
     password: hashedPassword,
     birthDate: new Date(birthDate),
     currentJob: currentJob || undefined,

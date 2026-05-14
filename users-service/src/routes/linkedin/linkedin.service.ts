@@ -72,6 +72,7 @@ export const loginOrCreateLinkedInUser = async (
             firstName: profile.given_name,
             lastName: profile.family_name,
             email: emailLower,
+            role: "user",
             achievements: [],
             technologies: [],
             interests: [],

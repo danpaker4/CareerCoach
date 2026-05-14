@@ -38,6 +38,7 @@ describe("Users Router - POST /users", () => {
             expect(createdUser.firstName).toBe(mockUserData.firstName);
             expect(createdUser.lastName).toBe(mockUserData.lastName);
             expect(createdUser.email).toBe(mockUserData.email);
+            expect(createdUser.role).toBe("user");
             expect(createdUser.currentJob).toBe(mockUserData.currentJob);
             expect(createdUser.birthDate).toBeDefined();
 
