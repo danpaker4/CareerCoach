@@ -155,7 +155,7 @@ export const App = () => {
 
         <PageTransition>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={currentUser ? <Navigate to="/dashboard" replace /> : <Home />} />
 
             <Route
               path="/login"
