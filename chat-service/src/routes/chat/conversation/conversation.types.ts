@@ -1,6 +1,12 @@
-import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
+
+export type ConversationRef = {
+    userId: string;
+    conversationId: string;
+};
 
 export type ConversationResponse = {
+    conversationId: string;
     userId: string;
     achievements: UserAchievement[];
     messages: {
@@ -9,6 +15,12 @@ export type ConversationResponse = {
         timestamp: string;
         attachedJobs?: AttachedJobSnapshot[];
     }[];
+};
+
+export type ConversationSummaryResponse = {
+    conversationId: string;
+    updatedAt: string;
+    previewText: string;
 };
 
 export type ProfileInput = {

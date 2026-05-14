@@ -1,10 +1,11 @@
-import type { EmbeddingPort } from "../../../ai/ports/embedding.types";
-import type { Conversation } from "../conversation/conversation.model";
+
+import type { Conversation } from "../chat/conversation/conversation.model";
 import { createEmptyProfileSignals, mergeProfileSignals, toProfileSummaryText } from "./career-profile.utils";
 import type { CareerProfileSignalUpdate, CareerSignal, CoachProfileAccountLink, UserCareerProfile } from "./career-profile.types";
 import { CareerProfileRepository } from "./career-profile.repository";
 import { EXPLICIT_USER_SIGNAL_CONFIDENCE } from "./career-profile.consts";
-import type { ProfileInput } from "../conversation/conversation.types";
+import type { ProfileInput } from "../chat/conversation/conversation.types";
+import { EmbeddingPort } from "../../ai/ports/embedding.types";
 
 const buildDefaultProfile = (userId: string): UserCareerProfile => {
     const now = new Date();
@@ -181,16 +182,6 @@ export class CareerProfileService {
         private readonly embedding: EmbeddingPort,
         private readonly accountLink: CoachProfileAccountLink | null = null
     ) { }
-
-    findByUserId = async (userId: string): Promise<UserCareerProfile | null> => {
-        const document = await this.repository.findByUserId(userId);
-        if (!document) {
-            return null;
-        }
-        const { _id, ...profile } = document;
-        void _id;
-        return profile;
-    };
 
     getOrCreateProfile = async (userId: string): Promise<UserCareerProfile> => {
         const existing = await this.repository.findByUserId(userId);

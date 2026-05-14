@@ -29,6 +29,37 @@ const parseRoadmapResponse = (data: unknown): CareerRoadmapData[] => {
   });
 };
 
+const loadDefaultChatConversationId = async (userId: string): Promise<string | null> => {
+  const listRes = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/users/${encodeURIComponent(userId)}/conversations`);
+  if (listRes.ok) {
+    const data: unknown = await listRes.json();
+    if (typeof data === 'object' && data !== null && 'conversations' in data) {
+      const list = (data as { conversations: unknown }).conversations;
+      if (Array.isArray(list) && list.length > 0) {
+        const first = list[0];
+        if (typeof first === 'object' && first !== null && 'conversationId' in first) {
+          const id = (first as { conversationId: unknown }).conversationId;
+          if (typeof id === 'string' && id.trim().length > 0) {
+            return id;
+          }
+        }
+      }
+    }
+  }
+  const convRes = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/${encodeURIComponent(userId)}`);
+  if (!convRes.ok) {
+    return null;
+  }
+  const conv: unknown = await convRes.json();
+  if (typeof conv === 'object' && conv !== null && 'conversationId' in conv) {
+    const id = (conv as { conversationId: unknown }).conversationId;
+    if (typeof id === 'string' && id.trim().length > 0) {
+      return id;
+    }
+  }
+  return null;
+};
+
 const STEP_CONTENT = [
   {
     label: 'Foundation & Fundamentals',
@@ -65,6 +96,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [floatingChatConversationId, setFloatingChatConversationId] = useState<string | null>(null);
 
   const loadData = useCallback(() => {
     if (!user?.id) return;
@@ -83,6 +115,27 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   }, [user?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    if (!isChatOpen || !user?.id) {
+      return;
+    }
+    let cancelled = false;
+    loadDefaultChatConversationId(user.id)
+      .then((id) => {
+        if (!cancelled) {
+          setFloatingChatConversationId(id);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFloatingChatConversationId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isChatOpen, user?.id]);
 
   // Keep active tab in bounds when roadmaps change
   useEffect(() => {
@@ -311,8 +364,10 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               X
             </button>
           </div>
+          {user?.id && floatingChatConversationId ? (
           <ChatInterface
-            userId={user?.id ?? 'guest'}
+            userId={user.id}
+            conversationId={floatingChatConversationId}
             userProfile={{
               firstName: user?.firstName,
               lastName: user?.lastName,
@@ -328,6 +383,9 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                   : undefined,
             }}
           />
+          ) : (
+            <div className="floating-chat-loading">Loading chat…</div>
+          )}
         </div>
       )}
     </div>

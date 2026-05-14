@@ -1,4 +1,4 @@
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { JobSearchRequest } from "../chat.types";
 import type { JobSearchPlan } from "./job-search-plan.types";
 

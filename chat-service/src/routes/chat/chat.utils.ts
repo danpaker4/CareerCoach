@@ -5,7 +5,7 @@ import type {
     JobSearchResultItem,
     UserAchievementResponse,
     UserProfileResponse,
-} from "../chat.types";
+} from "./chat.types";
 import { z } from "zod";
 
 const toStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -15,17 +15,35 @@ export const isChatMessageBody = (body: unknown): body is ChatMessageRequestBody
         return false;
     }
 
+    const conversationIdOk =
+        !("conversationId" in body)
+        || body.conversationId === undefined
+        || (typeof body.conversationId === "string" && body.conversationId.trim().length > 0);
+
     return (
         "userId" in body &&
         "message" in body &&
         typeof body.userId === "string" &&
         typeof body.message === "string" &&
+        conversationIdOk &&
         (!("userProfile" in body) || typeof body.userProfile === "object" || body.userProfile === undefined || body.userProfile === null)
     );
 };
 
 export const hasUserIdParam = (params: unknown): params is { userId: string } =>
     typeof params === "object" && params !== null && "userId" in params && typeof (params as { userId: unknown }).userId === "string";
+
+export const hasUserIdAndConversationIdParams = (params: unknown): params is { userId: string; conversationId: string } => {
+    if (typeof params !== "object" || params === null) {
+        return false;
+    }
+    const record = params as { userId?: unknown; conversationId?: unknown };
+    return (
+        typeof record.userId === "string"
+        && typeof record.conversationId === "string"
+        && record.conversationId.trim().length > 0
+    );
+};
 
 export const isAchievement = (value: unknown): value is UserAchievementResponse => {
     if (typeof value !== "object" || value === null) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { JobSearchPlanService } from "./job-search-plan.service";
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 
 const emptySignals = {
     strengths: [],

@@ -41,11 +41,6 @@ export type UserCareerProfile = CareerProfileSignals & {
     createdAt: Date;
 };
 
-/** API-safe view: same shape as `UserCareerProfile` but without large embedding vectors. */
-export type PublicCareerProfileView = Omit<UserCareerProfile, "profileSummaryEmbedding"> & {
-    profileSummaryEmbeddingLength: number;
-};
-
 /** Notifies users-service when chat first persists a career profile for `userId` (same as users `id`). */
 export type CoachProfileAccountLink = {
     notifyProfileMaterialized: (userId: string) => Promise<void>;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CareerConfidenceService } from "./career-confidence.service";
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
-import { createEmptyProfileSignals } from "../career-profile/career-profile.utils";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
+import { createEmptyProfileSignals } from "../../career-profile/career-profile.utils";
 
 const buildProfile = (): UserCareerProfile => ({
     userId: "u1",

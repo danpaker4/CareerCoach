@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { JobFollowUpAnswerService } from "./job-follow-up-answer.service";
 import type { SanitizedJob } from "./job-context.types";
-import { createEmptyProfileSignals } from "../career-profile/career-profile.utils";
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import { createEmptyProfileSignals } from "../../career-profile/career-profile.utils";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 
 const job: SanitizedJob = {
     id: "1",

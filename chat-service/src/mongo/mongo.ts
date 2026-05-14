@@ -1,7 +1,7 @@
 import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClientOptions } from "mongodb";
 import { Service } from "../types/service";
 import type { Conversation } from "../routes/chat/conversation/conversation.model";
-import type { UserCareerProfileDocument } from "../routes/chat/career-profile/career-profile.model";
+import type { UserCareerProfileDocument } from "../routes/career-profile/career-profile.model";
 import type { ConversationMemoryDocument } from "../routes/chat/memory/conversation-memory.model";
 import type { CareerDirectionExample } from "../routes/chat/knowledge/career-knowledge.types";
 
@@ -51,9 +51,10 @@ export class MongoClient implements Service {
     };
 
     private ensureIndexes = async (): Promise<void> => {
-        if (!this.careerProfilesCollection || !this.conversationMemoriesCollection || !this.careerDirectionExamplesCollection) {
+        if (!this.conversationsCollection || !this.careerProfilesCollection || !this.conversationMemoriesCollection || !this.careerDirectionExamplesCollection) {
             return;
         }
+        await this.conversationsCollection.createIndex({ userId: 1, updatedAt: -1 });
         await this.careerProfilesCollection.createIndex({ userId: 1 }, { unique: true });
         await this.conversationMemoriesCollection.createIndex({ userId: 1, createdAt: -1 });
         await this.careerDirectionExamplesCollection.createIndex({ directionName: 1 });

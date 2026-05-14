@@ -1,4 +1,4 @@
-import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { CareerConfidenceSummary } from "./career-confidence.types";
 import type { ConversationMode } from "./conversation-mode.types";
 

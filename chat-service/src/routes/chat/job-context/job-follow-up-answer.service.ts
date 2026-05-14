@@ -1,4 +1,4 @@
-import type { CareerSignal, UserCareerProfile } from "../career-profile/career-profile.types";
+import type { CareerSignal, UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { JobFollowUpField, SanitizedJob } from "./job-context.types";
 
 const formatList = (items: readonly string[]): string =>

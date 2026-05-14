@@ -384,6 +384,16 @@
   opacity: 1;
 }
 
+.floating-chat-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--clr-slate-500);
+  font-size: var(--fz-sm);
+  min-height: 120px;
+}
+
 .step-check-img {
   width: 13px;
   height: 13px;

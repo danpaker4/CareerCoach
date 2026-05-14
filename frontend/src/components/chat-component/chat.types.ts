@@ -1,5 +1,12 @@
+export type ConversationSummary = {
+    conversationId: string;
+    updatedAt: string;
+    previewText: string;
+};
+
 export interface ChatProps {
     userId: string;
+    conversationId: string;
     userProfile?: {
         firstName?: string;
         lastName?: string;
@@ -35,6 +42,7 @@ export interface Message {
 }
 
 export interface ConversationResponse {
+    conversationId: string;
     userId: string;
     achievements: {
         id: string;

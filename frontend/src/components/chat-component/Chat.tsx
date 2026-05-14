@@ -56,14 +56,18 @@ const readConversationResponse = async (response: Response): Promise<Conversatio
     if (typeof payload !== 'object' || payload === null || !('messages' in payload)) {
         return null;
     }
+    const record = payload as Record<string, unknown>;
+    if (typeof record.conversationId !== 'string' || record.conversationId.trim().length === 0) {
+        return null;
+    }
     return payload as ConversationResponse;
 };
 
-export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
+export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -78,8 +82,11 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
     useEffect(() => {
         const loadConversation = async () => {
             setIsLoading(true);
+            setMessages([]);
+            setInput('');
             try {
-                const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/${userId}`);
+                const query = new URLSearchParams({ conversationId });
+                const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/${userId}?${query.toString()}`);
                 if (!response.ok) {
                     return;
                 }
@@ -107,9 +114,8 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
         };
 
         loadConversation().catch(() => undefined);
-    }, [userId]);
+    }, [userId, conversationId]);
 
-    // פונקציה להגדלת התיבה
     const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
         setInput(e.target.value);
         if (textareaRef.current) {
@@ -126,24 +132,24 @@ export const ChatInterface = ({ userId, userProfile }: ChatProps) => {
     };
 
     const handleSend = async () => {
-        if (!input.trim()) return;
+        const text = input.trim();
+        if (!text.length) return;
 
-        const userMessage = createMessage('user', input);
+        const userMessage = createMessage('user', text);
         setMessages(prev => [...prev, userMessage]);
         setInput('');
-        
-        // איפוס גובה התיבה
+
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
-        
+
         setIsLoading(true);
 
         try {
             const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, message: input, userProfile })
+                body: JSON.stringify({ userId, conversationId, message: text, userProfile })
             });
             if (!response.ok) {
                 setMessages(prev => [...prev, createMessage('assistant', 'I could not reach the chat service. Please try again.')]);
