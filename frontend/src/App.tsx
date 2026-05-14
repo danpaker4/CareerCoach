@@ -11,6 +11,7 @@ import { Profile } from './components/profile/Profile';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { MySkills } from './components/my-skills/MySkills';
 import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
+import { Management } from './components/management/Management';
 import { GithubCallback } from './components/github-callback/GithubCallback';
 import { LinkedInCallback } from './components/linkedin-callback/LinkedInCallback';
 import { ChatPage } from './components/chat-page/ChatPage';
@@ -19,7 +20,7 @@ import { PageTransition } from './components/page-transition/PageTransition';
 import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
-import { isUser } from './lib/authResponse';
+import { normalizeUser } from './lib/authResponse';
 import { clearStoredAccessToken } from './lib/authSession';
 import { applyTheme, readInitialTheme, type ThemeMode } from './lib/theme';
 
@@ -33,7 +34,7 @@ const readStoredUser = (): User | null => {
   }
 
   const parsed: unknown = JSON.parse(raw);
-  return isUser(parsed) ? parsed : null;
+  return normalizeUser(parsed);
 };
 
 const persistUser = (user: User | null): void => {
@@ -50,9 +51,21 @@ interface ProtectedRouteProps {
   children: ReactNode;
 }
 
+interface AdminRouteProps extends ProtectedRouteProps {
+  sessionVerified: boolean;
+}
+
 const ProtectedRoute = ({ user, children }: ProtectedRouteProps) => {
   if (user === undefined) return null;
   if (user === null) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const AdminRoute = ({ user, sessionVerified, children }: AdminRouteProps) => {
+  if (user === undefined) return null;
+  if (user === null) return <Navigate to="/login" replace />;
+  if (!sessionVerified) return null;
+  if (user.role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -64,6 +77,7 @@ const AppLoader = () => (
 
 export const App = () => {
   const [theme, setTheme] = useState<ThemeMode>(() => readInitialTheme());
+  const [sessionVerified, setSessionVerified] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null | undefined>(() => {
     try {
       return readStoredUser() ?? undefined;
@@ -94,23 +108,27 @@ export const App = () => {
         clearStoredAccessToken();
         persistUser(null);
         setCurrentUser(null);
+        setSessionVerified(true);
         return;
       }
 
       persistUser(user);
       setCurrentUser(user);
+      setSessionVerified(true);
     };
 
     loadCurrentUser().catch(() => {
       clearStoredAccessToken();
       persistUser(null);
       setCurrentUser(null);
+      setSessionVerified(true);
     });
   }, []);
 
   const handleLoginSuccess = (user: User) => {
     persistUser(user);
     setCurrentUser(user);
+    setSessionVerified(true);
   };
 
   const handleLogout = async () => {
@@ -128,7 +146,12 @@ export const App = () => {
   return (
     <Router>
       <div className="App">
-        <Header userName={userDisplayName} theme={theme} onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')} />
+        <Header
+          userName={userDisplayName}
+          isAdmin={sessionVerified && currentUser?.role === 'admin'}
+          theme={theme}
+          onToggleTheme={() => setTheme((currentTheme) => currentTheme === 'light' ? 'dark' : 'light')}
+        />
 
         <PageTransition>
           <Routes>
@@ -215,6 +238,15 @@ export const App = () => {
                 <ProtectedRoute user={currentUser}>
                   {currentUser ? <ChatPage user={currentUser} /> : null}
                 </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/management"
+              element={
+                <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
+                  {currentUser ? <Management currentUser={currentUser} /> : null}
+                </AdminRoute>
               }
             />
 

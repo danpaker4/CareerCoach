@@ -4,11 +4,14 @@ export interface Achievement {
   grade: number;
 }
 
+export type UserRole = 'user' | 'admin';
+
 export interface User {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
+  role: UserRole;
   birthDate?: string;
   currentJob?: string;
   linkedInUrl?: string;

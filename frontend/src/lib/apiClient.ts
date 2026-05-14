@@ -1,6 +1,6 @@
 import { ENV } from "../config";
 import type { User } from "../types/user";
-import { isUser } from "./authResponse";
+import { normalizeUser } from "./authResponse";
 import { clearStoredAccessToken, getStoredAccessToken, setStoredAccessToken } from "./authSession";
 
 const REFRESH_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/refresh`;
@@ -23,13 +23,20 @@ const shouldTryRefresh = (status: number, payload: unknown): boolean => {
   return code === "ACCESS_TOKEN_EXPIRED" || code === "ACCESS_TOKEN_MISSING";
 };
 
-const isRefreshPayload = (payload: unknown): payload is { accessToken: string; user: User } =>
-  typeof payload === "object" &&
-  payload !== null &&
-  "accessToken" in payload &&
-  typeof payload.accessToken === "string" &&
-  "user" in payload &&
-  isUser(payload.user);
+const parseRefreshPayload = (payload: unknown): { accessToken: string; user: User } | null => {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("accessToken" in payload) ||
+    typeof payload.accessToken !== "string" ||
+    !("user" in payload)
+  ) {
+    return null;
+  }
+
+  const user = normalizeUser(payload.user);
+  return user ? { accessToken: payload.accessToken, user } : null;
+};
 
 const redirectToLogin = (): void => {
   clearStoredAccessToken();
@@ -106,9 +113,10 @@ export const refreshAccessToken = async (): Promise<User | null> => {
   }
 
   const payload: unknown = await response.json().catch(() => null);
-  if (isRefreshPayload(payload)) {
-    setStoredAccessToken(payload.accessToken);
-    return payload.user;
+  const refreshPayload = parseRefreshPayload(payload);
+  if (refreshPayload) {
+    setStoredAccessToken(refreshPayload.accessToken);
+    return refreshPayload.user;
   }
 
   return null;

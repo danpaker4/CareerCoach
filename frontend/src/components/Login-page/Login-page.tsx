@@ -6,17 +6,13 @@ import { SignIn } from './signIn-component/SignIn'
 import { SignUp } from './signUp-component/SignUp'
 import { Card } from './Login-Card/Card'
 import { ButtonToggle } from './Login-Card/ButtonToggle'
-import type { User } from '../../types/user'
 import githubIcon from '../../assets/github-icon.svg'
 import linkedInIcon from '../../assets/icon-linkedin.svg'
 import { setStoredAccessToken } from '../../lib/authSession'
 import { useNavigate } from 'react-router-dom'
-
-interface LoginPageProps {
-  onLoginSuccess: (user: User) => void;
-}
-
-const LINKEDIN_CLIENT_ID = import.meta.env.VITE_LINKEDIN_CLIENT_ID as string | undefined;
+import { normalizeUser } from '../../lib/authResponse'
+import type { LoginPageProps } from './login-page.types'
+import { LINKEDIN_CLIENT_ID } from './login-page.consts'
 
 export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
   const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
@@ -69,7 +65,8 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
             if (!res.ok) throw new Error('Authentication failed');
             const data = await res.json() as Record<string, unknown>;
             if (typeof data.accessToken === 'string') setStoredAccessToken(data.accessToken);
-            if (data.user) { onLoginSuccess(data.user as User); navigate('/dashboard', { replace: true }); }
+            const user = normalizeUser(data.user);
+            if (user) { onLoginSuccess(user); navigate('/dashboard', { replace: true }); }
           })
           .catch((err: unknown) => { console.error('GitHub login failed:', err); })
           .finally(() => { setIsLoadingGithub(false); });
@@ -90,7 +87,8 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
             if (!res.ok) throw new Error('Authentication failed');
             const data = await res.json() as Record<string, unknown>;
             if (typeof data.accessToken === 'string') setStoredAccessToken(data.accessToken);
-            if (data.user) { onLoginSuccess(data.user as User); navigate('/dashboard', { replace: true }); }
+            const user = normalizeUser(data.user);
+            if (user) { onLoginSuccess(user); navigate('/dashboard', { replace: true }); }
           })
           .catch((err: unknown) => { console.error('LinkedIn login failed:', err); })
           .finally(() => { setIsLoadingLinkedIn(false); });
