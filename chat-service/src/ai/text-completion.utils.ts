@@ -22,8 +22,6 @@ const createSingleTextCompletionPort = (llm: ResolvedLlmConfig): TextCompletionP
     return new HttpCustomTextCompletionAdapter(llm.endpointUrl);
 };
 
-export const createTextCompletionPort = (llm: ResolvedLlmConfig): TextCompletionPort => createSingleTextCompletionPort(llm);
-
 export const createTextCompletionPortFromChain = (chain: readonly ResolvedLlmConfig[]): TextCompletionPort => {
     if (chain.length === 0) {
         throw new Error("createTextCompletionPortFromChain requires at least one provider");

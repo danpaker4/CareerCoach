@@ -60,13 +60,18 @@ export interface ConversationResponse {
 export interface ChatResponse {
     reply?: string;
     jobs?: Array<{
-        jobId: string;
-        jobTitle: string;
+        id: string;
+        title: string;
         url: string;
         seniority: string;
         description: string;
-        company?: string;
-        salary?: number;
+        company: string;
+        salary: number | null;
+        requirements: string[];
+        mustKnowSkills: string[];
+        niceToHaveSkills: string[];
+        benefits: string[];
+        location: string | null;
     }>;
     jobMatches?: Array<{
         jobId: string;

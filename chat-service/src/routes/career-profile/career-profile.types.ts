@@ -1,4 +1,4 @@
-export type CareerSignalSource = "cv" | "chat" | "job_interaction" | "llm_inference";
+type CareerSignalSource = "cv" | "chat" | "job_interaction" | "llm_inference";
 
 export type CareerSignal = {
     value: string;
@@ -26,7 +26,7 @@ export type CareerProfileSignalBucketKey =
     | "shortTermGoals"
     | "extractedKeywords";
 
-export type CareerProfileSignals = Record<CareerProfileSignalBucketKey, CareerSignal[]>;
+type CareerProfileSignals = Record<CareerProfileSignalBucketKey, CareerSignal[]>;
 
 export type UserCareerProfile = CareerProfileSignals & {
     userId: string;

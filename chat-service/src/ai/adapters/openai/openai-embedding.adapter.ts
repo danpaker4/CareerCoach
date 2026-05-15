@@ -34,7 +34,6 @@ export class OpenAiEmbeddingAdapter implements EmbeddingPort {
     };
 
     readonly embedJob = (jobText: string): Promise<number[]> => this.embedText(jobText);
-    readonly embedUserMemory = (memoryText: string): Promise<number[]> => this.embedText(memoryText);
     readonly embedCareerProfile = (profileText: string): Promise<number[]> => this.embedText(profileText);
     readonly embedCareerDirection = (directionText: string): Promise<number[]> => this.embedText(directionText);
 }

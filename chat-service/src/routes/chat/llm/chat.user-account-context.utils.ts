@@ -1,4 +1,4 @@
-import type { ProfileInput } from "../conversation/conversation.types";
+import type { ProfileInput } from "../../conversation/conversation.types";
 
 const MAX_CV_CONTEXT_CHARS = 3500;
 const MAX_ARRAY_ITEMS = 40;

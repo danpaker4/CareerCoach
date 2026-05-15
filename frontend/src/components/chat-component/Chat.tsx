@@ -24,13 +24,13 @@ const readChatResponse = async (response: Response): Promise<ChatResponse> => {
             const job = item as Record<string, unknown>;
             const companyOk = !('company' in job) || typeof job.company === 'string';
             const salaryOk = !('salary' in job) || typeof job.salary === 'number';
-            return typeof job.jobId === 'string'
-                && typeof job.jobTitle === 'string'
+            return typeof job.id === 'string'
+                && typeof job.title === 'string'
                 && typeof job.url === 'string'
                 && typeof job.seniority === 'string'
                 && typeof job.description === 'string'
                 && companyOk
-                && salaryOk;
+                && (salaryOk || job.salary === null);
         })
         : [];
     const parsedMatches = Array.isArray(record.jobMatches)
@@ -99,7 +99,7 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
                     const historyJobsSummary = jobsFromHistory.length > 0
                         ? `\n\nReal jobs found:\n${jobsFromHistory.slice(0, 5).map((job) => {
                             const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
-                            return `- ${job.jobTitle}${company} (${job.seniority})`;
+                            return `- ${job.title}${company} (${job.seniority})`;
                         }).join('\n')}`
                         : '';
                     return {
@@ -162,7 +162,7 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
             const jobsSummary = jobsFromResponse.length > 0
                 ? `\n\nReal jobs found:\n${jobsFromResponse.slice(0, 5).map((job) => {
                     const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
-                    return `- ${job.jobTitle}${company} (${job.seniority})`;
+                    return `- ${job.title}${company} (${job.seniority})`;
                 }).join('\n')}`
                 : (data.jobMatches && data.jobMatches.length > 0
                     ? `\n\nTop matches:\n${data.jobMatches.slice(0, 5).map((match) => `- ${match.title}`).join('\n')}`

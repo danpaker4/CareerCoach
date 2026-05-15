@@ -1,8 +1,7 @@
 import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClientOptions } from "mongodb";
 import { Service } from "../types/service";
-import type { Conversation } from "../routes/chat/conversation/conversation.model";
+import type { Conversation } from "../routes/conversation/conversation.model";
 import type { UserCareerProfileDocument } from "../routes/career-profile/career-profile.model";
-import type { ConversationMemoryDocument } from "../routes/chat/memory/conversation-memory.model";
 import type { CareerDirectionExample } from "../routes/chat/knowledge/career-knowledge.types";
 
 export class MongoClient implements Service {
@@ -11,7 +10,6 @@ export class MongoClient implements Service {
     private db: Db | null = null;
     private conversationsCollection: Collection<Conversation> | null = null;
     private careerProfilesCollection: Collection<UserCareerProfileDocument> | null = null;
-    private conversationMemoriesCollection: Collection<ConversationMemoryDocument> | null = null;
     private careerDirectionExamplesCollection: Collection<CareerDirectionExample> | null = null;
 
     constructor(config: DatabaseConfig) {
@@ -29,7 +27,6 @@ export class MongoClient implements Service {
             
             this.conversationsCollection = this.db.collection<Conversation>("conversations");
             this.careerProfilesCollection = this.db.collection<UserCareerProfileDocument>("userCareerProfiles");
-            this.conversationMemoriesCollection = this.db.collection<ConversationMemoryDocument>("conversationMemories");
             this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("careerDirectionExamples");
             await this.ensureIndexes();
             
@@ -45,23 +42,20 @@ export class MongoClient implements Service {
         this.db = null;
         this.conversationsCollection = null;
         this.careerProfilesCollection = null;
-        this.conversationMemoriesCollection = null;
         this.careerDirectionExamplesCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
     private ensureIndexes = async (): Promise<void> => {
-        if (!this.conversationsCollection || !this.careerProfilesCollection || !this.conversationMemoriesCollection || !this.careerDirectionExamplesCollection) {
+        if (!this.conversationsCollection || !this.careerProfilesCollection || !this.careerDirectionExamplesCollection) {
             return;
         }
         await this.conversationsCollection.createIndex({ userId: 1, updatedAt: -1 });
         await this.careerProfilesCollection.createIndex({ userId: 1 }, { unique: true });
-        await this.conversationMemoriesCollection.createIndex({ userId: 1, createdAt: -1 });
         await this.careerDirectionExamplesCollection.createIndex({ directionName: 1 });
 
         await Promise.all([
             this.createVectorSearchIndex(this.careerProfilesCollection.collectionName, "profileSummaryEmbedding", process.env.CAREER_PROFILE_VECTOR_INDEX_NAME || "career_profile_vector_index"),
-            this.createVectorSearchIndex(this.conversationMemoriesCollection.collectionName, "embedding", process.env.CONVERSATION_MEMORY_VECTOR_INDEX_NAME || "conversation_memory_vector_index"),
             this.createVectorSearchIndex(this.careerDirectionExamplesCollection.collectionName, "embedding", process.env.CAREER_DIRECTION_VECTOR_INDEX_NAME || "career_direction_vector_index"),
         ]);
     };
@@ -107,13 +101,6 @@ export class MongoClient implements Service {
             throw new Error("Career profiles collection is not initialized");
         }
         return this.careerProfilesCollection;
-    }
-
-    get conversationMemories(): Collection<ConversationMemoryDocument> {
-        if (!this.conversationMemoriesCollection) {
-            throw new Error("Conversation memories collection is not initialized");
-        }
-        return this.conversationMemoriesCollection;
     }
 
     get careerDirectionExamples(): Collection<CareerDirectionExample> {

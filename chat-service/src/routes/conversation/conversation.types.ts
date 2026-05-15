@@ -1,4 +1,11 @@
-import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
+import type { ObjectId } from "mongodb";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
+
+export type { UserAchievement };
+
+export type EnsureConversationExistsResult = {
+    conversationId: string;
+};
 
 export type ConversationRef = {
     userId: string;
@@ -20,6 +27,12 @@ export type ConversationResponse = {
 export type ConversationSummaryResponse = {
     conversationId: string;
     updatedAt: string;
+    previewText: string;
+};
+
+export type ConversationListRow = {
+    _id: ObjectId;
+    updatedAt: Date;
     previewText: string;
 };
 

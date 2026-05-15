@@ -1,11 +1,14 @@
+import type { FastifyRequest } from "fastify";
 import type {
     ChatMessageRequestBody,
     JobSearchPlanRequest,
     JobSearchRequest,
     JobSearchResultItem,
+    RawJobSearchResultItem,
     UserAchievementResponse,
     UserProfileResponse,
 } from "./chat.types";
+import type { ProfileInput } from "../conversation/conversation.types";
 import { z } from "zod";
 
 const toStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -45,6 +48,23 @@ export const hasUserIdAndConversationIdParams = (params: unknown): params is { u
     );
 };
 
+export const readOptionalConversationIdQuery = (request: FastifyRequest): string | undefined => {
+    const query = request.query;
+    if (typeof query !== "object" || query === null || !("conversationId" in query)) {
+        return undefined;
+    }
+    const value = (query as { conversationId?: unknown }).conversationId;
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+};
+
+export const readOptionalUserProfileFromBody = (body: unknown): ProfileInput | undefined => {
+    if (typeof body !== "object" || body === null || !("userProfile" in body)) {
+        return undefined;
+    }
+    const profile = (body as { userProfile: unknown }).userProfile;
+    return typeof profile === "object" && profile !== null ? (profile as ProfileInput) : undefined;
+};
+
 export const isAchievement = (value: unknown): value is UserAchievementResponse => {
     if (typeof value !== "object" || value === null) {
         return false;
@@ -79,7 +99,7 @@ export const normalizeSearchPlan = (plan: JobSearchPlanRequest): JobSearchPlanRe
         : [],
 });
 
-export const isJobSearchResultItem = (value: unknown): value is JobSearchResultItem => {
+export const isJobSearchResultItem = (value: unknown): value is RawJobSearchResultItem => {
     if (typeof value !== "object" || value === null) {
         return false;
     }
@@ -114,13 +134,19 @@ export const isJobSearchResultItem = (value: unknown): value is JobSearchResultI
     );
 };
 
-export const normalizeJobSearchResultItem = (job: JobSearchResultItem): JobSearchResultItem => ({
-    ...job,
+export const normalizeJobSearchResultItem = (job: RawJobSearchResultItem): JobSearchResultItem => ({
+    id: job.jobId,
+    title: job.jobTitle,
+    company: job.company ?? "",
+    seniority: job.seniority,
+    description: job.description,
     requirements: toStringArray(job.requirements),
     mustKnowSkills: toStringArray(job.mustKnowSkills),
     niceToHaveSkills: toStringArray(job.niceToHaveSkills),
     benefits: toStringArray(job.benefits),
+    salary: typeof job.salary === "number" ? job.salary : null,
     location: typeof job.location === "string" ? job.location : null,
+    url: job.url,
 });
 
 const userAchievementResponseSchema = z.object({

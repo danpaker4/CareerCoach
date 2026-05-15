@@ -1,9 +1,8 @@
-import type { AttachedJobSnapshot } from "../chat.model";
-import type { Conversation } from "../conversation/conversation.model";
-import type { ConversationStage } from "../conversation/conversation.stage.consts";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
+import type { Conversation } from "../../conversation/conversation.model";
+import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
-import type { ConversationMemory } from "../memory/conversation-memory.types";
-import type { ConversationMode } from "../coach/conversation-mode.types";
+import type { ConversationMode } from "../conversation-mode/conversation-mode.types";
 
 const MAX_JOB_DESCRIPTION_CHARS = 1200;
 
@@ -35,15 +34,10 @@ const buildHistory = (conversation: Conversation): string =>
         })
         .join("\n");
 
-const achievementsText = (conversation: Conversation): string =>
-    conversation.achievements.length === 0
+const achievementsText = (userAchievements: readonly UserAchievement[]): string =>
+    userAchievements.length === 0
         ? "No achievements available yet."
-        : conversation.achievements.map((achievement) => `- ${achievement.name}`).join("\n");
-
-const memoryText = (memories: readonly ConversationMemory[]): string =>
-    memories.length === 0
-        ? "No memory snippets available."
-        : memories.map((memory) => `- [${memory.type}] ${memory.text}`).join("\n");
+        : userAchievements.map((achievement) => `- ${achievement.name}`).join("\n");
 
 const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
@@ -51,7 +45,7 @@ const DEFAULT_USER_ACCOUNT_CONTEXT =
 export const buildDecisionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
-    memories: readonly ConversationMemory[] = [],
+    userAchievements: readonly UserAchievement[],
     mode: ConversationMode = "GUIDED",
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
@@ -93,16 +87,13 @@ Rules:
 - When Known account context lists CV text, technologies, interests, or GitHub skills, use them to personalize replies and searchFilters; do not ask the user to repeat that entire background unless you need one missing clarification.
 
 User achievements:
-${achievementsText(conversation)}
+${achievementsText(userAchievements)}
 
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}
 
 Conversation mode:
 ${mode}
-
-Relevant user memory snippets:
-${memoryText(memories)}
 
 Conversation so far:
 ${buildHistory(conversation)}
@@ -115,7 +106,7 @@ export const buildRecommendationPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     jobs: readonly JobSearchResultItem[],
-    memories: readonly ConversationMemory[] = [],
+    userAchievements: readonly UserAchievement[],
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are CareerCoach AI.
@@ -133,7 +124,7 @@ Respond ONLY with valid JSON in this exact structure:
 }
 
 You can recommend ONLY from these jobs:
-${jobs.map((job) => `- jobId: ${job.jobId}, title: ${job.jobTitle}, company: ${job.company ?? ""}, salary: ${typeof job.salary === "number" ? job.salary : "n/a"}, seniority: ${job.seniority}, description: ${job.description}`).join("\n")}
+${jobs.map((job) => `- jobId: ${job.id}, title: ${job.title}, company: ${job.company}, salary: ${job.salary ?? "n/a"}, seniority: ${job.seniority}, description: ${job.description}`).join("\n")}
 
 Strict rules:
 - Every recommendedJobIds value must match a listed jobId.
@@ -151,13 +142,10 @@ Strict rules:
 - Do not ask the user to describe day-to-day job duties unless it is strictly required to resolve ambiguity.
 
 User achievements:
-${achievementsText(conversation)}
+${achievementsText(userAchievements)}
 
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}
-
-Relevant user memory snippets:
-${memoryText(memories)}
 
 Conversation so far:
 ${buildHistory(conversation)}
@@ -170,6 +158,7 @@ export const buildStagePrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     stage: ConversationStage,
+    userAchievements: readonly UserAchievement[],
     mode: ConversationMode = "GUIDED",
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
@@ -223,7 +212,7 @@ Conversation strategy (apply the branch that fits the user):
 3. Enough signal to suggest relevant job directions after stages complete.
 
 User achievements:
-${achievementsText(conversation)}
+${achievementsText(userAchievements)}
 
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}

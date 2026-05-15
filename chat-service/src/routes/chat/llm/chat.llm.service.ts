@@ -1,9 +1,9 @@
 import type { TextCompletionPort } from "../../../ai/ports/text-completion.types";
-import type { Conversation } from "../conversation/conversation.model";
-import type { ConversationStage } from "../conversation/conversation.stage.consts";
+import type { UserAchievement } from "../chat.model";
+import type { Conversation } from "../../conversation/conversation.model";
+import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
-import type { ConversationMode } from "../coach/conversation-mode.types";
-import type { ConversationMemory } from "../memory/conversation-memory.types";
+import type { ConversationMode } from "../conversation-mode/conversation-mode.types";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,
@@ -19,12 +19,12 @@ export class ChatLlmService {
     decideNextStep = async (
         conversation: Conversation,
         latestUserMessage: string,
-        memories: readonly ConversationMemory[] = [],
+        userAchievements: readonly UserAchievement[],
         mode: ConversationMode = "GUIDED",
         userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildDecisionPrompt(conversation, latestUserMessage, memories, mode, userAccountContext)
+            buildDecisionPrompt(conversation, latestUserMessage, userAchievements, mode, userAccountContext)
         );
 
         try {
@@ -43,11 +43,11 @@ export class ChatLlmService {
         conversation: Conversation,
         latestUserMessage: string,
         jobs: readonly JobSearchResultItem[],
-        memories: readonly ConversationMemory[] = [],
+        userAchievements: readonly UserAchievement[],
         userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildRecommendationPrompt(conversation, latestUserMessage, jobs, memories, userAccountContext)
+            buildRecommendationPrompt(conversation, latestUserMessage, jobs, userAchievements, userAccountContext)
         );
 
         try {
@@ -56,7 +56,7 @@ export class ChatLlmService {
             return {
                 reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
-                recommendedJobIds: jobs.map((job) => job.jobId),
+                recommendedJobIds: jobs.map((job) => job.id),
                 searchFilters: EMPTY_LLM_SEARCH_FILTERS,
             };
         }
@@ -66,10 +66,13 @@ export class ChatLlmService {
         conversation: Conversation,
         latestUserMessage: string,
         stage: ConversationStage,
+        userAchievements: readonly UserAchievement[],
         mode: ConversationMode = "GUIDED",
         userAccountContext?: string
     ): Promise<StageLlmDecision> => {
-        const rawText = await this.textCompletion.complete(buildStagePrompt(conversation, latestUserMessage, stage, mode, userAccountContext));
+        const rawText = await this.textCompletion.complete(
+            buildStagePrompt(conversation, latestUserMessage, stage, userAchievements, mode, userAccountContext)
+        );
         try {
             return parseStageLlmDecisionFromJson(rawText);
         } catch {
