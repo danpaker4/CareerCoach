@@ -1,10 +1,10 @@
 import type { ConversationStageProgress } from "../conversation/conversation.model";
-import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
+import type { ConversationMode } from "./chat-mode/conversation-mode.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { Conversation } from "../conversation/conversation.model";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
 import type { UserAchievement } from "./chat.model";
-import type { ConversationRef, ProfileInput } from "../conversation/conversation.types";
+import type { ProfileInput } from "../conversation/conversation.types";
 import type { JobFollowUpIntentResult } from "./job-context/job-follow-up-intent.service";
 
 export type DomainExplorationTarget = {
@@ -22,8 +22,8 @@ export type PrepareSendMessageContextParams = {
 };
 
 export type SendMessagePreparedContext = {
-    ref: ConversationRef;
     userId: string;
+    conversationId: string;
     normalizedMessage: string;
     profile: ProfileInput | undefined;
     userAchievements: UserAchievement[];

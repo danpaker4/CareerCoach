@@ -1,4 +1,4 @@
-import type { ConversationRef, ProfileInput } from "../conversation/conversation.types";
+import type { ProfileInput } from "../conversation/conversation.types";
 import type { Conversation } from "../conversation/conversation.model";
 import type { ChatMessageResponse } from "./chat.types";
 import { ChatConversationService } from "../conversation/conversation.service";
@@ -8,16 +8,18 @@ import { ChatValidationService } from "./llm/chat.validation.service";
 import { ChatExternalService } from "../external-chat/chat.external.service";
 import { CareerProfileService } from "../career-profile/career-profile.service";
 import { ConfidenceService } from "./confidence/confidence.service";
-import { ConversationModeService } from "./conversation-mode/conversation-mode.service";
-import { AchievementInferenceService } from "./inference/achievement-inference.service";
-import { WorkStyleInferenceService } from "./inference/work-style-inference.service";
+import { ConversationModeService } from "./chat-mode/conversation-mode.service";
+import { AchievementInferenceService } from "./inference/achievement-inference/achievement-inference.service";
+import type { AchievementInferenceResult } from "./inference/achievement-inference/achievement-inference.types";
+import { toUserAchievementFromInferred } from "./inference/achievement-inference/achievement-inference.utils";
+import { WorkStyleInferenceService } from "./inference/work-style-inference/work-style-inference.service";
 import { JobSearchPlanService } from "./search/job-search-plan.service";
 import { JobRankingService } from "./ranking/job-ranking.service";
 import { buildUserAccountContext } from "./llm/chat.user-account-context.utils";
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
-import type { CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "../career-profile/career-profile.types";
+import type { CareerProfileSignalUpdate, UserCareerProfile } from "../career-profile/career-profile.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
-import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
+import type { ConversationMode } from "./chat-mode/conversation-mode.types";
 import type { JobSearchResultItem } from "./chat.types";
 import type { SanitizedJob, JobRecommendationContextState } from "./job-context/job-context.types";
 import { JobFollowUpIntentService } from "./job-context/job-follow-up-intent.service";
@@ -46,6 +48,7 @@ import {
     withPipelineClosing,
 } from "./chat.job-presentation.utils";
 import { resolveSelectedJobFromRecommendations } from "./chat.job-mapping.utils";
+import { toSignal } from "./chat.service.utils";
 
 export class ChatService {
     constructor(
@@ -69,47 +72,49 @@ export class ChatService {
         private readonly pipelineService: PipelineService
     ) { }
 
-    private toSignal = (value: string, confidence: number, evidence: string, source: CareerSignal["source"]): CareerSignal => ({
-        value,
-        confidence,
-        evidence: [evidence],
-        source,
-        updatedAt: new Date(),
-    });
-
     private toSignalUpdateFromInferences = (
         message: string,
         achievementSkills: readonly string[],
         inferredSkills: readonly string[],
         workStyleSignals: readonly string[]
     ): CareerProfileSignalUpdate => ({
-        strengths: inferredSkills.map((skill) => this.toSignal(skill, 0.7, message, "llm_inference")),
-        technologies: achievementSkills.map((skill) => this.toSignal(skill, 0.86, message, "chat")),
-        workStyle: workStyleSignals.map((signal) => this.toSignal(signal, 0.75, message, "llm_inference")),
+        strengths: inferredSkills.map((skill) => toSignal(skill, 0.7, message, "llm_inference")),
+        technologies: achievementSkills.map((skill) => toSignal(skill, 0.86, message, "chat")),
+        workStyle: workStyleSignals.map((signal) => toSignal(signal, 0.75, message, "llm_inference")),
         extractedKeywords: [...achievementSkills, ...inferredSkills, ...workStyleSignals]
-            .map((keyword) => this.toSignal(keyword, 0.6, message, "llm_inference")),
+            .map((keyword) => toSignal(keyword, 0.6, message, "llm_inference")),
     });
 
+    private updateUserAchievements = async (userId: string, achievementInference: AchievementInferenceResult): Promise<void> => {
+        await this.externalService
+            .applyInferredAchievementSignals(userId, {
+                technologies: achievementInference.skills,
+                knownSkills: achievementInference.inferredSkills,
+                achievements: achievementInference.achievements.map(toUserAchievementFromInferred),
+            })
+            .catch(() => null);
+    };
+
     private handlePipelineAccept = async (params: {
-        ref: ConversationRef;
+        conversationId: string;
         userId: string;
         jobContext: NonNullable<Conversation["jobContext"]>;
         mode: ConversationMode;
         confidenceSummary: ConfidenceSummary;
     }): Promise<ChatMessageResponse> => {
-        const { ref, userId, jobContext, mode, confidenceSummary } = params;
+        const { conversationId, userId, jobContext, mode, confidenceSummary } = params;
         const job = jobContext.selectedJobSnapshot;
         const rec = jobContext.jobRecommendationContext;
         if (!job || !rec) {
             const reply = "I do not have an active job recommendation to add yet. Ask me for roles and I will suggest one.";
-            await this.conversationService.appendAssistantMessage(ref, reply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
         const result = await this.pipelineService.addJobToPipeline(userId, job);
         if (result.status === "error") {
             const reply =
                 "I could not add that role to your pipeline from here. You can add it from the Jobs page, or tell me if you want to keep exploring other roles.";
-            await this.conversationService.appendAssistantMessage(ref, reply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
         const acceptedIds = rec.acceptedJobIds.includes(job.id) ? rec.acceptedJobIds : [...rec.acceptedJobIds, job.id];
@@ -129,13 +134,14 @@ export class ChatService {
             },
             updatedAt: now,
         };
-        await this.conversationService.saveJobContext(ref, nextContext);
-        await this.conversationService.appendAssistantMessage(ref, reply);
+        await this.conversationService.saveJobContext(userId, conversationId, nextContext);
+        await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
         return { reply, mode, confidenceSummary };
     };
 
     private pipelineRejectPresentNextSanitizedJob = async (params: {
-        ref: ConversationRef;
+        userId: string;
+        conversationId: string;
         jobContext: NonNullable<Conversation["jobContext"]>;
         nextSanitized: SanitizedJob;
         rejectedIds: string[];
@@ -144,7 +150,7 @@ export class ChatService {
         mode: ConversationMode;
         confidenceSummary: ConfidenceSummary;
     }): Promise<ChatMessageResponse> => {
-        const { ref, jobContext, nextSanitized, rejectedIds, rec, userCareerProfile, mode, confidenceSummary } = params;
+        const { userId, conversationId, jobContext, nextSanitized, rejectedIds, rec, userCareerProfile, mode, confidenceSummary } = params;
         const ranked = this.rankingService.rankJobs(userCareerProfile, [nextSanitized]);
         const top = ranked[0];
         const reasonsText = top.reasons.join(" ");
@@ -166,14 +172,14 @@ export class ChatService {
             },
             updatedAt: now,
         };
-        await this.conversationService.saveJobContext(ref, nextContext);
+        await this.conversationService.saveJobContext(userId, conversationId, nextContext);
         const jobMatches = [mapRankedJobResultToChatMatchRow(top)];
-        await this.conversationService.appendAssistantMessage(ref, reply, [nextSanitized]);
+        await this.conversationService.appendAssistantMessage(userId, conversationId, reply, [nextSanitized]);
         return { reply, jobs: [nextSanitized], jobMatches, mode, confidenceSummary };
     };
 
     private pipelineRejectRunBroaderRefill = async (params: {
-        ref: ConversationRef;
+        conversationId: string;
         userId: string;
         normalizedMessage: string;
         conversation: Conversation;
@@ -187,8 +193,8 @@ export class ChatService {
         confidenceSummary: ConfidenceSummary;
     }): Promise<ChatMessageResponse> => {
         const {
-            ref,
             userId,
+            conversationId,
             normalizedMessage,
             conversation,
             jobContext,
@@ -208,7 +214,7 @@ export class ChatService {
             const reply =
                 "I do not have another stored match right now, and a broader search did not surface a new role yet. Try naming a nearby title or domain you are curious about, and I will search again.";
             const now = new Date();
-            await this.conversationService.saveJobContext(ref, {
+            await this.conversationService.saveJobContext(userId, conversationId, {
                 ...jobContext,
                 jobRecommendationContext: {
                     ...rec,
@@ -218,7 +224,7 @@ export class ChatService {
                 },
                 updatedAt: now,
             });
-            await this.conversationService.appendAssistantMessage(ref, reply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
         const rankedJobs = this.rankingService.rankJobs(userCareerProfile, filteredJobs);
@@ -226,12 +232,12 @@ export class ChatService {
         const focusJob = orderedPool[0] ?? null;
         if (!focusJob) {
             const reply = "I could not find another role to suggest yet. Tell me a role family or skill area to lean into, and I will search again.";
-            await this.conversationService.appendAssistantMessage(ref, reply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
         return await this.pipelineRejectFinalizeBroaderRefill({
-            ref,
             userId,
+            conversationId,
             normalizedMessage,
             conversation,
             jobContext,
@@ -248,7 +254,7 @@ export class ChatService {
     };
 
     private pipelineRejectFinalizeBroaderRefill = async (params: {
-        ref: ConversationRef;
+        conversationId: string;
         userId: string;
         normalizedMessage: string;
         conversation: Conversation;
@@ -264,7 +270,7 @@ export class ChatService {
         focusJob: JobSearchResultItem;
     }): Promise<ChatMessageResponse> => {
         const {
-            ref,
+            conversationId,
             userId,
             normalizedMessage,
             conversation,
@@ -295,7 +301,7 @@ export class ChatService {
         );
         const selectedJob = validatedAfterFallback.validatedJobs[0] ?? focusJob;
         const queryLabel = jobContext.lastSearchQuery ?? "your direction";
-        await this.conversationService.saveJobContext(ref, {
+        await this.conversationService.saveJobContext(userId, conversationId, {
             ...jobContext,
             jobRecommendationContext: {
                 ...rec,
@@ -304,7 +310,8 @@ export class ChatService {
             updatedAt: new Date(),
         });
         await this.conversationService.setJobContextAfterSearch(
-            ref,
+            userId,
+            conversationId,
             orderedPool,
             selectedJob,
             queryLabel,
@@ -314,7 +321,7 @@ export class ChatService {
         const rankedForMatches = this.rankingService.rankJobs(userCareerProfile, presentationJobs);
         const jobMatches = rankedForMatches.map((item) => mapRankedJobResultToChatMatchRow(item));
         const reply = withPipelineClosing(validatedAfterFallback.sanitizedReply);
-        await this.conversationService.appendAssistantMessage(ref, reply, presentationJobs);
+        await this.conversationService.appendAssistantMessage(userId, conversationId, reply, presentationJobs);
         return {
             reply,
             jobs: presentationJobs,
@@ -325,7 +332,7 @@ export class ChatService {
     };
 
     private handlePipelineReject = async (params: {
-        ref: ConversationRef;
+        conversationId: string;
         userId: string;
         normalizedMessage: string;
         conversation: Conversation;
@@ -335,12 +342,12 @@ export class ChatService {
         confidenceSummary: ConfidenceSummary;
         userAccountContext: string;
     }): Promise<ChatMessageResponse> => {
-        const { ref, userId, normalizedMessage, conversation, jobContext, userCareerProfile, mode, confidenceSummary, userAccountContext } = params;
+        const { conversationId, userId, normalizedMessage, conversation, jobContext, userCareerProfile, mode, confidenceSummary, userAccountContext } = params;
         const job = jobContext.selectedJobSnapshot;
         const rec = jobContext.jobRecommendationContext;
         if (!job || !rec) {
             const reply = "I do not have an active job recommendation to skip. Ask me for roles and I will suggest one.";
-            await this.conversationService.appendAssistantMessage(ref, reply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
         const rejectedIds = rec.rejectedJobIds.includes(job.id) ? rec.rejectedJobIds : [...rec.rejectedJobIds, job.id];
@@ -350,7 +357,8 @@ export class ChatService {
 
         if (nextSanitized) {
             return await this.pipelineRejectPresentNextSanitizedJob({
-                ref,
+                conversationId,
+                userId,
                 jobContext,
                 nextSanitized,
                 rejectedIds,
@@ -362,7 +370,7 @@ export class ChatService {
         }
 
         return await this.pipelineRejectRunBroaderRefill({
-            ref,
+            conversationId,
             userId,
             normalizedMessage,
             conversation,
@@ -378,19 +386,21 @@ export class ChatService {
     };
 
     private resolveStageFlowForSendMessage = async (params: {
-        ref: ConversationRef;
         normalizedMessage: string;
         conversationAfterUserMessage: Conversation;
         currentStage: ReturnType<ConversationStageService["getCurrentStage"]>;
         shouldSkipStages: boolean;
         mode: ConversationMode;
+        userId: string;
+        conversationId: string;
         userAccountContext: string;
         userAchievements: SendMessagePreparedContext["userAchievements"];
         stageProgressWithNote: Conversation["stageProgress"];
         confidenceSummary: ConfidenceSummary;
     }): Promise<StageFlowSendMessageResult> => {
         const {
-            ref,
+            conversationId,
+            userId,
             normalizedMessage,
             conversationAfterUserMessage,
             currentStage,
@@ -428,8 +438,8 @@ export class ChatService {
         };
         const nextStage = this.stageService.getCurrentStage(conversationAfterStageAdvance, normalizedMessage);
         if (nextStage) {
-            await this.conversationService.updateStageProgress(ref, nextStageProgress);
-            await this.conversationService.appendAssistantMessage(ref, stageReply.reply);
+            await this.conversationService.updateStageProgress(userId, conversationId, nextStageProgress);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, stageReply.reply);
             return {
                 kind: "stage_reply_only",
                 progress: nextStageProgress,
@@ -442,7 +452,8 @@ export class ChatService {
     };
 
     private respondAfterWorkDirectionSearch = async (params: {
-        ref: ConversationRef;
+        conversationId: string;
+        userId: string;
         normalizedMessage: string;
         conversationAfterUserMessage: Conversation;
         userCareerProfile: UserCareerProfile;
@@ -454,7 +465,8 @@ export class ChatService {
         confidenceSummary: ConfidenceSummary;
     }): Promise<ChatMessageResponse> => {
         const {
-            ref,
+            conversationId,
+            userId,
             normalizedMessage,
             conversationAfterUserMessage,
             userCareerProfile,
@@ -475,7 +487,7 @@ export class ChatService {
         if (orderedRankedPool.length === 0) {
             const exhaustedReply =
                 "Every match in the current list was already skipped or saved. Tell me a nearby title, skill, or domain to lean into and I will run a broader search.";
-            await this.conversationService.appendAssistantMessage(ref, exhaustedReply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, exhaustedReply);
             return { reply: exhaustedReply, mode, confidenceSummary };
         }
         const topRankedJobs = orderedRankedPool.map((item) => item.job);
@@ -498,7 +510,8 @@ export class ChatService {
         const sanitizedReply = withPipelineClosing(fallbackPack.sanitizedReply);
         const selectedJob = resolveSelectedJobFromRecommendations(fallbackPack.validatedJobs, validJobIds) ?? focusJob;
         await this.conversationService.setJobContextAfterSearch(
-            ref,
+            userId,
+            conversationId,
             topRankedJobs,
             selectedJob,
             normalizedQuery,
@@ -509,7 +522,7 @@ export class ChatService {
         const jobMatches = rankedJobs
             .filter((item) => item.jobId === primaryJobId)
             .map((item) => mapRankedJobResultToChatMatchRow(item));
-        await this.conversationService.appendAssistantMessage(ref, sanitizedReply, presentationJobs);
+        await this.conversationService.appendAssistantMessage(userId, conversationId, sanitizedReply, presentationJobs);
         return {
             reply: sanitizedReply,
             jobs: presentationJobs.length > 0 ? presentationJobs : fallbackPack.validatedJobs,
@@ -520,7 +533,8 @@ export class ChatService {
     };
 
     private respondAfterSearchPlan = async (params: {
-        ref: ConversationRef;
+        userId: string;
+        conversationId: string;
         normalizedMessage: string;
         conversationForDecision: Conversation;
         userCareerProfile: UserCareerProfile;
@@ -532,7 +546,8 @@ export class ChatService {
         domainExplorationTarget: ReturnType<typeof detectDomainExplorationTarget>;
     }): Promise<ChatMessageResponse> => {
         const {
-            ref,
+            userId,
+            conversationId,
             normalizedMessage,
             conversationForDecision,
             userCareerProfile,
@@ -553,7 +568,7 @@ export class ChatService {
         if (orderedRankedPool.length === 0) {
             const exhaustedReply =
                 "Every match in the current list was already skipped or saved. Tell me a nearby title, skill, or domain to lean into and I will run a broader search.";
-            await this.conversationService.appendAssistantMessage(ref, exhaustedReply);
+            await this.conversationService.appendAssistantMessage(userId, conversationId, exhaustedReply);
             return { reply: exhaustedReply, mode, confidenceSummary };
         }
         const topRankedJobs = orderedRankedPool.map((item) => item.job);
@@ -576,7 +591,8 @@ export class ChatService {
         const sanitizedReply = withPipelineClosing(fallbackPack.sanitizedReply);
         const selectedJob = resolveSelectedJobFromRecommendations(fallbackPack.validatedJobs, validJobIds) ?? focusJob;
         await this.conversationService.setJobContextAfterSearch(
-            ref,
+            userId,
+            conversationId,
             topRankedJobs,
             selectedJob,
             normalizedMessage,
@@ -591,7 +607,7 @@ export class ChatService {
             .filter((item) => item.jobId === primaryJobId)
             .map((item) => mapRankedJobResultToChatMatchRow(item));
 
-        await this.conversationService.appendAssistantMessage(ref, replyWithDomainContext, presentationJobs);
+        await this.conversationService.appendAssistantMessage(userId, conversationId, replyWithDomainContext, presentationJobs);
 
         return {
             reply: replyWithDomainContext,
@@ -605,39 +621,33 @@ export class ChatService {
 
     private prepareSendMessageContext = async (params: PrepareSendMessageContextParams): Promise<SendMessagePreparedContext> => {
         const { userId, normalizedMessage, profile, requestedConversationId } = params;
-        const { conversationId: resolvedConversationId } = await this.conversationService.ensureConversationExists(
-            userId,
-            requestedConversationId
-        );
-        const ref: ConversationRef = { userId, conversationId: resolvedConversationId };
+        const { conversationId } = await this.conversationService.ensureConversationExists(userId, requestedConversationId);
         await this.profileService.updateProfileFromInput(userId, profile);
-        await this.conversationService.appendUserMessage(ref, normalizedMessage);
+        await this.conversationService.appendUserMessage(userId, conversationId, normalizedMessage);
 
         const serverUser = await this.externalService.readUserPublicProfile(userId).catch(() => null);
         const userAccountContext = buildUserAccountContext({ serverUser, profile });
 
-        const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(ref);
+        const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(userId, conversationId);
         const userAchievements = await this.externalService.readUserAchievements(userId);
         const baseCareerProfile = await this.profileService.getOrCreateProfile(userId);
         const achievementInference = this.achievementInferenceService.inferFromMessage(normalizedMessage);
         const workStyleInference = this.workStyleInferenceService.inferFromMessage(normalizedMessage);
-        const aggregatedExplicitSkills = [...new Set(achievementInference.achievements.flatMap((item) => item.skills))];
-        const aggregatedInferredSkills = [...new Set(achievementInference.achievements.flatMap((item) => item.inferredSkills))];
         const inferredSignalUpdate = this.toSignalUpdateFromInferences(
             normalizedMessage,
-            aggregatedExplicitSkills,
-            aggregatedInferredSkills,
+            achievementInference.skills,
+            achievementInference.inferredSkills,
             workStyleInference.signals
         );
         const userCareerProfile = await this.profileService.mergeProfileSignals(baseCareerProfile, inferredSignalUpdate);
-        await this.externalService.upsertKnownSkills(userId, aggregatedExplicitSkills).catch(() => null);
+        await this.updateUserAchievements(userId, achievementInference);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile);
         const mode = this.modeService.detectMode(normalizedMessage, confidenceSummary);
         const followUpIntent = this.followUpIntentService.detect(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
         return {
-            ref,
             userId,
+            conversationId,
             normalizedMessage,
             profile,
             userAchievements,
@@ -658,8 +668,8 @@ export class ChatService {
         const pipelineIntent = awaitingPipelineDecision ? this.pipelineIntentService.detect(ctx.normalizedMessage) : null;
         if (pipelineIntent === "PIPELINE_ACCEPT" && ctx.jobContext) {
             return await this.handlePipelineAccept({
-                ref: ctx.ref,
                 userId: ctx.userId,
+                conversationId: ctx.conversationId,
                 jobContext: ctx.jobContext,
                 mode: ctx.mode,
                 confidenceSummary: ctx.confidenceSummary,
@@ -667,8 +677,8 @@ export class ChatService {
         }
         if (pipelineIntent === "PIPELINE_REJECT" && ctx.jobContext) {
             return await this.handlePipelineReject({
-                ref: ctx.ref,
                 userId: ctx.userId,
+                conversationId: ctx.conversationId,
                 normalizedMessage: ctx.normalizedMessage,
                 conversation: ctx.conversationAfterUserMessage,
                 jobContext: ctx.jobContext,
@@ -693,12 +703,12 @@ export class ChatService {
         );
         if (resolution.status === "missing") {
             const missingMessage = "I do not have stored jobs in context yet. Ask me for jobs first, and I will keep them for follow-up questions.";
-            await this.conversationService.appendAssistantMessage(ctx.ref, missingMessage);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, missingMessage);
             return { reply: missingMessage, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
         if (resolution.status === "ambiguous") {
             const question = this.followUpAnswerService.buildDisambiguationQuestion(resolution.options);
-            await this.conversationService.appendAssistantMessage(ctx.ref, question);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, question);
             return { reply: question, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
@@ -708,8 +718,8 @@ export class ChatService {
             ctx.normalizedMessage,
             ctx.userCareerProfile
         );
-        await this.conversationService.setSelectedJob(ctx.ref, resolution.job);
-        await this.conversationService.appendAssistantMessage(ctx.ref, followUpReply);
+        await this.conversationService.setSelectedJob(ctx.userId, ctx.conversationId, resolution.job);
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, followUpReply);
         return { reply: followUpReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
     };
 
@@ -733,12 +743,13 @@ export class ChatService {
             const fallback = normalizedQuery.toLowerCase().includes("cyber")
                 ? `I searched for ${normalizedQuery} roles but didn’t find exact matches. I can broaden it to beginner-friendly cybersecurity roles like SOC Analyst, Cybersecurity Analyst, Security QA, or Vulnerability Analyst.`
                 : `I searched for ${normalizedQuery} roles but didn’t find exact matches. I can broaden this to related beginner-friendly roles and adjacent directions.`;
-            await this.conversationService.appendAssistantMessage(ctx.ref, fallback);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, fallback);
             return { reply: fallback, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
         return await this.respondAfterWorkDirectionSearch({
-            ref: ctx.ref,
+            userId: ctx.userId,
+            conversationId: ctx.conversationId,
             normalizedMessage: ctx.normalizedMessage,
             conversationAfterUserMessage: ctx.conversationAfterUserMessage,
             userCareerProfile: ctx.userCareerProfile,
@@ -781,13 +792,13 @@ export class ChatService {
 
         if (ctx.mode === "DEEP_DISCOVERY" && !shouldSearchJobs && ctx.confidenceSummary.discoveryConfidence < JOB_SEARCH_DEEP_DISCOVERY_DISCOVERY_MIN) {
             const question = buildDiscoveryQuestion(ctx.normalizedMessage);
-            await this.conversationService.appendAssistantMessage(ctx.ref, question);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, question);
             return { reply: question, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
         if (!shouldSearchJobs) {
             const sanitizedReply = this.validationService.sanitizeReply(llmDecision.reply);
-            await this.conversationService.appendAssistantMessage(ctx.ref, sanitizedReply);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, sanitizedReply);
             return { reply: sanitizedReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
@@ -799,12 +810,13 @@ export class ChatService {
         console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=SEARCH_PLAN results=${jobs.length}`);
         if (jobs.length === 0) {
             const noJobsReply = "I could not find matching jobs yet. Want me to broaden the search toward adjacent roles based on what you enjoy?";
-            await this.conversationService.appendAssistantMessage(ctx.ref, noJobsReply);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, noJobsReply);
             return { reply: noJobsReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
         return await this.respondAfterSearchPlan({
-            ref: ctx.ref,
+            userId: ctx.userId,
+            conversationId: ctx.conversationId,
             normalizedMessage: ctx.normalizedMessage,
             conversationForDecision,
             userCareerProfile: ctx.userCareerProfile,
@@ -837,7 +849,8 @@ export class ChatService {
             : ctx.conversationAfterUserMessage.stageProgress;
         const shouldSkipStages = isStageSkipRequested(ctx.normalizedMessage) || forceDomainExplorationSearch;
         const stageFlow = await this.resolveStageFlowForSendMessage({
-            ref: ctx.ref,
+            userId: ctx.userId,
+            conversationId: ctx.conversationId,
             normalizedMessage: ctx.normalizedMessage,
             conversationAfterUserMessage: ctx.conversationAfterUserMessage,
             currentStage,
@@ -857,7 +870,7 @@ export class ChatService {
             };
         }
 
-        await this.conversationService.updateStageProgress(ctx.ref, stageFlow.progress);
+        await this.conversationService.updateStageProgress(ctx.userId, ctx.conversationId, stageFlow.progress);
 
         const conversationForDecision = {
             ...ctx.conversationAfterUserMessage,

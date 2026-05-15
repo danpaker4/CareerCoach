@@ -1,5 +1,4 @@
 import type {
-    ConversationRef,
     ConversationResponse,
     ConversationSummaryResponse,
     EnsureConversationExistsResult,
@@ -12,7 +11,7 @@ import {
     InvalidConversationIdError,
     toAttachedJobSnapshots,
     toConversationResponse,
-    toRefObjectId,
+    parseConversationObjectIdOrThrow,
     tryParseConversationObjectId,
 } from "./conversation.utils";
 import { ConversationStageService } from "./conversation.stage.service";
@@ -69,9 +68,8 @@ export class ChatConversationService {
         return { conversationId: created._id!.toHexString() };
     };
 
-    getConversationOrThrow = async (ref: ConversationRef): Promise<Conversation> => {
-        const objectId = toRefObjectId(ref);
-        const conversation = await this.repository.findByIdAndUserId(objectId, ref.userId);
+    getConversationOrThrow = async (userId: string, conversationId: string): Promise<Conversation> => {
+        const conversation = await this.repository.findByIdAndUserId(parseConversationObjectIdOrThrow(conversationId), userId);
         if (!conversation) {
             throw new ConversationNotFoundError();
         }
@@ -80,7 +78,7 @@ export class ChatConversationService {
 
     getConversationResponse = async (userId: string, requestedConversationId?: string): Promise<ConversationResponse> => {
         const { conversationId } = await this.ensureConversationExists(userId, requestedConversationId);
-        const conversation = await this.getConversationOrThrow({ userId, conversationId });
+        const conversation = await this.getConversationOrThrow(userId, conversationId);
         const achievements = await this.chatExternalService.readUserAchievements(userId);
         return toConversationResponse(conversation, achievements);
     };
@@ -93,9 +91,8 @@ export class ChatConversationService {
         await this.repository.deleteByIdAndUserId(objectId, userId);
     };
 
-    appendUserMessage = async (ref: ConversationRef, content: string): Promise<void> => {
-        const objectId = toRefObjectId(ref);
-        await this.repository.appendMessage(ref.userId, objectId, {
+    appendUserMessage = async (userId: string, conversationId: string, content: string): Promise<void> => {
+        await this.repository.appendMessage(userId, parseConversationObjectIdOrThrow(conversationId), {
             role: "user",
             content,
             timestamp: new Date(),
@@ -103,13 +100,13 @@ export class ChatConversationService {
     };
 
     appendAssistantMessage = async (
-        ref: ConversationRef,
+        userId: string,
+        conversationId: string,
         content: string,
         attachedJobs?: readonly JobSearchResultItem[]
     ): Promise<void> => {
-        const objectId = toRefObjectId(ref);
         const snapshots = attachedJobs && attachedJobs.length > 0 ? toAttachedJobSnapshots(attachedJobs) : undefined;
-        await this.repository.appendMessage(ref.userId, objectId, {
+        await this.repository.appendMessage(userId, parseConversationObjectIdOrThrow(conversationId), {
             role: "assistant",
             content,
             timestamp: new Date(),
@@ -117,25 +114,24 @@ export class ChatConversationService {
         });
     };
 
-    updateStageProgress = async (ref: ConversationRef, stageProgress: ConversationStageProgress): Promise<void> => {
-        const objectId = toRefObjectId(ref);
-        await this.repository.updateStageProgress(ref.userId, objectId, stageProgress);
+    updateStageProgress = async (userId: string, conversationId: string, stageProgress: ConversationStageProgress): Promise<void> => {
+        await this.repository.updateStageProgress(userId, parseConversationObjectIdOrThrow(conversationId), stageProgress);
     };
 
-    saveJobContext = async (ref: ConversationRef, jobContext: ConversationJobContext): Promise<void> => {
-        const objectId = toRefObjectId(ref);
-        await this.repository.updateJobContext(ref.userId, objectId, jobContext);
+    saveJobContext = async (userId: string, conversationId: string, jobContext: ConversationJobContext): Promise<void> => {
+        await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
     };
 
     setJobContextAfterSearch = async (
-        ref: ConversationRef,
+        userId: string,
+        conversationId: string,
         jobs: readonly JobSearchResultItem[],
         selection: JobSearchResultItem | null,
         lastSearchQuery: string | null,
         lastSearchIntent: string | null
     ): Promise<void> => {
         const now = new Date();
-        const conversation = await this.getConversationOrThrow(ref);
+        const conversation = await this.getConversationOrThrow(userId, conversationId);
         const prevRec = conversation.jobContext?.jobRecommendationContext;
         const mergedRejected = [...new Set([...(prevRec?.rejectedJobIds ?? [])])];
         const mergedAccepted = [...new Set([...(prevRec?.acceptedJobIds ?? [])])];
@@ -176,11 +172,11 @@ export class ChatConversationService {
             updatedAt: now,
             jobRecommendationContext,
         };
-        await this.repository.updateJobContext(ref.userId, toRefObjectId(ref), jobContext);
+        await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
     };
 
-    setSelectedJob = async (ref: ConversationRef, selectedJob: SanitizedJob): Promise<void> => {
-        const conversation = await this.getConversationOrThrow(ref);
+    setSelectedJob = async (userId: string, conversationId: string, selectedJob: SanitizedJob): Promise<void> => {
+        const conversation = await this.getConversationOrThrow(userId, conversationId);
         const existingJobContext = conversation.jobContext;
         if (!existingJobContext) {
             return;
@@ -202,6 +198,6 @@ export class ChatConversationService {
                   }
                 : {}),
         };
-        await this.repository.updateJobContext(ref.userId, toRefObjectId(ref), updatedContext);
+        await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), updatedContext);
     };
 }

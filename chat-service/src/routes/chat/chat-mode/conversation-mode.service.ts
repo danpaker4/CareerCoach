@@ -1,4 +1,3 @@
-import type { UserCareerProfile } from "../../career-profile/career-profile.types";
 import type { ConfidenceSummary } from "../confidence/confidence.types";
 import { DEEP_DISCOVERY_SIGNALS, FAST_SEARCH_SIGNALS } from "./conversation-mode.consts";
 import type { ConversationMode } from "./conversation-mode.types";

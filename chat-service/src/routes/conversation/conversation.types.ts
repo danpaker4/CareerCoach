@@ -7,11 +7,6 @@ export type EnsureConversationExistsResult = {
     conversationId: string;
 };
 
-export type ConversationRef = {
-    userId: string;
-    conversationId: string;
-};
-
 export type ConversationResponse = {
     conversationId: string;
     userId: string;

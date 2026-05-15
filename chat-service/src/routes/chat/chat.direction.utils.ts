@@ -1,4 +1,4 @@
-import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
+import type { ConversationMode } from "./chat-mode/conversation-mode.types";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
 import type { Conversation } from "../conversation/conversation.model";
 import type { JobSearchRequest } from "./chat.types";
