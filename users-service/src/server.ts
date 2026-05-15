@@ -53,7 +53,7 @@ export class Server {
                 prefix: AUTH_ROUTE_PREFIX,
             });
             await this.app.register(usersRouter(this.DBClient.users));
-            await this.app.register(adminRouter(this.DBClient.users), {
+            await this.app.register(adminRouter(this.DBClient.users, this.DBClient.llmTokenUsage), {
                 prefix: ADMIN_ROUTE_PREFIX,
             });
             await this.app.register(githubRouter(this.DBClient.users), {

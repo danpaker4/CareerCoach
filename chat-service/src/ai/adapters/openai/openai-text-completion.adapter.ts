@@ -1,14 +1,17 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
+import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
+import { readOpenAiUsage, recordLlmTokenUsage } from "../../token-usage.utils";
 import { OPENAI_CHAT_COMPLETIONS_URL } from "./openai-text-completion.consts";
 import { formatOpenAiErrorMessage, isOpenAiChatResponse } from "./openai-text-completion.utils";
 
 export class OpenAiTextCompletionAdapter implements TextCompletionPort {
     constructor(
         private readonly apiKey: string,
-        private readonly model: string
+        private readonly model: string,
+        private readonly tokenUsageRecorder?: LlmTokenUsageRecorder
     ) { }
 
-    readonly complete = async (prompt: string): Promise<string> => {
+    readonly complete = async (prompt: string, context?: LlmTokenUsageContext): Promise<string> => {
         console.info(`[LLM] Sending request provider=openai model=${this.model}`);
         const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
             method: "POST",
@@ -37,6 +40,13 @@ export class OpenAiTextCompletionAdapter implements TextCompletionPort {
             throw new Error("OpenAI returned empty completion");
         }
 
+        await recordLlmTokenUsage(this.tokenUsageRecorder, {
+            sourceService: "chat-service",
+            operation: context?.operation ?? "chat.text_completion",
+            provider: "openai",
+            model: this.model,
+            usage: readOpenAiUsage(payload),
+        });
         return text;
     };
 }

@@ -3,6 +3,7 @@ import { Service } from "../types/service";
 import type { Conversation } from "../routes/conversation/conversation.model";
 import type { UserCareerProfileDocument } from "../routes/career-profile/career-profile.model";
 import type { CareerDirectionExample } from "../routes/chat/knowledge/career-knowledge.types";
+import type { LlmTokenUsageDocument } from "../ai/token-usage.types";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -11,6 +12,7 @@ export class MongoClient implements Service {
     private conversationsCollection: Collection<Conversation> | null = null;
     private careerProfilesCollection: Collection<UserCareerProfileDocument> | null = null;
     private careerDirectionExamplesCollection: Collection<CareerDirectionExample> | null = null;
+    private llmTokenUsageCollection: Collection<LlmTokenUsageDocument> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -28,6 +30,7 @@ export class MongoClient implements Service {
             this.conversationsCollection = this.db.collection<Conversation>("conversations");
             this.careerProfilesCollection = this.db.collection<UserCareerProfileDocument>("userCareerProfiles");
             this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("careerDirectionExamples");
+            this.llmTokenUsageCollection = this.db.collection<LlmTokenUsageDocument>("llmTokenUsage");
             await this.ensureIndexes();
             
             console.log('MongoDb Connection Succeeded');
@@ -43,16 +46,18 @@ export class MongoClient implements Service {
         this.conversationsCollection = null;
         this.careerProfilesCollection = null;
         this.careerDirectionExamplesCollection = null;
+        this.llmTokenUsageCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
     private ensureIndexes = async (): Promise<void> => {
-        if (!this.conversationsCollection || !this.careerProfilesCollection || !this.careerDirectionExamplesCollection) {
+        if (!this.conversationsCollection || !this.careerProfilesCollection || !this.careerDirectionExamplesCollection || !this.llmTokenUsageCollection) {
             return;
         }
         await this.conversationsCollection.createIndex({ userId: 1, updatedAt: -1 });
         await this.careerProfilesCollection.createIndex({ userId: 1 }, { unique: true });
         await this.careerDirectionExamplesCollection.createIndex({ directionName: 1 });
+        await this.llmTokenUsageCollection.createIndex({ createdAt: -1, provider: 1, model: 1 });
 
         await Promise.all([
             this.createVectorSearchIndex(this.careerProfilesCollection.collectionName, "profileSummaryEmbedding", process.env.CAREER_PROFILE_VECTOR_INDEX_NAME || "career_profile_vector_index"),
@@ -108,6 +113,13 @@ export class MongoClient implements Service {
             throw new Error("Career direction examples collection is not initialized");
         }
         return this.careerDirectionExamplesCollection;
+    }
+
+    get llmTokenUsage(): Collection<LlmTokenUsageDocument> {
+        if (!this.llmTokenUsageCollection) {
+            throw new Error("LLM token usage collection is not initialized");
+        }
+        return this.llmTokenUsageCollection;
     }
 }
 

@@ -1,3 +1,4 @@
+import type { LlmTokenUsageContext } from "../../token-usage.types";
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 
 type TextCompletionAttempt = {
@@ -8,12 +9,12 @@ type TextCompletionAttempt = {
 export class FallbackTextCompletionAdapter implements TextCompletionPort {
     constructor(private readonly attempts: readonly TextCompletionAttempt[]) { }
 
-    readonly complete = async (prompt: string): Promise<string> => {
+    readonly complete = async (prompt: string, context?: LlmTokenUsageContext): Promise<string> => {
         const errors: string[] = [];
 
         for (const attempt of this.attempts) {
             try {
-                return await attempt.adapter.complete(prompt);
+                return await attempt.adapter.complete(prompt, context);
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : "Unknown error";
                 errors.push(`${attempt.provider}: ${message}`);

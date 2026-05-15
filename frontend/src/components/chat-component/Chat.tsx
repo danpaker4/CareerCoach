@@ -99,7 +99,7 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
                     const historyJobsSummary = jobsFromHistory.length > 0
                         ? `\n\nReal jobs found:\n${jobsFromHistory.slice(0, 5).map((job) => {
                             const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
-                            return `- ${job.title}${company} (${job.seniority})`;
+                            return `- ${job.jobTitle}${company} (${job.seniority})`;
                         }).join('\n')}`
                         : '';
                     return {
