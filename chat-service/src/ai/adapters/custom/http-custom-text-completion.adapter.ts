@@ -1,10 +1,15 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
+import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
+import { recordLlmTokenUsage } from "../../token-usage.utils";
 import { readTextFromCustomLlmPayload } from "./http-custom-text-completion.utils";
 
 export class HttpCustomTextCompletionAdapter implements TextCompletionPort {
-    constructor(private readonly endpointUrl: string) { }
+    constructor(
+        private readonly endpointUrl: string,
+        private readonly tokenUsageRecorder?: LlmTokenUsageRecorder
+    ) { }
 
-    readonly complete = async (prompt: string): Promise<string> => {
+    readonly complete = async (prompt: string, context?: LlmTokenUsageContext): Promise<string> => {
         console.info(`[LLM] Sending request provider=custom endpoint=${this.endpointUrl}`);
         const response = await fetch(this.endpointUrl, {
             method: "POST",
@@ -22,6 +27,13 @@ export class HttpCustomTextCompletionAdapter implements TextCompletionPort {
             throw new Error("Custom LLM response must include non-empty text, reply, or content string");
         }
 
+        await recordLlmTokenUsage(this.tokenUsageRecorder, {
+            sourceService: "chat-service",
+            operation: context?.operation ?? "chat.text_completion",
+            provider: "custom",
+            model: "custom",
+            usage: null,
+        });
         return text;
     };
 }

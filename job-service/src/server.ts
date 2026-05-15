@@ -52,7 +52,7 @@ export class Server {
                 port: this.config.port,
                 host: process.env.HOST || "127.0.0.1"
             });
-            startJobPollerSchedule(this.DBClient.jobs);
+            startJobPollerSchedule(this.DBClient.jobs, this.DBClient.llmTokenUsage);
             console.log(`🚀 Server running on ${address}`);
 
         } catch (err) {

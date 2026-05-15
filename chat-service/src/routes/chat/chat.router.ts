@@ -10,6 +10,7 @@ import { validateChatMessageBody } from "./chat.middleware";
 import { ChatService } from "./chat.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
 import { createTextCompletionPortFromChain } from "../../ai/text-completion.utils";
+import { LlmTokenUsageRepository } from "../../ai/token-usage.repository";
 import { createEmbeddingPort } from "../../ai/embedding.utils";
 import { CareerProfileRepository } from "../career-profile/career-profile.repository";
 import { CareerProfileService } from "../career-profile/career-profile.service";
@@ -29,10 +30,11 @@ import { JobRankingService } from "./ranking/job-ranking.service";
 
 export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
+    const tokenUsageRepository = new LlmTokenUsageRepository(dbClient.llmTokenUsage);
     const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
-    const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain);
+    const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain, tokenUsageRepository);
     const embedding = createEmbeddingPort(chatConfig.llm, chatConfig.embeddingModel, chatConfig.customEmbeddingUrl);
     const llmService = new ChatLlmService(textCompletion);
     const validationService = new ChatValidationService();
