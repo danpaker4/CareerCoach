@@ -15,6 +15,7 @@ export const buildAuthSessionAdminUser = async (): Promise<User> => ({
     technologies: [],
     interests: [],
     knownSkills: [],
+    roleExperience: [],
     githubSkills: [],
 });
 

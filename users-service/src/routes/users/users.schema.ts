@@ -1,7 +1,7 @@
 import type { FastifySchema } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { UserSchema } from "./user.model";
+import { RoleExperienceEntrySchema, UserSchema } from "./user.model";
 
 export const getUserSchema = {
     response: {
@@ -41,6 +41,7 @@ export const createUserSchema = {
         technologies: z.array(z.string()).optional(),
         interests: z.array(z.string()).optional(),
         knownSkills: z.array(z.string()).optional(),
+        roleExperience: z.array(RoleExperienceEntrySchema).optional(),
     }),
 } satisfies FastifySchema;
 
@@ -77,6 +78,7 @@ export const updateUserSchema = {
         interests: z.array(z.string()).optional(),
         knownSkills: z.array(z.string()).optional(),
         coachProfileMaterializedAt: z.coerce.date().optional(),
+        roleExperience: z.array(RoleExperienceEntrySchema).optional(),
     }),
 } satisfies FastifySchema;
 

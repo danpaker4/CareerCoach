@@ -1,4 +1,5 @@
 import type { UserCareerProfile } from "../../career-profile/career-profile.types";
+import type { RoleExperienceEntry } from "../../external-chat/role-experience.types";
 import type { JobSearchRequest } from "../chat.types";
 import type { JobSearchPlan } from "./job-search-plan.types";
 
@@ -6,7 +7,11 @@ const pickTopValues = (values: readonly { value: string }[], limit: number): str
     values.slice(0, limit).map((item) => item.value);
 
 export class JobSearchPlanService {
-    buildPlan = (profile: UserCareerProfile, baseFilters: JobSearchRequest): JobSearchPlan => {
+    buildPlan = (
+        profile: UserCareerProfile,
+        baseFilters: JobSearchRequest,
+        roleExperience: readonly RoleExperienceEntry[] = []
+    ): JobSearchPlan => {
         const roleKeywords = pickTopValues(profile.preferredRoles, 2);
         const interests = pickTopValues(profile.interests, 3);
         const technologies = pickTopValues(profile.technologies, 4);
@@ -34,7 +39,7 @@ export class JobSearchPlanService {
                 },
                 {
                     type: "SEMANTIC_PROFILE",
-                    query: `${interests.join(" ")} ${pickTopValues(profile.workStyle, 2).join(" ")}`.trim(),
+                    query: `${interests.join(" ")} ${roleExperience.map((item) => item.displayLabel).slice(0, 2).join(" ")}`.trim(),
                     filters: strictFilters,
                 },
                 {
@@ -46,8 +51,12 @@ export class JobSearchPlanService {
         };
     };
 
-    buildBroaderPlan = (profile: UserCareerProfile, baseFilters: JobSearchRequest): JobSearchPlan => {
-        const basePlan = this.buildPlan(profile, baseFilters);
+    buildBroaderPlan = (
+        profile: UserCareerProfile,
+        baseFilters: JobSearchRequest,
+        roleExperience: readonly RoleExperienceEntry[] = []
+    ): JobSearchPlan => {
+        const basePlan = this.buildPlan(profile, baseFilters, roleExperience);
         const adjacentKeywords = [
             ...baseFilters.keywords,
             "entry level",

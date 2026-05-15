@@ -1,5 +1,29 @@
 import type { UserAchievementResponse } from "../chat/chat.types";
+import { isAchievement } from "../chat/chat.utils";
 import { EXPERIENCE_HINTS } from "./chat.external.consts";
+
+export const mergeUniqueStrings = (existing: readonly string[], incoming: readonly string[]): string[] =>
+    [...new Set([...existing, ...incoming].map((item) => item.trim()).filter((item) => item.length > 0))];
+
+export const readUserStringArrayField = (profile: Record<string, unknown>, field: string): string[] =>
+    Array.isArray(profile[field]) ? profile[field].filter((item): item is string => typeof item === "string") : [];
+
+export const readUserAchievementsField = (profile: Record<string, unknown>): UserAchievementResponse[] =>
+    Array.isArray(profile.achievements) ? profile.achievements.filter(isAchievement) : [];
+
+export const mergeUserAchievements = (
+    existing: readonly UserAchievementResponse[],
+    incoming: readonly UserAchievementResponse[]
+): UserAchievementResponse[] => {
+    const merged = [...existing];
+    incoming.forEach((achievement) => {
+        const isDuplicate = merged.some((item) => item.name.toLowerCase() === achievement.name.toLowerCase());
+        if (!isDuplicate) {
+            merged.push(achievement);
+        }
+    });
+    return merged;
+};
 
 export const toAchievementFromMessage = (message: string): UserAchievementResponse | null => {
     const normalized = message.trim().replace(/\s+/g, " ");

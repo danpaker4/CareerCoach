@@ -77,6 +77,7 @@ export const loginOrCreateLinkedInUser = async (
             technologies: [],
             interests: [],
             knownSkills: [],
+            roleExperience: [],
             linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
             avatarUrl: profile.picture,
             githubSkills: [],

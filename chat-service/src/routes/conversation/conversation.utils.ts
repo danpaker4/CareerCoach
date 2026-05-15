@@ -3,7 +3,7 @@ import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
 import type { JobSearchResultItem } from "../chat/chat.types";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
 import { CONVERSATION_STAGES } from "./conversation.stage.consts";
-import type { ConversationRef, ConversationResponse } from "./conversation.types";
+import type { ConversationResponse } from "./conversation.types";
 
 export class ConversationNotFoundError extends Error {
     constructor() {
@@ -62,8 +62,8 @@ export const appendStageNote = (
     };
 };
 
-export const toRefObjectId = (ref: ConversationRef): ObjectId => {
-    const parsed = tryParseConversationObjectId(ref.conversationId);
+export const parseConversationObjectIdOrThrow = (conversationId: string): ObjectId => {
+    const parsed = tryParseConversationObjectId(conversationId);
     if (!parsed) {
         throw new InvalidConversationIdError();
     }

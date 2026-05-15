@@ -14,6 +14,7 @@ export const buildAdminTestUser = (role: User["role"], email: string): User => (
     technologies: [],
     interests: [],
     knownSkills: [],
+    roleExperience: [],
     githubSkills: [],
 });
 
@@ -28,5 +29,6 @@ export const buildLegacyUserDocument = (email: string): UserDocument => ({
     technologies: [],
     interests: [],
     knownSkills: [],
+    roleExperience: [],
     githubSkills: [],
 });

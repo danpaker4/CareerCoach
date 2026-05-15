@@ -3,7 +3,7 @@ import type { UserAchievement } from "../chat.model";
 import type { Conversation } from "../../conversation/conversation.model";
 import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
-import type { ConversationMode } from "../conversation-mode/conversation-mode.types";
+import type { ConversationMode } from "../chat-mode/conversation-mode.types";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,

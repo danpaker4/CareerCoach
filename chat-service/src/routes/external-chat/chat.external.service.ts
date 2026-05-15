@@ -1,6 +1,15 @@
 import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse, UserProfileResponse } from "../chat/chat.types";
 import { isAchievement, isJobSearchResultItem, normalizeFilters, normalizeJobSearchResultItem, normalizeSearchPlan, parseUserProfileResponse } from "../chat/chat.utils";
-import { toAchievementFromMessage } from "./chat.external.utils";
+import {
+    mergeUniqueStrings,
+    mergeUserAchievements,
+    readUserAchievementsField,
+    readUserStringArrayField,
+    toAchievementFromMessage,
+} from "./chat.external.utils";
+import type { ApplyInferredAchievementSignalsParams, ApplyInferredRoleExperienceParams } from "./chat.external.types";
+import type { RoleExperienceEntry } from "./role-experience.types";
+import { mergeRoleExperience, readUserRoleExperienceField } from "./role-experience.utils";
 
 export class ChatExternalService {
     constructor(private readonly usersServiceBaseUrl: string, private readonly jobServiceBaseUrl: string) { }
@@ -93,6 +102,11 @@ export class ChatExternalService {
         return updatedAchievements;
     };
 
+    readUserRoleExperience = async (userId: string): Promise<RoleExperienceEntry[]> => {
+        const profile = await this.readUserPublicProfile(userId);
+        return profile ? readUserRoleExperienceField(profile) : [];
+    };
+
     readUserPublicProfile = async (userId: string): Promise<Record<string, unknown> | null> => {
         const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
         if (!response.ok) {
@@ -116,15 +130,56 @@ export class ChatExternalService {
         }).catch(() => null);
     };
 
-    upsertKnownSkills = async (userId: string, skills: readonly string[]): Promise<void> => {
-        const normalized = [...new Set(skills.map((item) => item.trim()).filter((item) => item.length > 0))];
-        if (normalized.length === 0) {
+    applyInferredAchievementSignals = async (userId: string, params: ApplyInferredAchievementSignalsParams): Promise<void> => {
+        const { technologies, knownSkills, achievements } = params;
+        if (technologies.length === 0 && knownSkills.length === 0 && achievements.length === 0) {
             return;
         }
+
+        const profile = await this.readUserPublicProfile(userId);
+        if (!profile) {
+            return;
+        }
+
+        const patchBody: {
+            technologies?: string[];
+            knownSkills?: string[];
+            achievements?: UserAchievementResponse[];
+        } = {};
+
+        if (technologies.length > 0) {
+            patchBody.technologies = mergeUniqueStrings(readUserStringArrayField(profile, "technologies"), technologies);
+        }
+        if (knownSkills.length > 0) {
+            patchBody.knownSkills = mergeUniqueStrings(readUserStringArrayField(profile, "knownSkills"), knownSkills);
+        }
+        if (achievements.length > 0) {
+            patchBody.achievements = mergeUserAchievements(readUserAchievementsField(profile), achievements);
+        }
+
         await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ knownSkills: normalized }),
+            body: JSON.stringify(patchBody),
+        }).catch(() => null);
+    };
+
+    applyInferredRoleExperience = async (userId: string, params: ApplyInferredRoleExperienceParams): Promise<void> => {
+        const { roleExperience } = params;
+        if (roleExperience.length === 0) {
+            return;
+        }
+
+        const profile = await this.readUserPublicProfile(userId);
+        if (!profile) {
+            return;
+        }
+
+        const mergedRoleExperience = mergeRoleExperience(readUserRoleExperienceField(profile), roleExperience);
+        await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roleExperience: mergedRoleExperience }),
         }).catch(() => null);
     };
 }

@@ -17,9 +17,8 @@ export const PREFERENCES_CONFIDENCE_POINTS = {
     dislikePerItem: 9,
 } as const;
 
-export const WORK_STYLE_CONFIDENCE_POINTS = {
-    workStylePerItem: 24,
-    personalitySignalPerItem: 14,
+export const ROLE_EXPERIENCE_CONFIDENCE_POINTS = {
+    roleExperiencePerItem: 35,
 } as const;
 
 export const DOMAIN_CONFIDENCE_POINTS = {
@@ -43,7 +42,7 @@ export const SEARCH_READINESS_BLEND_PERCENT = {
 /** Share of each input in discovery confidence (must total 100). */
 export const DISCOVERY_CONFIDENCE_BLEND_PERCENT = {
     preferences: 45,
-    workStyle: 25,
+    roleExperience: 25,
     /** Uses `(100 - goalsConfidence)` as the third input. */
     goalsGap: 30,
 } as const;

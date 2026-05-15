@@ -2,7 +2,7 @@ export type ConfidenceSummary = {
     skillsConfidence: number;
     goalsConfidence: number;
     preferencesConfidence: number;
-    workStyleConfidence: number;
+    roleExperienceConfidence: number;
     domainConfidence: number;
     seniorityConfidence: number;
     searchReadinessConfidence: number;
