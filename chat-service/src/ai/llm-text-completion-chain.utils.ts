@@ -5,21 +5,26 @@ const hasValue = (value: string | undefined): boolean => typeof value === "strin
 
 export const buildTextCompletionLlmChain = (env: LlmEnvInput): readonly ResolvedLlmConfig[] => {
     const chain: ResolvedLlmConfig[] = [];
+    const configuredProviders = new Set<ResolvedLlmConfig["provider"]>();
 
-    if (env.llmProvider === "ollama" || hasValue(env.ollamaBaseUrl)) {
-        chain.push(resolveLlmConfig({ ...env, llmProvider: "ollama" }));
+    const addProvider = (config: ResolvedLlmConfig): void => {
+        if (configuredProviders.has(config.provider)) {
+            return;
+        }
+        configuredProviders.add(config.provider);
+        chain.push(config);
+    };
+
+    if (env.llmProvider === "ollama" || hasValue(env.ollamaBaseUrl) || hasValue(env.ollamaModel)) {
+        addProvider(resolveLlmConfig({ ...env, llmProvider: "ollama" }));
     }
 
     if (hasValue(env.geminiApiKey)) {
-        chain.push(resolveLlmConfig({ ...env, llmProvider: "gemini" }));
-    }
-
-    if (hasValue(env.openaiApiKey)) {
-        chain.push(resolveLlmConfig({ ...env, llmProvider: "openai" }));
+        addProvider(resolveLlmConfig({ ...env, llmProvider: "gemini" }));
     }
 
     if (hasValue(env.customLlmUrl)) {
-        chain.push(resolveLlmConfig({ ...env, llmProvider: "custom" }));
+        addProvider(resolveLlmConfig({ ...env, llmProvider: "custom" }));
     }
 
     return chain;

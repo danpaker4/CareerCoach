@@ -9,6 +9,7 @@ export type ResolvedLlmConfig =
 export type LlmEnvInput = {
     readonly llmProvider: LlmProviderId;
     readonly geminiApiKey?: string;
+    readonly geminiModel?: string;
     readonly openaiApiKey?: string;
     readonly llmModel?: string;
     readonly openaiModel?: string;
