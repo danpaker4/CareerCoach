@@ -12,6 +12,8 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { MySkills } from './components/my-skills/MySkills';
 import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { Management } from './components/management/Management';
+import { ManagementUsage } from './components/management/ManagementUsage';
+import { ManagementUsers } from './components/management/ManagementUsers';
 import { GithubCallback } from './components/github-callback/GithubCallback';
 import { LinkedInCallback } from './components/linkedin-callback/LinkedInCallback';
 import { ChatPage } from './components/chat-page/ChatPage';
@@ -245,7 +247,25 @@ export const App = () => {
               path="/management"
               element={
                 <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
-                  {currentUser ? <Management currentUser={currentUser} /> : null}
+                  <Management />
+                </AdminRoute>
+              }
+            />
+
+            <Route
+              path="/management/usage"
+              element={
+                <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
+                  <ManagementUsage />
+                </AdminRoute>
+              }
+            />
+
+            <Route
+              path="/management/users"
+              element={
+                <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
+                  {currentUser ? <ManagementUsers currentUser={currentUser} /> : null}
                 </AdminRoute>
               }
             />

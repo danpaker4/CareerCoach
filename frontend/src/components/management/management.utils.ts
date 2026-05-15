@@ -1,5 +1,16 @@
-import { ADMIN_DELETE_USER_PATH, ADMIN_DEMOTE_PATH, ADMIN_LLM_TOKEN_USAGE_PATH, ADMIN_USERS_PATH } from './management.consts';
-import type { AdminLlmTokenUsageResult, AdminLlmTokenUsageSeriesItem, AdminUserSummary, LlmProvider } from './management.types';
+import { ADMIN_DELETE_USER_PATH, ADMIN_DEMOTE_PATH, ADMIN_LLM_TOKEN_USAGE_PATH, ADMIN_USERS_PATH, MANAGEMENT_USERS_PAGE_SIZE } from './management.consts';
+import type {
+  AdminLlmTokenUsageOperationItem,
+  AdminLlmTokenUsageOperationSeriesItem,
+  AdminLlmTokenUsageResult,
+  AdminLlmTokenUsageSeriesItem,
+  AdminLlmTokenUsageUserAverageSeriesItem,
+  AdminUsersPagination,
+  AdminUsersResult,
+  AdminUserSummary,
+  LlmProvider,
+  TokenUsageDays,
+} from './management.types';
 
 export const isAdminUserSummary = (value: unknown): value is AdminUserSummary => {
   if (typeof value !== 'object' || value === null) {
@@ -16,8 +27,37 @@ export const isAdminUserSummary = (value: unknown): value is AdminUserSummary =>
   );
 };
 
-export const parseAdminUsers = (value: unknown): AdminUserSummary[] =>
-  Array.isArray(value) ? value.filter(isAdminUserSummary) : [];
+const isAdminUsersPagination = (value: unknown): value is AdminUsersPagination => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const pagination = value as Record<string, unknown>;
+  return (
+    isNumber(pagination.page) &&
+    isNumber(pagination.pageSize) &&
+    isNumber(pagination.total) &&
+    isNumber(pagination.totalPages) &&
+    typeof pagination.hasNextPage === 'boolean' &&
+    typeof pagination.hasPreviousPage === 'boolean'
+  );
+};
+
+export const parseAdminUsersResult = (value: unknown): AdminUsersResult | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (!Array.isArray(payload.users) || !isAdminUsersPagination(payload.pagination)) {
+    return null;
+  }
+
+  return {
+    users: payload.users.filter(isAdminUserSummary),
+    pagination: payload.pagination,
+  };
+};
 
 export const readManagementErrorMessage = async (response: Response, fallback: string): Promise<string> => {
   const payload: unknown = await response.json().catch(() => null);
@@ -28,13 +68,17 @@ export const readManagementErrorMessage = async (response: Response, fallback: s
   return fallback;
 };
 
-export const buildAdminUsersUrl = (searchQuery: string): string => {
+export const buildAdminUsersUrl = (searchQuery: string, page: number, pageSize = MANAGEMENT_USERS_PAGE_SIZE): string => {
   const trimmedQuery = searchQuery.trim();
-  if (trimmedQuery.length === 0) {
-    return ADMIN_USERS_PATH;
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+
+  if (trimmedQuery.length > 0) {
+    params.set('query', trimmedQuery);
   }
 
-  const params = new URLSearchParams({ query: trimmedQuery });
   return `${ADMIN_USERS_PATH}?${params.toString()}`;
 };
 
@@ -64,7 +108,49 @@ const isTokenUsageSeriesItem = (value: unknown): value is AdminLlmTokenUsageSeri
     isNumber(item.completionTokens) &&
     isNumber(item.totalTokens) &&
     isNumber(item.requestCount) &&
+    isNumber(item.unknownRequestCount) &&
+    isNumber(item.errorCount)
+  );
+};
+
+const isTokenUsageOperationItem = (value: unknown): value is AdminLlmTokenUsageOperationItem => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.sourceService === 'string' &&
+    typeof item.operation === 'string' &&
+    isNumber(item.promptTokens) &&
+    isNumber(item.completionTokens) &&
+    isNumber(item.totalTokens) &&
+    isNumber(item.requestCount) &&
     isNumber(item.unknownRequestCount)
+  );
+};
+
+const isTokenUsageOperationSeriesItem = (value: unknown): value is AdminLlmTokenUsageOperationSeriesItem => {
+  if (!isTokenUsageOperationItem(value)) {
+    return false;
+  }
+
+  return typeof (value as unknown as Record<string, unknown>).date === 'string';
+};
+
+const isTokenUsageUserAverageSeriesItem = (value: unknown): value is AdminLlmTokenUsageUserAverageSeriesItem => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.date === 'string' &&
+    isNumber(item.totalTokens) &&
+    isNumber(item.requestCount) &&
+    isNumber(item.activeUserCount) &&
+    isNumber(item.averageTokensPerUser) &&
+    isNumber(item.averageRequestsPerUser)
   );
 };
 
@@ -95,10 +181,19 @@ export const parseTokenUsage = (value: unknown): AdminLlmTokenUsageResult | null
       days: rangeRecord.days,
     },
     series: payload.series.filter(isTokenUsageSeriesItem),
+    operationBreakdown: Array.isArray(payload.operationBreakdown)
+      ? payload.operationBreakdown.filter(isTokenUsageOperationItem)
+      : [],
+    operationSeries: Array.isArray(payload.operationSeries)
+      ? payload.operationSeries.filter(isTokenUsageOperationSeriesItem)
+      : [],
+    userAverageSeries: Array.isArray(payload.userAverageSeries)
+      ? payload.userAverageSeries.filter(isTokenUsageUserAverageSeriesItem)
+      : [],
   };
 };
 
-export const buildAdminLlmTokenUsageUrl = (days = 30): string => {
+export const buildAdminLlmTokenUsageUrl = (days: TokenUsageDays): string => {
   const params = new URLSearchParams({ days: String(days) });
   return `${ADMIN_LLM_TOKEN_USAGE_PATH}?${params.toString()}`;
 };

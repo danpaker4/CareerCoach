@@ -70,3 +70,6 @@ export const recordLlmTokenUsage = async (
         console.warn("[LLM] Failed to record token usage", error);
     }
 };
+
+export const toLlmErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);

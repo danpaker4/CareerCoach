@@ -6,6 +6,9 @@ export const ADMIN_DEMOTE_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/admins
 export const ADMIN_DELETE_USER_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/users`;
 export const ADMIN_LLM_TOKEN_USAGE_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/llm-token-usage`;
 
+export const MANAGEMENT_USERS_PAGE_SIZE = 25;
+export const MANAGEMENT_TOKEN_USAGE_DAYS = [7, 30, 90] as const;
+
 export const MANAGEMENT_LOAD_ERROR_MESSAGE = 'Unable to load users';
 export const MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE = 'Unable to load model token usage';
 export const MANAGEMENT_PROMOTE_ERROR_MESSAGE = 'Unable to promote user';

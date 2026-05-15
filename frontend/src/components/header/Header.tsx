@@ -21,7 +21,13 @@ export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: Head
   const menuRef = useRef<HTMLDivElement>(null);
   const homePath = userName ? '/dashboard' : '/';
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string): boolean => {
+    if (path === '/management') {
+      return location.pathname === path || location.pathname.startsWith('/management/');
+    }
+
+    return location.pathname === path;
+  };
 
   useEffect(() => {
     setMenuOpen(false);

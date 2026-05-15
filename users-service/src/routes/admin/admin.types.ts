@@ -11,6 +11,20 @@ export type AdminUserSummary = {
     role: UserRole;
 };
 
+export type AdminUsersPagination = {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+};
+
+export type AdminUsersResult = {
+    users: AdminUserSummary[];
+    pagination: AdminUsersPagination;
+};
+
 export type PromoteAdminResult = {
     user: AdminUserSummary;
 };
@@ -32,6 +46,30 @@ export type AdminLlmTokenUsageSeriesItem = {
     totalTokens: number;
     requestCount: number;
     unknownRequestCount: number;
+    errorCount: number;
+};
+
+export type AdminLlmTokenUsageOperationItem = {
+    sourceService: string;
+    operation: string;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    requestCount: number;
+    unknownRequestCount: number;
+};
+
+export type AdminLlmTokenUsageOperationSeriesItem = AdminLlmTokenUsageOperationItem & {
+    date: string;
+};
+
+export type AdminLlmTokenUsageUserAverageSeriesItem = {
+    date: string;
+    totalTokens: number;
+    requestCount: number;
+    activeUserCount: number;
+    averageTokensPerUser: number;
+    averageRequestsPerUser: number;
 };
 
 export type AdminLlmTokenUsageResult = {
@@ -41,6 +79,9 @@ export type AdminLlmTokenUsageResult = {
         days: number;
     };
     series: AdminLlmTokenUsageSeriesItem[];
+    operationBreakdown: AdminLlmTokenUsageOperationItem[];
+    operationSeries: AdminLlmTokenUsageOperationSeriesItem[];
+    userAverageSeries: AdminLlmTokenUsageUserAverageSeriesItem[];
 };
 
 export type AdminAuthenticatedRequest<Schema extends FastifySchema> =
