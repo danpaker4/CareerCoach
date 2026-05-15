@@ -9,9 +9,18 @@ import type {
     UserProfileResponse,
 } from "./chat.types";
 import type { ProfileInput } from "../conversation/conversation.types";
+import type { CareerSignal } from "../career-profile/career-profile.types";
 import { z } from "zod";
 
 const toStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+export const toSignal = (value: string, confidence: number, evidence: string, source: CareerSignal["source"]): CareerSignal => ({
+    value,
+    confidence,
+    evidence: [evidence],
+    source,
+    updatedAt: new Date(),
+});
 
 export const isChatMessageBody = (body: unknown): body is ChatMessageRequestBody => {
     if (typeof body !== "object" || body === null) {

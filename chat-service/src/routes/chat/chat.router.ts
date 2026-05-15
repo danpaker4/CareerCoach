@@ -20,9 +20,7 @@ import { AchievementInferenceService } from "./inference/achievement-inference/a
 import { SeniorityInferenceService } from "./inference/seniority-inference/seniority-inference.service";
 import { JobSearchPlanService } from "./search/job-search-plan.service";
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
-import { JobFollowUpIntentService } from "./job-context/job-follow-up-intent.service";
-import { JobSelectionResolverService } from "./job-context/job-selection-resolver.service";
-import { JobFollowUpAnswerService } from "./job-context/job-follow-up-answer.service";
+import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
 import type { MongoClient } from "../../mongo/mongo";
@@ -48,8 +46,6 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     const seniorityInferenceService = new SeniorityInferenceService();
     const searchPlanService = new JobSearchPlanService();
     const rankingService = new JobRankingService();
-    const followUpIntentService = new JobFollowUpIntentService();
-    const selectionResolverService = new JobSelectionResolverService();
     const followUpAnswerService = new JobFollowUpAnswerService();
     const pipelineIntentService = new PipelineIntentService();
     const pipelineService = new PipelineService(chatConfig.jobServiceBaseUrl);
@@ -72,8 +68,6 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         searchPlanService,
         rankingService,
         knowledgeService,
-        followUpIntentService,
-        selectionResolverService,
         followUpAnswerService,
         pipelineIntentService,
         pipelineService
