@@ -16,7 +16,7 @@ import { CareerProfileService } from "../career-profile/career-profile.service";
 import { ConfidenceService } from "./confidence/confidence.service";
 import { ConversationModeService } from "./chat-mode/conversation-mode.service";
 import { AchievementInferenceService } from "./inference/achievement-inference/achievement-inference.service";
-import { WorkStyleInferenceService } from "./inference/work-style-inference/work-style-inference.service";
+import { SeniorityInferenceService } from "./inference/seniority-inference/seniority-inference.service";
 import { JobSearchPlanService } from "./search/job-search-plan.service";
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
 import { JobFollowUpIntentService } from "./job-context/job-follow-up-intent.service";
@@ -43,7 +43,7 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     const confidenceService = new ConfidenceService();
     const modeService = new ConversationModeService();
     const achievementInferenceService = new AchievementInferenceService();
-    const workStyleInferenceService = new WorkStyleInferenceService();
+    const seniorityInferenceService = new SeniorityInferenceService();
     const searchPlanService = new JobSearchPlanService();
     const rankingService = new JobRankingService();
     const followUpIntentService = new JobFollowUpIntentService();
@@ -66,7 +66,7 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         confidenceService,
         modeService,
         achievementInferenceService,
-        workStyleInferenceService,
+        seniorityInferenceService,
         searchPlanService,
         rankingService,
         knowledgeService,

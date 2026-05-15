@@ -8,7 +8,7 @@ export type RankedJobResult = {
         semanticSimilarityScore: number;
         preferenceFitScore: number;
         growthPotentialScore: number;
-        workStyleFitScore: number;
+        seniorityFitScore: number;
         locationOrConstraintFitScore: number;
     };
     reasons: string[];

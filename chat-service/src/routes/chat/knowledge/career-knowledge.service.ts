@@ -1,6 +1,7 @@
 import type { Collection } from "mongodb";
 import type { EmbeddingPort } from "../../../ai/ports/embedding.types";
 import type { UserCareerProfile } from "../../career-profile/career-profile.types";
+import type { RoleExperienceEntry } from "../../external-chat/role-experience.types";
 import type { CareerDirectionExample, CareerDirectionSuggestion } from "./career-knowledge.types";
 
 export class CareerKnowledgeService {
@@ -10,11 +11,15 @@ export class CareerKnowledgeService {
         private readonly directionVectorIndexName: string
     ) { }
 
-    suggestDirections = async (profile: UserCareerProfile, limit = 3): Promise<CareerDirectionSuggestion[]> => {
+    suggestDirections = async (
+        profile: UserCareerProfile,
+        roleExperience: readonly RoleExperienceEntry[] = [],
+        limit = 3
+    ): Promise<CareerDirectionSuggestion[]> => {
         const query = [
             ...profile.interests.map((item) => item.value),
             ...profile.technologies.map((item) => item.value),
-            ...profile.workStyle.map((item) => item.value),
+            ...roleExperience.map((item) => `${item.displayLabel} ${item.level}`),
         ].join(" ");
         if (!query.trim()) {
             return [];

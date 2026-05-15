@@ -280,6 +280,7 @@ export const loginOrCreateGithubUser = async (
                 technologies: [],
                 interests: [],
                 knownSkills: [],
+                roleExperience: [],
                 githubSkills: extractedSkills,
                 githubId: githubProfile.id,
                 githubUrl: githubProfile.html_url,

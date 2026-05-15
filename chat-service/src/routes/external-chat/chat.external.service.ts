@@ -7,7 +7,9 @@ import {
     readUserStringArrayField,
     toAchievementFromMessage,
 } from "./chat.external.utils";
-import type { ApplyInferredAchievementSignalsParams } from "./chat.external.types";
+import type { ApplyInferredAchievementSignalsParams, ApplyInferredRoleExperienceParams } from "./chat.external.types";
+import type { RoleExperienceEntry } from "./role-experience.types";
+import { mergeRoleExperience, readUserRoleExperienceField } from "./role-experience.utils";
 
 export class ChatExternalService {
     constructor(private readonly usersServiceBaseUrl: string, private readonly jobServiceBaseUrl: string) { }
@@ -100,6 +102,11 @@ export class ChatExternalService {
         return updatedAchievements;
     };
 
+    readUserRoleExperience = async (userId: string): Promise<RoleExperienceEntry[]> => {
+        const profile = await this.readUserPublicProfile(userId);
+        return profile ? readUserRoleExperienceField(profile) : [];
+    };
+
     readUserPublicProfile = async (userId: string): Promise<Record<string, unknown> | null> => {
         const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
         if (!response.ok) {
@@ -154,6 +161,25 @@ export class ChatExternalService {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(patchBody),
+        }).catch(() => null);
+    };
+
+    applyInferredRoleExperience = async (userId: string, params: ApplyInferredRoleExperienceParams): Promise<void> => {
+        const { roleExperience } = params;
+        if (roleExperience.length === 0) {
+            return;
+        }
+
+        const profile = await this.readUserPublicProfile(userId);
+        if (!profile) {
+            return;
+        }
+
+        const mergedRoleExperience = mergeRoleExperience(readUserRoleExperienceField(profile), roleExperience);
+        await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roleExperience: mergedRoleExperience }),
         }).catch(() => null);
     };
 }

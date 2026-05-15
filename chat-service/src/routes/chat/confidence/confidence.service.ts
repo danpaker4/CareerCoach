@@ -1,4 +1,5 @@
 import type { UserCareerProfile } from "../../career-profile/career-profile.types";
+import type { RoleExperienceEntry } from "../../external-chat/role-experience.types";
 import {
     DISCOVERY_CONFIDENCE_BLEND_PERCENT,
     DOMAIN_CONFIDENCE_POINTS,
@@ -7,13 +8,16 @@ import {
     SEARCH_READINESS_BLEND_PERCENT,
     SENIORITY_CONFIDENCE_POINTS,
     SKILLS_CONFIDENCE_POINTS,
-    WORK_STYLE_CONFIDENCE_POINTS,
+    ROLE_EXPERIENCE_CONFIDENCE_POINTS,
 } from "./confidence.consts";
 import type { ConfidenceSummary } from "./confidence.types";
 import { blendPercentScores, toPercent } from "./confidence.utils";
 
 export class ConfidenceService {
-    calculateConfidence = (profile: UserCareerProfile): ConfidenceSummary => {
+    calculateConfidence = (
+        profile: UserCareerProfile,
+        roleExperience: readonly RoleExperienceEntry[] = []
+    ): ConfidenceSummary => {
         const skillsConfidence = toPercent(
             profile.technologies.length * SKILLS_CONFIDENCE_POINTS.technologyPerItem
                 + profile.strengths.length * SKILLS_CONFIDENCE_POINTS.strengthPerItem
@@ -28,16 +32,17 @@ export class ConfidenceService {
                 + profile.interests.length * PREFERENCES_CONFIDENCE_POINTS.interestPerItem
                 + profile.dislikes.length * PREFERENCES_CONFIDENCE_POINTS.dislikePerItem
         );
-        const workStyleConfidence = toPercent(
-            profile.workStyle.length * WORK_STYLE_CONFIDENCE_POINTS.workStylePerItem
-                + profile.personalitySignals.length * WORK_STYLE_CONFIDENCE_POINTS.personalitySignalPerItem
+        const roleExperienceConfidence = toPercent(
+            roleExperience.length * ROLE_EXPERIENCE_CONFIDENCE_POINTS.roleExperiencePerItem
         );
         const domainConfidence = toPercent(
             profile.preferredDomains.length * DOMAIN_CONFIDENCE_POINTS.preferredDomainPerItem
                 + profile.dislikedDomains.length * DOMAIN_CONFIDENCE_POINTS.dislikedDomainPerItem
         );
         const seniorityConfidence = toPercent(
-            profile.senioritySignal ? SENIORITY_CONFIDENCE_POINTS.whenKnown : SENIORITY_CONFIDENCE_POINTS.whenUnknown
+            roleExperience.length > 0 || profile.senioritySignal
+                ? SENIORITY_CONFIDENCE_POINTS.whenKnown
+                : SENIORITY_CONFIDENCE_POINTS.whenUnknown
         );
         const searchReadinessConfidence = blendPercentScores([
             { score: skillsConfidence, weightPercent: SEARCH_READINESS_BLEND_PERCENT.skills },
@@ -47,7 +52,7 @@ export class ConfidenceService {
         ]);
         const discoveryConfidence = blendPercentScores([
             { score: preferencesConfidence, weightPercent: DISCOVERY_CONFIDENCE_BLEND_PERCENT.preferences },
-            { score: workStyleConfidence, weightPercent: DISCOVERY_CONFIDENCE_BLEND_PERCENT.workStyle },
+            { score: roleExperienceConfidence, weightPercent: DISCOVERY_CONFIDENCE_BLEND_PERCENT.roleExperience },
             { score: 100 - goalsConfidence, weightPercent: DISCOVERY_CONFIDENCE_BLEND_PERCENT.goalsGap },
         ]);
 
@@ -55,7 +60,7 @@ export class ConfidenceService {
             skillsConfidence,
             goalsConfidence,
             preferencesConfidence,
-            workStyleConfidence,
+            roleExperienceConfidence,
             domainConfidence,
             seniorityConfidence,
             searchReadinessConfidence,

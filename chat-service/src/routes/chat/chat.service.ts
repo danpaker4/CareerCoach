@@ -12,7 +12,10 @@ import { ConversationModeService } from "./chat-mode/conversation-mode.service";
 import { AchievementInferenceService } from "./inference/achievement-inference/achievement-inference.service";
 import type { AchievementInferenceResult } from "./inference/achievement-inference/achievement-inference.types";
 import { toUserAchievementFromInferred } from "./inference/achievement-inference/achievement-inference.utils";
-import { WorkStyleInferenceService } from "./inference/work-style-inference/work-style-inference.service";
+import { SeniorityInferenceService } from "./inference/seniority-inference/seniority-inference.service";
+import { toRoleExperienceEntryFromInferred } from "./inference/seniority-inference/seniority-inference.utils";
+import { mergeRoleExperience } from "../external-chat/role-experience.utils";
+import type { RoleExperienceEntry } from "../external-chat/role-experience.types";
 import { JobSearchPlanService } from "./search/job-search-plan.service";
 import { JobRankingService } from "./ranking/job-ranking.service";
 import { buildUserAccountContext } from "./llm/chat.user-account-context.utils";
@@ -61,7 +64,7 @@ export class ChatService {
         private readonly confidenceService: ConfidenceService,
         private readonly modeService: ConversationModeService,
         private readonly achievementInferenceService: AchievementInferenceService,
-        private readonly workStyleInferenceService: WorkStyleInferenceService,
+        private readonly seniorityInferenceService: SeniorityInferenceService,
         private readonly searchPlanService: JobSearchPlanService,
         private readonly rankingService: JobRankingService,
         private readonly knowledgeService: CareerKnowledgeService,
@@ -75,13 +78,11 @@ export class ChatService {
     private toSignalUpdateFromInferences = (
         message: string,
         achievementSkills: readonly string[],
-        inferredSkills: readonly string[],
-        workStyleSignals: readonly string[]
+        inferredSkills: readonly string[]
     ): CareerProfileSignalUpdate => ({
         strengths: inferredSkills.map((skill) => toSignal(skill, 0.7, message, "llm_inference")),
         technologies: achievementSkills.map((skill) => toSignal(skill, 0.86, message, "chat")),
-        workStyle: workStyleSignals.map((signal) => toSignal(signal, 0.75, message, "llm_inference")),
-        extractedKeywords: [...achievementSkills, ...inferredSkills, ...workStyleSignals]
+        extractedKeywords: [...achievementSkills, ...inferredSkills]
             .map((keyword) => toSignal(keyword, 0.6, message, "llm_inference")),
     });
 
@@ -93,6 +94,10 @@ export class ChatService {
                 achievements: achievementInference.achievements.map(toUserAchievementFromInferred),
             })
             .catch(() => null);
+    };
+
+    private updateUserRoleExperience = async (userId: string, roleExperience: readonly RoleExperienceEntry[]): Promise<void> => {
+        await this.externalService.applyInferredRoleExperience(userId, { roleExperience }).catch(() => null);
     };
 
     private handlePipelineAccept = async (params: {
@@ -147,11 +152,12 @@ export class ChatService {
         rejectedIds: string[];
         rec: JobRecommendationContextState;
         userCareerProfile: UserCareerProfile;
+        userRoleExperience: RoleExperienceEntry[];
         mode: ConversationMode;
         confidenceSummary: ConfidenceSummary;
     }): Promise<ChatMessageResponse> => {
-        const { userId, conversationId, jobContext, nextSanitized, rejectedIds, rec, userCareerProfile, mode, confidenceSummary } = params;
-        const ranked = this.rankingService.rankJobs(userCareerProfile, [nextSanitized]);
+        const { userId, conversationId, jobContext, nextSanitized, rejectedIds, rec, userCareerProfile, userRoleExperience, mode, confidenceSummary } = params;
+        const ranked = this.rankingService.rankJobs(userCareerProfile, [nextSanitized], userRoleExperience);
         const top = ranked[0];
         const reasonsText = top.reasons.join(" ");
         const reply = withPipelineClosing(
@@ -185,6 +191,7 @@ export class ChatService {
         conversation: Conversation;
         jobContext: NonNullable<Conversation["jobContext"]>;
         userCareerProfile: UserCareerProfile;
+        userRoleExperience: RoleExperienceEntry[];
         rejectedIds: string[];
         rec: JobRecommendationContextState;
         excluded: ReadonlySet<string>;
@@ -199,6 +206,7 @@ export class ChatService {
             conversation,
             jobContext,
             userCareerProfile,
+            userRoleExperience,
             rejectedIds,
             rec,
             excluded,
@@ -207,7 +215,7 @@ export class ChatService {
             confidenceSummary,
         } = params;
         const broaderFilters = buildBroaderJobSearchFilters(jobContext, userCareerProfile);
-        const broaderPlan = this.searchPlanService.buildBroaderPlan(userCareerProfile, broaderFilters);
+        const broaderPlan = this.searchPlanService.buildBroaderPlan(userCareerProfile, broaderFilters, userRoleExperience);
         const searchedJobs = await this.externalService.searchJobsByPlan(broaderPlan);
         const filteredJobs = searchedJobs.filter((j) => !excluded.has(j.id));
         if (filteredJobs.length === 0) {
@@ -227,7 +235,7 @@ export class ChatService {
             await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
-        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, filteredJobs);
+        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, filteredJobs, userRoleExperience);
         const orderedPool = rankedJobs.slice(0, 15).map((item) => item.job);
         const focusJob = orderedPool[0] ?? null;
         if (!focusJob) {
@@ -242,6 +250,7 @@ export class ChatService {
             conversation,
             jobContext,
             userCareerProfile,
+            userRoleExperience,
             rejectedIds,
             rec,
             userAccountContext,
@@ -260,6 +269,7 @@ export class ChatService {
         conversation: Conversation;
         jobContext: NonNullable<Conversation["jobContext"]>;
         userCareerProfile: UserCareerProfile;
+        userRoleExperience: RoleExperienceEntry[];
         rejectedIds: string[];
         rec: JobRecommendationContextState;
         userAccountContext: string;
@@ -276,6 +286,7 @@ export class ChatService {
             conversation,
             jobContext,
             userCareerProfile,
+            userRoleExperience,
             rejectedIds,
             rec,
             userAccountContext,
@@ -318,7 +329,7 @@ export class ChatService {
             "BROADER_PIPELINE_REFILL"
         );
         const presentationJobs = [selectedJob];
-        const rankedForMatches = this.rankingService.rankJobs(userCareerProfile, presentationJobs);
+        const rankedForMatches = this.rankingService.rankJobs(userCareerProfile, presentationJobs, userRoleExperience);
         const jobMatches = rankedForMatches.map((item) => mapRankedJobResultToChatMatchRow(item));
         const reply = withPipelineClosing(validatedAfterFallback.sanitizedReply);
         await this.conversationService.appendAssistantMessage(userId, conversationId, reply, presentationJobs);
@@ -338,11 +349,12 @@ export class ChatService {
         conversation: Conversation;
         jobContext: NonNullable<Conversation["jobContext"]>;
         userCareerProfile: UserCareerProfile;
+        userRoleExperience: RoleExperienceEntry[];
         mode: ConversationMode;
         confidenceSummary: ConfidenceSummary;
         userAccountContext: string;
     }): Promise<ChatMessageResponse> => {
-        const { conversationId, userId, normalizedMessage, conversation, jobContext, userCareerProfile, mode, confidenceSummary, userAccountContext } = params;
+        const { conversationId, userId, normalizedMessage, conversation, jobContext, userCareerProfile, userRoleExperience, mode, confidenceSummary, userAccountContext } = params;
         const job = jobContext.selectedJobSnapshot;
         const rec = jobContext.jobRecommendationContext;
         if (!job || !rec) {
@@ -364,6 +376,7 @@ export class ChatService {
                 rejectedIds,
                 rec,
                 userCareerProfile,
+                userRoleExperience,
                 mode,
                 confidenceSummary,
             });
@@ -376,6 +389,7 @@ export class ChatService {
             conversation,
             jobContext,
             userCareerProfile,
+            userRoleExperience,
             rejectedIds,
             rec,
             excluded,
@@ -457,6 +471,7 @@ export class ChatService {
         normalizedMessage: string;
         conversationAfterUserMessage: Conversation;
         userCareerProfile: UserCareerProfile;
+        userRoleExperience: RoleExperienceEntry[];
         normalizedQuery: string;
         jobs: JobSearchResultItem[];
         userAccountContext: string;
@@ -470,6 +485,7 @@ export class ChatService {
             normalizedMessage,
             conversationAfterUserMessage,
             userCareerProfile,
+            userRoleExperience,
             normalizedQuery,
             jobs,
             userAccountContext,
@@ -479,7 +495,7 @@ export class ChatService {
         } = params;
         const rejectedIds = new Set(conversationAfterUserMessage.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
         const acceptedIds = new Set(conversationAfterUserMessage.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
-        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, jobs);
+        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, jobs, userRoleExperience);
         const eligibleRanked = rankedJobs.filter(
             (item) => !rejectedIds.has(item.job.id) && !acceptedIds.has(item.job.id)
         );
@@ -538,6 +554,7 @@ export class ChatService {
         normalizedMessage: string;
         conversationForDecision: Conversation;
         userCareerProfile: UserCareerProfile;
+        userRoleExperience: RoleExperienceEntry[];
         jobs: JobSearchResultItem[];
         userAccountContext: string;
         userAchievements: SendMessagePreparedContext["userAchievements"];
@@ -551,6 +568,7 @@ export class ChatService {
             normalizedMessage,
             conversationForDecision,
             userCareerProfile,
+            userRoleExperience,
             jobs,
             userAccountContext,
             userAchievements,
@@ -560,7 +578,7 @@ export class ChatService {
         } = params;
         const rejectedIds = new Set(conversationForDecision.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
         const acceptedIds = new Set(conversationForDecision.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
-        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, jobs);
+        const rankedJobs = this.rankingService.rankJobs(userCareerProfile, jobs, userRoleExperience);
         const eligibleRanked = rankedJobs.filter(
             (item) => !rejectedIds.has(item.job.id) && !acceptedIds.has(item.job.id)
         );
@@ -582,7 +600,7 @@ export class ChatService {
             userAccountContext
         );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
-        const recommendedDirections = await this.knowledgeService.suggestDirections(userCareerProfile);
+        const recommendedDirections = await this.knowledgeService.suggestDirections(userCareerProfile, userRoleExperience);
         const fallbackPack = applyValidatedJobsFallback(
             topRankedJobs.filter((jobItem) => validJobIds.includes(jobItem.id)).slice(0, 10),
             this.validationService.sanitizeReply(jobAwareDecision.reply),
@@ -632,16 +650,19 @@ export class ChatService {
         const userAchievements = await this.externalService.readUserAchievements(userId);
         const baseCareerProfile = await this.profileService.getOrCreateProfile(userId);
         const achievementInference = this.achievementInferenceService.inferFromMessage(normalizedMessage);
-        const workStyleInference = this.workStyleInferenceService.inferFromMessage(normalizedMessage);
+        const seniorityInference = this.seniorityInferenceService.inferFromMessage(normalizedMessage);
+        const inferredRoleExperience = seniorityInference.entries.map(toRoleExperienceEntryFromInferred);
+        const existingRoleExperience = await this.externalService.readUserRoleExperience(userId);
         const inferredSignalUpdate = this.toSignalUpdateFromInferences(
             normalizedMessage,
             achievementInference.skills,
-            achievementInference.inferredSkills,
-            workStyleInference.signals
+            achievementInference.inferredSkills
         );
         const userCareerProfile = await this.profileService.mergeProfileSignals(baseCareerProfile, inferredSignalUpdate);
         await this.updateUserAchievements(userId, achievementInference);
-        const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile);
+        await this.updateUserRoleExperience(userId, inferredRoleExperience);
+        const userRoleExperience = mergeRoleExperience(existingRoleExperience, inferredRoleExperience);
+        const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile, userRoleExperience);
         const mode = this.modeService.detectMode(normalizedMessage, confidenceSummary);
         const followUpIntent = this.followUpIntentService.detect(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
@@ -654,6 +675,7 @@ export class ChatService {
             userAccountContext,
             conversationAfterUserMessage,
             userCareerProfile,
+            userRoleExperience,
             confidenceSummary,
             mode,
             followUpIntent,
@@ -683,6 +705,7 @@ export class ChatService {
                 conversation: ctx.conversationAfterUserMessage,
                 jobContext: ctx.jobContext,
                 userCareerProfile: ctx.userCareerProfile,
+                userRoleExperience: ctx.userRoleExperience,
                 mode: ctx.mode,
                 confidenceSummary: ctx.confidenceSummary,
                 userAccountContext: ctx.userAccountContext,
@@ -733,7 +756,7 @@ export class ChatService {
         }
         const normalizedQuery = extractedWorkDirection ?? domainExplorationTarget?.domain ?? ctx.normalizedMessage;
         const workDirectionFilters = buildWorkDirectionFilters(normalizedQuery);
-        const searchPlan = this.searchPlanService.buildPlan(ctx.userCareerProfile, workDirectionFilters);
+        const searchPlan = this.searchPlanService.buildPlan(ctx.userCareerProfile, workDirectionFilters, ctx.userRoleExperience);
         console.info(
             `[CHAT][SEARCH] userId=${ctx.userId} trigger=WORK_DIRECTION_INTENT query="${normalizedQuery}" filters=${JSON.stringify(workDirectionFilters)} planSearches=${searchPlan.searches.length}`
         );
@@ -753,6 +776,7 @@ export class ChatService {
             normalizedMessage: ctx.normalizedMessage,
             conversationAfterUserMessage: ctx.conversationAfterUserMessage,
             userCareerProfile: ctx.userCareerProfile,
+            userRoleExperience: ctx.userRoleExperience,
             normalizedQuery,
             jobs,
             userAccountContext: ctx.userAccountContext,
@@ -802,7 +826,7 @@ export class ChatService {
             return { reply: sanitizedReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
-        const searchPlan = this.searchPlanService.buildPlan(ctx.userCareerProfile, effectiveSearchFilters);
+        const searchPlan = this.searchPlanService.buildPlan(ctx.userCareerProfile, effectiveSearchFilters, ctx.userRoleExperience);
         console.info(
             `[CHAT][SEARCH] userId=${ctx.userId} trigger=SEARCH_PLAN planSearches=${searchPlan.searches.length} plan=${JSON.stringify(searchPlan.searches.map((item) => ({ type: item.type, query: item.query })))}`
         );
@@ -820,6 +844,7 @@ export class ChatService {
             normalizedMessage: ctx.normalizedMessage,
             conversationForDecision,
             userCareerProfile: ctx.userCareerProfile,
+            userRoleExperience: ctx.userRoleExperience,
             jobs,
             userAccountContext: ctx.userAccountContext,
             userAchievements: ctx.userAchievements,

@@ -3,6 +3,7 @@ import type { ConversationMode } from "./chat-mode/conversation-mode.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { Conversation } from "../conversation/conversation.model";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { RoleExperienceEntry } from "../external-chat/role-experience.types";
 import type { UserAchievement } from "./chat.model";
 import type { ProfileInput } from "../conversation/conversation.types";
 import type { JobFollowUpIntentResult } from "./job-context/job-follow-up-intent.service";
@@ -30,6 +31,7 @@ export type SendMessagePreparedContext = {
     userAccountContext: string;
     conversationAfterUserMessage: Conversation;
     userCareerProfile: UserCareerProfile;
+    userRoleExperience: RoleExperienceEntry[];
     confidenceSummary: ConfidenceSummary;
     mode: ConversationMode;
     followUpIntent: JobFollowUpIntentResult;

@@ -43,6 +43,7 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     technologies: userData.technologies ?? [],
                     interests: userData.interests ?? [],
                     knownSkills: userData.knownSkills ?? [],
+                    roleExperience: userData.roleExperience ?? [],
                 };
 
                 await usersCollection.insertOne(toUserDocument(newUser));
