@@ -7,7 +7,7 @@ export const resolveLlmConfig = (env: LlmEnvInput): ResolvedLlmConfig => {
         if (!apiKey) {
             throw new Error("resolveLlmConfig: missing GEMINI_API_KEY for provider gemini");
         }
-        const model = env.llmModel?.trim() || DEFAULT_GEMINI_MODEL;
+        const model = env.geminiModel?.trim() || DEFAULT_GEMINI_MODEL;
         return { provider: "gemini", apiKey, model };
     }
 

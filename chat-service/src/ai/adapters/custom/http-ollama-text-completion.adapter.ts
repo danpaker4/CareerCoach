@@ -1,5 +1,6 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
+import { DEFAULT_OLLAMA_TIMEOUT_MS } from "../../llm-config.consts";
 import { readOllamaUsage, recordLlmTokenUsage } from "../../token-usage.utils";
 
 type OllamaGenerateResponse = {
@@ -21,6 +22,7 @@ export class HttpOllamaTextCompletionAdapter implements TextCompletionPort {
         const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/api/generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(DEFAULT_OLLAMA_TIMEOUT_MS),
             body: JSON.stringify({
                 model: this.model,
                 prompt,

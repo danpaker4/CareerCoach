@@ -15,8 +15,9 @@ const EnvSchema = z
         MONGO_KEY_PATH: z.string().optional(),
         USERS_SERVICE_BASE_URL: envString("USERS_SERVICE_BASE_URL"),
         JOB_SERVICE_BASE_URL: envString("JOB_SERVICE_BASE_URL"),
-        LLM_PROVIDER: LlmProviderSchema.default("gemini"),
+        LLM_PROVIDER: LlmProviderSchema.default("ollama"),
         GEMINI_API_KEY: z.string().optional(),
+        GEMINI_MODEL: z.string().optional(),
         LLM_MODEL: z.string().optional(),
         OPENAI_API_KEY: z.string().optional(),
         OPENAI_MODEL: z.string().optional(),
@@ -32,6 +33,7 @@ const EnvSchema = z
         const chain = buildTextCompletionLlmChain({
             llmProvider: data.LLM_PROVIDER,
             geminiApiKey: data.GEMINI_API_KEY,
+            geminiModel: data.GEMINI_MODEL,
             openaiApiKey: data.OPENAI_API_KEY,
             llmModel: data.LLM_MODEL,
             openaiModel: data.OPENAI_MODEL,
@@ -53,6 +55,7 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
     const llmTextCompletionChain = buildTextCompletionLlmChain({
         llmProvider: parsed.LLM_PROVIDER,
         geminiApiKey: parsed.GEMINI_API_KEY,
+        geminiModel: parsed.GEMINI_MODEL,
         openaiApiKey: parsed.OPENAI_API_KEY,
         llmModel: parsed.LLM_MODEL,
         openaiModel: parsed.OPENAI_MODEL,
@@ -65,6 +68,7 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
             return resolveLlmConfig({
                 llmProvider: parsed.LLM_PROVIDER,
                 geminiApiKey: parsed.GEMINI_API_KEY,
+                geminiModel: parsed.GEMINI_MODEL,
                 openaiApiKey: parsed.OPENAI_API_KEY,
                 llmModel: parsed.LLM_MODEL,
                 openaiModel: parsed.OPENAI_MODEL,
