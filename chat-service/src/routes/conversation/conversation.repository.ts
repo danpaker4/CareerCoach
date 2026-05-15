@@ -1,10 +1,10 @@
 import type { Collection } from "mongodb";
 import { ObjectId } from "mongodb";
-import type { ChatMessage } from "../chat.model";
+import type { ChatMessage } from "../chat/chat.model";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
 import type { ConversationListRow } from "./conversation.types";
 import { conversationFilter } from "./conversation.utils";
-import type { ConversationJobContext } from "../job-context/job-context.types";
+import type { ConversationJobContext } from "../chat/job-context/job-context.types";
 
 export class ConversationRepository {
     constructor(private readonly conversationsCollection: Collection<Conversation>) {}

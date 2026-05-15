@@ -1,5 +1,5 @@
 import type { ObjectId } from "mongodb";
-import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
 
 export type { UserAchievement };
 

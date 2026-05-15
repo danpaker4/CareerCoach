@@ -4,11 +4,11 @@ import type {
     ConversationSummaryResponse,
     EnsureConversationExistsResult,
 } from "./conversation.types";
-import { ChatExternalService } from "../../external-chat/chat.external.service";
+import { ChatExternalService } from "../external-chat/chat.external.service";
 import { ConversationRepository } from "./conversation.repository";
 import {
     ConversationNotFoundError,
-    initialStageProgress,
+    defaultStageProgress,
     InvalidConversationIdError,
     toAttachedJobSnapshots,
     toConversationResponse,
@@ -17,8 +17,8 @@ import {
 } from "./conversation.utils";
 import { ConversationStageService } from "./conversation.stage.service";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
-import type { JobSearchResultItem } from "../chat.types";
-import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../job-context/job-context.types";
+import type { JobSearchResultItem } from "../chat/chat.types";
+import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../chat/job-context/job-context.types";
 
 export class ChatConversationService {
     constructor(
@@ -38,7 +38,7 @@ export class ChatConversationService {
 
     createAdditionalConversation = async (userId: string): Promise<ConversationResponse> => {
         const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
-        const created = await this.repository.createConversation(userId, firstAssistantMessage, initialStageProgress());
+        const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
         const achievements = await this.chatExternalService.readUserAchievements(userId);
         return toConversationResponse(created, achievements);
     };
@@ -65,7 +65,7 @@ export class ChatConversationService {
         }
 
         const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
-        const created = await this.repository.createConversation(userId, firstAssistantMessage, initialStageProgress());
+        const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
         return { conversationId: created._id!.toHexString() };
     };
 
@@ -90,10 +90,7 @@ export class ChatConversationService {
         if (!objectId) {
             throw new InvalidConversationIdError();
         }
-        const removed = await this.repository.deleteByIdAndUserId(objectId, userId);
-        if (!removed) {
-            throw new ConversationNotFoundError();
-        }
+        await this.repository.deleteByIdAndUserId(objectId, userId);
     };
 
     appendUserMessage = async (ref: ConversationRef, content: string): Promise<void> => {

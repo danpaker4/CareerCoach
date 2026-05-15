@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
-import type { ChatMessage } from "../chat.model";
-import type { ConversationJobContext } from "../job-context/job-context.types";
+import type { ChatMessage } from "../chat/chat.model";
+import type { ConversationJobContext } from "../chat/job-context/job-context.types";
 
 export interface ConversationStageProgress {
     currentStageIndex: number;

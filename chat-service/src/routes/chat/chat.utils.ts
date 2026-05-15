@@ -8,7 +8,7 @@ import type {
     UserAchievementResponse,
     UserProfileResponse,
 } from "./chat.types";
-import type { ProfileInput } from "./conversation/conversation.types";
+import type { ProfileInput } from "../conversation/conversation.types";
 import { z } from "zod";
 
 const toStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];

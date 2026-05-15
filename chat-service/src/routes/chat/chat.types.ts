@@ -1,4 +1,4 @@
-import type { ProfileInput } from "./conversation/conversation.types";
+import type { ProfileInput } from "../conversation/conversation.types";
 import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { SanitizedJob } from "./job-context/job-context.types";

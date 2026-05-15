@@ -19,7 +19,6 @@ const deterministicEmbedding = (text: string): number[] => {
 export class FallbackEmbeddingAdapter implements EmbeddingPort {
     readonly embedText = async (text: string): Promise<number[]> => deterministicEmbedding(text);
     readonly embedJob = (jobText: string): Promise<number[]> => this.embedText(jobText);
-    readonly embedUserMemory = (memoryText: string): Promise<number[]> => this.embedText(memoryText);
     readonly embedCareerProfile = (profileText: string): Promise<number[]> => this.embedText(profileText);
     readonly embedCareerDirection = (directionText: string): Promise<number[]> => this.embedText(directionText);
 }

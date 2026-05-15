@@ -1,7 +1,8 @@
 import { ObjectId } from "mongodb";
-import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
-import type { JobSearchResultItem } from "../chat.types";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
+import type { JobSearchResultItem } from "../chat/chat.types";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import { CONVERSATION_STAGES } from "./conversation.stage.consts";
 import type { ConversationRef, ConversationResponse } from "./conversation.types";
 
 export class ConversationNotFoundError extends Error {
@@ -37,14 +38,29 @@ export const toAttachedJobSnapshots = (jobs: readonly JobSearchResultItem[]): At
         salary: typeof job.salary === "number" ? job.salary : 0,
     }));
 
-export const initialStageProgress = (): ConversationStageProgress => ({
+export const defaultStageProgress = (): ConversationStageProgress => ({
     currentStageIndex: 0,
-    currentStageId: "achievements",
+    currentStageId: CONVERSATION_STAGES[0]?.id,
     completedStageIds: [],
     awaitingConfirmation: false,
     stageNotes: {},
     surfacedAchievementIds: [],
 });
+
+export const appendStageNote = (
+    stageProgress: ConversationStageProgress,
+    stageId: string,
+    note: string
+): ConversationStageProgress => {
+    const existing = stageProgress.stageNotes[stageId] ?? [];
+    return {
+        ...stageProgress,
+        stageNotes: {
+            ...stageProgress.stageNotes,
+            [stageId]: [...existing, note],
+        },
+    };
+};
 
 export const toRefObjectId = (ref: ConversationRef): ObjectId => {
     const parsed = tryParseConversationObjectId(ref.conversationId);

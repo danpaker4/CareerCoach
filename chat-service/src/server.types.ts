@@ -14,7 +14,6 @@ export interface ServerConfig {
         llmTextCompletionChain: readonly ResolvedLlmConfig[];
         embeddingModel?: string;
         customEmbeddingUrl?: string;
-        conversationMemoryVectorIndexName: string;
         careerProfileVectorIndexName: string;
         careerDirectionVectorIndexName: string;
     };

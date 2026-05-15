@@ -1,25 +1,6 @@
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
 import { CONVERSATION_STAGES, STAGE_SIGNALS, type ConversationStage } from "./conversation.stage.consts";
-
-const defaultStageProgress = (): ConversationStageProgress => ({
-    currentStageIndex: 0,
-    currentStageId: CONVERSATION_STAGES[0]?.id,
-    completedStageIds: [],
-    awaitingConfirmation: false,
-    stageNotes: {},
-    surfacedAchievementIds: [],
-});
-
-const appendStageNote = (stageProgress: ConversationStageProgress, stageId: string, note: string): ConversationStageProgress => {
-    const existing = stageProgress.stageNotes[stageId] ?? [];
-    return {
-        ...stageProgress,
-        stageNotes: {
-            ...stageProgress.stageNotes,
-            [stageId]: [...existing, note],
-        },
-    };
-};
+import { appendStageNote, defaultStageProgress } from "./conversation.utils";
 
 export class ConversationStageService {
     getInitialAssistantMessage = (): string =>

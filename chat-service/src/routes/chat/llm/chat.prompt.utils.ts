@@ -1,8 +1,7 @@
 import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
-import type { Conversation } from "../conversation/conversation.model";
-import type { ConversationStage } from "../conversation/conversation.stage.consts";
+import type { Conversation } from "../../conversation/conversation.model";
+import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
-import type { ConversationMemory } from "../memory/conversation-memory.types";
 import type { ConversationMode } from "../conversation-mode/conversation-mode.types";
 
 const MAX_JOB_DESCRIPTION_CHARS = 1200;
@@ -40,11 +39,6 @@ const achievementsText = (userAchievements: readonly UserAchievement[]): string 
         ? "No achievements available yet."
         : userAchievements.map((achievement) => `- ${achievement.name}`).join("\n");
 
-const memoryText = (memories: readonly ConversationMemory[]): string =>
-    memories.length === 0
-        ? "No memory snippets available."
-        : memories.map((memory) => `- [${memory.type}] ${memory.text}`).join("\n");
-
 const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
 
@@ -52,7 +46,6 @@ export const buildDecisionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     userAchievements: readonly UserAchievement[],
-    memories: readonly ConversationMemory[] = [],
     mode: ConversationMode = "GUIDED",
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
@@ -102,9 +95,6 @@ ${userAccountContext}
 Conversation mode:
 ${mode}
 
-Relevant user memory snippets:
-${memoryText(memories)}
-
 Conversation so far:
 ${buildHistory(conversation)}
 
@@ -117,7 +107,6 @@ export const buildRecommendationPrompt = (
     latestUserMessage: string,
     jobs: readonly JobSearchResultItem[],
     userAchievements: readonly UserAchievement[],
-    memories: readonly ConversationMemory[] = [],
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are CareerCoach AI.
@@ -157,9 +146,6 @@ ${achievementsText(userAchievements)}
 
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}
-
-Relevant user memory snippets:
-${memoryText(memories)}
 
 Conversation so far:
 ${buildHistory(conversation)}

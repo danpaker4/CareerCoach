@@ -1,13 +1,12 @@
-import type { ConversationRef, ProfileInput } from "./conversation/conversation.types";
-import type { Conversation } from "./conversation/conversation.model";
+import type { ConversationRef, ProfileInput } from "../conversation/conversation.types";
+import type { Conversation } from "../conversation/conversation.model";
 import type { ChatMessageResponse } from "./chat.types";
-import { ChatConversationService } from "./conversation/conversation.service";
-import { ConversationStageService } from "./conversation/conversation.stage.service";
+import { ChatConversationService } from "../conversation/conversation.service";
+import { ConversationStageService } from "../conversation/conversation.stage.service";
 import { ChatLlmService } from "./llm/chat.llm.service";
 import { ChatValidationService } from "./llm/chat.validation.service";
 import { ChatExternalService } from "../external-chat/chat.external.service";
 import { CareerProfileService } from "../career-profile/career-profile.service";
-import { ConversationMemoryService } from "./memory/conversation-memory.service";
 import { ConfidenceService } from "./confidence/confidence.service";
 import { ConversationModeService } from "./conversation-mode/conversation-mode.service";
 import { AchievementInferenceService } from "./inference/achievement-inference.service";
@@ -56,7 +55,6 @@ export class ChatService {
         private readonly llmService: ChatLlmService,
         private readonly validationService: ChatValidationService,
         private readonly profileService: CareerProfileService,
-        private readonly memoryService: ConversationMemoryService,
         private readonly confidenceService: ConfidenceService,
         private readonly modeService: ConversationModeService,
         private readonly achievementInferenceService: AchievementInferenceService,
@@ -70,16 +68,6 @@ export class ChatService {
         private readonly pipelineIntentService: PipelineIntentService,
         private readonly pipelineService: PipelineService
     ) { }
-
-    getConversation = async (userId: string, conversationId?: string) =>
-        this.conversationService.getConversationResponse(userId, conversationId);
-
-    listConversationSummaries = async (userId: string) => this.conversationService.listConversationSummaries(userId);
-
-    createConversation = async (userId: string) => this.conversationService.createAdditionalConversation(userId);
-
-    deleteConversation = async (userId: string, conversationId: string): Promise<void> =>
-        this.conversationService.deleteConversation(userId, conversationId);
 
     private toSignal = (value: string, confidence: number, evidence: string, source: CareerSignal["source"]): CareerSignal => ({
         value,
@@ -291,14 +279,12 @@ export class ChatService {
             orderedPool,
             focusJob,
         } = params;
-        const memories = await this.memoryService.getRelevantMemories(userId, normalizedMessage);
         const userAchievements = await this.externalService.readUserAchievements(userId);
         const jobAwareDecision = await this.llmService.generateJobAwareReply(
             conversation,
             "Show another role",
             [focusJob],
             userAchievements,
-            memories,
             userAccountContext
         );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, filteredJobs);
@@ -462,7 +448,6 @@ export class ChatService {
         userCareerProfile: UserCareerProfile;
         normalizedQuery: string;
         jobs: JobSearchResultItem[];
-        memories: Awaited<ReturnType<ConversationMemoryService["getRelevantMemories"]>>;
         userAccountContext: string;
         userAchievements: SendMessagePreparedContext["userAchievements"];
         mode: ConversationMode;
@@ -475,7 +460,6 @@ export class ChatService {
             userCareerProfile,
             normalizedQuery,
             jobs,
-            memories,
             userAccountContext,
             userAchievements,
             mode,
@@ -502,7 +486,6 @@ export class ChatService {
             normalizedMessage,
             jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
             userAchievements,
-            memories,
             userAccountContext
         );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
@@ -542,7 +525,6 @@ export class ChatService {
         conversationForDecision: Conversation;
         userCareerProfile: UserCareerProfile;
         jobs: JobSearchResultItem[];
-        memories: Awaited<ReturnType<ConversationMemoryService["getRelevantMemories"]>>;
         userAccountContext: string;
         userAchievements: SendMessagePreparedContext["userAchievements"];
         mode: ConversationMode;
@@ -555,7 +537,6 @@ export class ChatService {
             conversationForDecision,
             userCareerProfile,
             jobs,
-            memories,
             userAccountContext,
             userAchievements,
             mode,
@@ -583,7 +564,6 @@ export class ChatService {
             normalizedMessage,
             jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
             userAchievements,
-            memories,
             userAccountContext
         );
         const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
@@ -638,7 +618,6 @@ export class ChatService {
 
         const conversationAfterUserMessage = await this.conversationService.getConversationOrThrow(ref);
         const userAchievements = await this.externalService.readUserAchievements(userId);
-        const memories = await this.memoryService.getRelevantMemories(userId, normalizedMessage);
         const baseCareerProfile = await this.profileService.getOrCreateProfile(userId);
         const achievementInference = this.achievementInferenceService.inferFromMessage(normalizedMessage);
         const workStyleInference = this.workStyleInferenceService.inferFromMessage(normalizedMessage);
@@ -651,7 +630,6 @@ export class ChatService {
             workStyleInference.signals
         );
         const userCareerProfile = await this.profileService.mergeProfileSignals(baseCareerProfile, inferredSignalUpdate);
-        await this.memoryService.saveSignalsAsMemories(userId, conversationAfterUserMessage, inferredSignalUpdate);
         await this.externalService.upsertKnownSkills(userId, aggregatedExplicitSkills).catch(() => null);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile);
         const mode = this.modeService.detectMode(normalizedMessage, confidenceSummary);
@@ -665,7 +643,6 @@ export class ChatService {
             userAchievements,
             userAccountContext,
             conversationAfterUserMessage,
-            memories,
             userCareerProfile,
             confidenceSummary,
             mode,
@@ -767,7 +744,6 @@ export class ChatService {
             userCareerProfile: ctx.userCareerProfile,
             normalizedQuery,
             jobs,
-            memories: ctx.memories,
             userAccountContext: ctx.userAccountContext,
             userAchievements: ctx.userAchievements,
             mode: ctx.mode,
@@ -786,7 +762,6 @@ export class ChatService {
             conversationForDecision,
             ctx.normalizedMessage,
             ctx.userAchievements,
-            ctx.memories,
             ctx.mode,
             ctx.userAccountContext
         );
@@ -834,7 +809,6 @@ export class ChatService {
             conversationForDecision,
             userCareerProfile: ctx.userCareerProfile,
             jobs,
-            memories: ctx.memories,
             userAccountContext: ctx.userAccountContext,
             userAchievements: ctx.userAchievements,
             mode: ctx.mode,

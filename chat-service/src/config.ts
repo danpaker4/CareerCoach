@@ -25,7 +25,6 @@ const EnvSchema = z
         OLLAMA_MODEL: z.string().optional(),
         EMBEDDING_MODEL: z.string().optional(),
         CUSTOM_EMBEDDING_URL: z.string().url().optional(),
-        CONVERSATION_MEMORY_VECTOR_INDEX_NAME: z.string().default("conversation_memory_vector_index"),
         CAREER_PROFILE_VECTOR_INDEX_NAME: z.string().default("career_profile_vector_index"),
         CAREER_DIRECTION_VECTOR_INDEX_NAME: z.string().default("career_direction_vector_index"),
     })
@@ -92,7 +91,6 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
             llmTextCompletionChain,
             embeddingModel: parsed.EMBEDDING_MODEL,
             customEmbeddingUrl: parsed.CUSTOM_EMBEDDING_URL,
-            conversationMemoryVectorIndexName: parsed.CONVERSATION_MEMORY_VECTOR_INDEX_NAME,
             careerProfileVectorIndexName: parsed.CAREER_PROFILE_VECTOR_INDEX_NAME,
             careerDirectionVectorIndexName: parsed.CAREER_DIRECTION_VECTOR_INDEX_NAME,
         },

@@ -1,10 +1,10 @@
 
-import type { Conversation } from "../chat/conversation/conversation.model";
+import type { Conversation } from "../conversation/conversation.model";
 import { createEmptyProfileSignals, mergeProfileSignals, toProfileSummaryText } from "./career-profile.utils";
 import type { CareerProfileSignalUpdate, CareerSignal, CoachProfileAccountLink, UserCareerProfile } from "./career-profile.types";
 import { CareerProfileRepository } from "./career-profile.repository";
 import { EXPLICIT_USER_SIGNAL_CONFIDENCE } from "./career-profile.consts";
-import type { ProfileInput } from "../chat/conversation/conversation.types";
+import type { ProfileInput } from "../conversation/conversation.types";
 import { EmbeddingPort } from "../../ai/ports/embedding.types";
 
 const buildDefaultProfile = (userId: string): UserCareerProfile => {
