@@ -11,6 +11,7 @@ import type {
     CareerRoleProfile,
     CareerSkillProfile,
 } from "../routes/careerKnowledge/career-knowledge.types";
+import type { LlmTokenUsageDocument } from "../llm-token-usage/llm-token-usage.types";
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
@@ -24,6 +25,7 @@ export class MongoClient implements Service {
     private careerSkillProfilesCollection: Collection<CareerSkillProfile> | null = null;
     private careerPathProfilesCollection: Collection<CareerPathProfile> | null = null;
     private careerDirectionExamplesCollection: Collection<CareerDirectionExample> | null = null;
+    private llmTokenUsageCollection: Collection<LlmTokenUsageDocument> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -47,6 +49,8 @@ export class MongoClient implements Service {
             this.careerSkillProfilesCollection = this.db.collection<CareerSkillProfile>("career_skill_profiles");
             this.careerPathProfilesCollection = this.db.collection<CareerPathProfile>("career_path_profiles");
             this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("career_direction_examples");
+            this.llmTokenUsageCollection = this.db.collection<LlmTokenUsageDocument>("llmTokenUsage");
+            await this.llmTokenUsageCollection.createIndex({ createdAt: -1, provider: 1, model: 1 });
 
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -67,6 +71,7 @@ export class MongoClient implements Service {
         this.careerSkillProfilesCollection = null;
         this.careerPathProfilesCollection = null;
         this.careerDirectionExamplesCollection = null;
+        this.llmTokenUsageCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
@@ -131,6 +136,13 @@ export class MongoClient implements Service {
             throw new Error("Career direction examples collection is not initialized");
         }
         return this.careerDirectionExamplesCollection;
+    }
+
+    get llmTokenUsage(): Collection<LlmTokenUsageDocument> {
+        if (!this.llmTokenUsageCollection) {
+            throw new Error("LLM token usage collection is not initialized");
+        }
+        return this.llmTokenUsageCollection;
     }
 
 }

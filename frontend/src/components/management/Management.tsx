@@ -6,22 +6,29 @@ import {
   MANAGEMENT_DEMOTE_ERROR_MESSAGE,
   MANAGEMENT_LOAD_ERROR_MESSAGE,
   MANAGEMENT_PROMOTE_ERROR_MESSAGE,
+  MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE,
 } from './management.consts';
-import type { AdminUserSummary, ManagementProps, ManagementStatus, ManagementUserAction } from './management.types';
+import type { AdminLlmTokenUsageResult, AdminUserSummary, ManagementProps, ManagementStatus, ManagementUserAction, TokenUsageStatus } from './management.types';
 import {
+  buildAdminLlmTokenUsageUrl,
   buildAdminUsersUrl,
   buildDeleteUserUrl,
   buildDemoteAdminUrl,
+  parseTokenUsage,
   parseAdminUsers,
   readManagementErrorMessage,
 } from './management.utils';
 import { DeleteUserDialog } from './DeleteUserDialog';
+import { TokenUsageGraph } from './TokenUsageGraph';
 import './Management.css';
 
 export const Management = ({ currentUser }: ManagementProps) => {
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [status, setStatus] = useState<ManagementStatus>('loading');
+  const [tokenUsageStatus, setTokenUsageStatus] = useState<TokenUsageStatus>('loading');
+  const [tokenUsage, setTokenUsage] = useState<AdminLlmTokenUsageResult | null>(null);
+  const [tokenUsageError, setTokenUsageError] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [activeAction, setActiveAction] = useState<{ userId: string; action: ManagementUserAction } | null>(null);
@@ -45,11 +52,41 @@ export const Management = ({ currentUser }: ManagementProps) => {
     setStatus('success');
   };
 
+  const loadTokenUsage = async (): Promise<void> => {
+    setTokenUsageStatus('loading');
+    setTokenUsageError('');
+
+    const response = await apiFetch(buildAdminLlmTokenUsageUrl());
+    if (!response.ok) {
+      setTokenUsage(null);
+      setTokenUsageStatus('error');
+      setTokenUsageError(await readManagementErrorMessage(response, MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE));
+      return;
+    }
+
+    const payload: unknown = await response.json().catch(() => null);
+    const parsed = parseTokenUsage(payload);
+    if (!parsed) {
+      setTokenUsage(null);
+      setTokenUsageStatus('error');
+      setTokenUsageError(MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE);
+      return;
+    }
+
+    setTokenUsage(parsed);
+    setTokenUsageStatus('success');
+  };
+
   useEffect(() => {
     loadUsers('').catch((loadError: unknown) => {
       setUsers([]);
       setStatus('error');
       setError(loadError instanceof Error ? loadError.message : MANAGEMENT_LOAD_ERROR_MESSAGE);
+    });
+    loadTokenUsage().catch((loadError: unknown) => {
+      setTokenUsage(null);
+      setTokenUsageStatus('error');
+      setTokenUsageError(loadError instanceof Error ? loadError.message : MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE);
     });
   }, []);
 
@@ -163,6 +200,8 @@ export const Management = ({ currentUser }: ManagementProps) => {
           </div>
         </form>
       </section>
+
+      <TokenUsageGraph usage={tokenUsage} status={tokenUsageStatus} error={tokenUsageError} />
 
       {error && <p className="management-alert management-alert--error">{error}</p>}
       {successMessage && <p className="management-alert management-alert--success">{successMessage}</p>}

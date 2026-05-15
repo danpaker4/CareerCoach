@@ -2,11 +2,24 @@ import type { FastifyReply } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { Collection } from "mongodb";
 import type { SchematicRequest } from "../../types/fastify";
+import type { LlmTokenUsageDocument } from "./admin-token-usage.model";
 import type { UserDocument } from "../users/user.model";
 import { ADMIN_USERS_SEARCH_LIMIT } from "./admin.consts";
-import { deleteAdminUserSchema, demoteAdminSchema, getAdminUsersSchema, promoteAdminSchema } from "./admin.schema";
-import type { AdminAuthenticatedRequest, DeleteAdminUserResult, DemoteAdminResult, PromoteAdminResult } from "./admin.types";
+import { deleteAdminUserSchema, demoteAdminSchema, getAdminLlmTokenUsageSchema, getAdminUsersSchema, promoteAdminSchema } from "./admin.schema";
+import type {
+    AdminAuthenticatedRequest,
+    AdminLlmTokenUsageResult,
+    AdminLlmTokenUsageSeriesItem,
+    DeleteAdminUserResult,
+    DemoteAdminResult,
+    PromoteAdminResult,
+} from "./admin.types";
 import { buildExactEmailRegex, buildSearchRegex, toAdminUserSummary } from "./admin.utils";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const startOfUtcDay = (date: Date): Date =>
+    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 
 export const getAdminUsers = (usersCollection: Collection<UserDocument>) =>
     async (request: SchematicRequest<typeof getAdminUsersSchema>, reply: FastifyReply): Promise<void> => {
@@ -126,6 +139,66 @@ export const deleteAdminUser = (usersCollection: Collection<UserDocument>) =>
 
         const result: DeleteAdminUserResult = {
             deletedUserId: userId,
+        };
+
+        reply.status(StatusCodes.OK).send(result);
+    };
+
+export const getAdminLlmTokenUsage = (tokenUsageCollection: Collection<LlmTokenUsageDocument>) =>
+    async (request: SchematicRequest<typeof getAdminLlmTokenUsageSchema>, reply: FastifyReply): Promise<void> => {
+        const days = request.query.days;
+        const now = new Date();
+        const from = new Date(startOfUtcDay(now).getTime() - (days - 1) * DAY_MS);
+        const series = await tokenUsageCollection.aggregate<AdminLlmTokenUsageSeriesItem>([
+            {
+                $match: {
+                    createdAt: {
+                        $gte: from,
+                        $lte: now,
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: "UTC" } },
+                        provider: "$provider",
+                        model: "$model",
+                    },
+                    promptTokens: { $sum: "$promptTokens" },
+                    completionTokens: { $sum: "$completionTokens" },
+                    totalTokens: { $sum: "$totalTokens" },
+                    requestCount: { $sum: "$requestCount" },
+                    unknownRequestCount: {
+                        $sum: {
+                            $cond: [{ $eq: ["$tokenStatus", "unknown"] }, "$requestCount", 0],
+                        },
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    date: "$_id.date",
+                    provider: "$_id.provider",
+                    model: "$_id.model",
+                    promptTokens: 1,
+                    completionTokens: 1,
+                    totalTokens: 1,
+                    requestCount: 1,
+                    unknownRequestCount: 1,
+                },
+            },
+            { $sort: { date: 1, provider: 1, model: 1 } },
+        ]).toArray();
+
+        const result: AdminLlmTokenUsageResult = {
+            range: {
+                from: from.toISOString(),
+                to: now.toISOString(),
+                days,
+            },
+            series,
         };
 
         reply.status(StatusCodes.OK).send(result);

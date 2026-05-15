@@ -24,7 +24,8 @@ export class ChatLlmService {
         userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildDecisionPrompt(conversation, latestUserMessage, userAchievements, mode, userAccountContext)
+            buildDecisionPrompt(conversation, latestUserMessage, userAchievements, mode, userAccountContext),
+            { operation: "chat.decision" }
         );
 
         try {
@@ -47,7 +48,8 @@ export class ChatLlmService {
         userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildRecommendationPrompt(conversation, latestUserMessage, jobs, userAchievements, userAccountContext)
+            buildRecommendationPrompt(conversation, latestUserMessage, jobs, userAchievements, userAccountContext),
+            { operation: "chat.job_aware_reply" }
         );
 
         try {
@@ -71,7 +73,8 @@ export class ChatLlmService {
         userAccountContext?: string
     ): Promise<StageLlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildStagePrompt(conversation, latestUserMessage, stage, userAchievements, mode, userAccountContext)
+            buildStagePrompt(conversation, latestUserMessage, stage, userAchievements, mode, userAccountContext),
+            { operation: "chat.stage_reply" }
         );
         try {
             return parseStageLlmDecisionFromJson(rawText);

@@ -37,6 +37,7 @@ describe("Admin Router", () => {
                 ],
             },
         });
+        await server.DBClient.llmTokenUsage.deleteMany({});
     });
 
     it("returns 403 for authenticated non-admin users", async () => {
@@ -53,6 +54,154 @@ describe("Admin Router", () => {
             error: "Admin access required",
             errorCode: "ADMIN_REQUIRED",
         });
+    });
+
+    it("returns 403 for token usage when authenticated user is not an admin", async () => {
+        await server.DBClient.users.insertOne(toUserDocument(regularUser));
+
+        const response = await server.app.inject({
+            method: "GET",
+            url: "/api/admin/llm-token-usage",
+            headers: authHeadersForUser(regularUser),
+        });
+
+        expect(response.statusCode).toBe(StatusCodes.FORBIDDEN);
+        expect(response.json()).toEqual({
+            error: "Admin access required",
+            errorCode: "ADMIN_REQUIRED",
+        });
+    });
+
+    it("aggregates llm token usage with a default 30 day range", async () => {
+        await server.DBClient.users.insertOne(toUserDocument(adminUser));
+        const now = new Date();
+        const today = new Date(now.getTime() - 1000);
+
+        await server.DBClient.llmTokenUsage.insertMany([
+            {
+                createdAt: today,
+                sourceService: "chat-service",
+                operation: "chat.decision",
+                provider: "ollama",
+                model: "llama3",
+                promptTokens: 10,
+                completionTokens: 15,
+                totalTokens: 25,
+                tokenStatus: "known",
+                requestCount: 1,
+            },
+            {
+                createdAt: today,
+                sourceService: "job-service",
+                operation: "job.enrichment",
+                provider: "ollama",
+                model: "llama3",
+                promptTokens: 20,
+                completionTokens: 30,
+                totalTokens: 50,
+                tokenStatus: "known",
+                requestCount: 1,
+            },
+            {
+                createdAt: today,
+                sourceService: "chat-service",
+                operation: "chat.stage_reply",
+                provider: "custom",
+                model: "custom",
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                tokenStatus: "unknown",
+                requestCount: 1,
+            },
+        ]);
+
+        const response = await server.app.inject({
+            method: "GET",
+            url: "/api/admin/llm-token-usage",
+            headers: authHeadersForUser(adminUser),
+        });
+
+        const payload = response.json();
+
+        expect(response.statusCode).toBe(StatusCodes.OK);
+        expect(payload.range.days).toBe(30);
+        expect(payload.series).toEqual([
+            {
+                date: today.toISOString().slice(0, 10),
+                provider: "custom",
+                model: "custom",
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                requestCount: 1,
+                unknownRequestCount: 1,
+            },
+            {
+                date: today.toISOString().slice(0, 10),
+                provider: "ollama",
+                model: "llama3",
+                promptTokens: 30,
+                completionTokens: 45,
+                totalTokens: 75,
+                requestCount: 2,
+                unknownRequestCount: 0,
+            },
+        ]);
+    });
+
+    it("filters token usage by requested day range", async () => {
+        await server.DBClient.users.insertOne(toUserDocument(adminUser));
+        const now = new Date();
+        const today = new Date(now.getTime() - 1000);
+        const olderThanRange = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
+
+        await server.DBClient.llmTokenUsage.insertMany([
+            {
+                createdAt: olderThanRange,
+                sourceService: "chat-service",
+                operation: "chat.decision",
+                provider: "gemini",
+                model: "gemini-3.0-flash",
+                promptTokens: 100,
+                completionTokens: 100,
+                totalTokens: 200,
+                tokenStatus: "known",
+                requestCount: 1,
+            },
+            {
+                createdAt: today,
+                sourceService: "chat-service",
+                operation: "chat.decision",
+                provider: "openai",
+                model: "gpt-4o-mini",
+                promptTokens: 7,
+                completionTokens: 9,
+                totalTokens: 16,
+                tokenStatus: "known",
+                requestCount: 1,
+            },
+        ]);
+
+        const response = await server.app.inject({
+            method: "GET",
+            url: "/api/admin/llm-token-usage?days=1",
+            headers: authHeadersForUser(adminUser),
+        });
+
+        expect(response.statusCode).toBe(StatusCodes.OK);
+        expect(response.json().series).toEqual([
+            {
+                date: today.toISOString().slice(0, 10),
+                provider: "openai",
+                model: "gpt-4o-mini",
+                promptTokens: 7,
+                completionTokens: 9,
+                totalTokens: 16,
+                requestCount: 1,
+                unknownRequestCount: 0,
+            },
+        ]);
     });
 
     it("searches users and defaults legacy missing roles to user", async () => {
