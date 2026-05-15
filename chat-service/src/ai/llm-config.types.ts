@@ -1,4 +1,4 @@
-export type LlmProviderId = "gemini" | "openai" | "custom" | "ollama";
+type LlmProviderId = "gemini" | "openai" | "custom" | "ollama";
 
 export type ResolvedLlmConfig =
     | { readonly provider: "gemini"; readonly apiKey: string; readonly model: string }

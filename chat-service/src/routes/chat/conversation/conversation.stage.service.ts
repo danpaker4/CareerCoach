@@ -1,5 +1,5 @@
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
-import { CONVERSATION_STAGES, type ConversationStage } from "./conversation.stage.consts";
+import { CONVERSATION_STAGES, STAGE_SIGNALS, type ConversationStage } from "./conversation.stage.consts";
 
 const defaultStageProgress = (): ConversationStageProgress => ({
     currentStageIndex: 0,
@@ -23,7 +23,7 @@ const appendStageNote = (stageProgress: ConversationStageProgress, stageId: stri
 
 export class ConversationStageService {
     getInitialAssistantMessage = (): string =>
-        "Hey! Great to meet you. Tell me a bit about your background—or what you're drawn to lately if you're still figuring out the next step.";
+        "Hey! Great to meet you. Tell me a bit about your background—or what you're interested in lately if you're still figuring out the next step.";
 
     private getCompletedStageIds = (stageProgress: ConversationStageProgress): string[] =>
         stageProgress.completedStageIds ?? [];
@@ -34,39 +34,11 @@ export class ConversationStageService {
             return null;
         }
 
-        const stageSignals: Record<string, readonly string[]> = {
-            achievements: ["experience", "project", "built", "developed", "worked", "achievement", "skill", "stack"],
-            timeline: ["immediately", "asap", "soon", "timeline", "months", "years", "long-term", "long term", "future", "now"],
-            preferences: [
-                "role",
-                "position",
-                "product manager",
-                "frontend",
-                "backend",
-                "fullstack",
-                "domain",
-                "industry",
-                "prefer",
-                "love",
-                "enjoy",
-                "passion",
-                "interested in",
-                "care about",
-                "don't know",
-                "do not know",
-                "not sure",
-                "no idea",
-                "exploring",
-                "figuring out",
-                "unsure",
-            ],
-        };
-
         for (const stage of CONVERSATION_STAGES) {
             if (completedStageIds.includes(stage.id)) {
                 continue;
             }
-            const hints = stageSignals[stage.id] ?? [];
+            const hints = STAGE_SIGNALS[stage.id] ?? [];
             if (hints.some((hint) => normalizedMessage.includes(hint))) {
                 return stage.id;
             }

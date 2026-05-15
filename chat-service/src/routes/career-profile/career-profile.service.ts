@@ -142,7 +142,7 @@ const inferInterestsFromText = (text: string): string[] => {
     return candidates.filter((item) => normalized.includes(item));
 };
 
-export const inferProfileUpdateFromProfileInput = (profile?: ProfileInput): CareerProfileSignalUpdate => {
+const inferProfileUpdateFromProfileInput = (profile?: ProfileInput): CareerProfileSignalUpdate => {
     if (!profile) {
         return {};
     }

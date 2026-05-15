@@ -1,4 +1,4 @@
-export type CareerConfidenceSummary = {
+export type ConfidenceSummary = {
     skillsConfidence: number;
     goalsConfidence: number;
     preferencesConfidence: number;

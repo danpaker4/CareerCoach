@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import type { ChatMessage, UserAchievement } from "../chat.model";
+import type { ChatMessage } from "../chat.model";
 import type { ConversationJobContext } from "../job-context/job-context.types";
 
 export interface ConversationStageProgress {
@@ -14,7 +14,6 @@ export interface ConversationStageProgress {
 export interface Conversation {
     _id?: ObjectId;
     userId: string;
-    achievements: UserAchievement[];
     messages: ChatMessage[];
     jobContext?: ConversationJobContext;
     stageProgress: ConversationStageProgress;

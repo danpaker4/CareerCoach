@@ -5,7 +5,7 @@ export const validateRecommendedJobIds = (
     recommendedJobIds: readonly string[],
     availableJobs: readonly JobSearchResultItem[]
 ): string[] => {
-    const availableJobIds = new Set(availableJobs.map((job) => job.jobId));
+    const availableJobIds = new Set(availableJobs.map((job) => job.id));
     const allMentionedIds = [...new Set(recommendedJobIds)];
     const invalidIds = allMentionedIds.filter((id) => !availableJobIds.has(id));
 

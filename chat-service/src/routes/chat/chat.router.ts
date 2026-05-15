@@ -15,8 +15,8 @@ import { CareerProfileRepository } from "../career-profile/career-profile.reposi
 import { CareerProfileService } from "../career-profile/career-profile.service";
 import { ConversationMemoryRepository } from "./memory/conversation-memory.repository";
 import { ConversationMemoryService } from "./memory/conversation-memory.service";
-import { CareerConfidenceService } from "./coach/career-confidence.service";
-import { ConversationModeService } from "./coach/conversation-mode.service";
+import { ConfidenceService } from "./confidence/confidence.service";
+import { ConversationModeService } from "./conversation-mode/conversation-mode.service";
 import { AchievementInferenceService } from "./inference/achievement-inference.service";
 import { WorkStyleInferenceService } from "./inference/work-style-inference.service";
 import { JobSearchPlanService } from "./search/job-search-plan.service";
@@ -44,7 +44,7 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         notifyProfileMaterialized: (userId) => externalService.notifyCoachProfileMaterialized(userId),
     });
     const memoryService = new ConversationMemoryService(memoryRepository, embedding, chatConfig.conversationMemoryVectorIndexName);
-    const confidenceService = new CareerConfidenceService();
+    const confidenceService = new ConfidenceService();
     const modeService = new ConversationModeService();
     const achievementInferenceService = new AchievementInferenceService();
     const workStyleInferenceService = new WorkStyleInferenceService();

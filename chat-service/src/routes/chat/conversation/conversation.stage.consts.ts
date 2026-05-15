@@ -3,6 +3,34 @@ export type ConversationStage = {
     objective: string;
 };
 
+export const STAGE_SIGNALS: Readonly<Record<string, readonly string[]>> = {
+    achievements: ["experience", "project", "built", "developed", "worked", "achievement", "skill", "stack"],
+    timeline: ["immediately", "asap", "soon", "timeline", "months", "years", "long-term", "long term", "future", "now"],
+    preferences: [
+        "role",
+        "position",
+        "product manager",
+        "frontend",
+        "backend",
+        "fullstack",
+        "domain",
+        "industry",
+        "prefer",
+        "love",
+        "enjoy",
+        "passion",
+        "interested in",
+        "care about",
+        "don't know",
+        "do not know",
+        "not sure",
+        "no idea",
+        "exploring",
+        "figuring out",
+        "unsure",
+    ],
+};
+
 export const CONVERSATION_STAGES: readonly ConversationStage[] = [
     {
         id: "achievements",

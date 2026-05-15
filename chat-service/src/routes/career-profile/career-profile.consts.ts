@@ -20,5 +20,4 @@ export const CAREER_PROFILE_SIGNAL_BUCKETS: readonly CareerProfileSignalBucketKe
 ];
 
 export const EXPLICIT_USER_SIGNAL_CONFIDENCE = 0.92;
-export const INFERRED_SIGNAL_CONFIDENCE = 0.62;
 export const SIGNAL_CONFIDENCE_WEAK_OVERRIDE_GAP = 0.18;

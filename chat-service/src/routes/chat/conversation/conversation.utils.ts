@@ -1,37 +1,65 @@
-import type { Conversation } from "./conversation.model";
-import type { ConversationResponse, ProfileInput } from "./conversation.types";
+import { ObjectId } from "mongodb";
+import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
+import type { JobSearchResultItem } from "../chat.types";
+import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { ConversationRef, ConversationResponse } from "./conversation.types";
 
-export const formatAchievementsForWelcome = (achievements: readonly { name: string; grade: number }[]): string => {
-    if (achievements.length === 0) {
-        return "I do not have achievements yet. Share your highlights and I will build your profile as we chat.";
+export class ConversationNotFoundError extends Error {
+    constructor() {
+        super("CONVERSATION_NOT_FOUND");
+        this.name = "ConversationNotFoundError";
     }
+}
 
-    return achievements.map((achievement) => `- ${achievement.name}`).join("\n");
+export class InvalidConversationIdError extends Error {
+    constructor() {
+        super("INVALID_CONVERSATION_ID");
+        this.name = "InvalidConversationIdError";
+    }
+}
+
+export const tryParseConversationObjectId = (value: string): ObjectId | null =>
+    ObjectId.isValid(value) ? new ObjectId(value) : null;
+
+export const conversationFilter = (userId: string, conversationId: ObjectId): { userId: string; _id: ObjectId } => ({
+    userId,
+    _id: conversationId,
+});
+
+export const toAttachedJobSnapshots = (jobs: readonly JobSearchResultItem[]): AttachedJobSnapshot[] =>
+    jobs.map((job) => ({
+        jobId: job.id,
+        jobTitle: job.title,
+        url: job.url,
+        seniority: job.seniority,
+        description: job.description,
+        company: job.company,
+        salary: typeof job.salary === "number" ? job.salary : 0,
+    }));
+
+export const initialStageProgress = (): ConversationStageProgress => ({
+    currentStageIndex: 0,
+    currentStageId: "achievements",
+    completedStageIds: [],
+    awaitingConfirmation: false,
+    stageNotes: {},
+    surfacedAchievementIds: [],
+});
+
+export const toRefObjectId = (ref: ConversationRef): ObjectId => {
+    const parsed = tryParseConversationObjectId(ref.conversationId);
+    if (!parsed) {
+        throw new InvalidConversationIdError();
+    }
+    return parsed;
 };
 
-export const profileToSeedAchievements = (profile?: ProfileInput): { id: string; name: string; grade: number }[] => {
-    const profileAchievements = profile?.achievements ?? [];
-    if (profileAchievements.length > 0) {
-        return profileAchievements;
-    }
-
-    if (profile?.currentJob && profile.currentJob.trim()) {
-        return [{
-            id: "profile-current-job",
-            name: `Current job: ${profile.currentJob.trim()}`,
-            grade: 70,
-        }];
-    }
-
-    return [];
-};
-
-export const toConversationResponse = (conversation: Conversation): ConversationResponse => {
+export const toConversationResponse = (conversation: Conversation, achievements: UserAchievement[]): ConversationResponse => {
     const conversationId = conversation._id?.toHexString() ?? "";
     return {
         conversationId,
         userId: conversation.userId,
-        achievements: conversation.achievements,
+        achievements,
         messages: conversation.messages.map((message) => ({
             role: message.role,
             content: message.content,

@@ -1,4 +1,4 @@
-import type { ConversationMode } from "./coach/conversation-mode.types";
+import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
 import type { Conversation } from "./conversation/conversation.model";
 import type { JobSearchRequest } from "./chat.types";
@@ -65,7 +65,7 @@ export const detectDomainExplorationTarget = (message: string): DomainExploratio
     return directOpportunityAsk ? matchedDomain : null;
 };
 
-export const normalizeWorkDirection = (raw: string): string => {
+const normalizeWorkDirection = (raw: string): string => {
     const normalized = raw.trim().replace(/\s+/g, " ");
     const fixLeadingJ = normalized.replace(/\bunior\b/gi, "Junior");
     const fixCyber = fixLeadingJ.replace(/\bcyber\s*security\b/gi, "cybersecurity");

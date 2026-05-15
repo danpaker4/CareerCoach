@@ -1,26 +1,9 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { ChatMessageRequestBody } from "./chat.types";
-import type { ProfileInput } from "./conversation/conversation.types";
-import { ConversationNotFoundError, InvalidConversationIdError } from "./conversation/conversation.service";
+import { readOptionalConversationIdQuery, readOptionalUserProfileFromBody } from "./chat.utils";
+import { ConversationNotFoundError, InvalidConversationIdError } from "./conversation/conversation.utils";
 import { ChatService } from "./chat.service";
-
-const readOptionalConversationIdQuery = (request: FastifyRequest): string | undefined => {
-    const query = request.query;
-    if (typeof query !== "object" || query === null || !("conversationId" in query)) {
-        return undefined;
-    }
-    const value = (query as { conversationId?: unknown }).conversationId;
-    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
-};
-
-const readOptionalUserProfileFromBody = (body: unknown): ProfileInput | undefined => {
-    if (typeof body !== "object" || body === null || !("userProfile" in body)) {
-        return undefined;
-    }
-    const profile = (body as { userProfile: unknown }).userProfile;
-    return typeof profile === "object" && profile !== null ? (profile as ProfileInput) : undefined;
-};
 
 export class ChatController {
     constructor(private readonly chatService: ChatService) {}
@@ -42,8 +25,7 @@ export class ChatController {
     createConversation = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const { userId } = request.params as { userId: string };
-            const profile = readOptionalUserProfileFromBody(request.body);
-            const conversation = await this.chatService.createConversation(userId, profile);
+            const conversation = await this.chatService.createConversation(userId);
             reply.status(StatusCodes.CREATED).send(conversation);
         } catch (error) {
             request.log.error({ error }, "Failed creating conversation");

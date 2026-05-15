@@ -12,7 +12,7 @@ export class JobRankingService {
         const workStyle = toLowerSet(profile.workStyle.map((item) => item.value));
 
         const scored = jobs.map((job) => {
-            const corpus = `${job.jobTitle} ${job.description}`.toLowerCase();
+            const corpus = `${job.title} ${job.description}`.toLowerCase();
             const skillHits = [...skills].filter((skill) => corpus.includes(skill)).length;
             const prefHits = [...preferences].filter((pref) => corpus.includes(pref)).length;
             const styleHits = [...workStyle].filter((style) => corpus.includes(style)).length;
@@ -38,7 +38,7 @@ export class JobRankingService {
             const concerns = missingSkills.length > 0 ? ["Some core skills are not explicit in this role description."] : [];
 
             return {
-                jobId: job.jobId,
+                jobId: job.id,
                 finalScore,
                 scoreBreakdown: {
                     skillMatchScore,

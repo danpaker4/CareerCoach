@@ -1,9 +1,10 @@
 import type { ConversationStageProgress } from "./conversation/conversation.model";
-import type { ConversationMode } from "./coach/conversation-mode.types";
-import type { CareerConfidenceSummary } from "./coach/career-confidence.types";
+import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
+import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { Conversation } from "./conversation/conversation.model";
 import type { ConversationMemory } from "./memory/conversation-memory.types";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
+import type { UserAchievement } from "./chat.model";
 import type { ConversationRef, ProfileInput } from "./conversation/conversation.types";
 import type { JobFollowUpIntentResult } from "./job-context/job-follow-up-intent.service";
 
@@ -14,16 +15,24 @@ export type DomainExplorationTarget = {
     intro: string;
 };
 
+export type PrepareSendMessageContextParams = {
+    userId: string;
+    normalizedMessage: string;
+    profile: ProfileInput | undefined;
+    requestedConversationId: string | undefined;
+};
+
 export type SendMessagePreparedContext = {
     ref: ConversationRef;
     userId: string;
     normalizedMessage: string;
     profile: ProfileInput | undefined;
+    userAchievements: UserAchievement[];
     userAccountContext: string;
     conversationAfterUserMessage: Conversation;
     memories: ConversationMemory[];
     userCareerProfile: UserCareerProfile;
-    confidenceSummary: CareerConfidenceSummary;
+    confidenceSummary: ConfidenceSummary;
     mode: ConversationMode;
     followUpIntent: JobFollowUpIntentResult;
     jobContext: Conversation["jobContext"];
@@ -36,5 +45,5 @@ export type StageFlowSendMessageResult =
         progress: ConversationStageProgress;
         reply: string;
         mode: ConversationMode;
-        confidenceSummary: CareerConfidenceSummary;
+        confidenceSummary: ConfidenceSummary;
     };

@@ -1,7 +1,29 @@
 import type { ProfileInput } from "./conversation/conversation.types";
-import type { ConversationMode } from "./coach/conversation-mode.types";
-import type { CareerConfidenceSummary } from "./coach/career-confidence.types";
+import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
+import type { ConfidenceSummary } from "./confidence/confidence.types";
+import type { SanitizedJob } from "./job-context/job-context.types";
 import type { JobSearchPlanItem } from "./search/job-search-plan.types";
+
+export type { SanitizedJob };
+
+/** Normalized job shape used across search, LLM, ranking, and persisted job context. */
+export type JobSearchResultItem = SanitizedJob;
+
+/** Wire format returned by the job search API before normalization. */
+export type RawJobSearchResultItem = {
+    jobId: string;
+    jobTitle: string;
+    url: string;
+    seniority: string;
+    description: string;
+    company?: string;
+    salary?: number;
+    requirements?: string[];
+    mustKnowSkills?: string[];
+    niceToHaveSkills?: string[];
+    benefits?: string[];
+    location?: string | null;
+};
 
 export type ChatMessageRequestBody = {
     userId: string;
@@ -32,7 +54,7 @@ export type ChatMessageResponse = {
         why: string;
         exampleRoles: string[];
     }>;
-    confidenceSummary?: CareerConfidenceSummary;
+    confidenceSummary?: ConfidenceSummary;
     mode?: ConversationMode;
 };
 
@@ -57,29 +79,12 @@ export type JobSearchPlanRequest = {
     searches: JobSearchPlanItem[];
 };
 
-export type JobSearchResultItem = {
-    jobId: string;
-    jobTitle: string;
-    url: string;
-    seniority: string;
-    description: string;
-    company?: string;
-    salary?: number;
-    requirements?: string[];
-    mustKnowSkills?: string[];
-    niceToHaveSkills?: string[];
-    benefits?: string[];
-    location?: string | null;
-};
-
 export type LlmDecision = {
     reply: string;
     shouldSearchJobs: boolean;
     recommendedJobIds: string[];
     searchFilters: JobSearchRequest;
 };
-
-export type { ProfileInput } from "./conversation/conversation.types";
 
 export type StageLlmDecision = {
     reply: string;

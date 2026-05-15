@@ -1,26 +1,6 @@
 import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse, UserProfileResponse } from "../chat/chat.types";
 import { isAchievement, isJobSearchResultItem, normalizeFilters, normalizeJobSearchResultItem, normalizeSearchPlan, parseUserProfileResponse } from "../chat/chat.utils";
-import { EXPERIENCE_HINTS } from "./chat.external.consts";
-
-const toAchievementFromMessage = (message: string): UserAchievementResponse | null => {
-    const normalized = message.trim().replace(/\s+/g, " ");
-    if (normalized.length < 20) {
-        return null;
-    }
-
-    const lowered = normalized.toLowerCase();
-    const hasExperienceSignal = EXPERIENCE_HINTS.some((hint) => lowered.includes(hint));
-    if (!hasExperienceSignal) {
-        return null;
-    }
-
-    const name = normalized.length > 140 ? `${normalized.slice(0, 137)}...` : normalized;
-    return {
-        id: crypto.randomUUID(),
-        name,
-        grade: 70,
-    };
-};
+import { toAchievementFromMessage } from "./chat.external.utils";
 
 export class ChatExternalService {
     constructor(private readonly usersServiceBaseUrl: string, private readonly jobServiceBaseUrl: string) { }
