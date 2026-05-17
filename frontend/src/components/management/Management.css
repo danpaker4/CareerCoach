@@ -7,6 +7,7 @@
 .management-header,
 .management-token-usage,
 .management-users,
+.management-llm-evaluation,
 .management-alert {
   width: min(1120px, 100%);
   margin: 0 auto;
@@ -164,8 +165,126 @@
   background: var(--input-bg-focus);
 }
 
-.management-token-usage {
+.management-token-usage,
+.management-llm-evaluation {
   margin-bottom: 16px;
+}
+
+.management-llm-evaluation-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.management-file-input {
+  display: none;
+}
+
+.management-table--evaluation {
+  min-width: 920px;
+}
+
+.management-eval-status {
+  display: inline-flex;
+  align-items: center;
+  min-width: 72px;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  font-size: var(--fz-xs);
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.management-eval-status--pass {
+  background: var(--clr-success-bg, #e8f7ee);
+  color: var(--clr-success, #1f7a3f);
+}
+
+.management-eval-status--fail {
+  background: var(--clr-error-bg);
+  color: var(--clr-error);
+}
+
+.management-eval-status--idle {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.management-eval-result-row td {
+  background: var(--surface-muted);
+}
+
+.management-eval-result-panel {
+  display: grid;
+  gap: 14px;
+  padding: 4px 0 8px;
+}
+
+.management-eval-result-header h3 {
+  margin-bottom: 4px;
+  font-size: var(--fz-lg);
+}
+
+.management-eval-result-header p,
+.management-eval-result-label {
+  color: var(--text-secondary);
+  font-size: var(--fz-sm);
+}
+
+.management-eval-result-reply pre {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.management-eval-result-checks ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.management-eval-check {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--surface-base);
+}
+
+.management-eval-check span:first-child {
+  color: var(--text-heading);
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.management-eval-check span:nth-child(2) {
+  font-size: var(--fz-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.management-eval-check--pass span:nth-child(2) {
+  color: var(--clr-success, #1f7a3f);
+}
+
+.management-eval-check--fail span:nth-child(2) {
+  color: var(--clr-error);
+}
+
+.management-eval-check p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--fz-sm);
 }
 
 .management-token-usage .management-alert {

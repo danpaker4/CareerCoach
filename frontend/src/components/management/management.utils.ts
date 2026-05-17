@@ -1,4 +1,11 @@
-import { ADMIN_DELETE_USER_PATH, ADMIN_DEMOTE_PATH, ADMIN_LLM_TOKEN_USAGE_PATH, ADMIN_USERS_PATH, MANAGEMENT_USERS_PAGE_SIZE } from './management.consts';
+import {
+  ADMIN_DELETE_USER_PATH,
+  ADMIN_DEMOTE_PATH,
+  ADMIN_LLM_TOKEN_USAGE_PATH,
+  ADMIN_USERS_PATH,
+  EVALUATION_CASES_PATH,
+  MANAGEMENT_USERS_PAGE_SIZE,
+} from './management.consts';
 import type {
   AdminLlmTokenUsageOperationItem,
   AdminLlmTokenUsageOperationSeriesItem,
@@ -8,6 +15,13 @@ import type {
   AdminUsersPagination,
   AdminUsersResult,
   AdminUserSummary,
+  EvaluationCaseSummary,
+  EvaluationCheckResult,
+  EvaluationExpected,
+  EvaluationStage,
+  EvaluationMessage,
+  EvaluationMessageRole,
+  EvaluationRunResult,
   LlmProvider,
   TokenUsageDays,
 } from './management.types';
@@ -196,4 +210,115 @@ export const parseTokenUsage = (value: unknown): AdminLlmTokenUsageResult | null
 export const buildAdminLlmTokenUsageUrl = (days: TokenUsageDays): string => {
   const params = new URLSearchParams({ days: String(days) });
   return `${ADMIN_LLM_TOKEN_USAGE_PATH}?${params.toString()}`;
+};
+
+const isEvaluationMessageRole = (value: unknown): value is EvaluationMessageRole =>
+  value === 'user' || value === 'assistant' || value === 'system';
+
+const isEvaluationMessage = (value: unknown): value is EvaluationMessage => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const message = value as Record<string, unknown>;
+  return isEvaluationMessageRole(message.role) && typeof message.content === 'string' && message.content.length > 0;
+};
+
+const isEvaluationStage = (value: unknown): value is EvaluationStage =>
+  value === 'achievements' || value === 'timeline' || value === 'preferences';
+
+const isEvaluationExpected = (value: unknown): value is EvaluationExpected => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const expected = value as Record<string, unknown>;
+  return isEvaluationStage(expected.stage);
+};
+
+export const isEvaluationCaseSummary = (value: unknown): value is EvaluationCaseSummary => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const evaluationCase = value as Record<string, unknown>;
+  return (
+    typeof evaluationCase.id === 'string' &&
+    Array.isArray(evaluationCase.messages) &&
+    evaluationCase.messages.every(isEvaluationMessage) &&
+    isEvaluationExpected(evaluationCase.expected) &&
+    typeof evaluationCase.createdAt === 'string' &&
+    typeof evaluationCase.updatedAt === 'string'
+  );
+};
+
+export const parseEvaluationCases = (value: unknown): EvaluationCaseSummary[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isEvaluationCaseSummary);
+};
+
+export const buildEvaluationCaseUrl = (caseId: string): string =>
+  `${EVALUATION_CASES_PATH}/${encodeURIComponent(caseId)}`;
+
+export const isJsonEvaluationFile = (file: File): boolean =>
+  file.name.toLowerCase().endsWith('.json') || file.type === 'application/json';
+
+const isEvaluationCheckResult = (value: unknown): value is EvaluationCheckResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const check = value as Record<string, unknown>;
+  return typeof check.name === 'string' && typeof check.passed === 'boolean';
+};
+
+export const parseEvaluationRunResult = (value: unknown): EvaluationRunResult | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const metadata = payload.metadata;
+  if (
+    typeof payload.caseId !== 'string' ||
+    typeof payload.runId !== 'string' ||
+    typeof payload.passed !== 'boolean' ||
+    typeof payload.reply !== 'string' ||
+    !Array.isArray(payload.checks) ||
+    typeof metadata !== 'object' ||
+    metadata === null
+  ) {
+    return null;
+  }
+
+  const metadataRecord = metadata as Record<string, unknown>;
+  if (
+    typeof metadataRecord.userId !== 'string' ||
+    typeof metadataRecord.conversationId !== 'string' ||
+    typeof metadataRecord.userTurnCount !== 'number' ||
+    typeof metadataRecord.durationMs !== 'number' ||
+    typeof metadataRecord.ranAt !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    caseId: payload.caseId,
+    runId: payload.runId,
+    passed: payload.passed,
+    reply: payload.reply,
+    checks: payload.checks.filter(isEvaluationCheckResult),
+    metadata: {
+      userId: metadataRecord.userId,
+      conversationId: metadataRecord.conversationId,
+      userTurnCount: metadataRecord.userTurnCount,
+      durationMs: metadataRecord.durationMs,
+      ranAt: metadataRecord.ranAt,
+    },
+    stage: typeof payload.stage === 'string' ? payload.stage : undefined,
+    mode: typeof payload.mode === 'string' ? payload.mode : undefined,
+  };
 };
