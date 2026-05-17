@@ -17,7 +17,7 @@ import {
 import { ConversationStageService } from "./conversation.stage.service";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
 import type { JobSearchResultItem } from "../chat/chat.types";
-import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../chat/job-context/job-context.types";
+import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../../job-in-conversation.types";
 
 export class ChatConversationService {
     constructor(

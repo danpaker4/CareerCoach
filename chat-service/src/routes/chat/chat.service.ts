@@ -24,13 +24,12 @@ import type { CareerProfileSignalUpdate, UserCareerProfile } from "../career-pro
 import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { ConversationMode } from "./chat-mode/conversation-mode.types";
 import type { JobSearchResultItem } from "./chat.types";
-import type { SanitizedJob, JobRecommendationContextState } from "./job-context/job-context.types";
-import { JobFollowUpIntentService } from "./job-context/job-follow-up-intent.service";
-import { JobSelectionResolverService } from "./job-context/job-selection-resolver.service";
-import { JobFollowUpAnswerService } from "./job-context/job-follow-up-answer.service";
+import type { SanitizedJob, JobRecommendationContextState } from "../../job-in-conversation.types";
+import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
+import { resolveJobSelectionFromFollowUpMessage } from "./job-follow-up-answer/job-follow-up-answer.utils";
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
-import type { PrepareSendMessageContextParams, SendMessagePreparedContext, StageFlowSendMessageResult } from "./chat.service.types";
+import type { PrepareSendMessageContextParams, SendMessagePreparedContext, StageFlowSendMessageResult } from "./chat.types";
 import {
     buildBroaderJobSearchFilters,
     buildDomainExplorationFilters,
@@ -51,7 +50,7 @@ import {
     withPipelineClosing,
 } from "./chat.job-presentation.utils";
 import { resolveSelectedJobFromRecommendations } from "./chat.job-mapping.utils";
-import { toSignal } from "./chat.service.utils";
+import { toSignal } from "./chat.utils";
 
 export class ChatService {
     constructor(
@@ -68,8 +67,6 @@ export class ChatService {
         private readonly searchPlanService: JobSearchPlanService,
         private readonly rankingService: JobRankingService,
         private readonly knowledgeService: CareerKnowledgeService,
-        private readonly followUpIntentService: JobFollowUpIntentService,
-        private readonly selectionResolverService: JobSelectionResolverService,
         private readonly followUpAnswerService: JobFollowUpAnswerService,
         private readonly pipelineIntentService: PipelineIntentService,
         private readonly pipelineService: PipelineService
@@ -664,7 +661,7 @@ export class ChatService {
         const userRoleExperience = mergeRoleExperience(existingRoleExperience, inferredRoleExperience);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile, userRoleExperience);
         const mode = this.modeService.detectMode(normalizedMessage, confidenceSummary);
-        const followUpIntent = this.followUpIntentService.detect(normalizedMessage);
+        const followUpIntent = this.followUpAnswerService.detectFollowUpIntent(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
         return {
             userId,
@@ -719,7 +716,7 @@ export class ChatService {
         if (!hasStoredJobs || !ctx.followUpIntent.isFollowUp || ctx.followUpIntent.isExplicitNewSearch || !ctx.jobContext) {
             return null;
         }
-        const resolution = this.selectionResolverService.resolve(
+        const resolution = resolveJobSelectionFromFollowUpMessage(
             ctx.normalizedMessage,
             ctx.jobContext.selectedJobSnapshot,
             ctx.jobContext.lastReturnedJobs

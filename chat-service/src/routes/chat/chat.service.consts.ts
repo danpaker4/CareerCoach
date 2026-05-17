@@ -1,4 +1,4 @@
-import type { DomainExplorationTarget } from "./chat.service.types";
+import type { DomainExplorationTarget } from "./chat.types";
 
 export const DOMAIN_EXPLORATION_PHRASES = [
     "what roles are there",

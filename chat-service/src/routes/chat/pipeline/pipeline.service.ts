@@ -1,4 +1,4 @@
-import type { SanitizedJob } from "../job-context/job-context.types";
+import type { SanitizedJob } from "../../../job-in-conversation.types";
 import { hashStringToNumber } from "./pipeline-hash.utils";
 
 export type AddJobToPipelineResult =

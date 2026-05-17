@@ -33,16 +33,3 @@ export type ConversationJobContext = {
     updatedAt: Date;
     jobRecommendationContext?: JobRecommendationContextState | null;
 };
-
-export type JobFollowUpField =
-    | "mustKnowSkills"
-    | "requirements"
-    | "skillsNeeded"
-    | "details"
-    | "salary"
-    | "seniority"
-    | "company"
-    | "benefits"
-    | "learningPlan"
-    | "fitReason"
-    | "missingSkills";
