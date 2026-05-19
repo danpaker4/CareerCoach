@@ -1,4 +1,11 @@
-import { ADMIN_DELETE_USER_PATH, ADMIN_DEMOTE_PATH, ADMIN_LLM_TOKEN_USAGE_PATH, ADMIN_USERS_PATH, MANAGEMENT_USERS_PAGE_SIZE } from './management.consts';
+import {
+  ADMIN_BENCHMARKS_PATH,
+  ADMIN_DELETE_USER_PATH,
+  ADMIN_DEMOTE_PATH,
+  ADMIN_LLM_TOKEN_USAGE_PATH,
+  ADMIN_USERS_PATH,
+  MANAGEMENT_USERS_PAGE_SIZE,
+} from './management.consts';
 import type {
   AdminLlmTokenUsageOperationItem,
   AdminLlmTokenUsageOperationSeriesItem,
@@ -8,6 +15,17 @@ import type {
   AdminUsersPagination,
   AdminUsersResult,
   AdminUserSummary,
+  BenchmarkCandidate,
+  BenchmarkCandidateId,
+  BenchmarkCaseResult,
+  BenchmarkCaseSummary,
+  BenchmarkConfig,
+  BenchmarkMetricBreakdown,
+  BenchmarkParseEvent,
+  BenchmarkRubricItem,
+  BenchmarkRunSummary,
+  BenchmarkCandidateRunResult,
+  BenchmarkManualScore,
   LlmProvider,
   TokenUsageDays,
 } from './management.types';
@@ -197,3 +215,194 @@ export const buildAdminLlmTokenUsageUrl = (days: TokenUsageDays): string => {
   const params = new URLSearchParams({ days: String(days) });
   return `${ADMIN_LLM_TOKEN_USAGE_PATH}?${params.toString()}`;
 };
+
+const isBenchmarkCandidateId = (value: unknown): value is BenchmarkCandidateId =>
+  value === 'ollama-llama' || value === 'gemini';
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isBenchmarkCandidate = (value: unknown): value is BenchmarkCandidate => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    isBenchmarkCandidateId(candidate.id) &&
+    typeof candidate.label === 'string' &&
+    isLlmProvider(candidate.provider) &&
+    typeof candidate.model === 'string' &&
+    typeof candidate.available === 'boolean' &&
+    (candidate.unavailableReason === undefined || typeof candidate.unavailableReason === 'string')
+  );
+};
+
+const isBenchmarkCaseSummary = (value: unknown): value is BenchmarkCaseSummary => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const benchmarkCase = value as Record<string, unknown>;
+  return (
+    typeof benchmarkCase.id === 'string' &&
+    typeof benchmarkCase.title === 'string' &&
+    typeof benchmarkCase.description === 'string'
+  );
+};
+
+const isBenchmarkRubricItem = (value: unknown): value is BenchmarkRubricItem => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const item = value as Record<string, unknown>;
+  return typeof item.label === 'string' && isNumber(item.weight) && typeof item.description === 'string';
+};
+
+export const parseBenchmarkConfig = (value: unknown): BenchmarkConfig | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (!Array.isArray(payload.candidates) || !Array.isArray(payload.cases) || !Array.isArray(payload.rubric)) {
+    return null;
+  }
+
+  return {
+    candidates: payload.candidates.filter(isBenchmarkCandidate),
+    cases: payload.cases.filter(isBenchmarkCaseSummary),
+    rubric: payload.rubric.filter(isBenchmarkRubricItem),
+  };
+};
+
+const isBenchmarkMetricBreakdown = (value: unknown): value is BenchmarkMetricBreakdown => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const metric = value as Record<string, unknown>;
+  return (
+    isNumber(metric.workflowScore) &&
+    isNumber(metric.structuredOutputScore) &&
+    isNumber(metric.guardrailScore) &&
+    isNumber(metric.reliabilityScore) &&
+    isNumber(metric.tokenEfficiencyScore)
+  );
+};
+
+const isBenchmarkParseEvent = (value: unknown): value is BenchmarkParseEvent => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const event = value as Record<string, unknown>;
+  return (
+    typeof event.operation === 'string' &&
+    typeof event.rawText === 'string' &&
+    (event.parseStatus === 'success' || event.parseStatus === 'fallback')
+  );
+};
+
+const isBenchmarkCaseResult = (value: unknown): value is BenchmarkCaseResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const result = value as Record<string, unknown>;
+  return (
+    typeof result.caseId === 'string' &&
+    typeof result.caseTitle === 'string' &&
+    typeof result.success === 'boolean' &&
+    isNumber(result.responseCount) &&
+    typeof result.finalReply === 'string' &&
+    isStringArray(result.replies) &&
+    isStringArray(result.failedAssertions) &&
+    Array.isArray(result.parseEvents) &&
+    result.parseEvents.every(isBenchmarkParseEvent) &&
+    isNumber(result.latencyMs) &&
+    isNumber(result.totalTokens) &&
+    (result.errorMessage === undefined || typeof result.errorMessage === 'string') &&
+    isBenchmarkMetricBreakdown(result.metricBreakdown) &&
+    isNumber(result.automaticScore)
+  );
+};
+
+const isBenchmarkManualScore = (value: unknown): value is BenchmarkManualScore => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const score = value as Record<string, unknown>;
+  return (
+    isNumber(score.relevance) &&
+    isNumber(score.personalization) &&
+    isNumber(score.actionability) &&
+    isNumber(score.clarity) &&
+    isNumber(score.safety) &&
+    typeof score.notes === 'string' &&
+    (score.updatedAt === undefined || typeof score.updatedAt === 'string')
+  );
+};
+
+const isBenchmarkCandidateRunResult = (value: unknown): value is BenchmarkCandidateRunResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const result = value as Record<string, unknown>;
+  return (
+    isBenchmarkCandidateId(result.candidateId) &&
+    isLlmProvider(result.provider) &&
+    typeof result.model === 'string' &&
+    typeof result.available === 'boolean' &&
+    (result.unavailableReason === undefined || typeof result.unavailableReason === 'string') &&
+    Array.isArray(result.caseResults) &&
+    result.caseResults.every(isBenchmarkCaseResult) &&
+    isNumber(result.successRate) &&
+    isNumber(result.averageLatencyMs) &&
+    isNumber(result.totalTokens) &&
+    isNumber(result.errorCount) &&
+    isNumber(result.automaticScore) &&
+    (result.manualScore === undefined || isBenchmarkManualScore(result.manualScore)) &&
+    isNumber(result.overallScore) &&
+    (result.scoreStatus === 'provisional' || result.scoreStatus === 'manual')
+  );
+};
+
+const isBenchmarkRunSummary = (value: unknown): value is BenchmarkRunSummary => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const run = value as Record<string, unknown>;
+  return (
+    typeof run.id === 'string' &&
+    typeof run.createdAt === 'string' &&
+    (run.status === 'completed' || run.status === 'completed_with_errors') &&
+    isStringArray(run.selectedCaseIds) &&
+    Array.isArray(run.candidateResults) &&
+    run.candidateResults.every(isBenchmarkCandidateRunResult)
+  );
+};
+
+export const parseBenchmarkRun = (value: unknown): BenchmarkRunSummary | null =>
+  isBenchmarkRunSummary(value) ? value : null;
+
+export const parseBenchmarkRuns = (value: unknown): BenchmarkRunSummary[] | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  return Array.isArray(payload.runs) ? payload.runs.filter(isBenchmarkRunSummary) : null;
+};
+
+export const buildBenchmarksRunsUrl = (limit: number): string => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return `${ADMIN_BENCHMARKS_PATH}/runs?${params.toString()}`;
+};
+
+export const buildBenchmarkRunScoreUrl = (runId: string): string =>
+  `${ADMIN_BENCHMARKS_PATH}/runs/${encodeURIComponent(runId)}/scores`;

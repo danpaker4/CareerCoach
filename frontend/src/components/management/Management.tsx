@@ -26,6 +26,13 @@ export const Management = () => (
           <p>Search users, page through accounts, update roles, and delete accounts.</p>
           <span className="management-home-card-action">Open users</span>
         </Link>
+
+        <Link to="/management/benchmarks" className="management-home-card">
+          <span className="management-eyebrow">Evaluation</span>
+          <h2>Chat LLM benchmark</h2>
+          <p>Run repeatable chat-flow cases against Llama/Ollama and Gemini, then score results.</p>
+          <span className="management-home-card-action">Open benchmarks</span>
+        </Link>
       </div>
     </section>
   </main>

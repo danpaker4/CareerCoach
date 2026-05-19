@@ -89,6 +89,16 @@ export const deleteAdminUserSchema = {
     },
 } satisfies FastifySchema;
 
+export const getAdminSessionSchema = {
+    response: {
+        [StatusCodes.OK]: z.object({
+            adminUserId: z.uuid(),
+        }),
+        [StatusCodes.UNAUTHORIZED]: errorResponseSchema,
+        [StatusCodes.FORBIDDEN]: errorResponseSchema,
+    },
+} satisfies FastifySchema;
+
 const AdminLlmTokenUsageSeriesItemSchema = z.object({
     date: z.string(),
     provider: LlmProviderSchema,

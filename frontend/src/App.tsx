@@ -12,6 +12,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { MySkills } from './components/my-skills/MySkills';
 import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { Management } from './components/management/Management';
+import { ManagementBenchmarks } from './components/management/ManagementBenchmarks';
 import { ManagementUsage } from './components/management/ManagementUsage';
 import { ManagementUsers } from './components/management/ManagementUsers';
 import { GithubCallback } from './components/github-callback/GithubCallback';
@@ -266,6 +267,15 @@ export const App = () => {
               element={
                 <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
                   {currentUser ? <ManagementUsers currentUser={currentUser} /> : null}
+                </AdminRoute>
+              }
+            />
+
+            <Route
+              path="/management/benchmarks"
+              element={
+                <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
+                  <ManagementBenchmarks />
                 </AdminRoute>
               }
             />

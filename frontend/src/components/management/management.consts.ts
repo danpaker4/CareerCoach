@@ -5,12 +5,16 @@ export const ADMIN_PROMOTE_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/admin
 export const ADMIN_DEMOTE_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/admins`;
 export const ADMIN_DELETE_USER_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/users`;
 export const ADMIN_LLM_TOKEN_USAGE_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/admin/llm-token-usage`;
+export const ADMIN_BENCHMARKS_PATH = `${ENV.CHAT_SERVICE_BASE_URL}/api/chat/benchmarks`;
 
 export const MANAGEMENT_USERS_PAGE_SIZE = 25;
 export const MANAGEMENT_TOKEN_USAGE_DAYS = [7, 30, 90] as const;
 
 export const MANAGEMENT_LOAD_ERROR_MESSAGE = 'Unable to load users';
 export const MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE = 'Unable to load model token usage';
+export const MANAGEMENT_BENCHMARK_LOAD_ERROR_MESSAGE = 'Unable to load chat benchmarks';
+export const MANAGEMENT_BENCHMARK_RUN_ERROR_MESSAGE = 'Unable to run chat benchmark';
+export const MANAGEMENT_BENCHMARK_SCORE_ERROR_MESSAGE = 'Unable to save benchmark score';
 export const MANAGEMENT_PROMOTE_ERROR_MESSAGE = 'Unable to promote user';
 export const MANAGEMENT_DEMOTE_ERROR_MESSAGE = 'Unable to demote admin';
 export const MANAGEMENT_DELETE_ERROR_MESSAGE = 'Unable to delete user';
