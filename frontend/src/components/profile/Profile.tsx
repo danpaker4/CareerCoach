@@ -8,6 +8,7 @@ import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import githubIcon from '../../assets/github-icon.svg';
 import type { User } from '../../types/user';
+import { WantedJobsList } from './WantedJobsList';
 import './Profile.css';
 
 interface ProfileProps {
@@ -413,6 +414,8 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
               </button>
             </div>
           </section>
+
+          <WantedJobsList userId={user.id} />
         </div>
       </main>
     </div>

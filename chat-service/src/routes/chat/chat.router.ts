@@ -23,6 +23,7 @@ import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
 import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
+import { WantedJobService } from "./wanted-jobs/wanted-job.service";
 import type { MongoClient } from "../../mongo/mongo";
 import { JobRankingService } from "./ranking/job-ranking.service";
 
@@ -49,6 +50,7 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
     const followUpAnswerService = new JobFollowUpAnswerService();
     const pipelineIntentService = new PipelineIntentService();
     const pipelineService = new PipelineService(chatConfig.jobServiceBaseUrl);
+    const wantedJobService = new WantedJobService(chatConfig.jobServiceBaseUrl);
     const knowledgeService = new CareerKnowledgeService(
         dbClient.careerDirectionExamples,
         embedding,
@@ -70,7 +72,8 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         knowledgeService,
         followUpAnswerService,
         pipelineIntentService,
-        pipelineService
+        pipelineService,
+        wantedJobService
     );
     const controller = new ChatController(service);
 

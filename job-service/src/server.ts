@@ -10,6 +10,7 @@ import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.route
 import { jobSearchRouter } from "./routes/jobSearch/job-search.router";
 import { startJobPollerSchedule } from "./poller/job-poller";
 import { jobsRouter } from "./routes/jobs/jobs.router";
+import { wantedJobsRouter } from "./routes/wantedJobs/wanted-job.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -47,6 +48,7 @@ export class Server {
             await this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
             await this.app.register(jobsRouter(this.DBClient.jobs, this.DBClient.skillMatchers));
+            await this.app.register(wantedJobsRouter(this.DBClient.wantedJobs));
 
             const address = await this.app.listen({
                 port: this.config.port,

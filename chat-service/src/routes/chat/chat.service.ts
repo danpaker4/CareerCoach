@@ -29,6 +29,7 @@ import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-a
 import { resolveJobSelectionFromFollowUpMessage } from "./job-follow-up-answer/job-follow-up-answer.utils";
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
+import { WantedJobService, buildWantedJobInputFromSearch } from "./wanted-jobs/wanted-job.service";
 import type { PrepareSendMessageContextParams, SendMessagePreparedContext, StageFlowSendMessageResult } from "./chat.types";
 import {
     buildBroaderJobSearchFilters,
@@ -69,7 +70,8 @@ export class ChatService {
         private readonly knowledgeService: CareerKnowledgeService,
         private readonly followUpAnswerService: JobFollowUpAnswerService,
         private readonly pipelineIntentService: PipelineIntentService,
-        private readonly pipelineService: PipelineService
+        private readonly pipelineService: PipelineService,
+        private readonly wantedJobService: WantedJobService
     ) { }
 
     private toSignalUpdateFromInferences = (
@@ -830,7 +832,28 @@ export class ChatService {
         const jobs = await this.externalService.searchJobsByPlan(searchPlan);
         console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=SEARCH_PLAN results=${jobs.length}`);
         if (jobs.length === 0) {
-            const noJobsReply = "I could not find matching jobs yet. Want me to broaden the search toward adjacent roles based on what you enjoy?";
+            const wantedJobInput = buildWantedJobInputFromSearch({
+                userId: ctx.userId,
+                normalizedMessage: ctx.normalizedMessage,
+                searchFilters: effectiveSearchFilters,
+            });
+            let wantedSavedTitle: string | null = null;
+            if (wantedJobInput) {
+                const result = await this.wantedJobService.create(wantedJobInput);
+                if (result.status === "error") {
+                    console.warn(
+                        `[CHAT][WANTED_JOB] userId=${ctx.userId} status=error message=${result.message}`
+                    );
+                } else {
+                    wantedSavedTitle = result.jobTitle;
+                    console.info(
+                        `[CHAT][WANTED_JOB] userId=${ctx.userId} status=${result.status} title=${result.jobTitle}`
+                    );
+                }
+            }
+            const noJobsReply = wantedSavedTitle
+                ? `I do not have a matching role yet, but I have saved "${wantedSavedTitle}" to your wanted jobs and will alert you when one is added. Want me to broaden the search toward adjacent roles in the meantime?`
+                : "I could not find matching jobs yet. Want me to broaden the search toward adjacent roles based on what you enjoy?";
             await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, noJobsReply);
             return { reply: noJobsReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }

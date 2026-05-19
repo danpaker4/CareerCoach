@@ -12,6 +12,7 @@ import type {
     CareerSkillProfile,
 } from "../routes/careerKnowledge/career-knowledge.types";
 import type { LlmTokenUsageDocument } from "../llm-token-usage/llm-token-usage.types";
+import type { WantedJob } from "../routes/wantedJobs/wanted-job.model";
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
@@ -26,6 +27,7 @@ export class MongoClient implements Service {
     private careerPathProfilesCollection: Collection<CareerPathProfile> | null = null;
     private careerDirectionExamplesCollection: Collection<CareerDirectionExample> | null = null;
     private llmTokenUsageCollection: Collection<LlmTokenUsageDocument> | null = null;
+    private wantedJobsCollection: Collection<WantedJob> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -51,6 +53,10 @@ export class MongoClient implements Service {
             this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("career_direction_examples");
             this.llmTokenUsageCollection = this.db.collection<LlmTokenUsageDocument>("llmTokenUsage");
             await this.llmTokenUsageCollection.createIndex({ createdAt: -1, provider: 1, model: 1 });
+            this.wantedJobsCollection = this.db.collection<WantedJob>("wantedJobs");
+            await this.wantedJobsCollection.createIndex({ userId: 1, createdAt: -1 });
+            await this.wantedJobsCollection.createIndex({ id: 1 }, { unique: true });
+            await this.wantedJobsCollection.createIndex({ status: 1, createdAt: -1 });
 
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -72,6 +78,7 @@ export class MongoClient implements Service {
         this.careerPathProfilesCollection = null;
         this.careerDirectionExamplesCollection = null;
         this.llmTokenUsageCollection = null;
+        this.wantedJobsCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
@@ -143,6 +150,13 @@ export class MongoClient implements Service {
             throw new Error("LLM token usage collection is not initialized");
         }
         return this.llmTokenUsageCollection;
+    }
+
+    get wantedJobs(): Collection<WantedJob> {
+        if (!this.wantedJobsCollection) {
+            throw new Error("Wanted jobs collection is not initialized");
+        }
+        return this.wantedJobsCollection;
     }
 
 }
