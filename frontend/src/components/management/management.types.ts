@@ -194,3 +194,55 @@ export interface BenchmarkRunSummary {
 }
 
 export type BenchmarkStatus = 'loading' | 'success' | 'error';
+
+export type EvaluationMessageRole = 'user' | 'assistant' | 'system';
+
+export interface EvaluationMessage {
+  role: EvaluationMessageRole;
+  content: string;
+}
+
+export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY';
+
+export interface EvaluationExpected {
+  mode?: EvaluationMode;
+  maxLines?: number;
+  mustAskQuestion?: boolean;
+  forbiddenWords?: string[];
+}
+
+export interface EvaluationCaseSummary {
+  id: string;
+  messages: EvaluationMessage[];
+  expected: EvaluationExpected;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvaluationCheckResult {
+  name: string;
+  passed: boolean;
+  expected?: string | number | boolean | string[];
+  actual?: string | number | boolean;
+  message?: string;
+}
+
+export interface EvaluationRunMetadata {
+  userId: string;
+  conversationId: string;
+  userTurnCount: number;
+  durationMs: number;
+  ranAt: string;
+}
+
+export interface EvaluationRunResult {
+  caseId: string;
+  runId: string;
+  passed: boolean;
+  reply: string;
+  conversation: EvaluationMessage[];
+  checks: EvaluationCheckResult[];
+  expected: EvaluationExpected;
+  metadata: EvaluationRunMetadata;
+  mode?: string;
+}

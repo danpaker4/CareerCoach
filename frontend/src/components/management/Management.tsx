@@ -15,7 +15,7 @@ export const Management = () => (
       <div className="management-home-grid">
         <Link to="/management/usage" className="management-home-card">
           <span className="management-eyebrow">Analytics</span>
-          <h2>Generate content &amp; Live API</h2>
+          <h2>Monitor model usage</h2>
           <p>Monitor model token usage, request volume, averages, and source operations.</p>
           <span className="management-home-card-action">Open analytics</span>
         </Link>
@@ -32,6 +32,13 @@ export const Management = () => (
           <h2>Chat LLM benchmark</h2>
           <p>Run repeatable chat-flow cases against Llama/Ollama and Gemini, then score results.</p>
           <span className="management-home-card-action">Open benchmarks</span>
+        </Link>
+
+        <Link to="/management/llm-evaluation" className="management-home-card">
+          <span className="management-eyebrow">Quality</span>
+          <h2>LLM evaluation</h2>
+          <p>Review model responses, compare runs, and track evaluation metrics over time.</p>
+          <span className="management-home-card-action">Open LLM evaluation</span>
         </Link>
       </div>
     </section>
