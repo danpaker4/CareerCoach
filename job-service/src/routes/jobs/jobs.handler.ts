@@ -1,15 +1,22 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
+import type { AdaptedJob } from "../../poller/job-poller-api-stack/stages/adapt/adapt-resource.types";
 import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
+import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
 import { computeJobScore } from "../jobScores/job-score.service";
+import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/enrich-by-gemini";
+import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
+import type { CreateJobBody } from "./jobs.schema";
 
 type GetJobsQuery = { search?: string; userId?: string; skills?: string };
 
 export const JobsHandler = (
   jobsCollection: Collection<EnrichedJob>,
-  skillMatchersCollection: Collection<SkillMatcher>
+  skillMatchersCollection: Collection<SkillMatcher>,
+  tokenUsageRecorder?: LlmTokenUsageRecorder
 ) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
@@ -53,7 +60,6 @@ export const JobsHandler = (
           : undefined,
       }));
 
-      // Sort by match % descending when userId provided
       if (userId) {
         result.sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0));
       }
@@ -61,6 +67,51 @@ export const JobsHandler = (
       reply.code(StatusCodes.OK).send(result);
     } catch (error) {
       reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error" });
+    }
+  },
+
+  createJobHandler: async (
+    request: FastifyRequest<{ Body: CreateJobBody }>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const { jobTitle, company, url, description, seniority, salary } = request.body;
+
+      const adapted: AdaptedJob = {
+        id: randomUUID(),
+        jobTitle: jobTitle.trim(),
+        company: company.trim(),
+        url: url ? url.trim() : "",
+        seniority: seniority.trim(),
+        description: description.trim(),
+        lon: null,
+        lat: null,
+      };
+
+      const [enriched] = await enrichByGemini([adapted], tokenUsageRecorder);
+      const finalJob: EnrichedJob = salary !== undefined && salary > 0
+        ? { ...enriched, salary }
+        : enriched;
+
+      await saveEnrichedJobs(jobsCollection, [finalJob]);
+
+      reply.code(StatusCodes.CREATED).send({
+        id: finalJob.id,
+        jobTitle: finalJob.jobTitle,
+        company: finalJob.company,
+        seniority: finalJob.seniority,
+        description: finalJob.description,
+        url: finalJob.url,
+        salary: finalJob.salary,
+        requirements: finalJob.requirements,
+        benefits: finalJob.benefits,
+      });
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to create job");
+      reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+        message: "Failed to create job",
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   },
 });
