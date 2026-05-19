@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CareerCoach — Main Flows</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        --bg: #0a0e1f;
+        --bg-2: #0f1530;
+        --panel: #131a36;
+        --panel-2: #1a2148;
+        --line: #283163;
+        --text: #e6e9f5;
+        --muted: #9aa3c4;
+        --accent: #6ea8ff;
+        --accent-2: #9d7bff;
+        --good: #5ed1a8;
+        --warn: #ffcf6e;
+        --bad: #ff7d8a;
+        --tag: #1f2a52;
+        --tag-text: #cfd6ff;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      .app {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        height: 100vh;
+      }
+      @media (max-width: 900px) {
+        .app { grid-template-columns: 1fr; height: auto; }
+        aside { border-right: 0 !important; border-bottom: 1px solid var(--line); position: static !important; height: auto !important; }
+      }
+
+      aside {
+        background: var(--bg-2);
+        border-right: 1px solid var(--line);
+        padding: 22px 18px;
+        overflow-y: auto;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+      }
+      aside .brand {
+        display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+      }
+      aside .brand .dot {
+        width: 28px; height: 28px; border-radius: 8px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 6px 18px rgba(110,168,255,0.4);
+      }
+      aside .brand h1 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+      aside .brand small { color: var(--muted); font-size: 11px; }
+
+      .nav-section { margin-top: 18px; }
+      .nav-title {
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--muted); font-weight: 700; margin: 0 0 8px; padding-left: 8px;
+      }
+      .nav-list { list-style: none; padding: 0; margin: 0; }
+      .nav-list li {
+        padding: 8px 10px; border-radius: 8px; cursor: pointer;
+        display: flex; align-items: center; gap: 8px;
+        font-size: 13.5px; color: var(--text);
+        transition: background 0.15s, color 0.15s;
+      }
+      .nav-list li:hover { background: var(--panel); }
+      .nav-list li.active {
+        background: linear-gradient(90deg, rgba(110,168,255,0.18), rgba(157,123,255,0.08));
+        color: #fff;
+        box-shadow: inset 2px 0 0 var(--accent);
+      }
+      .nav-list li .badge {
+        margin-left: auto;
+        font-size: 10px; padding: 2px 6px; border-radius: 6px;
+        background: var(--tag); color: var(--tag-text); border: 1px solid var(--line);
+      }
+
+      main {
+        padding: 28px 36px;
+        overflow-y: auto;
+      }
+      @media (max-width: 700px) { main { padding: 22px 18px; } }
+
+      .topbar {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 22px; gap: 16px; flex-wrap: wrap;
+      }
+      .topbar h2 {
+        margin: 0; font-size: 22px; letter-spacing: -0.02em;
+      }
+      .topbar .crumbs { color: var(--muted); font-size: 13px; }
+      .topbar .actions { display: flex; gap: 8px; }
+      .btn {
+        background: var(--panel); color: var(--text); border: 1px solid var(--line);
+        padding: 7px 12px; border-radius: 8px; font-size: 12.5px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .btn:hover { background: var(--panel-2); border-color: var(--accent); }
+      .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border-color: transparent; color: #0a0e1f; font-weight: 600; }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+      .panel h3 {
+        margin: 0 0 12px; font-size: 14px; color: var(--muted);
+        text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+      }
+
+      .pill {
+        display: inline-block; padding: 2px 8px; border-radius: 999px;
+        background: var(--tag); color: var(--tag-text); font-size: 11px;
+        letter-spacing: 0.02em; text-transform: uppercase; font-weight: 600;
+        border: 1px solid var(--line);
+      }
+      .pill.cat { background: rgba(110,168,255,0.12); color: #b8cfff; border-color: rgba(110,168,255,0.3); }
+      .pill.mono { font-family: ui-monospace, Menlo, Consolas, monospace; text-transform: none; letter-spacing: 0; }
+      .stack { display: flex; flex-wrap: wrap; gap: 6px; }
+
+      .diagram-wrap {
+        background: #0e1430;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 24px;
+        overflow-x: auto;
+        text-align: center;
+        min-height: 200px;
+      }
+      .diagram-wrap svg { max-width: 100%; height: auto; }
+
+      table.endpoints {
+        width: 100%; border-collapse: collapse;
+      }
+      table.endpoints th, table.endpoints td {
+        text-align: left; padding: 8px 12px;
+        border-bottom: 1px solid var(--line); font-size: 13px;
+      }
+      table.endpoints th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+      table.endpoints tr:last-child td { border-bottom: 0; }
+      .method {
+        display: inline-block; min-width: 52px; text-align: center;
+        font-family: ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 700;
+        padding: 2px 6px; border-radius: 4px; color: #0a0e1f;
+      }
+      .method.GET { background: var(--good); }
+      .method.POST { background: var(--accent); }
+      .method.PATCH { background: var(--warn); }
+      .method.DELETE { background: var(--bad); }
+      code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+
+      .steps { margin: 0; padding-left: 20px; }
+      .steps li { margin: 4px 0; }
+
+      details.json {
+        background: #0a0f24; border: 1px solid var(--line); border-radius: 10px;
+        padding: 0; margin-bottom: 16px;
+      }
+      details.json summary {
+        padding: 12px 16px; cursor: pointer; color: var(--muted);
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+        list-style: none;
+      }
+      details.json summary::-webkit-details-marker { display: none; }
+      details.json summary::before { content: "▸ "; color: var(--accent); }
+      details.json[open] summary::before { content: "▾ "; }
+      details.json pre {
+        margin: 0; padding: 14px 16px; border-top: 1px solid var(--line);
+        font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+        white-space: pre-wrap; word-break: break-word;
+        color: #cfd6ff;
+        max-height: 480px; overflow: auto;
+      }
+
+      .overview .grid {
+        display: grid; gap: 14px;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      }
+      .overview .card {
+        background: var(--panel-2); border: 1px solid var(--line);
+        border-radius: 10px; padding: 14px;
+      }
+      .overview .card h4 { margin: 0 0 6px; font-size: 13px; }
+      .overview .card .muted { color: var(--muted); font-size: 12px; }
+      table.routes { width: 100%; border-collapse: collapse; }
+      table.routes th, table.routes td { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; text-align: left; }
+      table.routes th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+      .lock { color: var(--warn); font-weight: 600; }
+      .open { color: var(--good); font-weight: 600; }
+
+      .error {
+        padding: 18px; background: rgba(255,125,138,0.08);
+        border: 1px solid rgba(255,125,138,0.35); border-radius: 10px;
+        color: #ffd2d7; margin-bottom: 16px;
+      }
+      .error code { color: #ffe7ea; }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <div class="brand">
+          <div class="dot"></div>
+          <div>
+            <h1 id="brand-name">CareerCoach</h1>
+            <small>Main Flows</small>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <p class="nav-title">Overview</p>
+          <ul class="nav-list" id="nav-overview">
+            <li data-view="overview">App overview</li>
+          </ul>
+        </div>
+
+        <div class="nav-section">
+          <p class="nav-title">Flows</p>
+          <ul class="nav-list" id="nav-flows"></ul>
+        </div>
+      </aside>
+
+      <main>
+        <div id="error" class="error hidden"></div>
+        <div id="content"></div>
+      </main>
+    </div>
+
+    <script>
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "dark",
+        themeVariables: {
+          background: "#0e1430",
+          primaryColor: "#1a2148",
+          primaryTextColor: "#e6e9f5",
+          primaryBorderColor: "#6ea8ff",
+          lineColor: "#9aa3c4",
+          secondaryColor: "#283163",
+          tertiaryColor: "#131a36",
+          fontSize: "13px"
+        },
+        flowchart: { curve: "basis", padding: 14 }
+      });
+
+      const el = (tag, attrs = {}, kids = []) => {
+        const n = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          if (k === "class") n.className = v;
+          else if (k === "html") n.innerHTML = v;
+          else if (k === "onclick") n.onclick = v;
+          else if (k === "data") for (const [dk, dv] of Object.entries(v)) n.dataset[dk] = dv;
+          else n.setAttribute(k, v);
+        }
+        for (const kid of [].concat(kids)) {
+          if (kid == null) continue;
+          n.appendChild(typeof kid === "string" ? document.createTextNode(kid) : kid);
+        }
+        return n;
+      };
+
+      const escapeForMermaid = (s) =>
+        String(s).replace(/"/g, "'").replace(/\n/g, " ").slice(0, 80);
+
+      const flowToMermaid = (flow) => {
+        const lines = ["flowchart TD"];
+        const nodes = [];
+        nodes.push({ id: "U", label: "User", style: "user" });
+        nodes.push({ id: "FE", label: `UI: ${flow.frontend.route}`, style: "fe" });
+
+        flow.endpoints.forEach((e, i) => {
+          nodes.push({
+            id: `E${i}`,
+            label: `${e.method} ${e.path}\n(${e.service})`,
+            style: "ep",
+            method: e.method
+          });
+        });
+
+        (flow.dataFlow || []).forEach((step, i) => {
+          nodes.push({ id: `S${i}`, label: step, style: "step" });
+        });
+
+        if (flow.external) {
+          flow.external.forEach((x, i) => nodes.push({ id: `X${i}`, label: x, style: "ext" }));
+        }
+
+        for (const n of nodes) lines.push(`  ${n.id}["${escapeForMermaid(n.label)}"]`);
+
+        lines.push(`  U --> FE`);
+        if (flow.endpoints.length) {
+          lines.push(`  FE --> E0`);
+          for (let i = 1; i < flow.endpoints.length; i++) lines.push(`  E${i-1} -.-> E${i}`);
+        }
+        const stepCount = (flow.dataFlow || []).length;
+        if (stepCount > 0 && flow.endpoints.length) {
+          lines.push(`  E${flow.endpoints.length - 1} --> S0`);
+        } else if (stepCount > 0) {
+          lines.push(`  FE --> S0`);
+        }
+        for (let i = 1; i < stepCount; i++) lines.push(`  S${i-1} --> S${i}`);
+
+        if (flow.external) {
+          flow.external.forEach((_, i) => {
+            const target = flow.endpoints.length ? `E${Math.min(i, flow.endpoints.length - 1)}` : "FE";
+            lines.push(`  ${target} -.-> X${i}`);
+          });
+        }
+
+        lines.push(`  classDef user fill:#9d7bff,stroke:#9d7bff,color:#0a0e1f`);
+        lines.push(`  classDef fe fill:#6ea8ff,stroke:#6ea8ff,color:#0a0e1f`);
+        lines.push(`  classDef ep fill:#1a2148,stroke:#6ea8ff,color:#e6e9f5`);
+        lines.push(`  classDef step fill:#131a36,stroke:#5ed1a8,color:#e6e9f5`);
+        lines.push(`  classDef ext fill:#2a2046,stroke:#ffcf6e,color:#ffcf6e,stroke-dasharray: 4 3`);
+        lines.push(`  class U user`);
+        lines.push(`  class FE fe`);
+        flow.endpoints.forEach((_, i) => lines.push(`  class E${i} ep`));
+        (flow.dataFlow || []).forEach((_, i) => lines.push(`  class S${i} step`));
+        if (flow.external) flow.external.forEach((_, i) => lines.push(`  class X${i} ext`));
+
+        return lines.join("\n");
+      };
+
+      let DATA = null;
+
+      const renderOverview = () => {
+        const c = document.getElementById("content");
+        c.innerHTML = "";
+
+        const topbar = el("div", { class: "topbar" }, [
+          el("div", {}, [
+            el("h2", {}, DATA.app.name + " — Overview"),
+            el("div", { class: "crumbs" }, DATA.app.tagline)
+          ])
+        ]);
+        c.appendChild(topbar);
+
+        const intro = el("div", { class: "panel overview" }, [
+          el("h3", {}, "About"),
+          el("p", { html: DATA.app.description })
+        ]);
+        c.appendChild(intro);
+
+        const stack = el("div", { class: "panel overview" }, [
+          el("h3", {}, "Tech stack"),
+          el("div", { class: "grid" }, [
+            ["Frontend", DATA.techStack.frontend],
+            ["Backend", DATA.techStack.backend],
+            ["Auth", DATA.techStack.auth],
+            ["AI", DATA.techStack.ai],
+            ["Storage", DATA.techStack.storage],
+            ["Architecture", [DATA.techStack.architecture]]
+          ].map(([t, items]) =>
+            el("div", { class: "card" }, [
+              el("h4", {}, t),
+              el("div", { class: "stack" }, items.map((i) => el("span", { class: "pill" }, i)))
+            ])
+          ))
+        ]);
+        c.appendChild(stack);
+
+        const svc = el("div", { class: "panel overview" }, [
+          el("h3", {}, "Services"),
+          el("div", { class: "grid" }, DATA.services.map((s) =>
+            el("div", { class: "card" }, [
+              el("h4", {}, [s.name, " ", el("span", { class: "pill mono" }, `:${s.port}`)]),
+              el("div", { class: "muted" }, s.purpose)
+            ])
+          ))
+        ]);
+        c.appendChild(svc);
+
+        const routes = el("div", { class: "panel" }, [
+          el("h3", {}, "Frontend routes"),
+          el("table", { class: "routes" }, [
+            el("thead", {}, el("tr", {}, [
+              el("th", {}, "Path"), el("th", {}, "Auth"), el("th", {}, "Page")
+            ])),
+            el("tbody", {}, DATA.routes.map((r) =>
+              el("tr", {}, [
+                el("td", {}, el("code", {}, r.path)),
+                el("td", {}, el("span", { class: r.auth ? "lock" : "open" }, r.auth ? "protected" : "public")),
+                el("td", {}, r.page)
+              ])
+            ))
+          ])
+        ]);
+        c.appendChild(routes);
+
+        const models = el("div", { class: "panel overview" }, [
+          el("h3", {}, "Data models"),
+          el("div", { class: "grid" }, DATA.dataModels.map((m) =>
+            el("div", { class: "card" }, [
+              el("h4", {}, m.name),
+              el("div", { class: "stack" }, m.fields.map((f) => el("span", { class: "pill mono" }, f)))
+            ])
+          ))
+        ]);
+        c.appendChild(models);
+
+        if (DATA.absentFeatures && DATA.absentFeatures.length) {
+          const absent = el("div", { class: "panel overview" }, [
+            el("h3", {}, "Not yet built (tracked missions)"),
+            el("div", { class: "grid" }, DATA.absentFeatures.map((a) =>
+              el("div", { class: "card" }, [
+                el("h4", {}, a.name),
+                el("div", { class: "muted" }, [
+                  el("span", { class: "pill" }, a.status),
+                  " ",
+                  a.trackedBy ? el("span", { class: "mono" }, a.trackedBy) : null
+                ])
+              ])
+            ))
+          ]);
+          c.appendChild(absent);
+        }
+
+        setActive(document.querySelector("#nav-overview li[data-view='overview']"));
+      };
+
+      const renderFlow = async (flow) => {
+        const c = document.getElementById("content");
+        c.innerHTML = "";
+
+        const topbar = el("div", { class: "topbar" }, [
+          el("div", {}, [
+            el("h2", {}, flow.name),
+            el("div", { class: "crumbs" }, [
+              el("span", { class: "pill cat" }, flow.category),
+              " ",
+              flow.purpose
+            ])
+          ])
+        ]);
+        c.appendChild(topbar);
+
+        const diagramHost = el("div", { class: "diagram-wrap", id: "diagram-host" });
+        const diagramPanel = el("div", { class: "panel" }, [
+          el("h3", {}, "Flow diagram"),
+          diagramHost
+        ]);
+        c.appendChild(diagramPanel);
+
+        const trigger = el("div", { class: "panel" }, [
+          el("h3", {}, "Frontend trigger"),
+          el("div", {}, [
+            el("code", {}, flow.frontend.route),
+            " — ",
+            flow.frontend.trigger
+          ])
+        ]);
+        c.appendChild(trigger);
+
+        if (flow.endpoints.length) {
+          const eps = el("div", { class: "panel" }, [
+            el("h3", {}, "Backend endpoints"),
+            el("table", { class: "endpoints" }, [
+              el("thead", {}, el("tr", {}, [
+                el("th", {}, "Method"), el("th", {}, "Path"), el("th", {}, "Service"), el("th", {}, "Notes")
+              ])),
+              el("tbody", {}, flow.endpoints.map((e) =>
+                el("tr", {}, [
+                  el("td", {}, el("span", { class: `method ${e.method}` }, e.method)),
+                  el("td", {}, el("code", {}, e.path)),
+                  el("td", {}, el("span", { class: "muted" }, e.service)),
+                  el("td", {}, el("span", { class: "muted" }, e.notes || ""))
+                ])
+              ))
+            ])
+          ]);
+          c.appendChild(eps);
+        }
+
+        if (flow.external && flow.external.length) {
+          c.appendChild(el("div", { class: "panel" }, [
+            el("h3", {}, "External services"),
+            el("div", { class: "stack" }, flow.external.map((x) => el("span", { class: "pill" }, x)))
+          ]));
+        }
+
+        if (flow.dataFlow && flow.dataFlow.length) {
+          c.appendChild(el("div", { class: "panel" }, [
+            el("h3", {}, "Data flow"),
+            el("ol", { class: "steps" }, flow.dataFlow.map((s) => el("li", {}, s)))
+          ]));
+        }
+
+        const jsonDetails = el("details", { class: "json" });
+        jsonDetails.appendChild(el("summary", {}, "Raw JSON for this flow"));
+        jsonDetails.appendChild(el("pre", {}, JSON.stringify(flow, null, 2)));
+        c.appendChild(jsonDetails);
+
+        try {
+          const src = flowToMermaid(flow);
+          const { svg } = await mermaid.render(`mer-${flow.id}-${Date.now()}`, src);
+          diagramHost.innerHTML = svg;
+        } catch (err) {
+          diagramHost.innerHTML = `<div class="muted">Diagram render failed: ${err.message}</div>`;
+        }
+      };
+
+      const setActive = (li) => {
+        document.querySelectorAll(".nav-list li").forEach((x) => x.classList.remove("active"));
+        if (li) li.classList.add("active");
+      };
+
+      const buildNav = () => {
+        const nav = document.getElementById("nav-flows");
+        const categories = {};
+        for (const f of DATA.flows) {
+          (categories[f.category] = categories[f.category] || []).push(f);
+        }
+        for (const [cat, flows] of Object.entries(categories)) {
+          for (const f of flows) {
+            const li = el("li", { data: { id: f.id }, title: f.purpose }, [
+              f.name,
+              el("span", { class: "badge" }, cat)
+            ]);
+            li.onclick = () => {
+              setActive(li);
+              renderFlow(f);
+              location.hash = `#flow=${f.id}`;
+            };
+            nav.appendChild(li);
+          }
+        }
+        document.querySelector("#nav-overview li").onclick = () => {
+          renderOverview();
+          location.hash = "";
+        };
+      };
+
+      const showError = (msg) => {
+        const e = document.getElementById("error");
+        e.classList.remove("hidden");
+        e.innerHTML = "";
+        e.appendChild(el("strong", {}, "Could not load flows.json. "));
+        e.appendChild(el("span", {}, msg));
+        e.appendChild(el("p", {}, [
+          "Browsers block ",
+          el("code", {}, "fetch()"),
+          " of local files. Serve this folder: ",
+          el("code", {}, "cd docs && python3 -m http.server 8080"),
+          " then open ",
+          el("code", {}, "http://localhost:8080/flows.html"),
+          "."
+        ]));
+      };
+
+      const routeFromHash = () => {
+        const m = location.hash.match(/#flow=([\w-]+)/);
+        if (m) {
+          const f = DATA.flows.find((x) => x.id === m[1]);
+          if (f) {
+            const li = document.querySelector(`#nav-flows li[data-id="${f.id}"]`);
+            setActive(li);
+            renderFlow(f);
+            return;
+          }
+        }
+        renderOverview();
+      };
+
+      fetch("flows.json")
+        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then((data) => {
+          DATA = data;
+          document.getElementById("brand-name").textContent = data.app.name;
+          buildNav();
+          routeFromHash();
+          window.addEventListener("hashchange", routeFromHash);
+        })
+        .catch((err) => showError(String(err && err.message ? err.message : err)));
+    </script>
+  </body>
+</html>
