@@ -5,6 +5,7 @@ import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
+import { UploadJobModal } from './UploadJobModal';
 import './JobSuggestions.css';
 import type { User } from '../../types/user';
 
@@ -113,6 +114,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
   const [pipelineJobIdToEntryId, setPipelineJobIdToEntryId] = useState(() => new Map<number, string>());
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadPipelineJobHashes = useCallback(async () => {
@@ -241,6 +243,14 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
             <h1 className="jobs-title">Job Suggestions</h1>
             <p className="jobs-subtitle">Jobs matched to your profile and skills</p>
           </div>
+          <button
+            type="button"
+            className="btn-primary job-upload-btn"
+            onClick={() => setShowUploadModal(true)}
+          >
+            <img src={iconPlus} alt="" aria-hidden="true" className="job-btn-icon job-btn-icon--white" />
+            Upload Job
+          </button>
         </div>
 
         <div className="jobs-search-bar">
@@ -316,15 +326,17 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                       )}
 
                       <div className="job-card-actions">
-                        <a
-                          href={job.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn-outline job-view-btn"
-                        >
-                          <img src={iconArrowRight} alt="" aria-hidden="true" className="job-btn-icon" />
-                          View Job
-                        </a>
+                        {job.url ? (
+                          <a
+                            href={job.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-outline job-view-btn"
+                          >
+                            <img src={iconArrowRight} alt="" aria-hidden="true" className="job-btn-icon" />
+                            View Job
+                          </a>
+                        ) : null}
                         <button
                           type="button"
                           className={`job-pipeline-btn${alreadyInPipeline ? ' job-pipeline-btn--in-pipeline' : ' btn-primary'}`}
@@ -350,6 +362,16 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         )}
 
       </div>
+
+      {showUploadModal && (
+        <UploadJobModal
+          onClose={() => setShowUploadModal(false)}
+          onCreated={() => {
+            setShowUploadModal(false);
+            fetchJobs(searchQuery);
+          }}
+        />
+      )}
     </div>
   );
 };
