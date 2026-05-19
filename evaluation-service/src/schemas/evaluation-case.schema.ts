@@ -1,7 +1,7 @@
 import type { FastifySchema } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { CONVERSATION_STAGE_IDS } from "../evaluation-case.stage.consts";
+import { CONVERSATION_MODES } from "../evaluation-case.mode.consts";
 
 export const MessageRoleSchema = z.enum(["user", "assistant", "system"]);
 
@@ -10,23 +10,35 @@ export const EvaluationMessageSchema = z.object({
     content: z.string().min(1),
 });
 
-export const EvaluationStageSchema = z.enum(CONVERSATION_STAGE_IDS);
+export const EvaluationModeSchema = z.enum(CONVERSATION_MODES);
+
+const evaluationExpectedShape = {
+    mode: EvaluationModeSchema.optional(),
+    maxLines: z.number().optional(),
+    mustAskQuestion: z.boolean().optional(),
+    forbiddenWords: z.array(z.string()).optional(),
+} as const;
+
+const hasAtLeastOneExpectedCheck = (expected: {
+    mode?: unknown;
+    maxLines?: unknown;
+    mustAskQuestion?: unknown;
+    forbiddenWords?: unknown;
+}): boolean =>
+    expected.mode !== undefined ||
+    expected.maxLines !== undefined ||
+    expected.mustAskQuestion !== undefined ||
+    (Array.isArray(expected.forbiddenWords) && expected.forbiddenWords.length > 0);
 
 /** Strict validation for create/upload requests. */
-export const EvaluationExpectedInputSchema = z.object({
-    stage: EvaluationStageSchema,
-    maxLines: z.number().optional(),
-    mustAskQuestion: z.boolean().optional(),
-    forbiddenWords: z.array(z.string()).optional(),
-});
+export const EvaluationExpectedInputSchema = z
+    .object(evaluationExpectedShape)
+    .refine(hasAtLeastOneExpectedCheck, {
+        message: "expected must include at least one of: mode, maxLines, mustAskQuestion, forbiddenWords",
+    });
 
-/** Lenient shape for documents already stored (may include legacy stage values). */
-export const EvaluationExpectedResponseSchema = z.object({
-    stage: z.string().min(1),
-    maxLines: z.number().optional(),
-    mustAskQuestion: z.boolean().optional(),
-    forbiddenWords: z.array(z.string()).optional(),
-});
+/** Lenient shape for documents already stored. */
+export const EvaluationExpectedResponseSchema = z.object(evaluationExpectedShape);
 
 export const CreateEvaluationCaseBodySchema = z.object({
     id: z.string().min(1),
@@ -59,10 +71,9 @@ export const ErrorResponseSchema = z.object({
 
 export type MessageRole = z.infer<typeof MessageRoleSchema>;
 export type EvaluationMessage = z.infer<typeof EvaluationMessageSchema>;
-export type EvaluationStage = z.infer<typeof EvaluationStageSchema>;
+export type EvaluationMode = z.infer<typeof EvaluationModeSchema>;
 export type EvaluationExpectedInput = z.infer<typeof EvaluationExpectedInputSchema>;
 export type EvaluationExpectedResponse = z.infer<typeof EvaluationExpectedResponseSchema>;
-/** Canonical stage id used when running evaluations. */
 export type EvaluationExpected = EvaluationExpectedInput;
 export type CreateEvaluationCaseBody = z.infer<typeof CreateEvaluationCaseBodySchema>;
 export type EvaluationCaseResponse = z.infer<typeof EvaluationCaseResponseSchema>;
@@ -97,12 +108,26 @@ export const deleteEvaluationCaseRouteSchema = {
     },
 } satisfies FastifySchema;
 
+export const replaceEvaluationCaseRouteSchema = {
+    params: EvaluationCaseIdParamsSchema,
+    response: {
+        [StatusCodes.OK]: EvaluationCaseResponseSchema,
+        [StatusCodes.BAD_REQUEST]: ValidationErrorResponseSchema,
+        [StatusCodes.NOT_FOUND]: ErrorResponseSchema,
+    },
+} satisfies FastifySchema;
+
 export const EvaluationCheckResultSchema = z.object({
     name: z.string(),
     passed: z.boolean(),
     expected: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).optional(),
     actual: z.union([z.string(), z.number(), z.boolean()]).optional(),
     message: z.string().optional(),
+});
+
+export const EvaluationRunMessageSchema = z.object({
+    role: MessageRoleSchema,
+    content: z.string(),
 });
 
 export const EvaluationRunMetadataSchema = z.object({
@@ -118,10 +143,11 @@ export const EvaluationRunResultSchema = z.object({
     runId: z.string(),
     passed: z.boolean(),
     reply: z.string(),
+    conversation: z.array(EvaluationRunMessageSchema),
     checks: z.array(EvaluationCheckResultSchema),
+    expected: EvaluationExpectedResponseSchema,
     metadata: EvaluationRunMetadataSchema,
     mode: z.string().optional(),
-    stage: EvaluationStageSchema.optional(),
 });
 
 export type EvaluationRunResult = z.infer<typeof EvaluationRunResultSchema>;

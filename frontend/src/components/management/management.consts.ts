@@ -22,6 +22,7 @@ export const MANAGEMENT_EVALUATION_LOAD_ERROR_MESSAGE = 'Unable to load evaluati
 export const MANAGEMENT_EVALUATION_UPLOAD_ERROR_MESSAGE = 'Unable to add evaluation conversation';
 export const MANAGEMENT_EVALUATION_DELETE_ERROR_MESSAGE = 'Unable to delete evaluation conversation';
 export const MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE = 'Unable to run evaluation conversation';
+export const MANAGEMENT_EVALUATION_RUN_ALL_ERROR_MESSAGE = 'Unable to complete run all evaluations';
 export const MANAGEMENT_EVALUATION_INVALID_FILE_MESSAGE = 'Please choose a .json file';
 
 export const buildEvaluationCaseRunUrl = (caseId: string): string =>

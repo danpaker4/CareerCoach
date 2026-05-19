@@ -6,6 +6,7 @@ import {
     deleteEvaluationCaseRouteSchema,
     getEvaluationCaseRouteSchema,
     listEvaluationCasesRouteSchema,
+    replaceEvaluationCaseRouteSchema,
     runEvaluationCaseRouteSchema,
 } from "../schemas/evaluation-case.schema";
 import {
@@ -13,8 +14,10 @@ import {
     deleteEvaluationCaseById,
     EvaluationCaseConflictError,
     EvaluationCaseNotFoundError,
+    EvaluationCaseRequestIdMismatchError,
     getEvaluationCaseById,
     listEvaluationCases,
+    replaceEvaluationCaseById,
 } from "../services/evaluation-case.service";
 import { EvaluationRunnerError, runEvaluationCaseById } from "../services/evaluation-runner.service";
 import {
@@ -60,6 +63,28 @@ export const evaluationCaseRoutes = (runnerConfig: RunnerConfig): FastifyPluginA
                 reply.code(error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : StatusCodes.BAD_GATEWAY).send({
                     error: error.message,
                 });
+                return;
+            }
+            throw error;
+        }
+    });
+
+    fastify.put("/:id", { schema: replaceEvaluationCaseRouteSchema }, async (request, reply) => {
+        try {
+            const input = await parseCreateEvaluationCaseInput(request);
+            const saved = await replaceEvaluationCaseById(request.params.id, input);
+            reply.code(StatusCodes.OK).send(saved);
+        } catch (error) {
+            if (isEvaluationCaseRequestError(error)) {
+                reply.code(error.statusCode).send(formatEvaluationCaseRequestError(error));
+                return;
+            }
+            if (error instanceof EvaluationCaseNotFoundError) {
+                reply.code(StatusCodes.NOT_FOUND).send({ error: error.message });
+                return;
+            }
+            if (error instanceof EvaluationCaseRequestIdMismatchError) {
+                reply.code(StatusCodes.BAD_REQUEST).send({ error: error.message, details: [] });
                 return;
             }
             throw error;

@@ -1,15 +1,15 @@
 import { randomUUID } from "crypto";
-import { type ConversationStageId } from "../evaluation-case.stage.consts";
-import { isConversationStageId, normalizeEvaluationStage } from "../evaluation-case.stage.utils";
 import type { RunnerConfig } from "../server.types";
-import type { EvaluationCaseResponse } from "../schemas/evaluation-case.schema";
+import type { EvaluationCaseResponse, EvaluationExpected } from "../schemas/evaluation-case.schema";
+import { CONVERSATION_MODES } from "../evaluation-case.mode.consts";
 import { getEvaluationCaseById } from "./evaluation-case.service";
 import {
     aggregatePassed,
     evaluateAssistantReply,
     extractUserMessages,
+    hasCheckableExpected,
 } from "./evaluation-runner.utils";
-import type { ChatMessageResponse, EvaluationRunResult } from "./evaluation-runner.types";
+import type { ChatMessageResponse, EvaluationRunMessage, EvaluationRunResult } from "./evaluation-runner.types";
 
 export class EvaluationRunnerError extends Error {
     constructor(
@@ -107,20 +107,26 @@ const replayUserTurns = async (
     return sendChatMessage(config, conversationId, lastMessage);
 };
 
-type ConversationFetchResponse = {
-    conversationId: string;
-    currentStageId: string | null;
+const isConversationMode = (value: string): value is NonNullable<EvaluationExpected["mode"]> =>
+    (CONVERSATION_MODES as readonly string[]).includes(value);
+
+type ConversationMessagesResponse = {
+    messages: Array<{
+        role: string;
+        content: string;
+    }>;
 };
 
-const isConversationFetchResponse = (value: unknown): value is ConversationFetchResponse =>
+const isConversationMessagesResponse = (value: unknown): value is ConversationMessagesResponse =>
     typeof value === "object" &&
     value !== null &&
-    "conversationId" in value &&
-    "currentStageId" in value &&
-    (typeof (value as ConversationFetchResponse).currentStageId === "string" ||
-        (value as ConversationFetchResponse).currentStageId === null);
+    "messages" in value &&
+    Array.isArray((value as ConversationMessagesResponse).messages);
 
-const fetchConversationCurrentStage = async (config: RunnerConfig, conversationId: string): Promise<ConversationStageId | undefined> => {
+const isEvaluationRunMessageRole = (role: string): role is EvaluationRunMessage["role"] =>
+    role === "user" || role === "assistant" || role === "system";
+
+const fetchRunConversation = async (config: RunnerConfig, conversationId: string): Promise<EvaluationRunMessage[]> => {
     const params = new URLSearchParams({ conversationId });
     const response = await fetch(
         `${config.chatServiceBaseUrl}/chat/${encodeURIComponent(config.evaluationUserId)}?${params.toString()}`,
@@ -131,24 +137,43 @@ const fetchConversationCurrentStage = async (config: RunnerConfig, conversationI
     }
 
     const payload = await parseJsonResponse(response);
-    if (!isConversationFetchResponse(payload)) {
-        throw new EvaluationRunnerError(502, "Chat service returned an invalid conversation response");
+    if (!isConversationMessagesResponse(payload)) {
+        throw new EvaluationRunnerError(502, "Chat service returned an invalid conversation messages response");
     }
 
-    const stageId = payload.currentStageId;
-    return stageId && isConversationStageId(stageId) ? stageId : undefined;
+    return payload.messages.flatMap((message) => {
+        if (!isEvaluationRunMessageRole(message.role) || typeof message.content !== "string" || message.content.trim().length === 0) {
+            return [];
+        }
+
+        return [{ role: message.role, content: message.content }];
+    });
+};
+
+const normalizeExpectedForRun = (expected: EvaluationCaseResponse["expected"]): EvaluationExpected => {
+    const normalizedMode =
+        expected.mode && isConversationMode(expected.mode.toUpperCase())
+            ? (expected.mode.toUpperCase() as EvaluationExpected["mode"])
+            : undefined;
+
+    return {
+        maxLines: expected.maxLines,
+        mustAskQuestion: expected.mustAskQuestion,
+        forbiddenWords: expected.forbiddenWords,
+        mode: normalizedMode,
+    };
 };
 
 export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string): Promise<EvaluationRunResult> => {
     const startedAt = Date.now();
     const evaluationCase: EvaluationCaseResponse = await getEvaluationCaseById(caseId);
-    const expectedStage = normalizeEvaluationStage(evaluationCase.expected.stage);
+    const expectedForRun = normalizeExpectedForRun(evaluationCase.expected);
     const userMessages = extractUserMessages(evaluationCase.messages);
 
-    if (!expectedStage) {
+    if (!hasCheckableExpected(expectedForRun)) {
         throw new EvaluationRunnerError(
             400,
-            `Invalid expected.stage "${evaluationCase.expected.stage}". Use one of: achievements, timeline, preferences`,
+            "Evaluation case expected must include at least one of: mode, maxLines, mustAskQuestion, forbiddenWords",
         );
     }
 
@@ -158,11 +183,11 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
 
     const conversationId = await createEvaluationConversation(config);
     const finalChatResponse = await replayUserTurns(config, conversationId, userMessages);
-    const actualStage = await fetchConversationCurrentStage(config, conversationId);
+    const conversation = await fetchRunConversation(config, conversationId);
     const checks = evaluateAssistantReply({
         reply: finalChatResponse.reply,
-        expected: { ...evaluationCase.expected, stage: expectedStage },
-        actualStage,
+        expected: expectedForRun,
+        actualMode: finalChatResponse.mode,
     });
 
     return {
@@ -170,8 +195,9 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
         runId: randomUUID(),
         passed: aggregatePassed(checks),
         reply: finalChatResponse.reply,
+        conversation,
         checks,
-        stage: actualStage,
+        expected: expectedForRun,
         mode: finalChatResponse.mode,
         metadata: {
             userId: config.evaluationUserId,

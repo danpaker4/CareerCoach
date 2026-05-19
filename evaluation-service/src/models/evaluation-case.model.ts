@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { CONVERSATION_STAGE_IDS } from "../evaluation-case.stage.consts";
+import { CONVERSATION_MODES } from "../evaluation-case.mode.consts";
 import type { EvaluationExpected, EvaluationMessage } from "../schemas/evaluation-case.schema";
 
 export type EvaluationCaseDocument = {
@@ -20,7 +20,7 @@ const evaluationMessageSchema = new Schema<EvaluationMessage>(
 
 const evaluationExpectedSchema = new Schema<EvaluationExpected>(
     {
-        stage: { type: String, enum: CONVERSATION_STAGE_IDS, required: true },
+        mode: { type: String, enum: CONVERSATION_MODES, required: false },
         maxLines: { type: Number, required: false },
         mustAskQuestion: { type: Boolean, required: false },
         forbiddenWords: { type: [String], required: false },
@@ -40,7 +40,13 @@ const evaluationCaseSchema = new Schema<EvaluationCaseDocument>(
     },
 );
 
-export const EvaluationCaseModel = model<EvaluationCaseDocument>("EvaluationCase", evaluationCaseSchema);
+const EVALUATION_CASE_MODEL_NAME = "EvaluationCase";
+
+if (mongoose.models[EVALUATION_CASE_MODEL_NAME]) {
+    mongoose.deleteModel(EVALUATION_CASE_MODEL_NAME);
+}
+
+export const EvaluationCaseModel = model<EvaluationCaseDocument>(EVALUATION_CASE_MODEL_NAME, evaluationCaseSchema);
 
 export const connectMongo = async (connectionString: string): Promise<void> => {
     await mongoose.connect(connectionString);

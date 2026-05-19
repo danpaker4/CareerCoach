@@ -1,5 +1,4 @@
-import type { ConversationStageId } from "../evaluation-case.stage.consts";
-import type { EvaluationExpected } from "../schemas/evaluation-case.schema";
+import type { EvaluationExpected, EvaluationMessage } from "../schemas/evaluation-case.schema";
 
 export type ChatMessageResponse = {
     reply: string;
@@ -26,14 +25,17 @@ export type EvaluationRunMetadata = {
     ranAt: string;
 };
 
+export type EvaluationRunMessage = EvaluationMessage;
+
 export type EvaluationRunResult = {
     caseId: string;
     runId: string;
     passed: boolean;
     reply: string;
+    conversation: EvaluationRunMessage[];
     checks: EvaluationCheckResult[];
+    expected: EvaluationExpected;
     metadata: EvaluationRunMetadata;
-    stage?: ConversationStageId;
     mode?: string;
 };
 

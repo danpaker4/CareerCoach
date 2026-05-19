@@ -1,4 +1,3 @@
-import type { ConversationStageId } from "../evaluation-case.stage.consts";
 import type { EvaluationExpected } from "../schemas/evaluation-case.schema";
 import type { EvaluationCheckResult } from "./evaluation-runner.types";
 
@@ -19,27 +18,22 @@ export const replyAsksQuestion = (reply: string): boolean => {
     return /\b(what|how|why|when|where|which|who|could you|would you|can you|tell me|share)\b/i.test(reply);
 };
 
-export const matchesExpectedStage = (expectedStage: ConversationStageId, actualStage: string | undefined): boolean =>
-    expectedStage === actualStage;
+const normalizeMode = (value: string | undefined): string | undefined =>
+    value?.trim().toUpperCase();
+
+export const hasCheckableExpected = (expected: EvaluationExpected): boolean =>
+    expected.mode !== undefined ||
+    expected.maxLines !== undefined ||
+    expected.mustAskQuestion === true ||
+    (expected.forbiddenWords?.length ?? 0) > 0;
 
 export const evaluateAssistantReply = (params: {
     reply: string;
     expected: EvaluationExpected;
-    actualStage: string | undefined;
+    actualMode: string | undefined;
 }): EvaluationCheckResult[] => {
-    const { reply, expected, actualStage } = params;
+    const { reply, expected, actualMode } = params;
     const checks: EvaluationCheckResult[] = [];
-
-    const stagePassed = matchesExpectedStage(expected.stage, actualStage);
-    checks.push({
-        name: "stage",
-        passed: stagePassed,
-        expected: expected.stage,
-        actual: actualStage ?? "unknown",
-        message: stagePassed
-            ? undefined
-            : `Expected stage "${expected.stage}" but conversation stage was "${actualStage ?? "unknown"}"`,
-    });
 
     if (expected.maxLines !== undefined) {
         const lineCount = countNonEmptyLines(reply);
@@ -61,6 +55,21 @@ export const evaluateAssistantReply = (params: {
             expected: true,
             actual: asksQuestion,
             message: asksQuestion ? undefined : "Reply should include a question",
+        });
+    }
+
+    if (expected.mode !== undefined) {
+        const normalizedExpectedMode = normalizeMode(expected.mode);
+        const normalizedActualMode = normalizeMode(actualMode);
+        const modePassed = normalizedExpectedMode === normalizedActualMode;
+        checks.push({
+            name: "mode",
+            passed: modePassed,
+            expected: expected.mode,
+            actual: actualMode ?? "unknown",
+            message: modePassed
+                ? undefined
+                : `Expected mode "${expected.mode}" but chat mode was "${actualMode ?? "unknown"}"`,
         });
     }
 

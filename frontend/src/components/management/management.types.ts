@@ -106,10 +106,10 @@ export interface EvaluationMessage {
   content: string;
 }
 
-export type EvaluationStage = 'achievements' | 'timeline' | 'preferences';
+export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY';
 
 export interface EvaluationExpected {
-  stage: EvaluationStage;
+  mode?: EvaluationMode;
   maxLines?: number;
   mustAskQuestion?: boolean;
   forbiddenWords?: string[];
@@ -144,8 +144,9 @@ export interface EvaluationRunResult {
   runId: string;
   passed: boolean;
   reply: string;
+  conversation: EvaluationMessage[];
   checks: EvaluationCheckResult[];
+  expected: EvaluationExpected;
   metadata: EvaluationRunMetadata;
-  stage?: string;
   mode?: string;
 }

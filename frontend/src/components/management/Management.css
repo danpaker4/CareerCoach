@@ -172,8 +172,10 @@
 
 .management-llm-evaluation-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: flex-end;
+  gap: 10px;
 }
 
 .management-file-input {
@@ -182,6 +184,10 @@
 
 .management-table--evaluation {
   min-width: 920px;
+}
+
+.management-eval-row--running td {
+  background: var(--clr-primary-50);
 }
 
 .management-eval-status {
@@ -232,59 +238,172 @@
   font-size: var(--fz-sm);
 }
 
-.management-eval-result-reply pre {
+.management-eval-conversation {
+  display: grid;
+  gap: 8px;
+}
+
+.management-eval-conversation-empty {
   margin: 0;
-  padding: 12px 14px;
+  color: var(--text-muted);
+  font-size: var(--fz-sm);
+}
+
+.management-eval-conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  padding: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  background: var(--surface-base);
-  color: var(--text-primary);
+  background: var(--clr-slate-50);
+  overflow-y: auto;
+}
+
+.management-eval-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 92%;
+}
+
+.management-eval-message--user {
+  align-self: flex-end;
+}
+
+.management-eval-message--assistant,
+.management-eval-message--system {
+  align-self: flex-start;
+}
+
+.management-eval-message-role {
+  font-size: var(--fz-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.management-eval-message--user .management-eval-message-role {
+  text-align: right;
+}
+
+.management-eval-message-content {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
   font: inherit;
+  font-size: var(--fz-sm);
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.management-eval-result-checks ul {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.management-eval-message--user .management-eval-message-content {
+  background: var(--clr-primary);
+  color: white;
+  border-bottom-right-radius: 4px;
 }
 
-.management-eval-check {
+.management-eval-message--assistant .management-eval-message-content,
+.management-eval-message--system .management-eval-message-content {
+  background: var(--surface-base);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-bottom-left-radius: 4px;
+}
+
+.management-eval-comparison {
   display: grid;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 10px;
+}
+
+.management-eval-comparison-list {
+  display: grid;
+  gap: 12px;
+}
+
+.management-eval-comparison-item {
+  padding: 12px 14px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   background: var(--surface-base);
 }
 
-.management-eval-check span:first-child {
+.management-eval-comparison-item--pass {
+  border-color: color-mix(in srgb, var(--clr-success, #1f7a3f) 35%, var(--border-subtle));
+}
+
+.management-eval-comparison-item--fail {
+  border-color: color-mix(in srgb, var(--clr-error) 35%, var(--border-subtle));
+}
+
+.management-eval-comparison-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.management-eval-field-key {
   color: var(--text-heading);
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.management-eval-check span:nth-child(2) {
-  font-size: var(--fz-xs);
+  font-size: var(--fz-sm);
   font-weight: 800;
-  text-transform: uppercase;
 }
 
-.management-eval-check--pass span:nth-child(2) {
+.management-eval-comparison-verdict {
+  font-size: var(--fz-md);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.management-eval-comparison-item--pass .management-eval-comparison-verdict {
   color: var(--clr-success, #1f7a3f);
 }
 
-.management-eval-check--fail span:nth-child(2) {
+.management-eval-comparison-item--fail .management-eval-comparison-verdict {
   color: var(--clr-error);
 }
 
-.management-eval-check p {
+.management-eval-comparison-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.management-eval-comparison-side {
+  display: grid;
+  gap: 6px;
+}
+
+.management-eval-comparison-side-label {
+  color: var(--text-muted);
+  font-size: var(--fz-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.management-eval-field-value {
   margin: 0;
-  color: var(--text-secondary);
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   font-size: var(--fz-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .management-eval-comparison-pair {
+    grid-template-columns: 1fr;
+  }
 }
 
 .management-token-usage .management-alert {
@@ -624,6 +743,23 @@
   cursor: not-allowed;
   opacity: 0.55;
   transform: none;
+}
+
+.management-action-button--icon {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.management-action-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .management-pagination {

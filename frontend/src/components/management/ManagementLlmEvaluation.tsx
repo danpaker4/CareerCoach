@@ -1,24 +1,26 @@
 import { Fragment, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router-dom';
 import iconArrowRight from '../../assets/icon-arrow-right.svg';
+import { ManagementIconDelete, ManagementIconPlay } from './management-eval-icons';
 import { apiFetch } from '../../lib/apiClient';
 import {
-  buildEvaluationCaseRunUrl,
   EVALUATION_CASE_FILE_FIELD,
   EVALUATION_CASE_JSON_ACCEPT,
   EVALUATION_CASES_PATH,
   MANAGEMENT_EVALUATION_DELETE_ERROR_MESSAGE,
   MANAGEMENT_EVALUATION_INVALID_FILE_MESSAGE,
   MANAGEMENT_EVALUATION_LOAD_ERROR_MESSAGE,
+  MANAGEMENT_EVALUATION_RUN_ALL_ERROR_MESSAGE,
   MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE,
   MANAGEMENT_EVALUATION_UPLOAD_ERROR_MESSAGE,
 } from './management.consts';
-import type { EvaluationCaseSummary, EvaluationRunResult, ManagementStatus } from './management.types';
+import type { EvaluationCaseSummary, EvaluationMessage, EvaluationRunResult, ManagementStatus } from './management.types';
 import {
   buildEvaluationCaseUrl,
+  buildEvaluationComparisonRowsFromChecks,
+  fetchEvaluationRunResult,
   isJsonEvaluationFile,
   parseEvaluationCases,
-  parseEvaluationRunResult,
   readManagementErrorMessage,
 } from './management.utils';
 import './Management.css';
@@ -39,6 +41,78 @@ const formatDateTime = (value: string): string => {
 
 const formatDuration = (durationMs: number): string => `${(durationMs / 1000).toFixed(1)}s`;
 
+const formatMessageRoleLabel = (role: EvaluationMessage['role']): string => {
+  if (role === 'user') {
+    return 'User';
+  }
+
+  if (role === 'assistant') {
+    return 'Assistant';
+  }
+
+  return 'System';
+};
+
+const EvaluationRunConversation = ({ messages }: { messages: EvaluationMessage[] }) => (
+  <div className="management-eval-conversation">
+    <p className="management-eval-result-label">Conversation</p>
+    {messages.length === 0 ? (
+      <p className="management-eval-conversation-empty">No messages in this run.</p>
+    ) : (
+      <div className="management-eval-conversation-list">
+        {messages.map((message, index) => (
+          <div
+            key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
+            className={`management-eval-message management-eval-message--${message.role}`}
+          >
+            <span className="management-eval-message-role">{formatMessageRoleLabel(message.role)}</span>
+            <pre className="management-eval-message-content">{message.content}</pre>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+const EvaluationExpectedComparison = ({ runResult }: { runResult: EvaluationRunResult }) => {
+  const rows = buildEvaluationComparisonRowsFromChecks(runResult.checks);
+
+  return (
+    <div className="management-eval-comparison">
+      <p className="management-eval-result-label">Expected vs got</p>
+      <div className="management-eval-comparison-list">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className={`management-eval-comparison-item management-eval-comparison-item--${
+              row.passed === true ? 'pass' : row.passed === false ? 'fail' : 'neutral'
+            }`}
+          >
+            <div className="management-eval-comparison-item-header">
+              <span className="management-eval-field-key">{row.key}</span>
+              {row.passed !== null && (
+                <span className="management-eval-comparison-verdict" aria-label={row.passed ? 'Passed' : 'Failed'}>
+                  {row.passed ? '✓' : '✗'}
+                </span>
+              )}
+            </div>
+            <div className="management-eval-comparison-pair">
+              <div className="management-eval-comparison-side">
+                <span className="management-eval-comparison-side-label">Expected</span>
+                <pre className="management-eval-field-value">{row.expectedDisplay}</pre>
+              </div>
+              <div className="management-eval-comparison-side">
+                <span className="management-eval-comparison-side-label">Got</span>
+                <pre className="management-eval-field-value">{row.gotDisplay}</pre>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const ManagementLlmEvaluation = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cases, setCases] = useState<EvaluationCaseSummary[]>([]);
@@ -48,6 +122,8 @@ export const ManagementLlmEvaluation = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
   const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
+  const [isRunningAll, setIsRunningAll] = useState(false);
+  const [runAllProgress, setRunAllProgress] = useState<{ current: number; total: number } | null>(null);
   const [runResults, setRunResults] = useState<Record<string, EvaluationRunResult>>({});
   const [expandedResultCaseId, setExpandedResultCaseId] = useState<string | null>(null);
 
@@ -165,19 +241,7 @@ export const ManagementLlmEvaluation = () => {
     setSuccessMessage('');
 
     try {
-      const response = await apiFetch(buildEvaluationCaseRunUrl(caseId), { method: 'POST' });
-      if (!response.ok) {
-        setError(await readManagementErrorMessage(response, MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE));
-        return;
-      }
-
-      const payload: unknown = await response.json().catch(() => null);
-      const parsed = parseEvaluationRunResult(payload);
-      if (!parsed) {
-        setError(MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE);
-        return;
-      }
-
+      const parsed = await fetchEvaluationRunResult(caseId);
       setRunResults((current) => ({ ...current, [caseId]: parsed }));
       setExpandedResultCaseId(caseId);
       setSuccessMessage(
@@ -192,7 +256,62 @@ export const ManagementLlmEvaluation = () => {
     }
   };
 
-  const isActionDisabled = isUploading || deletingCaseId !== null || runningCaseId !== null;
+  const handleRunAll = async (): Promise<void> => {
+    if (cases.length === 0) {
+      return;
+    }
+
+    setIsRunningAll(true);
+    setRunAllProgress({ current: 0, total: cases.length });
+    setError('');
+    setSuccessMessage('');
+
+    const runErrors: string[] = [];
+    let passedCount = 0;
+    let completedCount = 0;
+
+    for (const [index, evaluationCase] of cases.entries()) {
+      const caseId = evaluationCase.id;
+      setRunningCaseId(caseId);
+      setRunAllProgress({ current: index + 1, total: cases.length });
+
+      try {
+        const parsed = await fetchEvaluationRunResult(caseId);
+        setRunResults((current) => ({ ...current, [caseId]: parsed }));
+        completedCount += 1;
+        if (parsed.passed) {
+          passedCount += 1;
+        }
+      } catch (runError: unknown) {
+        const message = runError instanceof Error ? runError.message : MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE;
+        runErrors.push(`${caseId}: ${message}`);
+      }
+    }
+
+    setRunningCaseId(null);
+    setRunAllProgress(null);
+    setIsRunningAll(false);
+
+    if (completedCount === 0) {
+      setError(runErrors[0] ?? MANAGEMENT_EVALUATION_RUN_ALL_ERROR_MESSAGE);
+      return;
+    }
+
+    const failedCount = completedCount - passedCount;
+    const summaryParts = [
+      `Ran ${completedCount} of ${cases.length} evaluation${cases.length === 1 ? '' : 's'}.`,
+      `${passedCount} passed`,
+      failedCount > 0 ? `${failedCount} failed` : null,
+    ].filter((part): part is string => part !== null);
+
+    setSuccessMessage(summaryParts.join(', ') + '.');
+
+    if (runErrors.length > 0) {
+      setError(runErrors.join(' '));
+    }
+  };
+
+  const isActionDisabled = isUploading || deletingCaseId !== null || runningCaseId !== null || isRunningAll;
 
   return (
     <main className="management-page">
@@ -243,6 +362,25 @@ export const ManagementLlmEvaluation = () => {
             />
             <button
               type="button"
+              className="btn-outline"
+              disabled={status === 'loading' || cases.length === 0 || isActionDisabled}
+              onClick={() => {
+                handleRunAll().catch((runAllError: unknown) => {
+                  setIsRunningAll(false);
+                  setRunningCaseId(null);
+                  setRunAllProgress(null);
+                  setError(
+                    runAllError instanceof Error ? runAllError.message : MANAGEMENT_EVALUATION_RUN_ALL_ERROR_MESSAGE,
+                  );
+                });
+              }}
+            >
+              {isRunningAll && runAllProgress
+                ? `Running ${runAllProgress.current}/${runAllProgress.total}...`
+                : 'Run All'}
+            </button>
+            <button
+              type="button"
               className="btn-primary"
               disabled={status === 'loading' || isActionDisabled}
               onClick={handleAddConversationClick}
@@ -271,7 +409,7 @@ export const ManagementLlmEvaluation = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Stage</th>
+                  <th>Mode</th>
                   <th>Messages</th>
                   <th>Last run</th>
                   <th>Updated</th>
@@ -285,11 +423,15 @@ export const ManagementLlmEvaluation = () => {
 
                   return (
                     <Fragment key={evaluationCase.id}>
-                      <tr>
+                      <tr
+                        className={
+                          runningCaseId === evaluationCase.id ? 'management-eval-row--running' : undefined
+                        }
+                      >
                         <td>
                           <span className="management-user-name">{evaluationCase.id}</span>
                         </td>
-                        <td>{evaluationCase.expected.stage}</td>
+                        <td>{evaluationCase.expected.mode ?? '—'}</td>
                         <td>{formatNumber(evaluationCase.messages.length)}</td>
                         <td>
                           {runResult ? (
@@ -307,8 +449,15 @@ export const ManagementLlmEvaluation = () => {
                           <div className="management-actions">
                             <button
                               type="button"
-                              className="btn-outline management-action-button"
+                              className="btn-outline management-action-button management-action-button--icon"
                               disabled={isActionDisabled}
+                              aria-label={
+                                runningCaseId === evaluationCase.id
+                                  ? 'Running evaluation'
+                                  : `Run evaluation ${evaluationCase.id}`
+                              }
+                              title={runningCaseId === evaluationCase.id ? 'Running...' : 'Run'}
+                              aria-busy={runningCaseId === evaluationCase.id}
                               onClick={() => {
                                 handleRun(evaluationCase.id).catch((runError: unknown) => {
                                   setRunningCaseId(null);
@@ -318,37 +467,44 @@ export const ManagementLlmEvaluation = () => {
                                 });
                               }}
                             >
-                              {runningCaseId === evaluationCase.id ? 'Running...' : 'Run'}
+                              <ManagementIconPlay className="management-action-icon" />
                             </button>
-                            {runResult && (
-                              <button
-                                type="button"
-                                className="btn-outline management-action-button"
-                                disabled={isActionDisabled}
-                                onClick={() => {
-                                  setExpandedResultCaseId(isExpanded ? null : evaluationCase.id);
-                                }}
-                              >
-                                {isExpanded ? 'Hide' : 'Details'}
-                              </button>
-                            )}
                             <button
                               type="button"
-                              className="btn-outline management-action-button management-action-button--danger"
+                              className="btn-outline management-action-button management-action-button--icon management-action-button--danger"
                               disabled={isActionDisabled}
+                              aria-label={
+                                deletingCaseId === evaluationCase.id
+                                ? 'Deleting evaluation'
+                                : `Delete evaluation ${evaluationCase.id}`
+                              }
+                              title={deletingCaseId === evaluationCase.id ? 'Deleting...' : 'Delete'}
+                              aria-busy={deletingCaseId === evaluationCase.id}
                               onClick={() => {
                                 handleDelete(evaluationCase.id).catch((deleteError: unknown) => {
                                   setDeletingCaseId(null);
                                   setError(
                                     deleteError instanceof Error
-                                      ? deleteError.message
-                                      : MANAGEMENT_EVALUATION_DELETE_ERROR_MESSAGE,
+                                    ? deleteError.message
+                                    : MANAGEMENT_EVALUATION_DELETE_ERROR_MESSAGE,
                                   );
                                 });
                               }}
-                            >
-                              {deletingCaseId === evaluationCase.id ? 'Deleting...' : 'Delete'}
+                              >
+                              <ManagementIconDelete className="management-action-icon" />
                             </button>
+                              {runResult && (
+                                <button
+                                  type="button"
+                                  className="btn-outline management-action-button"
+                                  disabled={isActionDisabled}
+                                  onClick={() => {
+                                    setExpandedResultCaseId(isExpanded ? null : evaluationCase.id);
+                                  }}
+                                >
+                                  {isExpanded ? 'Hide' : 'Details'}
+                                </button>
+                              )}
                           </div>
                         </td>
                       </tr>
@@ -360,28 +516,11 @@ export const ManagementLlmEvaluation = () => {
                                 <h3>Run result</h3>
                                 <p>
                                   {runResult.passed ? 'Passed' : 'Failed'} in {formatDuration(runResult.metadata.durationMs)}
-                                  {runResult.stage ? ` · stage ${runResult.stage}` : ''}
+                                  {runResult.mode ? ` · mode ${runResult.mode}` : ''}
                                 </p>
                               </div>
-                              <div className="management-eval-result-reply">
-                                <p className="management-eval-result-label">Assistant reply</p>
-                                <pre>{runResult.reply}</pre>
-                              </div>
-                              <div className="management-eval-result-checks">
-                                <p className="management-eval-result-label">Checks</p>
-                                <ul>
-                                  {runResult.checks.map((check) => (
-                                    <li
-                                      key={check.name}
-                                      className={`management-eval-check management-eval-check--${check.passed ? 'pass' : 'fail'}`}
-                                    >
-                                      <span>{check.name}</span>
-                                      <span>{check.passed ? 'pass' : 'fail'}</span>
-                                      {check.message && <p>{check.message}</p>}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                              <EvaluationRunConversation messages={runResult.conversation} />
+                              <EvaluationExpectedComparison runResult={runResult} />
                             </div>
                           </td>
                         </tr>
