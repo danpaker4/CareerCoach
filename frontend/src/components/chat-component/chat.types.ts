@@ -44,6 +44,7 @@ export interface Message {
 export interface ConversationResponse {
     conversationId: string;
     userId: string;
+    currentStageId?: string | null;
     achievements: {
         id: string;
         name: string;

@@ -70,11 +70,16 @@ export const parseConversationObjectIdOrThrow = (conversationId: string): Object
     return parsed;
 };
 
-export const toConversationResponse = (conversation: Conversation, achievements: UserAchievement[]): ConversationResponse => {
+export const toConversationResponse = (
+    conversation: Conversation,
+    achievements: UserAchievement[],
+    currentStageId: string | null,
+): ConversationResponse => {
     const conversationId = conversation._id?.toHexString() ?? "";
     return {
         conversationId,
         userId: conversation.userId,
+        currentStageId,
         achievements,
         messages: conversation.messages.map((message) => ({
             role: message.role,

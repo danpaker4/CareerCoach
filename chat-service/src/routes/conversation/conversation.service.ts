@@ -39,7 +39,8 @@ export class ChatConversationService {
         const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
         const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
         const achievements = await this.chatExternalService.readUserAchievements(userId);
-        return toConversationResponse(created, achievements);
+        const currentStage = this.stageService.getCurrentStage(created);
+        return toConversationResponse(created, achievements, currentStage?.id ?? null);
     };
 
     ensureConversationExists = async (
@@ -80,7 +81,9 @@ export class ChatConversationService {
         const { conversationId } = await this.ensureConversationExists(userId, requestedConversationId);
         const conversation = await this.getConversationOrThrow(userId, conversationId);
         const achievements = await this.chatExternalService.readUserAchievements(userId);
-        return toConversationResponse(conversation, achievements);
+        const lastUserMessage = [...conversation.messages].reverse().find((message) => message.role === "user")?.content;
+        const currentStage = this.stageService.getCurrentStage(conversation, lastUserMessage);
+        return toConversationResponse(conversation, achievements, currentStage?.id ?? null);
     };
 
     deleteConversation = async (userId: string, conversationIdRaw: string): Promise<void> => {

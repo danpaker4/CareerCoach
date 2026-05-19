@@ -1,4 +1,14 @@
-import { ADMIN_DELETE_USER_PATH, ADMIN_DEMOTE_PATH, ADMIN_LLM_TOKEN_USAGE_PATH, ADMIN_USERS_PATH, MANAGEMENT_USERS_PAGE_SIZE } from './management.consts';
+import { apiFetch } from '../../lib/apiClient';
+import {
+  ADMIN_DELETE_USER_PATH,
+  ADMIN_DEMOTE_PATH,
+  ADMIN_LLM_TOKEN_USAGE_PATH,
+  ADMIN_USERS_PATH,
+  buildEvaluationCaseRunUrl,
+  EVALUATION_CASES_PATH,
+  MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE,
+  MANAGEMENT_USERS_PAGE_SIZE,
+} from './management.consts';
 import type {
   AdminLlmTokenUsageOperationItem,
   AdminLlmTokenUsageOperationSeriesItem,
@@ -8,6 +18,12 @@ import type {
   AdminUsersPagination,
   AdminUsersResult,
   AdminUserSummary,
+  EvaluationCaseSummary,
+  EvaluationCheckResult,
+  EvaluationExpected,
+  EvaluationMessage,
+  EvaluationMessageRole,
+  EvaluationRunResult,
   LlmProvider,
   TokenUsageDays,
 } from './management.types';
@@ -196,4 +212,243 @@ export const parseTokenUsage = (value: unknown): AdminLlmTokenUsageResult | null
 export const buildAdminLlmTokenUsageUrl = (days: TokenUsageDays): string => {
   const params = new URLSearchParams({ days: String(days) });
   return `${ADMIN_LLM_TOKEN_USAGE_PATH}?${params.toString()}`;
+};
+
+const isEvaluationMessageRole = (value: unknown): value is EvaluationMessageRole =>
+  value === 'user' || value === 'assistant' || value === 'system';
+
+const isEvaluationMessage = (value: unknown): value is EvaluationMessage => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const message = value as Record<string, unknown>;
+  return isEvaluationMessageRole(message.role) && typeof message.content === 'string' && message.content.length > 0;
+};
+
+const hasAtLeastOneExpectedCheck = (expected: Record<string, unknown>): boolean =>
+  expected.mode !== undefined ||
+  expected.maxLines !== undefined ||
+  expected.mustAskQuestion !== undefined ||
+  (Array.isArray(expected.forbiddenWords) && expected.forbiddenWords.length > 0);
+
+const isEvaluationExpected = (value: unknown): value is EvaluationExpected => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const expected = value as Record<string, unknown>;
+  const optionalFieldsValid =
+    (expected.mode === undefined || typeof expected.mode === 'string') &&
+    (expected.maxLines === undefined || typeof expected.maxLines === 'number') &&
+    (expected.mustAskQuestion === undefined || typeof expected.mustAskQuestion === 'boolean') &&
+    (expected.forbiddenWords === undefined ||
+      (Array.isArray(expected.forbiddenWords) && expected.forbiddenWords.every((word) => typeof word === 'string')));
+
+  return optionalFieldsValid && hasAtLeastOneExpectedCheck(expected);
+};
+
+export const isEvaluationCaseSummary = (value: unknown): value is EvaluationCaseSummary => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const evaluationCase = value as Record<string, unknown>;
+  return (
+    typeof evaluationCase.id === 'string' &&
+    Array.isArray(evaluationCase.messages) &&
+    evaluationCase.messages.every(isEvaluationMessage) &&
+    isEvaluationExpected(evaluationCase.expected) &&
+    typeof evaluationCase.createdAt === 'string' &&
+    typeof evaluationCase.updatedAt === 'string'
+  );
+};
+
+export const parseEvaluationCases = (value: unknown): EvaluationCaseSummary[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isEvaluationCaseSummary);
+};
+
+export const buildEvaluationCaseUrl = (caseId: string): string =>
+  `${EVALUATION_CASES_PATH}/${encodeURIComponent(caseId)}`;
+
+export const fetchEvaluationRunResult = async (caseId: string): Promise<EvaluationRunResult> => {
+  const response = await apiFetch(buildEvaluationCaseRunUrl(caseId), { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(await readManagementErrorMessage(response, MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE));
+  }
+
+  const payload: unknown = await response.json().catch(() => null);
+  const parsed = parseEvaluationRunResult(payload);
+  if (!parsed) {
+    throw new Error(MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE);
+  }
+
+  return parsed;
+};
+
+export const isJsonEvaluationFile = (file: File): boolean =>
+  file.name.toLowerCase().endsWith('.json') || file.type === 'application/json';
+
+const EXPECTED_FIELD_KEYS = ['mode', 'maxLines', 'mustAskQuestion', 'forbiddenWords'] as const;
+
+export type ExpectedFieldKey = (typeof EXPECTED_FIELD_KEYS)[number];
+
+export type EvaluationComparisonRow = {
+  key: ExpectedFieldKey;
+  expectedDisplay: string;
+  gotDisplay: string;
+  passed: boolean | null;
+};
+
+export const formatExpectedFieldDisplay = (value: string | number | boolean | string[]): string => {
+  if (Array.isArray(value)) {
+    return JSON.stringify(value, null, 2);
+  }
+
+  if (typeof value === 'string') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+};
+
+export const formatGotFieldDisplay = (value: string | number | boolean | string[] | undefined): string => {
+  if (value === undefined) {
+    return '—';
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0 ? 'none' : value.join(', ');
+  }
+
+  if (typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return String(value);
+};
+
+const hasExpectedField = (expected: EvaluationExpected, key: ExpectedFieldKey): boolean => {
+  if (key === 'mode') {
+    return expected.mode !== undefined;
+  }
+
+  return expected[key] !== undefined;
+};
+
+const readExpectedFieldValue = (expected: EvaluationExpected, key: ExpectedFieldKey): string | number | boolean | string[] => {
+  if (key === 'mode') {
+    return expected.mode ?? '';
+  }
+
+  const value = expected[key];
+  if (value === undefined) {
+    throw new Error(`Missing expected field: ${key}`);
+  }
+
+  return value;
+};
+
+export const buildEvaluationComparisonRows = (
+  expected: EvaluationExpected,
+  checks: EvaluationCheckResult[],
+): EvaluationComparisonRow[] => {
+  const checkByName = new Map(checks.map((check) => [check.name, check]));
+
+  return EXPECTED_FIELD_KEYS.filter((key) => hasExpectedField(expected, key)).map((key) => {
+    const check = checkByName.get(key);
+    const expectedValue = readExpectedFieldValue(expected, key);
+
+    return {
+      key,
+      expectedDisplay: formatExpectedFieldDisplay(check?.expected ?? expectedValue),
+      gotDisplay: formatGotFieldDisplay(check?.actual),
+      passed: check?.passed ?? null,
+    };
+  });
+};
+
+export const buildEvaluationComparisonRowsFromChecks = (
+  checks: EvaluationCheckResult[],
+): EvaluationComparisonRow[] =>
+  checks.map((check) => ({
+    key: check.name as ExpectedFieldKey,
+    expectedDisplay:
+      check.expected !== undefined ? formatExpectedFieldDisplay(check.expected) : '—',
+    gotDisplay: formatGotFieldDisplay(check.actual),
+    passed: check.passed,
+  }));
+
+const isEvaluationRunMessage = (value: unknown): value is EvaluationMessage => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const message = value as Record<string, unknown>;
+  return isEvaluationMessageRole(message.role) && typeof message.content === 'string' && message.content.length > 0;
+};
+
+const isEvaluationCheckResult = (value: unknown): value is EvaluationCheckResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const check = value as Record<string, unknown>;
+  return typeof check.name === 'string' && typeof check.passed === 'boolean';
+};
+
+export const parseEvaluationRunResult = (value: unknown): EvaluationRunResult | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const metadata = payload.metadata;
+  const expected = payload.expected;
+  if (
+    typeof payload.caseId !== 'string' ||
+    typeof payload.runId !== 'string' ||
+    typeof payload.passed !== 'boolean' ||
+    typeof payload.reply !== 'string' ||
+    !Array.isArray(payload.checks) ||
+    !Array.isArray(payload.conversation) ||
+    !isEvaluationExpected(expected) ||
+    typeof metadata !== 'object' ||
+    metadata === null
+  ) {
+    return null;
+  }
+
+  const metadataRecord = metadata as Record<string, unknown>;
+  if (
+    typeof metadataRecord.userId !== 'string' ||
+    typeof metadataRecord.conversationId !== 'string' ||
+    typeof metadataRecord.userTurnCount !== 'number' ||
+    typeof metadataRecord.durationMs !== 'number' ||
+    typeof metadataRecord.ranAt !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    caseId: payload.caseId,
+    runId: payload.runId,
+    passed: payload.passed,
+    reply: payload.reply,
+    conversation: payload.conversation.filter(isEvaluationRunMessage),
+    checks: payload.checks.filter(isEvaluationCheckResult),
+    expected,
+    metadata: {
+      userId: metadataRecord.userId,
+      conversationId: metadataRecord.conversationId,
+      userTurnCount: metadataRecord.userTurnCount,
+      durationMs: metadataRecord.durationMs,
+      ranAt: metadataRecord.ranAt,
+    },
+    mode: typeof payload.mode === 'string' ? payload.mode : undefined,
+  };
 };
