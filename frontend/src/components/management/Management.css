@@ -803,6 +803,25 @@
   gap: 3px;
 }
 
+.management-benchmark-case-result-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.management-benchmark-case-result-header .management-benchmark-expand-button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.management-benchmark-expand-button {
+  min-width: 92px;
+  height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
 .management-benchmark-case-result strong {
   color: var(--text-heading);
 }
@@ -819,46 +838,6 @@
   margin-left: 18px;
 }
 
-.management-benchmark-score-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.management-benchmark-score-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: var(--fz-xs);
-  font-weight: 800;
-}
-
-.management-benchmark-score-form input,
-.management-benchmark-score-form textarea {
-  min-width: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  background: var(--input-bg);
-  color: var(--text-primary);
-  font: inherit;
-}
-
-.management-benchmark-score-form input {
-  height: 38px;
-  padding: 0 10px;
-}
-
-.management-benchmark-score-form textarea {
-  min-height: 72px;
-  padding: 10px;
-  resize: vertical;
-}
-
-.management-benchmark-notes {
-  grid-column: 1 / -1;
-}
-
 .management-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border-subtle);
@@ -869,7 +848,7 @@
 
 .management-table {
   width: 100%;
-  min-width: 840px;
+  min-width: 920px;
   border-collapse: collapse;
 }
 

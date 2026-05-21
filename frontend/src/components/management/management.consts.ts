@@ -18,7 +18,6 @@ export const MANAGEMENT_LOAD_ERROR_MESSAGE = 'Unable to load users';
 export const MANAGEMENT_TOKEN_USAGE_LOAD_ERROR_MESSAGE = 'Unable to load model token usage';
 export const MANAGEMENT_BENCHMARK_LOAD_ERROR_MESSAGE = 'Unable to load chat benchmarks';
 export const MANAGEMENT_BENCHMARK_RUN_ERROR_MESSAGE = 'Unable to run chat benchmark';
-export const MANAGEMENT_BENCHMARK_SCORE_ERROR_MESSAGE = 'Unable to save benchmark score';
 export const MANAGEMENT_PROMOTE_ERROR_MESSAGE = 'Unable to promote user';
 export const MANAGEMENT_DEMOTE_ERROR_MESSAGE = 'Unable to demote admin';
 export const MANAGEMENT_DELETE_ERROR_MESSAGE = 'Unable to delete user';

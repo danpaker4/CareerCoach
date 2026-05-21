@@ -158,16 +158,6 @@ export interface BenchmarkCaseResult {
   automaticScore: number;
 }
 
-export interface BenchmarkManualScore {
-  relevance: number;
-  personalization: number;
-  actionability: number;
-  clarity: number;
-  safety: number;
-  notes: string;
-  updatedAt?: string;
-}
-
 export interface BenchmarkCandidateRunResult {
   candidateId: BenchmarkCandidateId;
   provider: LlmProvider;
@@ -180,9 +170,8 @@ export interface BenchmarkCandidateRunResult {
   totalTokens: number;
   errorCount: number;
   automaticScore: number;
-  manualScore?: BenchmarkManualScore;
   overallScore: number;
-  scoreStatus: 'provisional' | 'manual';
+  scoreStatus: 'automatic';
 }
 
 export interface BenchmarkRunSummary {

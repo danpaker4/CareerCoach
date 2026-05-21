@@ -39,16 +39,6 @@ export type BenchmarkCandidate = {
     readonly unavailableReason?: string;
 };
 
-export type BenchmarkManualScore = {
-    readonly relevance: number;
-    readonly personalization: number;
-    readonly actionability: number;
-    readonly clarity: number;
-    readonly safety: number;
-    readonly notes: string;
-    readonly updatedAt: Date;
-};
-
 export type BenchmarkMetricBreakdown = {
     readonly workflowScore: number;
     readonly structuredOutputScore: number;
@@ -86,9 +76,8 @@ export type BenchmarkCandidateRunResult = {
     readonly totalTokens: number;
     readonly errorCount: number;
     readonly automaticScore: number;
-    readonly manualScore?: BenchmarkManualScore;
     readonly overallScore: number;
-    readonly scoreStatus: "provisional" | "manual";
+    readonly scoreStatus: "automatic";
 };
 
 export type BenchmarkRunDocument = {
@@ -119,11 +108,4 @@ export type BenchmarkConfigResponse = {
 export type BenchmarkRunRequest = {
     readonly caseIds?: readonly string[];
     readonly candidateIds?: readonly BenchmarkCandidateId[];
-};
-
-export type BenchmarkManualScoreInput = Omit<BenchmarkManualScore, "updatedAt">;
-
-export type BenchmarkScoresRequest = {
-    readonly candidateId: BenchmarkCandidateId;
-    readonly manualScore: BenchmarkManualScoreInput;
 };

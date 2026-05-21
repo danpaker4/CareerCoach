@@ -17,5 +17,4 @@ export const benchmarkRouter = (dbClient: MongoClient, chatConfig: ServerConfig[
     app.get(`${BENCHMARK_ROUTE_PREFIX}/runs`, controller.listRuns);
     app.get(`${BENCHMARK_ROUTE_PREFIX}/runs/:runId`, controller.getRun);
     app.post(`${BENCHMARK_ROUTE_PREFIX}/runs`, controller.createRun);
-    app.patch(`${BENCHMARK_ROUTE_PREFIX}/runs/:runId/scores`, controller.updateScores);
 };

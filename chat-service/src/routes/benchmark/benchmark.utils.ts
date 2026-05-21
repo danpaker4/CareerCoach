@@ -41,7 +41,21 @@ export const toBenchmarkRunSummary = (run: BenchmarkRunDocument): BenchmarkRunSu
     createdAt: run.createdAt.toISOString(),
     status: run.status,
     selectedCaseIds: run.selectedCaseIds,
-    candidateResults: run.candidateResults,
+    candidateResults: run.candidateResults.map((candidateResult) => ({
+        candidateId: candidateResult.candidateId,
+        provider: candidateResult.provider,
+        model: candidateResult.model,
+        available: candidateResult.available,
+        ...(candidateResult.unavailableReason ? { unavailableReason: candidateResult.unavailableReason } : {}),
+        caseResults: candidateResult.caseResults,
+        successRate: candidateResult.successRate,
+        averageLatencyMs: candidateResult.averageLatencyMs,
+        totalTokens: candidateResult.totalTokens,
+        errorCount: candidateResult.errorCount,
+        automaticScore: candidateResult.automaticScore,
+        overallScore: candidateResult.automaticScore,
+        scoreStatus: "automatic",
+    })),
 });
 
 export const calculateCaseResult = (params: {
@@ -164,7 +178,8 @@ export const normalizeCandidateScores = (
             ...candidateResult,
             caseResults,
             automaticScore,
-            overallScore: candidateResult.scoreStatus === "manual" ? candidateResult.overallScore : automaticScore,
+            overallScore: automaticScore,
+            scoreStatus: "automatic",
         };
     });
 };

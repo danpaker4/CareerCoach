@@ -25,7 +25,6 @@ import type {
   BenchmarkCaseResult,
   BenchmarkCaseSummary,
   BenchmarkConfig,
-  BenchmarkManualScore,
   BenchmarkMetricBreakdown,
   BenchmarkParseEvent,
   BenchmarkRubricItem,
@@ -335,23 +334,6 @@ const isBenchmarkCaseResult = (value: unknown): value is BenchmarkCaseResult => 
   );
 };
 
-const isBenchmarkManualScore = (value: unknown): value is BenchmarkManualScore => {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const score = value as Record<string, unknown>;
-  return (
-    isNumber(score.relevance) &&
-    isNumber(score.personalization) &&
-    isNumber(score.actionability) &&
-    isNumber(score.clarity) &&
-    isNumber(score.safety) &&
-    typeof score.notes === 'string' &&
-    (score.updatedAt === undefined || typeof score.updatedAt === 'string')
-  );
-};
-
 const isBenchmarkCandidateRunResult = (value: unknown): value is BenchmarkCandidateRunResult => {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -371,9 +353,8 @@ const isBenchmarkCandidateRunResult = (value: unknown): value is BenchmarkCandid
     isNumber(result.totalTokens) &&
     isNumber(result.errorCount) &&
     isNumber(result.automaticScore) &&
-    (result.manualScore === undefined || isBenchmarkManualScore(result.manualScore)) &&
     isNumber(result.overallScore) &&
-    (result.scoreStatus === 'provisional' || result.scoreStatus === 'manual')
+    result.scoreStatus === 'automatic'
   );
 };
 
@@ -409,9 +390,6 @@ export const buildBenchmarksRunsUrl = (limit: number): string => {
   const params = new URLSearchParams({ limit: String(limit) });
   return `${ADMIN_BENCHMARKS_PATH}/runs?${params.toString()}`;
 };
-
-export const buildBenchmarkRunScoreUrl = (runId: string): string =>
-  `${ADMIN_BENCHMARKS_PATH}/runs/${encodeURIComponent(runId)}/scores`;
 
 const isEvaluationMessageRole = (value: unknown): value is EvaluationMessageRole =>
   value === 'user' || value === 'assistant' || value === 'system';

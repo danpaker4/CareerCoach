@@ -40,7 +40,6 @@ import type {
     BenchmarkRunDocument,
     BenchmarkRunRequest,
     BenchmarkRunSummary,
-    BenchmarkScoresRequest,
 } from "./benchmark.types";
 import {
     BenchmarkLlmObserver,
@@ -142,14 +141,6 @@ export class BenchmarkService {
         return run ? toBenchmarkRunSummary(run) : null;
     };
 
-    updateManualScore = async (runId: string, request: BenchmarkScoresRequest): Promise<BenchmarkRunSummary | null> => {
-        const updated = await this.repository.updateManualScore(runId, request.candidateId, {
-            ...request.manualScore,
-            updatedAt: new Date(),
-        });
-        return updated ? toBenchmarkRunSummary(updated) : null;
-    };
-
     runBenchmark = async (request: BenchmarkRunRequest, adminUserId: string): Promise<BenchmarkRunSummary> => {
         const cases = selectCases(request.caseIds);
         const candidateIds = selectCandidateIds(request.candidateIds);
@@ -191,7 +182,7 @@ export class BenchmarkService {
                 errorCount: benchmarkCases.length,
                 automaticScore: 0,
                 overallScore: 0,
-                scoreStatus: "provisional",
+                scoreStatus: "automatic",
             };
         }
 
@@ -210,7 +201,7 @@ export class BenchmarkService {
             errorCount: caseResults.filter((caseResult) => caseResult.errorMessage).length,
             automaticScore,
             overallScore: automaticScore,
-            scoreStatus: "provisional",
+            scoreStatus: "automatic",
         };
     };
 
