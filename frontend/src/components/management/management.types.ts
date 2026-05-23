@@ -129,10 +129,8 @@ export interface BenchmarkConfig {
 }
 
 export interface BenchmarkMetricBreakdown {
-  workflowScore: number;
-  structuredOutputScore: number;
-  guardrailScore: number;
-  reliabilityScore: number;
+  responseCoverageScore: number;
+  latencyScore: number;
   tokenEfficiencyScore: number;
 }
 
@@ -145,6 +143,7 @@ export interface BenchmarkParseEvent {
 export interface BenchmarkCaseResult {
   caseId: string;
   caseTitle: string;
+  caseDescription: string;
   success: boolean;
   responseCount: number;
   finalReply: string;

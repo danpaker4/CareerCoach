@@ -28,6 +28,7 @@ import {
     BENCHMARK_GEMINI_MODEL_FALLBACK,
     BENCHMARK_OLLAMA_BASE_URL_FALLBACK,
     BENCHMARK_OLLAMA_MODEL_FALLBACK,
+    BENCHMARK_RANDOM_CASE_COUNT,
     BENCHMARK_RUBRIC,
     BENCHMARK_USER_ID_PREFIX,
 } from "./benchmark.consts";
@@ -36,6 +37,7 @@ import type {
     BenchmarkCandidateId,
     BenchmarkCandidateRunResult,
     BenchmarkCase,
+    BenchmarkCaseResult,
     BenchmarkConfigResponse,
     BenchmarkRunDocument,
     BenchmarkRunRequest,
@@ -106,6 +108,26 @@ const selectCases = (caseIds: readonly string[] | undefined): readonly Benchmark
     return BENCHMARK_CASES.filter((benchmarkCase) => selectedIds.has(benchmarkCase.id));
 };
 
+const resolveSampleCount = (benchmarkCases: readonly BenchmarkCase[], requestedSampleCount: number | undefined): number => {
+    const fallbackCount = Math.min(BENCHMARK_RANDOM_CASE_COUNT, benchmarkCases.length);
+    if (!requestedSampleCount) {
+        return fallbackCount;
+    }
+
+    return Math.max(1, Math.min(benchmarkCases.length, requestedSampleCount));
+};
+
+const sampleCases = (benchmarkCases: readonly BenchmarkCase[], requestedSampleCount: number | undefined): readonly BenchmarkCase[] => {
+    const sampleCount = resolveSampleCount(benchmarkCases, requestedSampleCount);
+    if (benchmarkCases.length <= sampleCount) {
+        return benchmarkCases;
+    }
+
+    return [...benchmarkCases]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, sampleCount);
+};
+
 const selectCandidateIds = (candidateIds: readonly BenchmarkCandidateId[] | undefined): readonly BenchmarkCandidateId[] => {
     if (!candidateIds || candidateIds.length === 0) {
         return ["ollama-llama", "gemini"];
@@ -142,7 +164,7 @@ export class BenchmarkService {
     };
 
     runBenchmark = async (request: BenchmarkRunRequest, adminUserId: string): Promise<BenchmarkRunSummary> => {
-        const cases = selectCases(request.caseIds);
+        const cases = sampleCases(selectCases(request.caseIds), request.sampleCount);
         const candidateIds = selectCandidateIds(request.candidateIds);
         const candidateResults = await Promise.all(candidateIds.map((candidateId) => this.runCandidate(candidateId, cases)));
         const normalizedCandidateResults = normalizeCandidateScores(candidateResults);
@@ -186,7 +208,11 @@ export class BenchmarkService {
             };
         }
 
-        const caseResults = await Promise.all(benchmarkCases.map((benchmarkCase) => this.runCase(candidateId, config, benchmarkCase)));
+        const caseResults = await benchmarkCases.reduce<Promise<readonly BenchmarkCaseResult[]>>(async (previousResults, benchmarkCase) => {
+            const results = await previousResults;
+            const caseResult = await this.runCase(candidateId, config, benchmarkCase);
+            return [...results, caseResult];
+        }, Promise.resolve([]));
         const successCount = caseResults.filter((caseResult) => caseResult.success).length;
         const automaticScore = Math.round(average(caseResults.map((caseResult) => caseResult.automaticScore)));
         return {

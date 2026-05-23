@@ -30,7 +30,7 @@ export const Management = () => (
         <Link to="/management/benchmarks" className="management-home-card">
           <span className="management-eyebrow">Evaluation</span>
           <h2>Chat LLM benchmark</h2>
-          <p>Run repeatable chat-flow cases against Llama/Ollama and Gemini, then score results.</p>
+          <p>Run randomized chat benchmark samples against Llama/Ollama and Gemini, then compare model metrics.</p>
           <span className="management-home-card-action">Open benchmarks</span>
         </Link>
 

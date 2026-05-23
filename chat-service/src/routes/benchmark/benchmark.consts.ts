@@ -6,35 +6,26 @@ export const BENCHMARK_ROUTE_PREFIX = "/api/chat/benchmarks";
 export const BENCHMARK_DEFAULT_RUN_LIMIT = 10;
 export const BENCHMARK_MAX_RUN_LIMIT = 50;
 export const BENCHMARK_USER_ID_PREFIX = "benchmark-user";
+export const BENCHMARK_RANDOM_CASE_COUNT = 3;
 export const BENCHMARK_OLLAMA_MODEL_FALLBACK = DEFAULT_OLLAMA_MODEL;
 export const BENCHMARK_OLLAMA_BASE_URL_FALLBACK = DEFAULT_OLLAMA_BASE_URL;
 export const BENCHMARK_GEMINI_MODEL_FALLBACK = DEFAULT_GEMINI_MODEL;
 
 export const BENCHMARK_RUBRIC = [
     {
-        label: "Workflow correctness",
-        weight: 40,
-        description: "Search trigger, stage behavior, final response shape, and expected recommendation behavior.",
+        label: "Response coverage",
+        weight: 33,
+        description: "Non-empty replies that cover the latest user request, include broad required terms, and avoid internal leaks.",
     },
     {
-        label: "Structured output",
-        weight: 20,
-        description: "Valid JSON decisions without parser fallbacks.",
-    },
-    {
-        label: "Safety and guardrails",
-        weight: 15,
-        description: "No internal IDs, invented details, or forbidden repetitive questions.",
-    },
-    {
-        label: "Reliability and latency",
-        weight: 15,
-        description: "Successful completion without model errors and with reasonable response time.",
+        label: "Latency",
+        weight: 33,
+        description: "Faster successful responses score higher relative to the fastest model for the same case.",
     },
     {
         label: "Token efficiency",
-        weight: 10,
-        description: "Lower total token usage among successful candidates.",
+        weight: 34,
+        description: "Lower-token successful responses score higher relative to the most efficient model for the same case.",
     },
 ] as const;
 
@@ -114,7 +105,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: false,
             forbiddenPhrases: ["remote/hybrid/on-site", "internal achievement", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["backend"],
@@ -146,8 +136,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: true,
-            expectedRecommendedJobId: "fixture-security-qa",
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["security"],
@@ -179,8 +167,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: true,
-            expectedRecommendedJobId: "fixture-backend-node",
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["backend"],
@@ -213,8 +199,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: true,
-            expectedRecommendedJobId: "fixture-security-qa",
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["ShieldPath"],
@@ -247,8 +231,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: true,
-            expectedRecommendedJobId: "fixture-soc-analyst",
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["SOC"],
@@ -281,8 +263,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: true,
-            expectedRecommendedJobId: "fixture-backend-node",
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["Northstar Apps"],
@@ -318,7 +298,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: false,
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["backend"],
@@ -350,8 +329,6 @@ export const BENCHMARK_CASES: readonly BenchmarkCase[] = [
         }],
         jobs: benchmarkJobs,
         assertions: {
-            expectsJobSearch: true,
-            expectedRecommendedJobId: "fixture-security-qa",
             forbiddenPhrases: ["remote/hybrid/on-site", "job id"],
             forbiddenJobIds: benchmarkJobs.map((job) => job.id),
             requiredReplyTerms: ["QA"],

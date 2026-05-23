@@ -16,6 +16,148 @@ const normalizeText = (value: string): string => value.trim().toLowerCase();
 
 const includesTerm = (value: string, term: string): boolean => normalizeText(value).includes(normalizeText(term));
 
+const RESPONSE_COVERAGE_SUCCESS_THRESHOLD = 70;
+const RESPONSE_PRESENCE_SCORE = 20;
+const LATEST_REQUEST_SCORE = 25;
+const REQUIRED_TERMS_SCORE = 20;
+const GUARDRAIL_SCORE = 35;
+
+const TERM_MATCH_LIMIT = 3;
+const SHORT_SIGNAL_TERMS = new Set(["ai", "api", "ci", "it", "qa", "ui"]);
+const STOP_WORDS = new Set([
+    "a",
+    "about",
+    "after",
+    "am",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "before",
+    "between",
+    "can",
+    "did",
+    "do",
+    "for",
+    "from",
+    "get",
+    "help",
+    "how",
+    "i",
+    "in",
+    "is",
+    "it",
+    "know",
+    "me",
+    "my",
+    "of",
+    "on",
+    "or",
+    "some",
+    "that",
+    "the",
+    "to",
+    "what",
+    "which",
+    "with",
+]);
+
+const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+const calculateEqualMetricScore = (metricBreakdown: BenchmarkMetricBreakdown): number =>
+    clampScore((metricBreakdown.responseCoverageScore + metricBreakdown.latencyScore + metricBreakdown.tokenEfficiencyScore) / 3);
+
+const extractSignificantTerms = (value: string): readonly string[] =>
+    normalizeText(value)
+        .split(/[^a-z0-9+#.]+/)
+        .filter((term) => term.length > 0)
+        .filter((term) => (term.length > 2 || SHORT_SIGNAL_TERMS.has(term)) && !STOP_WORDS.has(term));
+
+const calculateTermCoverageScore = (reply: string, terms: readonly string[], maxScore: number): number => {
+    if (terms.length === 0) {
+        return maxScore;
+    }
+
+    const matchedCount = terms.filter((term) => includesTerm(reply, term)).length;
+    const denominator = Math.min(TERM_MATCH_LIMIT, terms.length);
+    return clampScore((Math.min(matchedCount, denominator) / denominator) * maxScore);
+};
+
+const readForbiddenFailures = (benchmarkCase: BenchmarkCase, reply: string): readonly string[] => [
+    ...benchmarkCase.assertions.forbiddenPhrases
+        .filter((phrase) => includesTerm(reply, phrase))
+        .map((phrase) => `Forbidden phrase appeared in reply: ${phrase}`),
+    ...benchmarkCase.assertions.forbiddenJobIds
+        .filter((jobId) => includesTerm(reply, jobId))
+        .map((jobId) => `Internal fixture job id leaked: ${jobId}`),
+];
+
+const calculateResponseCoverageScore = (benchmarkCase: BenchmarkCase, reply: string, forbiddenFailures: readonly string[]): number => {
+    if (reply.trim().length === 0) {
+        return 0;
+    }
+
+    const latestMessageTerms = extractSignificantTerms(benchmarkCase.messages.at(-1) ?? "");
+    const requiredTermsScore = calculateTermCoverageScore(reply, benchmarkCase.assertions.requiredReplyTerms, REQUIRED_TERMS_SCORE);
+    const latestMessageScore = calculateTermCoverageScore(reply, latestMessageTerms, LATEST_REQUEST_SCORE);
+    const guardrailScore = forbiddenFailures.length === 0 ? GUARDRAIL_SCORE : 0;
+    return clampScore(RESPONSE_PRESENCE_SCORE + latestMessageScore + requiredTermsScore + guardrailScore);
+};
+
+const normalizeMetricBreakdown = (metricBreakdown: BenchmarkMetricBreakdown): BenchmarkMetricBreakdown => {
+    const metricRecord = metricBreakdown as unknown as Record<string, unknown>;
+    if (
+        isNumber(metricRecord.responseCoverageScore) &&
+        isNumber(metricRecord.latencyScore) &&
+        isNumber(metricRecord.tokenEfficiencyScore)
+    ) {
+        return metricBreakdown;
+    }
+
+    const workflowScore = isNumber(metricRecord.workflowScore) ? metricRecord.workflowScore : 0;
+    const structuredOutputScore = isNumber(metricRecord.structuredOutputScore) ? metricRecord.structuredOutputScore : 0;
+    const guardrailScore = isNumber(metricRecord.guardrailScore) ? metricRecord.guardrailScore : 0;
+    const reliabilityScore = isNumber(metricRecord.reliabilityScore) ? metricRecord.reliabilityScore : 0;
+    const tokenEfficiencyScore = isNumber(metricRecord.tokenEfficiencyScore) ? metricRecord.tokenEfficiencyScore : 0;
+    return {
+        responseCoverageScore: clampScore((workflowScore + structuredOutputScore + guardrailScore) / 3),
+        latencyScore: clampScore(reliabilityScore),
+        tokenEfficiencyScore: clampScore(tokenEfficiencyScore),
+    };
+};
+
+const normalizeCaseResultForSummary = (caseResult: BenchmarkCaseResult): BenchmarkCaseResult => {
+    const metricBreakdown = normalizeMetricBreakdown(caseResult.metricBreakdown);
+    const automaticScore = calculateEqualMetricScore(metricBreakdown);
+    const caseRecord = caseResult as unknown as Record<string, unknown>;
+    const caseDescription = typeof caseRecord.caseDescription === "string" ? caseRecord.caseDescription : caseResult.caseTitle;
+    return {
+        ...caseResult,
+        caseDescription,
+        success: caseResult.errorMessage ? false : metricBreakdown.responseCoverageScore >= RESPONSE_COVERAGE_SUCCESS_THRESHOLD,
+        metricBreakdown,
+        automaticScore,
+    };
+};
+
+const readRelativeBaseline = (
+    candidateResults: readonly BenchmarkCandidateRunResult[],
+    caseId: string,
+    readValue: (caseResult: BenchmarkCaseResult) => number
+): number => {
+    const values = candidateResults
+        .flatMap((candidateResult) => candidateResult.caseResults)
+        .filter((caseResult) => caseResult.caseId === caseId && !caseResult.errorMessage)
+        .map(readValue)
+        .filter((value) => value > 0);
+
+    return values.length > 0 ? Math.min(...values) : 0;
+};
+
+const calculateRelativeScore = (baseline: number, value: number): number =>
+    baseline > 0 && value > 0 ? clampScore((baseline / value) * 100) : 0;
+
 export class BenchmarkTokenUsageRecorder implements LlmTokenUsageRecorder {
     private readonly records: LlmTokenUsageRecordInput[] = [];
 
@@ -41,21 +183,29 @@ export const toBenchmarkRunSummary = (run: BenchmarkRunDocument): BenchmarkRunSu
     createdAt: run.createdAt.toISOString(),
     status: run.status,
     selectedCaseIds: run.selectedCaseIds,
-    candidateResults: run.candidateResults.map((candidateResult) => ({
-        candidateId: candidateResult.candidateId,
-        provider: candidateResult.provider,
-        model: candidateResult.model,
-        available: candidateResult.available,
-        ...(candidateResult.unavailableReason ? { unavailableReason: candidateResult.unavailableReason } : {}),
-        caseResults: candidateResult.caseResults,
-        successRate: candidateResult.successRate,
-        averageLatencyMs: candidateResult.averageLatencyMs,
-        totalTokens: candidateResult.totalTokens,
-        errorCount: candidateResult.errorCount,
-        automaticScore: candidateResult.automaticScore,
-        overallScore: candidateResult.automaticScore,
-        scoreStatus: "automatic",
-    })),
+    candidateResults: run.candidateResults.map((candidateResult) => {
+        const caseResults = candidateResult.caseResults.map(normalizeCaseResultForSummary);
+        const automaticScore = caseResults.length > 0
+            ? clampScore(caseResults.reduce((sum, result) => sum + result.automaticScore, 0) / caseResults.length)
+            : candidateResult.automaticScore;
+        return {
+            candidateId: candidateResult.candidateId,
+            provider: candidateResult.provider,
+            model: candidateResult.model,
+            available: candidateResult.available,
+            ...(candidateResult.unavailableReason ? { unavailableReason: candidateResult.unavailableReason } : {}),
+            caseResults,
+            successRate: caseResults.length > 0
+                ? caseResults.filter((caseResult) => caseResult.success).length / caseResults.length
+                : candidateResult.successRate,
+            averageLatencyMs: candidateResult.averageLatencyMs,
+            totalTokens: candidateResult.totalTokens,
+            errorCount: candidateResult.errorCount,
+            automaticScore,
+            overallScore: automaticScore,
+            scoreStatus: "automatic",
+        };
+    }),
 });
 
 export const calculateCaseResult = (params: {
@@ -70,67 +220,31 @@ export const calculateCaseResult = (params: {
     const finalReply = replies.at(-1) ?? "";
     const combinedReply = replies.join("\n");
     const totalTokens = tokenUsage.reduce((sum, record) => sum + (record.usage?.totalTokens ?? 0), 0);
-    const successfulTokenRecords = tokenUsage.filter((record) => (record.requestStatus ?? "success") === "success").length;
-    const errorTokenRecords = tokenUsage.filter((record) => record.requestStatus === "error").length;
-    const parseFallbackCount = parseEvents.filter((event) => event.parseStatus === "fallback").length;
-    const jobSearchHappened = replies.some((reply) => benchmarkCase.jobs.some((job) => includesTerm(reply, job.title) || includesTerm(reply, job.company)));
-    const recommendedExpectedJob = benchmarkCase.assertions.expectedRecommendedJobId
-        ? replies.some((reply) => {
-            const expectedJob = benchmarkCase.jobs.find((job) => job.id === benchmarkCase.assertions.expectedRecommendedJobId);
-            return expectedJob ? includesTerm(reply, expectedJob.title) || includesTerm(reply, expectedJob.company) : false;
-        })
-        : true;
+    const forbiddenFailures = readForbiddenFailures(benchmarkCase, combinedReply);
+    const responseCoverageScore = errorMessage ? 0 : calculateResponseCoverageScore(benchmarkCase, finalReply, forbiddenFailures);
     const failedAssertions = [
-        ...(benchmarkCase.assertions.expectsJobSearch && !jobSearchHappened ? ["Expected a job recommendation/search result, but no fixture job appeared in the replies."] : []),
-        ...(!benchmarkCase.assertions.expectsJobSearch && jobSearchHappened ? ["Did not expect job search yet, but a fixture job appeared in the replies."] : []),
-        ...(!recommendedExpectedJob ? ["Expected recommendation did not match the fixture target job."] : []),
+        ...(finalReply.trim().length === 0 ? ["Reply was empty."] : []),
+        ...(responseCoverageScore < RESPONSE_COVERAGE_SUCCESS_THRESHOLD && finalReply.trim().length > 0
+            ? ["Reply did not cover enough of the latest user request."]
+            : []),
         ...benchmarkCase.assertions.requiredReplyTerms
-            .filter((term) => !includesTerm(combinedReply, term))
-            .map((term) => `Required term missing from replies: ${term}`),
-        ...benchmarkCase.assertions.forbiddenPhrases
-            .filter((phrase) => includesTerm(combinedReply, phrase))
-            .map((phrase) => `Forbidden phrase appeared in replies: ${phrase}`),
-        ...benchmarkCase.assertions.forbiddenJobIds
-            .filter((jobId) => includesTerm(combinedReply, jobId))
-            .map((jobId) => `Internal fixture job id leaked: ${jobId}`),
+            .filter((term) => !includesTerm(finalReply, term))
+            .map((term) => `Broad required term missing from final reply: ${term}`),
+        ...forbiddenFailures,
         ...(errorMessage ? [`Model error: ${errorMessage}`] : []),
     ];
-    const workflowScore = (() => {
-        const searchScore = benchmarkCase.assertions.expectsJobSearch === jobSearchHappened ? 55 : 0;
-        const recommendationScore = recommendedExpectedJob ? 30 : 0;
-        const responseScore = finalReply.trim().length > 0 ? 15 : 0;
-        return searchScore + recommendationScore + responseScore;
-    })();
-    const structuredOutputScore = parseEvents.length === 0
-        ? 75
-        : clampScore(((parseEvents.length - parseFallbackCount) / parseEvents.length) * 100);
-    const guardrailPenalty = failedAssertions.filter((failure) =>
-        failure.includes("Forbidden") || failure.includes("leaked")
-    ).length * 35;
-    const guardrailScore = clampScore(100 - guardrailPenalty);
-    const reliabilityScore = errorMessage || errorTokenRecords > 0
-        ? 0
-        : clampScore(100 - Math.max(0, latencyMs - 15000) / 500);
-    const tokenEfficiencyScore = successfulTokenRecords > 0 ? 100 : 0;
     const metricBreakdown: BenchmarkMetricBreakdown = {
-        workflowScore: clampScore(workflowScore),
-        structuredOutputScore,
-        guardrailScore,
-        reliabilityScore,
-        tokenEfficiencyScore,
+        responseCoverageScore,
+        latencyScore: errorMessage ? 0 : 100,
+        tokenEfficiencyScore: errorMessage ? 0 : 100,
     };
-    const automaticScore = clampScore(
-        metricBreakdown.workflowScore * 0.4 +
-        metricBreakdown.structuredOutputScore * 0.2 +
-        metricBreakdown.guardrailScore * 0.15 +
-        metricBreakdown.reliabilityScore * 0.15 +
-        metricBreakdown.tokenEfficiencyScore * 0.1
-    );
+    const automaticScore = calculateEqualMetricScore(metricBreakdown);
 
     return {
         caseId: benchmarkCase.id,
         caseTitle: benchmarkCase.title,
-        success: failedAssertions.length === 0,
+        caseDescription: benchmarkCase.description,
+        success: !errorMessage && responseCoverageScore >= RESPONSE_COVERAGE_SUCCESS_THRESHOLD,
         responseCount: replies.length,
         finalReply,
         replies,
@@ -148,27 +262,20 @@ export const calculateCaseResult = (params: {
 export const normalizeCandidateScores = (
     candidateResults: readonly BenchmarkCandidateRunResult[]
 ): readonly BenchmarkCandidateRunResult[] => {
-    const successfulTotals = candidateResults
-        .filter((candidateResult) => candidateResult.errorCount === 0 && candidateResult.totalTokens > 0)
-        .map((candidateResult) => candidateResult.totalTokens);
-    const minTokens = successfulTotals.length > 0 ? Math.min(...successfulTotals) : 0;
-
     return candidateResults.map((candidateResult) => {
-        const tokenEfficiencyScore = minTokens > 0 && candidateResult.totalTokens > 0
-            ? clampScore((minTokens / candidateResult.totalTokens) * 100)
-            : candidateResult.errorCount === 0 ? 100 : 0;
         const caseResults = candidateResult.caseResults.map((caseResult) => {
+            const fastestLatencyMs = readRelativeBaseline(candidateResults, caseResult.caseId, (result) => result.latencyMs);
+            const lowestTokenCount = readRelativeBaseline(candidateResults, caseResult.caseId, (result) => result.totalTokens);
             const metricBreakdown = {
                 ...caseResult.metricBreakdown,
-                tokenEfficiencyScore,
+                latencyScore: caseResult.errorMessage
+                    ? 0
+                    : calculateRelativeScore(fastestLatencyMs, caseResult.latencyMs),
+                tokenEfficiencyScore: caseResult.errorMessage
+                    ? 0
+                    : calculateRelativeScore(lowestTokenCount, caseResult.totalTokens),
             };
-            const automaticScore = clampScore(
-                metricBreakdown.workflowScore * 0.4 +
-                metricBreakdown.structuredOutputScore * 0.2 +
-                metricBreakdown.guardrailScore * 0.15 +
-                metricBreakdown.reliabilityScore * 0.15 +
-                metricBreakdown.tokenEfficiencyScore * 0.1
-            );
+            const automaticScore = calculateEqualMetricScore(metricBreakdown);
             return { ...caseResult, metricBreakdown, automaticScore };
         });
         const automaticScore = caseResults.length > 0

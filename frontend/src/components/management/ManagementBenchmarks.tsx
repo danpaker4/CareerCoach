@@ -23,6 +23,7 @@ import {
 import './Management.css';
 
 const RUN_HISTORY_LIMIT = 10;
+const DEFAULT_SAMPLE_COUNT = 3;
 
 const formatPercent = (value: number): string => `${Math.round(value * 100)}%`;
 
@@ -38,7 +39,7 @@ export const ManagementBenchmarks = () => {
   const [error, setError] = useState('');
   const [config, setConfig] = useState<BenchmarkConfig | null>(null);
   const [runs, setRuns] = useState<BenchmarkRunSummary[]>([]);
-  const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
+  const [selectedSampleCount, setSelectedSampleCount] = useState(DEFAULT_SAMPLE_COUNT);
   const [selectedRunId, setSelectedRunId] = useState('');
   const [expandedCandidateIds, setExpandedCandidateIds] = useState<BenchmarkCandidateId[]>([]);
   const [expandedCaseIds, setExpandedCaseIds] = useState<string[]>([]);
@@ -50,6 +51,10 @@ export const ManagementBenchmarks = () => {
   const expandedCandidateResults = useMemo(
     () => selectedRun?.candidateResults.filter((candidate) => expandedCandidateIds.includes(candidate.candidateId)) ?? [],
     [expandedCandidateIds, selectedRun],
+  );
+  const sampleCountOptions = useMemo(
+    () => Array.from({ length: config?.cases.length ?? 0 }, (_, index) => index + 1),
+    [config],
   );
 
   const loadBenchmarks = async (): Promise<void> => {
@@ -85,7 +90,7 @@ export const ManagementBenchmarks = () => {
 
     setConfig(parsedConfig);
     setRuns(parsedRuns);
-    setSelectedCaseIds(parsedConfig.cases.map((benchmarkCase) => benchmarkCase.id));
+    setSelectedSampleCount(Math.min(DEFAULT_SAMPLE_COUNT, parsedConfig.cases.length));
     setSelectedRunId(parsedRuns[0]?.id ?? '');
     setStatus('success');
   };
@@ -101,14 +106,6 @@ export const ManagementBenchmarks = () => {
     setExpandedCandidateIds([]);
     setExpandedCaseIds([]);
   }, [selectedRunId]);
-
-  const handleCaseToggle = (caseId: string): void => {
-    setSelectedCaseIds((currentCaseIds) =>
-      currentCaseIds.includes(caseId)
-        ? currentCaseIds.filter((currentCaseId) => currentCaseId !== caseId)
-        : [...currentCaseIds, caseId],
-    );
-  };
 
   const toggleCandidateDetails = (candidateId: BenchmarkCandidateId): void => {
     const isCurrentlyExpanded = expandedCandidateIds.includes(candidateId);
@@ -142,7 +139,7 @@ export const ManagementBenchmarks = () => {
     const response = await apiFetch(`${ADMIN_BENCHMARKS_PATH}/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ caseIds: selectedCaseIds }),
+      body: JSON.stringify({ sampleCount: selectedSampleCount }),
     });
 
     if (!response.ok) {
@@ -180,7 +177,7 @@ export const ManagementBenchmarks = () => {
             </Link>
             <h1>Chat LLM benchmark</h1>
           </div>
-          <p className="management-subtitle">Compare Llama/Ollama and Gemini on repeatable chat-flow cases.</p>
+          <p className="management-subtitle">Compare Llama/Ollama and Gemini on randomized lightweight benchmark cases.</p>
         </div>
       </section>
 
@@ -196,16 +193,30 @@ export const ManagementBenchmarks = () => {
             <div className="management-token-usage-header">
               <div>
                 <h2>Run benchmark</h2>
-                <p className="management-subtitle">Selected cases run against each model without fallback.</p>
+                <p className="management-subtitle">Each run samples hidden cases and compares both models.</p>
               </div>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={runStatus === 'running' || selectedCaseIds.length === 0}
-                onClick={() => { runBenchmark().catch(() => setRunStatus('idle')); }}
-              >
-                {runStatus === 'running' ? 'Running...' : 'Run selected cases'}
-              </button>
+              <div className="management-benchmark-run-actions">
+                <label className="management-benchmark-sample-select">
+                  <span>Samples</span>
+                  <select
+                    value={selectedSampleCount}
+                    disabled={runStatus === 'running'}
+                    onChange={(event) => setSelectedSampleCount(Number(event.target.value))}
+                  >
+                    {sampleCountOptions.map((sampleCount) => (
+                      <option key={sampleCount} value={sampleCount}>{sampleCount}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={runStatus === 'running'}
+                  onClick={() => { runBenchmark().catch(() => setRunStatus('idle')); }}
+                >
+                  {runStatus === 'running' ? 'Running...' : 'Run random samples'}
+                </button>
+              </div>
             </div>
 
             <div className="management-benchmark-candidates">
@@ -220,29 +231,13 @@ export const ManagementBenchmarks = () => {
                 </div>
               ))}
             </div>
-
-            <div className="management-benchmark-cases" aria-label="Benchmark cases">
-              {config.cases.map((benchmarkCase) => (
-                <label key={benchmarkCase.id} className="management-benchmark-case">
-                  <input
-                    type="checkbox"
-                    checked={selectedCaseIds.includes(benchmarkCase.id)}
-                    onChange={() => handleCaseToggle(benchmarkCase.id)}
-                  />
-                  <span>
-                    <strong>{benchmarkCase.title}</strong>
-                    <span>{benchmarkCase.description}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
           </div>
 
           <div className="management-benchmark-panel">
             <div className="management-token-usage-header">
               <div>
                 <h2>Latest results</h2>
-                <p className="management-subtitle">Overall score is calculated from automatic benchmark metrics.</p>
+                <p className="management-subtitle">Overall score is the average of coverage, latency, and token efficiency.</p>
               </div>
               {runs.length > 0 ? (
                 <select
@@ -268,7 +263,6 @@ export const ManagementBenchmarks = () => {
                       <tr>
                         <th>Model</th>
                         <th>Overall</th>
-                        <th>Auto</th>
                         <th>Success</th>
                         <th>Latency</th>
                         <th>Tokens</th>
@@ -283,10 +277,8 @@ export const ManagementBenchmarks = () => {
                           <tr key={candidate.candidateId}>
                             <td>
                               <div className="management-user-name">{candidate.provider} / {candidate.model}</div>
-                              <span className="management-subtitle">automatic</span>
                             </td>
                             <td>{formatScore(candidate.overallScore)}</td>
-                            <td>{formatScore(candidate.automaticScore)}</td>
                             <td>{formatPercent(candidate.successRate)}</td>
                             <td>{formatLatency(candidate.averageLatencyMs)}</td>
                             <td>{candidate.totalTokens}</td>
@@ -326,7 +318,7 @@ export const ManagementBenchmarks = () => {
                             return (
                               <div key={caseResult.caseId} className="management-benchmark-case-result">
                                 <div className="management-benchmark-case-result-header">
-                                  <strong>{caseResult.caseTitle}</strong>
+                                  <strong>{caseResult.caseDescription}</strong>
                                   <button
                                     type="button"
                                     className="btn-primary management-benchmark-expand-button"
@@ -340,6 +332,11 @@ export const ManagementBenchmarks = () => {
                                     {' / '}
                                     {caseResult.totalTokens} tokens
                                   </span>
+                                </div>
+                                <div className="management-benchmark-metrics" aria-label={`${caseResult.caseDescription} metric scores`}>
+                                  <span>Coverage {formatScore(caseResult.metricBreakdown.responseCoverageScore)}</span>
+                                  <span>Latency {formatScore(caseResult.metricBreakdown.latencyScore)}</span>
+                                  <span>Tokens {formatScore(caseResult.metricBreakdown.tokenEfficiencyScore)}</span>
                                 </div>
                                 {isCaseExpanded ? (
                                   <>

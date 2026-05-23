@@ -10,8 +10,6 @@ export type BenchmarkCandidateId = "ollama-llama" | "gemini";
 export type BenchmarkRunStatus = "completed" | "completed_with_errors";
 
 export type BenchmarkCaseAssertion = {
-    readonly expectsJobSearch: boolean;
-    readonly expectedRecommendedJobId?: string;
     readonly forbiddenPhrases: readonly string[];
     readonly forbiddenJobIds: readonly string[];
     readonly requiredReplyTerms: readonly string[];
@@ -40,16 +38,15 @@ export type BenchmarkCandidate = {
 };
 
 export type BenchmarkMetricBreakdown = {
-    readonly workflowScore: number;
-    readonly structuredOutputScore: number;
-    readonly guardrailScore: number;
-    readonly reliabilityScore: number;
+    readonly responseCoverageScore: number;
+    readonly latencyScore: number;
     readonly tokenEfficiencyScore: number;
 };
 
 export type BenchmarkCaseResult = {
     readonly caseId: string;
     readonly caseTitle: string;
+    readonly caseDescription: string;
     readonly success: boolean;
     readonly responseCount: number;
     readonly finalReply: string;
@@ -108,4 +105,5 @@ export type BenchmarkConfigResponse = {
 export type BenchmarkRunRequest = {
     readonly caseIds?: readonly string[];
     readonly candidateIds?: readonly BenchmarkCandidateId[];
+    readonly sampleCount?: number;
 };

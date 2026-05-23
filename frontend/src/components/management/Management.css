@@ -704,6 +704,49 @@
   font-weight: 700;
 }
 
+.management-benchmark-run-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.management-benchmark-sample-select {
+  display: grid;
+  position: relative;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: var(--fz-xs);
+  font-weight: 800;
+}
+
+.management-benchmark-sample-select::after {
+  content: '';
+  position: absolute;
+  right: 18px;
+  top: calc(50% + 10px);
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  pointer-events: none;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.management-benchmark-sample-select select {
+  min-width: 84px;
+  height: 40px;
+  padding: 0 30px 0 12px;
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fz-sm);
+}
+
 .management-benchmark-status {
   width: fit-content;
   padding: 4px 8px;
@@ -815,8 +858,25 @@
   grid-row: 1 / span 2;
 }
 
+.management-benchmark-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.management-benchmark-metrics span {
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-full);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--fz-xs);
+  font-weight: 800;
+}
+
 .management-benchmark-expand-button {
-  min-width: 92px;
+  width: 104px;
+  min-width: 104px;
   height: 34px;
   padding: 0 12px;
   white-space: nowrap;

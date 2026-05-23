@@ -288,14 +288,82 @@ const isBenchmarkMetricBreakdown = (value: unknown): value is BenchmarkMetricBre
   }
 
   const metric = value as Record<string, unknown>;
-  return (
+  const hasCurrentMetricShape =
+    isNumber(metric.responseCoverageScore) &&
+    isNumber(metric.latencyScore) &&
+    isNumber(metric.tokenEfficiencyScore);
+  const hasLegacyMetricShape =
     isNumber(metric.workflowScore) &&
     isNumber(metric.structuredOutputScore) &&
     isNumber(metric.guardrailScore) &&
     isNumber(metric.reliabilityScore) &&
-    isNumber(metric.tokenEfficiencyScore)
-  );
+    isNumber(metric.tokenEfficiencyScore);
+
+  return hasCurrentMetricShape || hasLegacyMetricShape;
 };
+
+const clampBenchmarkScore = (score: number): number => Math.max(0, Math.min(100, Math.round(score)));
+
+const normalizeBenchmarkMetricBreakdown = (metricBreakdown: BenchmarkMetricBreakdown): BenchmarkMetricBreakdown => {
+  const metric = metricBreakdown as unknown as Record<string, unknown>;
+  if (
+    isNumber(metric.responseCoverageScore) &&
+    isNumber(metric.latencyScore) &&
+    isNumber(metric.tokenEfficiencyScore)
+  ) {
+    return metricBreakdown;
+  }
+
+  const workflowScore = isNumber(metric.workflowScore) ? metric.workflowScore : 0;
+  const structuredOutputScore = isNumber(metric.structuredOutputScore) ? metric.structuredOutputScore : 0;
+  const guardrailScore = isNumber(metric.guardrailScore) ? metric.guardrailScore : 0;
+  const reliabilityScore = isNumber(metric.reliabilityScore) ? metric.reliabilityScore : 0;
+  const tokenEfficiencyScore = isNumber(metric.tokenEfficiencyScore) ? metric.tokenEfficiencyScore : 0;
+  return {
+    responseCoverageScore: clampBenchmarkScore((workflowScore + structuredOutputScore + guardrailScore) / 3),
+    latencyScore: clampBenchmarkScore(reliabilityScore),
+    tokenEfficiencyScore: clampBenchmarkScore(tokenEfficiencyScore),
+  };
+};
+
+const calculateBenchmarkAutomaticScore = (metricBreakdown: BenchmarkMetricBreakdown): number =>
+  clampBenchmarkScore(
+    (metricBreakdown.responseCoverageScore + metricBreakdown.latencyScore + metricBreakdown.tokenEfficiencyScore) / 3,
+  );
+
+const normalizeBenchmarkCaseResult = (result: BenchmarkCaseResult): BenchmarkCaseResult => {
+  const metricBreakdown = normalizeBenchmarkMetricBreakdown(result.metricBreakdown);
+  const resultRecord = result as unknown as Record<string, unknown>;
+  const caseDescription = typeof resultRecord.caseDescription === 'string' ? resultRecord.caseDescription : result.caseTitle;
+  return {
+    ...result,
+    caseDescription,
+    metricBreakdown,
+    automaticScore: calculateBenchmarkAutomaticScore(metricBreakdown),
+  };
+};
+
+const normalizeBenchmarkCandidateRunResult = (result: BenchmarkCandidateRunResult): BenchmarkCandidateRunResult => {
+  const caseResults = result.caseResults.map(normalizeBenchmarkCaseResult);
+  const automaticScore = caseResults.length > 0
+    ? clampBenchmarkScore(caseResults.reduce((sum, caseResult) => sum + caseResult.automaticScore, 0) / caseResults.length)
+    : result.automaticScore;
+
+  return {
+    ...result,
+    caseResults,
+    successRate: caseResults.length > 0
+      ? caseResults.filter((caseResult) => caseResult.success).length / caseResults.length
+      : result.successRate,
+    automaticScore,
+    overallScore: automaticScore,
+  };
+};
+
+const normalizeBenchmarkRunSummary = (run: BenchmarkRunSummary): BenchmarkRunSummary => ({
+  ...run,
+  candidateResults: run.candidateResults.map(normalizeBenchmarkCandidateRunResult),
+});
 
 const isBenchmarkParseEvent = (value: unknown): value is BenchmarkParseEvent => {
   if (typeof value !== 'object' || value === null) {
@@ -319,6 +387,7 @@ const isBenchmarkCaseResult = (value: unknown): value is BenchmarkCaseResult => 
   return (
     typeof result.caseId === 'string' &&
     typeof result.caseTitle === 'string' &&
+    (result.caseDescription === undefined || typeof result.caseDescription === 'string') &&
     typeof result.success === 'boolean' &&
     isNumber(result.responseCount) &&
     typeof result.finalReply === 'string' &&
@@ -375,7 +444,7 @@ const isBenchmarkRunSummary = (value: unknown): value is BenchmarkRunSummary => 
 };
 
 export const parseBenchmarkRun = (value: unknown): BenchmarkRunSummary | null =>
-  isBenchmarkRunSummary(value) ? value : null;
+  isBenchmarkRunSummary(value) ? normalizeBenchmarkRunSummary(value) : null;
 
 export const parseBenchmarkRuns = (value: unknown): BenchmarkRunSummary[] | null => {
   if (typeof value !== 'object' || value === null) {
@@ -383,7 +452,7 @@ export const parseBenchmarkRuns = (value: unknown): BenchmarkRunSummary[] | null
   }
 
   const payload = value as Record<string, unknown>;
-  return Array.isArray(payload.runs) ? payload.runs.filter(isBenchmarkRunSummary) : null;
+  return Array.isArray(payload.runs) ? payload.runs.filter(isBenchmarkRunSummary).map(normalizeBenchmarkRunSummary) : null;
 };
 
 export const buildBenchmarksRunsUrl = (limit: number): string => {

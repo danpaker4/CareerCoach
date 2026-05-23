@@ -28,6 +28,11 @@ const parseRunLimit = (request: FastifyRequest): number => {
     return Math.max(1, Math.min(BENCHMARK_MAX_RUN_LIMIT, Math.trunc(limitValue)));
 };
 
+const parseSampleCount = (value: unknown): number | undefined => {
+    const sampleCount = Number(value);
+    return Number.isFinite(sampleCount) ? Math.trunc(sampleCount) : undefined;
+};
+
 const parseRunRequest = (body: unknown): BenchmarkRunRequest => {
     if (typeof body !== "object" || body === null) {
         return {};
@@ -41,6 +46,7 @@ const parseRunRequest = (body: unknown): BenchmarkRunRequest => {
         candidateIds: Array.isArray(record.candidateIds)
             ? record.candidateIds.filter(isBenchmarkCandidateId)
             : undefined,
+        sampleCount: record.sampleCount === undefined ? undefined : parseSampleCount(record.sampleCount),
     };
 };
 
