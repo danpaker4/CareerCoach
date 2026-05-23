@@ -1,0 +1,22 @@
+{
+  "id": "eval-22-guided-non-cooperative-short-replies",
+  "messages": [
+    { "role": "user", "content": "i want a career change but dont ask too much" },
+    { "role": "assistant", "content": "Got it. What kind of work do you want more of day to day?" },
+    { "role": "user", "content": "idk" },
+    { "role": "assistant", "content": "No problem. Do you prefer technical tasks, people-facing work, or both?" },
+    { "role": "user", "content": "whatever pays" },
+    { "role": "assistant", "content": "Understood. Are you open to entry-level roles to switch faster?" },
+    { "role": "user", "content": "maybe. not writing long answers." }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 9,
+    "mustAskQuestion": true,
+    "forbiddenWords": [
+      "I can't help you",
+      "come back when you are serious",
+      "you are wasting my time"
+    ]
+  }
+}

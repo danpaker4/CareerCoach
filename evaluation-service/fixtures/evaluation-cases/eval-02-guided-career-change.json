@@ -1,0 +1,12 @@
+{
+  "id": "eval-02-guided-career-change",
+  "messages": [
+    { "role": "user", "content": "im a high school teacher for 5 years and thinking about tech" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["quit teaching immediately", "the only path is"]
+  }
+}
