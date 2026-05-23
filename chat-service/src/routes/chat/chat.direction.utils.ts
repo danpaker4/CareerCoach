@@ -72,6 +72,39 @@ const normalizeWorkDirection = (raw: string): string => {
     return fixCyber;
 };
 
+const TIMELINE_URGENCY_CANDIDATE_PATTERNS: readonly RegExp[] = [
+    /\b(in\s+the\s+)?next\s+\d+\s+(month|week|year|day)s?\b/i,
+    /\b(within|in)\s+\d+\s+(month|week|year|day)s?\b/i,
+    /\b\d+\s+(month|week|year|day)s?\s+(from\s+now|away|out|or\s+so)\b/i,
+    /\b(asap|immediately|right\s+now|long[\s-]?term|timeline)\b/i,
+    /^\s*(in\s+the\s+)?next\s+(month|week|year|day)s?\b/i,
+];
+
+const WORK_DIRECTION_ROLE_SIGNAL_PATTERN =
+    /\b(engineer|analyst|developer|designer|manager|tester|architect|consultant|specialist|administrator|qa|security|backend|frontend|devops|cyber|cybersecurity|data|cloud|ai|ml|product|pm|soc)\b/i;
+
+export const isTimelineOrUrgencyCandidate = (candidate: string): boolean => {
+    const lowered = candidate.toLowerCase().trim();
+    if (lowered.length === 0) {
+        return true;
+    }
+    if (TIMELINE_URGENCY_CANDIDATE_PATTERNS.some((pattern) => pattern.test(lowered))) {
+        return true;
+    }
+    const hasDomain = DOMAIN_TARGETS.some((target) => lowered.includes(target.domain));
+    const hasRoleSignal = hasDomain || WORK_DIRECTION_ROLE_SIGNAL_PATTERN.test(lowered);
+    const hasTimeSignal = /\b(month|week|year|day|soon|asap|timeline|future|now|immediately)\b/i.test(lowered);
+    return hasTimeSignal && !hasRoleSignal;
+};
+
+const acceptWorkDirectionCandidate = (raw: string): string | null => {
+    const normalized = normalizeWorkDirection(raw);
+    if (isTimelineOrUrgencyCandidate(normalized)) {
+        return null;
+    }
+    return normalized;
+};
+
 export const extractWorkDirectionQuery = (message: string): string | null => {
     const normalized = message.trim();
     const lowered = normalized.toLowerCase();
@@ -79,7 +112,10 @@ export const extractWorkDirectionQuery = (message: string): string | null => {
         const match = normalized.match(pattern);
         const candidate = match?.[1]?.trim();
         if (candidate) {
-            return normalizeWorkDirection(candidate);
+            const accepted = acceptWorkDirectionCandidate(candidate);
+            if (accepted) {
+                return accepted;
+            }
         }
     }
     const trigger = WORK_DIRECTION_PHRASES.find((phrase) => lowered.includes(phrase));
@@ -90,7 +126,7 @@ export const extractWorkDirectionQuery = (message: string): string | null => {
     const triggerIndex = lowered.indexOf(trigger);
     const suffix = normalized.slice(triggerIndex + trigger.length).trim().replace(/^[\s:,-]+/, "");
     if (suffix.length > 0) {
-        return normalizeWorkDirection(suffix);
+        return acceptWorkDirectionCandidate(suffix);
     }
 
     const domainTarget = DOMAIN_TARGETS.find((target) => lowered.includes(target.domain));

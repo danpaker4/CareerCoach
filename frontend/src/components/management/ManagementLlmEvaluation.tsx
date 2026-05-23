@@ -14,7 +14,13 @@ import {
   MANAGEMENT_EVALUATION_RUN_ERROR_MESSAGE,
   MANAGEMENT_EVALUATION_UPLOAD_ERROR_MESSAGE,
 } from './management.consts';
-import type { EvaluationCaseSummary, EvaluationMessage, EvaluationRunResult, ManagementStatus } from './management.types';
+import type {
+  EvaluationCaseSummary,
+  EvaluationMessage,
+  EvaluationMode,
+  EvaluationRunResult,
+  ManagementStatus,
+} from './management.types';
 import {
   buildEvaluationCaseUrl,
   buildEvaluationComparisonRowsFromChecks,
@@ -40,6 +46,7 @@ const formatDateTime = (value: string): string => {
 };
 
 const formatDuration = (durationMs: number): string => `${(durationMs / 1000).toFixed(1)}s`;
+const EVALUATION_MODE_FILTER_ORDER: EvaluationMode[] = ['GUIDED', 'FAST_SEARCH', 'DEEP_DISCOVERY'];
 
 const formatMessageRoleLabel = (role: EvaluationMessage['role']): string => {
   if (role === 'user') {
@@ -126,6 +133,10 @@ export const ManagementLlmEvaluation = () => {
   const [runAllProgress, setRunAllProgress] = useState<{ current: number; total: number } | null>(null);
   const [runResults, setRunResults] = useState<Record<string, EvaluationRunResult>>({});
   const [expandedResultCaseId, setExpandedResultCaseId] = useState<string | null>(null);
+  const [expandedPreviewCaseId, setExpandedPreviewCaseId] = useState<string | null>(null);
+  const [modeFilter, setModeFilter] = useState<'ALL' | EvaluationMode>('ALL');
+  const [minMessagesFilter, setMinMessagesFilter] = useState('');
+  const [maxMessagesFilter, setMaxMessagesFilter] = useState('');
 
   const loadCases = async (preserveAlerts = false): Promise<void> => {
     setStatus('loading');
@@ -225,6 +236,9 @@ export const ManagementLlmEvaluation = () => {
       if (expandedResultCaseId === caseId) {
         setExpandedResultCaseId(null);
       }
+      if (expandedPreviewCaseId === caseId) {
+        setExpandedPreviewCaseId(null);
+      }
 
       setSuccessMessage(`Deleted conversation "${caseId}".`);
       await loadCases(true);
@@ -244,6 +258,7 @@ export const ManagementLlmEvaluation = () => {
       const parsed = await fetchEvaluationRunResult(caseId);
       setRunResults((current) => ({ ...current, [caseId]: parsed }));
       setExpandedResultCaseId(caseId);
+      setExpandedPreviewCaseId((current) => (current === caseId ? null : current));
       setSuccessMessage(
         parsed.passed
           ? `Evaluation "${caseId}" passed.`
@@ -291,6 +306,7 @@ export const ManagementLlmEvaluation = () => {
     setRunningCaseId(null);
     setRunAllProgress(null);
     setIsRunningAll(false);
+    setExpandedPreviewCaseId(null);
 
     if (completedCount === 0) {
       setError(runErrors[0] ?? MANAGEMENT_EVALUATION_RUN_ALL_ERROR_MESSAGE);
@@ -312,6 +328,30 @@ export const ManagementLlmEvaluation = () => {
   };
 
   const isActionDisabled = isUploading || deletingCaseId !== null || runningCaseId !== null || isRunningAll;
+  const availableModes = EVALUATION_MODE_FILTER_ORDER.filter((mode) =>
+    cases.some((evaluationCase) => evaluationCase.expected.mode === mode),
+  );
+  const parsedMinMessages = minMessagesFilter === '' ? null : Number(minMessagesFilter);
+  const parsedMaxMessages = maxMessagesFilter === '' ? null : Number(maxMessagesFilter);
+  const hasValidMinFilter =
+    parsedMinMessages === null || (Number.isInteger(parsedMinMessages) && parsedMinMessages >= 0);
+  const hasValidMaxFilter =
+    parsedMaxMessages === null || (Number.isInteger(parsedMaxMessages) && parsedMaxMessages >= 0);
+  const hasValidMessageRange =
+    hasValidMinFilter &&
+    hasValidMaxFilter &&
+    (parsedMinMessages === null || parsedMaxMessages === null || parsedMinMessages <= parsedMaxMessages);
+  const filteredCases =
+    hasValidMessageRange && hasValidMinFilter && hasValidMaxFilter
+      ? cases.filter((evaluationCase) => {
+          const modeMatches = modeFilter === 'ALL' || evaluationCase.expected.mode === modeFilter;
+          const messageCount = evaluationCase.messages.length;
+          const minMatches = parsedMinMessages === null || messageCount >= parsedMinMessages;
+          const maxMatches = parsedMaxMessages === null || messageCount <= parsedMaxMessages;
+          return modeMatches && minMatches && maxMatches;
+        })
+      : [];
+  const hasActiveFilters = modeFilter !== 'ALL' || minMessagesFilter !== '' || maxMessagesFilter !== '';
 
   return (
     <main className="management-page">
@@ -343,7 +383,11 @@ export const ManagementLlmEvaluation = () => {
             <h2>Evaluation cases</h2>
             <p className="management-subtitle">
               {status === 'success'
-                ? `${formatNumber(cases.length)} conversation${cases.length === 1 ? '' : 's'} stored`
+                ? hasActiveFilters
+                  ? `${formatNumber(filteredCases.length)} of ${formatNumber(cases.length)} conversation${
+                      cases.length === 1 ? '' : 's'
+                    } shown`
+                  : `${formatNumber(cases.length)} conversation${cases.length === 1 ? '' : 's'} stored`
                 : 'Upload a JSON file to add a new evaluation conversation.'}
             </p>
           </div>
@@ -389,6 +433,73 @@ export const ManagementLlmEvaluation = () => {
             </button>
           </div>
         </div>
+        {status !== 'loading' && cases.length > 0 && (
+          <div className="management-eval-filters">
+            <div className="management-eval-filter-group">
+              <label htmlFor="management-eval-mode-filter">Mode</label>
+              <select
+                id="management-eval-mode-filter"
+                value={modeFilter}
+                onChange={(event) => {
+                  const nextMode = event.target.value as 'ALL' | EvaluationMode;
+                  setModeFilter(nextMode);
+                }}
+              >
+                <option value="ALL">All modes</option>
+                {availableModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="management-eval-filter-group">
+              <label htmlFor="management-eval-min-messages-filter">Min messages</label>
+              <input
+                id="management-eval-min-messages-filter"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={minMessagesFilter}
+                onChange={(event) => {
+                  setMinMessagesFilter(event.target.value);
+                }}
+                placeholder="Any"
+              />
+            </div>
+            <div className="management-eval-filter-group">
+              <label htmlFor="management-eval-max-messages-filter">Max messages</label>
+              <input
+                id="management-eval-max-messages-filter"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={maxMessagesFilter}
+                onChange={(event) => {
+                  setMaxMessagesFilter(event.target.value);
+                }}
+                placeholder="Any"
+              />
+            </div>
+            <button
+              type="button"
+              className="btn-outline management-eval-filter-reset"
+              disabled={!hasActiveFilters}
+              onClick={() => {
+                setModeFilter('ALL');
+                setMinMessagesFilter('');
+                setMaxMessagesFilter('');
+              }}
+            >
+              Reset filters
+            </button>
+          </div>
+        )}
+        {status !== 'loading' && cases.length > 0 && !hasValidMessageRange && (
+          <p className="management-alert management-alert--error">Message range is invalid. Min must be less than or equal to max.</p>
+        )}
 
         {status === 'loading' && (
           <div className="page-loading management-state">
@@ -403,7 +514,13 @@ export const ManagementLlmEvaluation = () => {
           </div>
         )}
 
-        {status !== 'loading' && cases.length > 0 && (
+        {status !== 'loading' && cases.length > 0 && hasValidMessageRange && filteredCases.length === 0 && (
+          <div className="page-empty management-state">
+            <p>No evaluation conversations match the selected filters.</p>
+          </div>
+        )}
+
+        {status !== 'loading' && cases.length > 0 && hasValidMessageRange && filteredCases.length > 0 && (
           <div className="management-table-wrap">
             <table className="management-table management-table--evaluation">
               <thead>
@@ -417,9 +534,10 @@ export const ManagementLlmEvaluation = () => {
                 </tr>
               </thead>
               <tbody>
-                {cases.map((evaluationCase) => {
+                {filteredCases.map((evaluationCase) => {
                   const runResult = runResults[evaluationCase.id];
                   const isExpanded = expandedResultCaseId === evaluationCase.id && runResult !== undefined;
+                  const isPreviewExpanded = expandedPreviewCaseId === evaluationCase.id;
 
                   return (
                     <Fragment key={evaluationCase.id}>
@@ -493,6 +611,17 @@ export const ManagementLlmEvaluation = () => {
                               >
                               <ManagementIconDelete className="management-action-icon" />
                             </button>
+                            {!runResult && (
+                              <button
+                                type="button"
+                                className="btn-outline management-action-button"
+                                onClick={() => {
+                                  setExpandedPreviewCaseId(isPreviewExpanded ? null : evaluationCase.id);
+                                }}
+                              >
+                                {isPreviewExpanded ? 'Hide Chat' : 'Preview Chat'}
+                              </button>
+                            )}
                               {runResult && (
                                 <button
                                   type="button"
@@ -508,6 +637,22 @@ export const ManagementLlmEvaluation = () => {
                           </div>
                         </td>
                       </tr>
+                      {isPreviewExpanded && !runResult && (
+                        <tr className="management-eval-result-row management-eval-preview-row">
+                          <td colSpan={6}>
+                            <div className="management-eval-result-panel">
+                              <div className="management-eval-result-header">
+                                <h3>Case conversation preview</h3>
+                                <p>
+                                  {formatNumber(evaluationCase.messages.length)} message
+                                  {evaluationCase.messages.length === 1 ? '' : 's'}
+                                </p>
+                              </div>
+                              <EvaluationRunConversation messages={evaluationCase.messages} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       {isExpanded && runResult && (
                         <tr className="management-eval-result-row">
                           <td colSpan={6}>

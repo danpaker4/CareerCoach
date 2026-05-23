@@ -1,0 +1,14 @@
+{
+  "id": "eval-20-check-all-fields-guided",
+  "messages": [
+    { "role": "user", "content": "hi im maya, 2 years business analyst in bank" },
+    { "role": "assistant", "content": "What did you enjoy about that role?" },
+    { "role": "user", "content": "i liked requirements and talking to stakeholders" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 8,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["I recommend backend developer", "you must become"]
+  }
+}

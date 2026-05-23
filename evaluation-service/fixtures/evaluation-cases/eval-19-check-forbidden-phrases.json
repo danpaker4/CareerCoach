@@ -1,0 +1,18 @@
+{
+  "id": "eval-19-check-forbidden-phrases",
+  "messages": [
+    { "role": "user", "content": "i worked in support and sales, thinking about tech" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": [
+      "I recommend backend developer",
+      "you must become a",
+      "the only career path",
+      "guaranteed salary of",
+      "apply only to FAANG"
+    ]
+  }
+}
