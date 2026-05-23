@@ -11,6 +11,13 @@ import {
     LLM_STAGE_PARSE_FALLBACK_REPLY,
 } from "./chat.llm.consts";
 import { parseLlmDecisionFromJson, parseStageLlmDecisionFromJson } from "./chat.llm.utils";
+import { buildDreamJobPrompt } from "../dream-job/chat.dream-job.prompt.utils";
+import {
+    DREAM_JOB_LLM_PARSE_FALLBACK_REPLY,
+    parseDreamJobLlmDecisionFromJson,
+} from "../dream-job/chat.dream-job.llm.utils";
+import type { DreamJobLlmDecision } from "../dream-job/chat.dream-job.types";
+import type { DreamJobFlow } from "../../conversation/conversation.model";
 import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
 
 export class ChatLlmService {
@@ -60,6 +67,28 @@ export class ChatLlmService {
                 shouldSearchJobs: false,
                 recommendedJobIds: jobs.map((job) => job.id),
                 searchFilters: EMPTY_LLM_SEARCH_FILTERS,
+            };
+        }
+    };
+
+    decideDreamJobStep = async (
+        conversation: Conversation,
+        latestUserMessage: string,
+        userAccountContext: string,
+        dreamJobFlow: DreamJobFlow | undefined
+    ): Promise<DreamJobLlmDecision> => {
+        const rawText = await this.textCompletion.complete(
+            buildDreamJobPrompt({ conversation, latestUserMessage, userAccountContext, dreamJobFlow }),
+            { operation: "chat.dream_job", userId: conversation.userId }
+        );
+
+        try {
+            return parseDreamJobLlmDecisionFromJson(rawText);
+        } catch {
+            return {
+                reply: DREAM_JOB_LLM_PARSE_FALLBACK_REPLY,
+                awaitingConfirmation: false,
+                userConfirmed: false,
             };
         }
     };

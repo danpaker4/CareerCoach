@@ -29,7 +29,11 @@ import { JobRankingService } from "./ranking/job-ranking.service";
 export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
     const tokenUsageRepository = new LlmTokenUsageRepository(dbClient.llmTokenUsage);
-    const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
+    const externalService = new ChatExternalService(
+        chatConfig.usersServiceBaseUrl,
+        chatConfig.jobServiceBaseUrl,
+        chatConfig.internalServiceApiKey,
+    );
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
     const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain, tokenUsageRepository);

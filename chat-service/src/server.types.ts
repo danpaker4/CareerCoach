@@ -16,5 +16,6 @@ export interface ServerConfig {
         customEmbeddingUrl?: string;
         careerProfileVectorIndexName: string;
         careerDirectionVectorIndexName: string;
+        internalServiceApiKey?: string;
     };
 }

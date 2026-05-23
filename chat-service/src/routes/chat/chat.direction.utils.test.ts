@@ -4,7 +4,24 @@ import {
     extractWorkDirectionQuery,
     isTimelineOrUrgencyCandidate,
     isWorkDirectionIntent,
+    shouldRunJobSearch,
 } from "./chat.direction.utils";
+
+describe("isWorkDirectionIntent", () => {
+    it("does not treat founder startup aspiration as work direction", () => {
+        const message = "i want to be a founder of startup that will find a solution to object detection with drones";
+        assert.equal(isWorkDirectionIntent(message), false);
+    });
+});
+
+describe("shouldRunJobSearch", () => {
+    it("returns false for DREAMJOB mode regardless of confidence", () => {
+        assert.equal(
+            shouldRunJobSearch("DREAMJOB", true, 100, 100, true),
+            false,
+        );
+    });
+});
 
 describe("isTimelineOrUrgencyCandidate", () => {
     it("detects timeline phrases", () => {

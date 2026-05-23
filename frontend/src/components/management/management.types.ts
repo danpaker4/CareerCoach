@@ -106,7 +106,7 @@ export interface EvaluationMessage {
   content: string;
 }
 
-export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY';
+export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY' | 'DREAMJOB';
 
 export interface EvaluationExpected {
   mode?: EvaluationMode;

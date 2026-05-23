@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } fro
 import './Chat.css';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { getStoredAccessToken } from '../../lib/authSession';
 import type { ChatProps, ChatResponse, ConversationResponse, Message } from './chat.types';
 
 const createMessage = (role: Message['role'], content: string): Message => ({
@@ -149,7 +150,13 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
             const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, conversationId, message: text, userProfile })
+                body: JSON.stringify({
+                    userId,
+                    conversationId,
+                    message: text,
+                    userProfile,
+                    accessToken: getStoredAccessToken() ?? undefined,
+                })
             });
             if (!response.ok) {
                 setMessages(prev => [...prev, createMessage('assistant', 'I could not reach the chat service. Please try again.')]);

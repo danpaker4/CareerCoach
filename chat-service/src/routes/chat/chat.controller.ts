@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
+import { resolveRequestAuthorization } from "./chat.authorization.utils";
 import type { ChatMessageRequestBody } from "./chat.types";
 import { ConversationNotFoundError, InvalidConversationIdError } from "../conversation/conversation.utils";
 import type { ChatService } from "./chat.service";
@@ -10,7 +11,14 @@ export class ChatController {
     sendMessage = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         try {
             const body = request.body as ChatMessageRequestBody;
-            const response = await this.chatService.sendMessage(body.userId, body.message, body.userProfile, body.conversationId);
+            const authorization = resolveRequestAuthorization(request.headers.authorization, body.accessToken);
+            const response = await this.chatService.sendMessage(
+                body.userId,
+                body.message,
+                body.userProfile,
+                body.conversationId,
+                authorization
+            );
             reply.status(StatusCodes.OK).send(response);
         } catch (error) {
             if (error instanceof Error && error.message === "Message is required") {
