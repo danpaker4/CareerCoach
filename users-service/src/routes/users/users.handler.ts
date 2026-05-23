@@ -7,7 +7,7 @@ import { readMultipartData } from "../auth/auth.utils";
 import type { User, UserDocument } from "./user.model";
 import { updateUserCv } from "./users-cv.service";
 import { toUser, toUserDocument } from "./user.utils";
-import { createUserSchema, getUserSchema, updateUserSchema, uploadUserCvSchema } from "./users.schema";
+import { createUserSchema, getUserSchema, updateDreamJobSchema, updateUserSchema, uploadUserCvSchema } from "./users.schema";
 import type { UsersHandlerType } from "./users.types";
 import { serializeRouteError } from "./users.utils";
 
@@ -66,6 +66,27 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     { upsert: true }
                 );
                 reply.code(StatusCodes.OK).send({ message: `User ${userId} updated`, status: "OK" });
+            } catch (error) {
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
+            }
+        },
+
+        updateDreamJobHandler: async (request: SchematicRequest<typeof updateDreamJobSchema>, reply: FastifyReply) => {
+            const { userId } = request.params;
+            const { dreamJob } = request.body;
+
+            try {
+                const result = await usersCollection.updateOne(
+                    { _id: userId },
+                    { $set: { dreamJob } },
+                );
+
+                if (result.matchedCount === 0) {
+                    reply.code(StatusCodes.NOT_FOUND).send({ error: "User not found" });
+                    return;
+                }
+
+                reply.code(StatusCodes.OK).send({ message: `Dream job updated for user ${userId}`, status: "OK" });
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
             }

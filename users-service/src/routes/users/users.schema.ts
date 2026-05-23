@@ -82,6 +82,24 @@ export const updateUserSchema = {
     }),
 } satisfies FastifySchema;
 
+export const updateDreamJobSchema = {
+    response: {
+        [StatusCodes.OK]: z.object({
+            message: z.string(),
+            status: z.string(),
+        }),
+        [StatusCodes.NOT_FOUND]: z.object({
+            error: z.string(),
+        }),
+    },
+    params: z.object({
+        userId: z.string().min(1, "userId cannot be empty"),
+    }),
+    body: z.object({
+        dreamJob: z.string().min(1, "dreamJob cannot be empty"),
+    }),
+} satisfies FastifySchema;
+
 export const uploadUserCvSchema = {
     response: {
         [StatusCodes.OK]: UserSchema.omit({ password: true }),

@@ -34,6 +34,7 @@ export const UserSchema = z.object({
     knownSkills: z.array(z.string()).default([]),
     roleExperience: z.array(RoleExperienceEntrySchema).default([]),
     currentJob: z.string().nullish(),
+    dreamJob: z.string().nullish(),
     linkedInUrl: z.string().nullish(),
     githubUrl: z.string().nullish(),
     githubSkills: z.array(z.string()).default([]),
