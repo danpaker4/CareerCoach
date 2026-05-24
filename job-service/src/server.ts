@@ -57,7 +57,6 @@ export class Server {
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
             await this.app.register(jobsRouter(
                 this.DBClient.jobs,
-                this.DBClient.skillMatchers,
                 this.DBClient.llmTokenUsage,
                 this.embeddingCache
             ));

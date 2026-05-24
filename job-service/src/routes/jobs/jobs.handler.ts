@@ -4,7 +4,6 @@ import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { AdaptedJob } from "../../poller/job-poller-api-stack/stages/adapt/adapt-resource.types";
-import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
 import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
 import type { UserEmbeddingCache } from "../../cache/user-embedding.cache";
 import { computeVectorMatchScore } from "../jobScores/vector-score.service";
@@ -15,13 +14,19 @@ import type { CreateJobBody } from "./jobs.schema";
 
 type GetJobsQuery = { search?: string; userId?: string };
 
-export const JobsHandler = (
-  jobsCollection: Collection<EnrichedJob>,
-  skillMatchersCollection: Collection<SkillMatcher>,
-  tokenUsageRecorder?: LlmTokenUsageRecorder,
-  usersServiceBaseUrl?: string,
-  embeddingCache?: UserEmbeddingCache
-) => ({
+interface JobsHandlerDeps {
+  jobsCollection: Collection<EnrichedJob>;
+  tokenUsageRecorder?: LlmTokenUsageRecorder;
+  usersServiceBaseUrl?: string;
+  embeddingCache?: UserEmbeddingCache;
+}
+
+export const JobsHandler = ({
+  jobsCollection,
+  tokenUsageRecorder,
+  usersServiceBaseUrl,
+  embeddingCache,
+}: JobsHandlerDeps) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
     reply: FastifyReply
