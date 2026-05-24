@@ -1,3 +1,7 @@
+interface UserProfileResponse {
+    profileEmbedding?: number[];
+}
+
 export const fetchUserProfileEmbedding = async (
     usersServiceBaseUrl: string,
     userId: string
@@ -8,7 +12,7 @@ export const fetchUserProfileEmbedding = async (
         );
         if (!response.ok) return null;
 
-        const user = await response.json();
+        const user = (await response.json()) as UserProfileResponse;
         const embedding = user?.profileEmbedding;
         return Array.isArray(embedding) && embedding.length > 0
             ? embedding

@@ -1,9 +1,9 @@
-type CacheEntry = {
-    embedding: number[];
-    expiresAt: number;
-};
+interface CacheEntry {
+    readonly embedding: number[];
+    readonly expiresAt: number;
+}
 
-const DEFAULT_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_TTL_MS = 5 * 60 * 1_000;
 
 export class UserEmbeddingCache {
     private readonly store = new Map<string, CacheEntry>();
@@ -32,5 +32,9 @@ export class UserEmbeddingCache {
 
     invalidate(userId: string): void {
         this.store.delete(userId);
+    }
+
+    get size(): number {
+        return this.store.size;
     }
 }
