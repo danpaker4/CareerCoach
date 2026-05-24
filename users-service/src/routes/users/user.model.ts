@@ -43,6 +43,8 @@ export const UserSchema = z.object({
     bio: z.string().nullish(),
     location: z.string().nullish(),
     company: z.string().nullish(),
+    profileEmbedding: z.array(z.number()).default([]),
+    profileEmbeddingUpdatedAt: z.coerce.date().optional(),
     /** Set when chat-service first creates the linked `userCareerProfiles` document for this `id`. */
     coachProfileMaterializedAt: z.coerce.date().optional(),
 });
