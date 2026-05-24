@@ -3,10 +3,16 @@ import type { Collection } from "mongodb";
 import type { User, UserDocument } from "./user.model";
 import { toUser } from "./user.utils";
 
-const EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"];
+const EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"] as const;
 
-const normalizeList = (items: readonly string[]): string =>
-    items.filter(Boolean).join(", ") || "none";
+let genAIInstance: GoogleGenerativeAI | null = null;
+
+const getGenAI = (apiKey: string): GoogleGenerativeAI => {
+    if (!genAIInstance) {
+        genAIInstance = new GoogleGenerativeAI(apiKey);
+    }
+    return genAIInstance;
+};
 
 export const buildUserProfileText = (user: User): string => {
     const sections: string[] = [];
@@ -25,10 +31,10 @@ export const buildUserProfileText = (user: User): string => {
     ])].filter(Boolean);
 
     if (allSkills.length > 0) {
-        sections.push(`Skills and technologies: ${normalizeList(allSkills)}`);
+        sections.push(`Skills and technologies: ${allSkills.join(", ")}`);
     }
     if (user.interests && user.interests.length > 0) {
-        sections.push(`Interests: ${normalizeList(user.interests)}`);
+        sections.push(`Interests: ${user.interests.join(", ")}`);
     }
     if (user.roleExperience && user.roleExperience.length > 0) {
         const expLines = user.roleExperience.map(
@@ -38,7 +44,7 @@ export const buildUserProfileText = (user: User): string => {
     }
     if (user.achievements && user.achievements.length > 0) {
         const achievementNames = user.achievements.map((a) => a.name);
-        sections.push(`Achievements: ${normalizeList(achievementNames)}`);
+        sections.push(`Achievements: ${achievementNames.join(", ")}`);
     }
 
     return sections.join("\n");
@@ -48,14 +54,14 @@ export const generateProfileEmbedding = async (
     profileText: string,
     apiKey: string
 ): Promise<number[]> => {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const genAI = getGenAI(apiKey);
 
     for (const modelName of EMBEDDING_MODELS) {
         try {
             const model = genAI.getGenerativeModel({ model: modelName });
             const result = await model.embedContent(profileText);
             const values = result.embedding?.values;
-            if (Array.isArray(values)) return values;
+            if (Array.isArray(values) && values.length > 0) return values;
         } catch (error) {
             const status = (error as { status?: number }).status;
             if (status === 404) continue;
