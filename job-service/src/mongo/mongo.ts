@@ -138,6 +138,11 @@ export class MongoClient implements Service {
         return this.careerDirectionExamplesCollection;
     }
 
+    get database(): Db {
+        if (!this.db) throw new Error("Database not initialized");
+        return this.db;
+    }
+
     get llmTokenUsage(): Collection<LlmTokenUsageDocument> {
         if (!this.llmTokenUsageCollection) {
             throw new Error("LLM token usage collection is not initialized");
