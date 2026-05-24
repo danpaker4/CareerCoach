@@ -14,28 +14,27 @@ const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_inde
 const NUM_CANDIDATES = 150;
 const SEARCH_LIMIT = 50;
 
-type GetJobsQuery = { search?: string; userId?: string };
-
-type MongoSearchError = {
-  code?: number;
-  codeName?: string;
-};
+type GetJobsQuery = { search?: string };
 
 interface JobsHandlerDeps {
   jobsCollection: Collection<EnrichedJob>;
   tokenUsageRecorder?: LlmTokenUsageRecorder;
 }
 
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const regexSearch = async (
   collection: Collection<EnrichedJob>,
   term: string
 ): Promise<EnrichedJob[]> => {
+  const escaped = escapeRegex(term);
   return collection
     .find({
       $or: [
-        { jobTitle: { $regex: term, $options: "i" } },
-        { company: { $regex: term, $options: "i" } },
-        { description: { $regex: term, $options: "i" } },
+        { jobTitle: { $regex: escaped, $options: "i" } },
+        { company: { $regex: escaped, $options: "i" } },
+        { description: { $regex: escaped, $options: "i" } },
       ],
     })
     .limit(SEARCH_LIMIT)
@@ -65,7 +64,7 @@ const vectorSearch = async (
 /**
  * Try vector search first; fall back to regex on any failure.
  * Gracefully degrades when: API key missing, embedding fails,
- * vector index absent, or vector returns no results.
+ * vector index absent, rate-limited, or vector returns no results.
  */
 const vectorSearchWithFallback = async (
   collection: Collection<EnrichedJob>,
@@ -78,13 +77,8 @@ const vectorSearchWithFallback = async (
       const results = await vectorSearch(collection, queryVector);
       if (results.length > 0) return results;
     }
-  } catch (error) {
-    const mongoErr = error as MongoSearchError;
-    const isSearchNotEnabled =
-      mongoErr.code === 31082 || mongoErr.codeName === "SearchNotEnabled";
-    if (!isSearchNotEnabled && (error as { status?: number }).status !== 429) {
-      throw error;
-    }
+  } catch {
+    // Any vector/embedding failure → fall through to regex
   }
 
   return regexSearch(collection, term);
@@ -99,7 +93,7 @@ export const JobsHandler = ({
     reply: FastifyReply
   ) => {
     try {
-      const { search, userId } = request.query;
+      const { search } = request.query;
       const term = search?.trim();
 
       let jobs: EnrichedJob[];
@@ -124,6 +118,7 @@ export const JobsHandler = ({
 
       reply.code(StatusCodes.OK).send(result);
     } catch (error) {
+      request.log.error({ err: error }, "Failed to fetch jobs");
       reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error" });
     }
   },

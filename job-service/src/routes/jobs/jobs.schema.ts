@@ -14,13 +14,10 @@ export const getJobsSchema = {
       salary: z.number().optional(),
       requirements: z.array(z.string()).optional(),
       benefits: z.array(z.string()).optional(),
-      matchPct: z.number().optional(),
     })),
   },
   querystring: z.object({
     search: z.string().optional(),
-    userId: z.string().uuid().optional(),
-    skills: z.string().optional(),
   }),
 } satisfies FastifySchema;
 
