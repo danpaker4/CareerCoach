@@ -6,28 +6,24 @@ import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enric
 import type { AdaptedJob } from "../../poller/job-poller-api-stack/stages/adapt/adapt-resource.types";
 import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
 import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
-import type { UserEmbeddingCache } from "../../cache/user-embedding.cache";
-import { computeVectorMatchScore } from "../jobScores/vector-score.service";
-import { fetchUserProfileEmbedding } from "./user-profile.client";
+import { computeJobScore } from "../jobScores/job-score.service";
 import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/enrich-by-gemini";
 import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
 import type { CreateJobBody } from "./jobs.schema";
 
-type GetJobsQuery = { search?: string; userId?: string };
+type GetJobsQuery = { search?: string; userId?: string; skills?: string };
 
 export const JobsHandler = (
   jobsCollection: Collection<EnrichedJob>,
   skillMatchersCollection: Collection<SkillMatcher>,
-  tokenUsageRecorder?: LlmTokenUsageRecorder,
-  usersServiceBaseUrl?: string,
-  embeddingCache?: UserEmbeddingCache
+  tokenUsageRecorder?: LlmTokenUsageRecorder
 ) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
     reply: FastifyReply
   ) => {
     try {
-      const { search, userId } = request.query;
+      const { search, userId, skills } = request.query;
 
       const filter: Record<string, unknown> = {};
       if (search && search.trim()) {
@@ -41,15 +37,12 @@ export const JobsHandler = (
 
       const jobs = await jobsCollection.find(filter).limit(50).toArray();
 
-      let userEmbedding: number[] | null = null;
-      if (userId && embeddingCache) {
-        userEmbedding = embeddingCache.get(userId);
-        if (!userEmbedding && usersServiceBaseUrl) {
-          userEmbedding = await fetchUserProfileEmbedding(usersServiceBaseUrl, userId);
-          if (userEmbedding) {
-            embeddingCache.set(userId, userEmbedding);
-          }
-        }
+      let allSkills: string[] = [];
+      if (userId) {
+        const matchers = await skillMatchersCollection.find({ userId }).toArray();
+        const matcherSkills = matchers.flatMap((m) => m.skillToImprove.map((s) => s.skill));
+        const profileSkills = skills ? skills.split(",").map((s) => s.trim()).filter(Boolean) : [];
+        allSkills = [...new Set([...matcherSkills, ...profileSkills])];
       }
 
       const result = jobs.map((job) => ({
@@ -62,8 +55,8 @@ export const JobsHandler = (
         salary: job.salary,
         requirements: job.requirements,
         benefits: job.benefits,
-        matchPct: userEmbedding && job.searchEmbedding?.length
-          ? computeVectorMatchScore(userEmbedding, job.searchEmbedding)
+        matchPct: userId && allSkills.length > 0
+          ? computeJobScore(job, allSkills).overallScore
           : undefined,
       }));
 

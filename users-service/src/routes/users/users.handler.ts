@@ -6,16 +6,10 @@ import type { SchematicRequest } from "../../types/fastify";
 import { readMultipartData } from "../auth/auth.utils";
 import type { User, UserDocument } from "./user.model";
 import { updateUserCv } from "./users-cv.service";
-import { regenerateProfileEmbedding } from "./user-embedding.service";
 import { toUser, toUserDocument } from "./user.utils";
 import { createUserSchema, getUserSchema, updateDreamJobSchema, updateUserSchema, uploadUserCvSchema } from "./users.schema";
 import type { UsersHandlerType } from "./users.types";
 import { serializeRouteError } from "./users.utils";
-
-const EMBEDDING_RELEVANT_FIELDS = [
-    "knownSkills", "technologies", "githubSkills", "interests",
-    "roleExperience", "currentJob", "dreamJob", "achievements",
-];
 
 export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHandlerType => {
     return {
@@ -71,16 +65,6 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     },
                     { upsert: true }
                 );
-
-                const touchesEmbeddingFields = EMBEDDING_RELEVANT_FIELDS.some(
-                    (field) => field in updateData
-                );
-                if (touchesEmbeddingFields) {
-                    regenerateProfileEmbedding(usersCollection, userId).catch(
-                        (err) => request.log.error({ err }, "Profile embedding update failed")
-                    );
-                }
-
                 reply.code(StatusCodes.OK).send({ message: `User ${userId} updated`, status: "OK" });
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
@@ -139,10 +123,6 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     reply.code(StatusCodes.NOT_FOUND).send({ error: "User not found" });
                     return;
                 }
-
-                regenerateProfileEmbedding(usersCollection, userId).catch(
-                    (err) => request.log.error({ err }, "Profile embedding update failed")
-                );
 
                 reply.code(StatusCodes.OK).send(updatedUser);
             } catch (error) {
