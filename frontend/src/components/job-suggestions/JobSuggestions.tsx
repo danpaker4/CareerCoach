@@ -138,15 +138,9 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const fetchJobs = useCallback((query: string) => {
     if (!user?.id) return;
     setFetchState('loading');
-    const userSkills = [
-      ...(user.knownSkills ?? []),
-      ...(user.technologies ?? []),
-      ...(user.githubSkills ?? []),
-    ].filter(Boolean);
-    const skillsParam = userSkills.length > 0 ? `&skills=${encodeURIComponent(userSkills.join(','))}` : '';
     const url = query.trim()
-      ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}${skillsParam}`
-      : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}${skillsParam}`;
+      ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}`
+      : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}`;
     apiFetch(url, { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) { setJobs([]); setFetchState('success'); return; }
@@ -159,7 +153,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         setErrorMessage(err instanceof Error ? err.message : 'Failed to load jobs');
         setFetchState('error');
       });
-  }, [user?.id, user?.knownSkills, user?.technologies, user?.githubSkills]);
+  }, [user?.id]);
 
   useEffect(() => {
     void loadPipelineJobHashes();
@@ -175,7 +169,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchJobs(value);
-    }, 400);
+    }, 600);
   };
 
   const togglePipeline = async (job: JobResult) => {
@@ -257,7 +251,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
           <input
             type="search"
             className="jobs-search-input"
-            placeholder="Search jobs, companies, skills..."
+            placeholder="Search by role, skill, or keyword... (AI-powered)"
             value={searchQuery}
             onChange={handleSearchChange}
             aria-label="Search jobs"

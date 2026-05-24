@@ -4,45 +4,110 @@ import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { AdaptedJob } from "../../poller/job-poller-api-stack/stages/adapt/adapt-resource.types";
-import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
 import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
-import { computeJobScore } from "../jobScores/job-score.service";
+import { generateQueryVector } from "../../ai/embedding.utils";
 import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/enrich-by-gemini";
 import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
 import type { CreateJobBody } from "./jobs.schema";
 
-type GetJobsQuery = { search?: string; userId?: string; skills?: string };
+const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
+const NUM_CANDIDATES = 150;
+const SEARCH_LIMIT = 50;
 
-export const JobsHandler = (
-  jobsCollection: Collection<EnrichedJob>,
-  skillMatchersCollection: Collection<SkillMatcher>,
-  tokenUsageRecorder?: LlmTokenUsageRecorder
-) => ({
+type GetJobsQuery = { search?: string; userId?: string };
+
+type MongoSearchError = {
+  code?: number;
+  codeName?: string;
+};
+
+interface JobsHandlerDeps {
+  jobsCollection: Collection<EnrichedJob>;
+  tokenUsageRecorder?: LlmTokenUsageRecorder;
+}
+
+const regexSearch = async (
+  collection: Collection<EnrichedJob>,
+  term: string
+): Promise<EnrichedJob[]> => {
+  return collection
+    .find({
+      $or: [
+        { jobTitle: { $regex: term, $options: "i" } },
+        { company: { $regex: term, $options: "i" } },
+        { description: { $regex: term, $options: "i" } },
+      ],
+    })
+    .limit(SEARCH_LIMIT)
+    .toArray();
+};
+
+const vectorSearch = async (
+  collection: Collection<EnrichedJob>,
+  queryVector: number[]
+): Promise<EnrichedJob[]> => {
+  const results = await collection
+    .aggregate([
+      {
+        $vectorSearch: {
+          index: VECTOR_INDEX_NAME,
+          path: "searchEmbedding",
+          queryVector,
+          numCandidates: NUM_CANDIDATES,
+          limit: SEARCH_LIMIT,
+        },
+      },
+    ])
+    .toArray();
+  return results as EnrichedJob[];
+};
+
+/**
+ * Try vector search first; fall back to regex on any failure.
+ * Gracefully degrades when: API key missing, embedding fails,
+ * vector index absent, or vector returns no results.
+ */
+const vectorSearchWithFallback = async (
+  collection: Collection<EnrichedJob>,
+  term: string
+): Promise<EnrichedJob[]> => {
+  try {
+    const queryVector = await generateQueryVector(term);
+
+    if (queryVector) {
+      const results = await vectorSearch(collection, queryVector);
+      if (results.length > 0) return results;
+    }
+  } catch (error) {
+    const mongoErr = error as MongoSearchError;
+    const isSearchNotEnabled =
+      mongoErr.code === 31082 || mongoErr.codeName === "SearchNotEnabled";
+    if (!isSearchNotEnabled && (error as { status?: number }).status !== 429) {
+      throw error;
+    }
+  }
+
+  return regexSearch(collection, term);
+};
+
+export const JobsHandler = ({
+  jobsCollection,
+  tokenUsageRecorder,
+}: JobsHandlerDeps) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
     reply: FastifyReply
   ) => {
     try {
-      const { search, userId, skills } = request.query;
+      const { search, userId } = request.query;
+      const term = search?.trim();
 
-      const filter: Record<string, unknown> = {};
-      if (search && search.trim()) {
-        const term = search.trim();
-        filter.$or = [
-          { jobTitle: { $regex: term, $options: "i" } },
-          { company: { $regex: term, $options: "i" } },
-          { description: { $regex: term, $options: "i" } },
-        ];
-      }
+      let jobs: EnrichedJob[];
 
-      const jobs = await jobsCollection.find(filter).limit(50).toArray();
-
-      let allSkills: string[] = [];
-      if (userId) {
-        const matchers = await skillMatchersCollection.find({ userId }).toArray();
-        const matcherSkills = matchers.flatMap((m) => m.skillToImprove.map((s) => s.skill));
-        const profileSkills = skills ? skills.split(",").map((s) => s.trim()).filter(Boolean) : [];
-        allSkills = [...new Set([...matcherSkills, ...profileSkills])];
+      if (term) {
+        jobs = await vectorSearchWithFallback(jobsCollection, term);
+      } else {
+        jobs = await jobsCollection.find({}).limit(SEARCH_LIMIT).toArray();
       }
 
       const result = jobs.map((job) => ({
@@ -55,14 +120,7 @@ export const JobsHandler = (
         salary: job.salary,
         requirements: job.requirements,
         benefits: job.benefits,
-        matchPct: userId && allSkills.length > 0
-          ? computeJobScore(job, allSkills).overallScore
-          : undefined,
       }));
-
-      if (userId) {
-        result.sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0));
-      }
 
       reply.code(StatusCodes.OK).send(result);
     } catch (error) {

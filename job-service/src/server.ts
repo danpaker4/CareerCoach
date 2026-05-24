@@ -46,7 +46,7 @@ export class Server {
             await this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
             await this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
-            await this.app.register(jobsRouter(this.DBClient.jobs, this.DBClient.skillMatchers, this.DBClient.llmTokenUsage));
+            await this.app.register(jobsRouter(this.DBClient.jobs, this.DBClient.llmTokenUsage));
 
             const address = await this.app.listen({
                 port: this.config.port,
