@@ -1,9 +1,16 @@
 import { z } from "zod";
 
+export const StageResourceSchema = z.object({
+    title: z.string(),
+    platform: z.string(),
+    url: z.string(),
+});
+
 export const StageContentSchema = z.object({
     label: z.string(),
     description: z.string(),
     actions: z.array(z.string()),
+    resources: z.array(StageResourceSchema).optional(),
     estimatedTimeframe: z.string().optional(),
 });
 

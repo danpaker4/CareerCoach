@@ -31,7 +31,7 @@ export class RoadmapGenerationService {
         stageCount: number
     ): Promise<RoadmapGenerationResponse> => {
         const [userProfile, jobs, directions] = await Promise.all([
-            this.externalService.readUserPublicProfile(userId),
+            this.externalService.readUserPublicProfile(userId).catch(() => null),
             this.externalService
                 .searchJobs({
                     skills: [],

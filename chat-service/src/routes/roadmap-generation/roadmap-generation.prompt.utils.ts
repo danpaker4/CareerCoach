@@ -6,7 +6,15 @@ export const formatSkillGapContext = (
     mustKnowSkills: string[]
 ): string => {
     const known = new Set(userSkills.map((s) => s.toLowerCase()));
-    const allRequired = [...new Set([...jobRequirements, ...mustKnowSkills])];
+    const seenKeys = new Set<string>();
+    const allRequired: string[] = [];
+    for (const skill of [...jobRequirements, ...mustKnowSkills]) {
+        const key = skill.toLowerCase();
+        if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            allRequired.push(skill);
+        }
+    }
     const alreadyHave = allRequired.filter((s) => known.has(s.toLowerCase()));
     const missing = allRequired.filter((s) => !known.has(s.toLowerCase()));
 
@@ -76,6 +84,13 @@ RULES:
 - Each stage should have 3-5 actions
 - If user is close to the dream job already (few missing skills), compress stages and focus on advancement
 
+RESOURCES:
+- For each stage, include 2-3 learning resources (courses, articles, documentation)
+- Each resource must have a "title" (specific name of course, article, or guide) and a "platform" (the source)
+- Use ONLY these platform values: "Udemy", "Coursera", "YouTube", "Pluralsight", "Medium", "Dev.to", "freeCodeCamp", "Official Docs", "GitHub"
+- Resources must be relevant to the skills being learned in that stage
+- Prefer well-known, real courses and content that actually exist
+
 Respond ONLY with valid JSON:
 {
   "stages": [
@@ -83,6 +98,9 @@ Respond ONLY with valid JSON:
       "label": "string — specific stage name",
       "description": "string — 1-2 sentences describing this milestone",
       "actions": ["concrete action 1", "concrete action 2", ...],
+      "resources": [
+        { "title": "specific course or article name", "platform": "Udemy" }
+      ],
       "estimatedTimeframe": "string — e.g. '2-3 months'"
     }
   ]

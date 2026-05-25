@@ -10,17 +10,24 @@ export class RoadmapGenerationController {
         request: FastifyRequest<{ Body: RoadmapGenerationRequestBody }>,
         reply: FastifyReply
     ): Promise<void> => {
-        const { userId, dreamJob, stageCount } = request.body;
+        const body = request.body as RoadmapGenerationRequestBody | undefined;
+        if (!body || typeof body !== "object") {
+            reply.code(StatusCodes.BAD_REQUEST).send({ error: "Request body is required" });
+            return;
+        }
+
+        const { userId, dreamJob, stageCount } = body;
 
         if (
             !userId ||
             !dreamJob?.trim() ||
             !stageCount ||
+            !Number.isInteger(stageCount) ||
             stageCount < 2 ||
             stageCount > 5
         ) {
             reply.code(StatusCodes.BAD_REQUEST).send({
-                error: "userId (UUID), dreamJob (non-empty string), and stageCount (2-5) are required",
+                error: "userId (UUID), dreamJob (non-empty string), and stageCount (integer 2-5) are required",
             });
             return;
         }
