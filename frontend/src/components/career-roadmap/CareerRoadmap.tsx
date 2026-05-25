@@ -60,33 +60,7 @@ const loadDefaultChatConversationId = async (userId: string): Promise<string | n
   return null;
 };
 
-const STEP_CONTENT = [
-  {
-    label: 'Foundation & Fundamentals',
-    description: 'Build the core skills and knowledge base required for your target role. Focus on essential technologies, tools, and industry practices.',
-    actions: ['Master core programming fundamentals', 'Complete foundational courses or certifications', 'Build small practice projects', 'Learn industry-standard development tools'],
-  },
-  {
-    label: 'Intermediate Growth',
-    description: 'Apply your knowledge on real projects and deepen your technical expertise. Start building a portfolio that demonstrates your growing capabilities.',
-    actions: ['Contribute to real-world projects', 'Build a portfolio with meaningful use cases', 'Learn testing, CI/CD, and best practices', 'Collaborate and get code review feedback'],
-  },
-  {
-    label: 'Advanced Proficiency',
-    description: 'Develop deep expertise in your domain and tackle complex engineering challenges. Become a reliable resource for technical decisions.',
-    actions: ['Solve complex architectural problems', 'Lead technical discussions and design reviews', 'Mentor junior developers on best practices', 'Study advanced patterns and system design'],
-  },
-  {
-    label: 'Leadership & Expertise',
-    description: 'Lead technical initiatives and drive impactful decisions. Your experience and judgment shape the direction of projects and teams.',
-    actions: ['Lead cross-functional technical projects', 'Drive architecture and tooling decisions', 'Build and grow high-performing team members', 'Contribute to engineering roadmaps and OKRs'],
-  },
-  {
-    label: 'Final Stretch',
-    description: 'The last steps before reaching your dream role. Polish your skills, strengthen your network, and position yourself as a standout candidate.',
-    actions: ['Prepare thoroughly for senior-level interviews', 'Build and nurture your professional network', 'Refine your portfolio and personal brand', 'Apply to your top target companies'],
-  },
-];
+const FALLBACK_STEP_CONTENT = { label: '', description: '', actions: [] as string[] };
 
 export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const navigate = useNavigate();
@@ -291,7 +265,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
 
                   <div className="steps-list">
                     {activeRoadmap.stagesToDreamJob.map((stage, idx) => {
-                      const content = STEP_CONTENT[idx] ?? { label: `Step ${idx + 1}`, description: '', actions: [] };
+                      const content = stage.content ?? { ...FALLBACK_STEP_CONTENT, label: `Step ${idx + 1}` };
                       const isNext = !stage.isDone && (idx === 0 || activeRoadmap.stagesToDreamJob[idx - 1]?.isDone);
                       const isLocked = !stage.isDone && !isNext;
 
@@ -311,6 +285,9 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                               {stage.isDone && <span className="badge badge-green">Completed</span>}
                               {isNext && <span className="badge badge-yellow">In Progress</span>}
                               {isLocked && <span className="badge badge-blue">Upcoming</span>}
+                              {content.estimatedTimeframe && (
+                                <span className="step-timeframe">{content.estimatedTimeframe}</span>
+                              )}
                             </div>
                             <h4 className="step-heading">{content.label}</h4>
                             <p className="step-desc">{content.description}</p>

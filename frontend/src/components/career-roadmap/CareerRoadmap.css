@@ -279,6 +279,13 @@
   letter-spacing: 0.02em;
 }
 
+.step-timeframe {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-400);
+  font-weight: 500;
+  margin-left: auto;
+}
+
 .step-heading {
   font-size: var(--fz-base);
   font-weight: 700;
