@@ -468,9 +468,17 @@
 .generation-resource-platform {
   font-size: 9px;
   font-weight: 700;
-  color: var(--clr-primary);
+  color: var(--platform-accent, var(--clr-primary));
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.generation-resource-icon {
+  font-size: 11px;
+  line-height: 1;
 }
 
 .generation-resource-title {

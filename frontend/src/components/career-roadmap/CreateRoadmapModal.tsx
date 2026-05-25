@@ -4,6 +4,7 @@ import { apiFetch } from '../../lib/apiClient';
 import iconX from '../../assets/icon-x.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
+import { getPlatformStyle } from './platform-config';
 import './CreateRoadmapModal.css';
 import type { StageContent, RoadmapGenerationResponse } from './career-roadmap.types';
 
@@ -287,20 +288,27 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
                       )}
                       {stage.resources && stage.resources.length > 0 && (
                         <div className="generation-resource-row">
-                          {stage.resources.slice(0, 2).map((r, j) => (
-                            <a
-                              key={j}
-                              href={r.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="generation-resource-chip"
-                            >
-                              <span className="generation-resource-platform">{r.platform}</span>
-                              <span className="generation-resource-title">{r.title}</span>
-                            </a>
-                          ))}
-                          {stage.resources.length > 2 && (
-                            <span className="generation-resource-more">+{stage.resources.length - 2} more</span>
+                          {stage.resources.slice(0, 3).map((r, j) => {
+                            const ps = getPlatformStyle(r.platform);
+                            return (
+                              <a
+                                key={j}
+                                href={r.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="generation-resource-chip"
+                                style={{ '--platform-accent': ps.accentColor } as React.CSSProperties}
+                              >
+                                <span className="generation-resource-platform">
+                                  <span className="generation-resource-icon">{ps.icon}</span>
+                                  {ps.label}
+                                </span>
+                                <span className="generation-resource-title">{r.title}</span>
+                              </a>
+                            );
+                          })}
+                          {stage.resources.length > 3 && (
+                            <span className="generation-resource-more">+{stage.resources.length - 3} more</span>
                           )}
                         </div>
                       )}

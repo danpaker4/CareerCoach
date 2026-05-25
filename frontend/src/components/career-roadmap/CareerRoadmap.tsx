@@ -10,6 +10,7 @@ import iconList from '../../assets/icon-list.svg';
 import iconMessage from '../../assets/icon-message.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
+import { getPlatformStyle, getResourceTypeStyle } from './platform-config';
 import './CareerRoadmap.css';
 import type { CareerRoadmapData, CareerRoadmapProps, FetchState } from './career-roadmap.types';
 
@@ -309,18 +310,37 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                               <div className="step-resources">
                                 <span className="step-resources-label">Learning Resources</span>
                                 <div className="step-resource-cards">
-                                  {content.resources.map((resource) => (
-                                    <a
-                                      key={resource.url}
-                                      href={resource.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="resource-card"
-                                    >
-                                      <span className="resource-platform">{resource.platform}</span>
-                                      <span className="resource-title">{resource.title}</span>
-                                    </a>
-                                  ))}
+                                  {content.resources.map((resource) => {
+                                    const ps = getPlatformStyle(resource.platform);
+                                    const ts = getResourceTypeStyle(resource.type);
+                                    return (
+                                      <a
+                                        key={resource.url}
+                                        href={resource.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="resource-card"
+                                        style={{
+                                          '--platform-accent': ps.accentColor,
+                                          '--platform-bg': ps.bgTint,
+                                        } as React.CSSProperties}
+                                      >
+                                        <div className="resource-card-header">
+                                          <span className="resource-card-icon">{ps.icon}</span>
+                                          <span className="resource-platform">{ps.label}</span>
+                                        </div>
+                                        <span className="resource-title">{resource.title}</span>
+                                        {ts && (
+                                          <span
+                                            className="resource-type-badge"
+                                            style={{ color: ts.color, background: ts.bg }}
+                                          >
+                                            {ts.label}
+                                          </span>
+                                        )}
+                                      </a>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}

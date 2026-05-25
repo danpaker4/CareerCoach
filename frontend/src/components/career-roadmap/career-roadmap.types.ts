@@ -1,9 +1,12 @@
 import type { User } from '../../types/user';
 
+export type ResourceType = 'course' | 'video' | 'practice' | 'article' | 'docs' | 'repository' | 'certification';
+
 export interface StageResource {
   title: string;
   platform: string;
   url: string;
+  type?: ResourceType;
 }
 
 export interface StageContent {
