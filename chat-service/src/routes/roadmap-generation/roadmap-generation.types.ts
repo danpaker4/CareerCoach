@@ -4,10 +4,13 @@ export type RoadmapGenerationRequestBody = {
     stageCount: number;
 };
 
+export type ResourceType = "course" | "video" | "practice" | "article" | "docs" | "repository" | "certification";
+
 export type GeneratedResource = {
     title: string;
     platform: string;
     url: string;
+    type: ResourceType;
 };
 
 export type GeneratedStageContent = {

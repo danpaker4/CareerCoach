@@ -1,4 +1,4 @@
-import type { GeneratedResource, GeneratedStageContent, RoadmapGenerationResponse } from "./roadmap-generation.types";
+import type { GeneratedResource, GeneratedStageContent, ResourceType, RoadmapGenerationResponse } from "./roadmap-generation.types";
 
 const PLATFORM_SEARCH_URLS: Record<string, (query: string) => string> = {
     udemy: (q) => `https://www.udemy.com/courses/search/?q=${encodeURIComponent(q)}`,
@@ -10,7 +10,42 @@ const PLATFORM_SEARCH_URLS: Record<string, (query: string) => string> = {
     freecodecamp: (q) => `https://www.freecodecamp.org/news/search/?query=${encodeURIComponent(q)}`,
     "official docs": (q) => `https://www.google.com/search?q=${encodeURIComponent(q + " official documentation")}`,
     github: (q) => `https://github.com/search?q=${encodeURIComponent(q)}&type=repositories`,
+    leetcode: (q) => `https://leetcode.com/problemset/?search=${encodeURIComponent(q)}`,
+    hackerrank: (q) => `https://www.hackerrank.com/domains?filters%5Bsubdomains%5D%5B%5D=${encodeURIComponent(q)}`,
+    "stack overflow": (q) => `https://stackoverflow.com/search?q=${encodeURIComponent(q)}`,
+    mdn: (q) => `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(q)}`,
+    "aws training": (q) => `https://www.aws.training/search?searchPhrase=${encodeURIComponent(q)}`,
+    "google cloud": (q) => `https://cloud.google.com/s/results/${encodeURIComponent(q)}`,
+    "linkedin learning": (q) => `https://www.linkedin.com/learning/search?keywords=${encodeURIComponent(q)}`,
+    codecademy: (q) => `https://www.codecademy.com/search?query=${encodeURIComponent(q)}`,
+    edx: (q) => `https://www.edx.org/search?q=${encodeURIComponent(q)}`,
+    kaggle: (q) => `https://www.kaggle.com/search?q=${encodeURIComponent(q)}`,
 };
+
+const PLATFORM_TYPE_MAP: Record<string, ResourceType> = {
+    udemy: "course",
+    coursera: "course",
+    pluralsight: "course",
+    "linkedin learning": "course",
+    codecademy: "course",
+    edx: "course",
+    youtube: "video",
+    leetcode: "practice",
+    hackerrank: "practice",
+    kaggle: "practice",
+    medium: "article",
+    "dev.to": "article",
+    freecodecamp: "article",
+    "stack overflow": "article",
+    "official docs": "docs",
+    mdn: "docs",
+    github: "repository",
+    "aws training": "certification",
+    "google cloud": "certification",
+};
+
+const deriveResourceType = (platform: string): ResourceType =>
+    PLATFORM_TYPE_MAP[platform.toLowerCase()] ?? "article";
 
 const buildResourceUrl = (title: string, platform: string): string => {
     const key = platform.toLowerCase();
@@ -49,6 +84,7 @@ const parseResources = (raw: unknown): GeneratedResource[] => {
                 title,
                 platform,
                 url: buildResourceUrl(title, platform),
+                type: deriveResourceType(platform),
             };
         })
         .filter((r) => r.title.length > 0);

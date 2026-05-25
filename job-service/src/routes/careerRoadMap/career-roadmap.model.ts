@@ -4,6 +4,7 @@ export const StageResourceSchema = z.object({
     title: z.string(),
     platform: z.string(),
     url: z.string(),
+    type: z.enum(["course", "video", "practice", "article", "docs", "repository", "certification"]).optional(),
 });
 
 export const StageContentSchema = z.object({

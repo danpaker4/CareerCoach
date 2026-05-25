@@ -85,9 +85,11 @@ RULES:
 - If user is close to the dream job already (few missing skills), compress stages and focus on advancement
 
 RESOURCES:
-- For each stage, include 2-3 learning resources (courses, articles, documentation)
+- For each stage, include 3-4 learning resources (courses, articles, documentation, practice platforms)
 - Each resource must have a "title" (specific name of course, article, or guide) and a "platform" (the source)
-- Use ONLY these platform values: "Udemy", "Coursera", "YouTube", "Pluralsight", "Medium", "Dev.to", "freeCodeCamp", "Official Docs", "GitHub"
+- Use ONLY these platform values: "Udemy", "Coursera", "YouTube", "Pluralsight", "Medium", "Dev.to", "freeCodeCamp", "Official Docs", "GitHub", "LeetCode", "HackerRank", "Stack Overflow", "MDN", "AWS Training", "Google Cloud", "LinkedIn Learning", "Codecademy", "edX", "Kaggle"
+- Mix resource types across stages: courses, articles, practice problems, docs, and certifications
+- Vary platforms across stages — don't use the same 2-3 platforms in every stage
 - Resources must be relevant to the skills being learned in that stage
 - Prefer well-known, real courses and content that actually exist
 
