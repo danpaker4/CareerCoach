@@ -48,12 +48,15 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
   const [generatedStages, setGeneratedStages] = useState<StageContent[]>([]);
   const [generationState, setGenerationState] = useState<GenerationState>('idle');
   const [generationError, setGenerationError] = useState('');
+  const [generationKey, setGenerationKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Trigger AI generation when entering step 3
+  // Trigger AI generation when entering step 3 or when generationKey bumps
   useEffect(() => {
     if (step !== 3 || generationState === 'success') return;
 
+    // Abort any previous in-flight request
+    abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setGenerationState('generating');
@@ -67,6 +70,7 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
       signal: controller.signal,
     })
       .then(async (res) => {
+        if (controller.signal.aborted) return;
         if (!res.ok) throw new Error(`Generation failed (${res.status})`);
         const data: unknown = await res.json();
         if (!isValidGenerationResponse(data)) {
@@ -77,21 +81,21 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (controller.signal.aborted) return;
         setGenerationError(err instanceof Error ? err.message : 'Generation failed');
         setGenerationState('error');
       });
 
     return () => { controller.abort(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, generationKey]);
 
   const retryGeneration = () => {
+    abortRef.current?.abort();
     setGenerationState('idle');
     setGeneratedStages([]);
     setGenerationError('');
-    // Re-trigger the effect
-    setStep(2);
-    setTimeout(() => setStep(3), 0);
+    setGenerationKey((k) => k + 1);
   };
 
   const handleSubmit = async () => {
@@ -280,6 +284,25 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
                             <li className="generation-stage-more">+{stage.actions.length - 3} more</li>
                           )}
                         </ul>
+                      )}
+                      {stage.resources && stage.resources.length > 0 && (
+                        <div className="generation-resource-row">
+                          {stage.resources.slice(0, 2).map((r, j) => (
+                            <a
+                              key={j}
+                              href={r.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="generation-resource-chip"
+                            >
+                              <span className="generation-resource-platform">{r.platform}</span>
+                              <span className="generation-resource-title">{r.title}</span>
+                            </a>
+                          ))}
+                          {stage.resources.length > 2 && (
+                            <span className="generation-resource-more">+{stage.resources.length - 2} more</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
