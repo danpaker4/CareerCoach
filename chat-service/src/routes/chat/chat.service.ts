@@ -762,9 +762,35 @@ export class ChatService {
         const jobs = await this.externalService.searchJobsByPlan(searchPlan);
         console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=WORK_DIRECTION_INTENT results=${jobs.length}`);
         if (jobs.length === 0) {
+            const wantedJobInput = buildWantedJobInputFromSearch({
+                userId: ctx.userId,
+                normalizedMessage: ctx.normalizedMessage,
+                searchFilters: workDirectionFilters,
+            });
+            const titleForSave = normalizedQuery.trim().length > 0 ? normalizedQuery.trim() : wantedJobInput?.jobTitle;
+            let wantedSavedTitle: string | null = null;
+            if (wantedJobInput && titleForSave) {
+                const saveResult = await this.wantedJobService.create({
+                    ...wantedJobInput,
+                    jobTitle: titleForSave,
+                });
+                if (saveResult.status === "error") {
+                    console.warn(
+                        `[CHAT][WANTED_JOB] userId=${ctx.userId} trigger=WORK_DIRECTION_INTENT status=error message=${saveResult.message}`
+                    );
+                } else {
+                    wantedSavedTitle = saveResult.jobTitle;
+                    console.info(
+                        `[CHAT][WANTED_JOB] userId=${ctx.userId} trigger=WORK_DIRECTION_INTENT status=${saveResult.status} title=${saveResult.jobTitle}`
+                    );
+                }
+            }
+            const savedSuffix = wantedSavedTitle
+                ? ` I have saved "${wantedSavedTitle}" to your wanted jobs and will alert you when a matching role is added.`
+                : "";
             const fallback = normalizedQuery.toLowerCase().includes("cyber")
-                ? `I searched for ${normalizedQuery} roles but didn’t find exact matches. I can broaden it to beginner-friendly cybersecurity roles like SOC Analyst, Cybersecurity Analyst, Security QA, or Vulnerability Analyst.`
-                : `I searched for ${normalizedQuery} roles but didn’t find exact matches. I can broaden this to related beginner-friendly roles and adjacent directions.`;
+                ? `I searched for ${normalizedQuery} roles but didn’t find exact matches.${savedSuffix} I can broaden it to beginner-friendly cybersecurity roles like SOC Analyst, Cybersecurity Analyst, Security QA, or Vulnerability Analyst.`
+                : `I searched for ${normalizedQuery} roles but didn’t find exact matches.${savedSuffix} I can broaden this to related beginner-friendly roles and adjacent directions.`;
             await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, fallback);
             return { reply: fallback, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }

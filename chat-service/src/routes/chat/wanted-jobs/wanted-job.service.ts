@@ -13,6 +13,34 @@ export type CreateWantedJobResult =
     | { status: "created" | "existing"; jobTitle: string }
     | { status: "error"; message: string };
 
+const LOCATION_PREPOSITIONS = ["in", "at", "near", "around", "based in", "located in"];
+
+const REMOTE_HINTS = ["remote", "remote-only", "fully remote", "hybrid", "anywhere"];
+
+const extractLocationFromMessage = (message: string): string | undefined => {
+    const trimmed = message.trim();
+    if (trimmed.length === 0) return undefined;
+
+    const lower = trimmed.toLowerCase();
+    for (const hint of REMOTE_HINTS) {
+        if (lower.includes(hint)) {
+            return hint;
+        }
+    }
+
+    const prepositionAlt = LOCATION_PREPOSITIONS.join("|");
+    const pattern = new RegExp(`\\b(?:${prepositionAlt})\\s+([A-Z][\\w'-]+(?:\\s+[A-Z][\\w'-]+){0,3})`, "g");
+    let lastMatch: RegExpExecArray | null = null;
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(trimmed)) !== null) {
+        lastMatch = m;
+    }
+    if (!lastMatch) return undefined;
+    const candidate = lastMatch[1].trim().replace(/[.,!?]+$/, "");
+    if (candidate.length < 2 || candidate.length > 80) return undefined;
+    return candidate;
+};
+
 export const buildWantedJobInputFromSearch = (params: {
     userId: string;
     normalizedMessage: string;
@@ -41,11 +69,13 @@ export const buildWantedJobInputFromSearch = (params: {
     }
 
     const seniority = searchFilters.experienceLevel?.trim() || undefined;
+    const location = extractLocationFromMessage(normalizedMessage);
     return {
         userId,
         jobTitle: inferredTitle || dedupedKeywords[0],
         keywords: dedupedKeywords,
         seniority,
+        location,
         rawText: normalizedMessage.trim().slice(0, 1000),
     };
 };
