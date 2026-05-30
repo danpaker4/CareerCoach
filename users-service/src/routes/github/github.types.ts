@@ -1,6 +1,7 @@
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { SchematicRequest } from "../../types/fastify";
-import { githubCallbackSchema } from "./github.schema";
+import { githubCallbackSchema, githubLinkSchema } from "./github.schema";
+import type { User } from "../users/user.model";
 
 export type GithubTokenResponse = {
   access_token: string;
@@ -70,6 +71,22 @@ export type GithubTreeResponse = {
   truncated?: boolean;
 };
 
+export type GithubLinkResult =
+  | {
+      status: "updated";
+      user: User;
+    }
+  | {
+      status: "not_found";
+    }
+  | {
+      status: "github_in_use";
+    };
+
 export type GithubHandlerType = {
     githubCallback: (request: SchematicRequest<typeof githubCallbackSchema>, reply: FastifyReply) => Promise<void>;
+    githubLink: (
+        request: SchematicRequest<typeof githubLinkSchema> & Pick<FastifyRequest, "authUser">,
+        reply: FastifyReply,
+    ) => Promise<void>;
 };

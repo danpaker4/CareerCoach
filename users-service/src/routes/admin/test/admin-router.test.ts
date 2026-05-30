@@ -65,6 +65,35 @@ describe("Admin Router", () => {
         });
     });
 
+    it("returns current admin session for admin users", async () => {
+        await server.DBClient.users.insertOne(toUserDocument(adminUser));
+
+        const response = await server.app.inject({
+            method: "GET",
+            url: "/api/admin/session",
+            headers: authHeadersForUser(adminUser),
+        });
+
+        expect(response.statusCode).toBe(StatusCodes.OK);
+        expect(response.json()).toEqual({ adminUserId: adminUser.id });
+    });
+
+    it("returns 403 for admin session when authenticated user is not an admin", async () => {
+        await server.DBClient.users.insertOne(toUserDocument(regularUser));
+
+        const response = await server.app.inject({
+            method: "GET",
+            url: "/api/admin/session",
+            headers: authHeadersForUser(regularUser),
+        });
+
+        expect(response.statusCode).toBe(StatusCodes.FORBIDDEN);
+        expect(response.json()).toEqual({
+            error: "Admin access required",
+            errorCode: "ADMIN_REQUIRED",
+        });
+    });
+
     it("returns 403 for token usage when authenticated user is not an admin", async () => {
         await server.DBClient.users.insertOne(toUserDocument(regularUser));
 
