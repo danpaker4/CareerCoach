@@ -1,0 +1,14 @@
+{
+  "id": "eval-06-guided-two-user-turns",
+  "messages": [
+    { "role": "user", "content": "hi im daniel, product manager for 6 years" },
+    { "role": "assistant", "content": "What types of products did you work on?" },
+    { "role": "user", "content": "mostly b2b saas, i liked working with engineers and customers" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["you must switch to engineering"]
+  }
+}

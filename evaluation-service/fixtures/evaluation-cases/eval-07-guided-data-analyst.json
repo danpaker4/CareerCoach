@@ -1,0 +1,12 @@
+{
+  "id": "eval-07-guided-data-analyst",
+  "messages": [
+    { "role": "user", "content": "i analyze data with sql and python, 3 years in fintech" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["data science is the only"]
+  }
+}

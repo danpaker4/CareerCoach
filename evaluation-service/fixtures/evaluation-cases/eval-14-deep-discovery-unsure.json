@@ -1,0 +1,12 @@
+{
+  "id": "eval-14-deep-discovery-unsure",
+  "messages": [
+    { "role": "user", "content": "im not sure what i want to do with my career" }
+  ],
+  "expected": {
+    "mode": "DEEP_DISCOVERY",
+    "maxLines": 12,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["the only career path is", "you must become"]
+  }
+}

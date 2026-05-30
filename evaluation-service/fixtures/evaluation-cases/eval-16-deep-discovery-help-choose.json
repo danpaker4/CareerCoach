@@ -1,0 +1,12 @@
+{
+  "id": "eval-16-deep-discovery-help-choose",
+  "messages": [
+    { "role": "user", "content": "help me choose between product and engineering, i feel lost" }
+  ],
+  "expected": {
+    "mode": "DEEP_DISCOVERY",
+    "maxLines": 12,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["pick product immediately", "pick engineering immediately"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "eval-03-guided-timeline-asap",
+  "messages": [
+    { "role": "user", "content": "i did manual qa for 3 years" },
+    { "role": "assistant", "content": "What did you enjoy most about that work?" },
+    { "role": "user", "content": "i need to change jobs soon, maybe in the next 2 months" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["apply only to"]
+  }
+}

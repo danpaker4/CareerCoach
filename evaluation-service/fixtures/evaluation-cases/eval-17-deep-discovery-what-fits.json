@@ -1,0 +1,12 @@
+{
+  "id": "eval-17-deep-discovery-what-fits",
+  "messages": [
+    { "role": "user", "content": "what fits me? i dont know my strengths yet" }
+  ],
+  "expected": {
+    "mode": "DEEP_DISCOVERY",
+    "maxLines": 12,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["the perfect job is"]
+  }
+}
