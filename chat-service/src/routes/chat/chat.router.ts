@@ -7,6 +7,8 @@ import { ChatValidationService } from "./llm/chat.validation.service";
 import { ChatController } from "./chat.controller";
 import { ChatExternalService } from "../external-chat/chat.external.service";
 import { validateChatMessageBody } from "./chat.middleware";
+import { ChatAuthService } from "./chat-auth.service";
+import { createValidateAuthenticatedChatBody } from "./chat-auth.middleware";
 import { ChatService } from "./chat.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
 import { createTextCompletionPortFromChain } from "../../ai/text-completion.utils";
@@ -25,8 +27,13 @@ import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
 import type { MongoClient } from "../../mongo/mongo";
 import { JobRankingService } from "./ranking/job-ranking.service";
+import type { ChatRateLimitService } from "./rate-limit/chat-rate-limit.service";
 
-export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
+export const chatRouter = (
+    dbClient: MongoClient,
+    chatConfig: ServerConfig["chatConfig"],
+    rateLimitService: ChatRateLimitService
+) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
     const tokenUsageRepository = new LlmTokenUsageRepository(dbClient.llmTokenUsage);
     const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
@@ -72,7 +79,12 @@ export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chat
         pipelineIntentService,
         pipelineService
     );
-    const controller = new ChatController(service);
+    const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
+    const controller = new ChatController(service, rateLimitService);
 
-    app.post("/chat/message", { preHandler: validateChatMessageBody }, controller.sendMessage);
+    app.post(
+        "/chat/message",
+        { preHandler: [validateChatMessageBody, createValidateAuthenticatedChatBody(authService)] },
+        controller.sendMessage
+    );
 };

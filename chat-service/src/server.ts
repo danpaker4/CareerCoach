@@ -6,6 +6,9 @@ import { MongoClient } from "./mongo/mongo";
 import { chatRouter } from "./routes/chat/chat.router";
 import { conversationRouter } from "./routes/conversation/conversation.router";
 import { benchmarkRouter } from "./routes/benchmark/benchmark.router";
+import { ChatRateLimitRepository } from "./routes/chat/rate-limit/chat-rate-limit.repository";
+import { ChatRateLimitService } from "./routes/chat/rate-limit/chat-rate-limit.service";
+import { chatRateLimitRouter } from "./routes/chat/rate-limit/chat-rate-limit.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -37,8 +40,18 @@ export class Server {
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
 
+            const rateLimitRepository = new ChatRateLimitRepository(
+                this.DBClient.chatRateLimitConfig,
+                this.DBClient.chatRateLimitConfigHistory,
+                this.DBClient.chatRateLimitCounters,
+                this.DBClient.chatActiveRequests,
+                this.DBClient.llmTokenUsage
+            );
+            const rateLimitService = new ChatRateLimitService(rateLimitRepository);
+
             await this.app.register(conversationRouter(this.DBClient, this.config.chatConfig));
-            await this.app.register(chatRouter(this.DBClient, this.config.chatConfig));
+            await this.app.register(chatRouter(this.DBClient, this.config.chatConfig, rateLimitService));
+            await this.app.register(chatRateLimitRouter(rateLimitService, this.config.chatConfig));
             await this.app.register(benchmarkRouter(this.DBClient, this.config.chatConfig));
 
             const address = await this.app.listen({ 

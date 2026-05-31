@@ -34,6 +34,13 @@ export const Management = () => (
           <span className="management-home-card-action">Open benchmarks</span>
         </Link>
 
+        <Link to="/management/rate-limits" className="management-home-card">
+          <span className="management-eyebrow">Controls</span>
+          <h2>Chat rate limits</h2>
+          <p>Update live chat request limits, active request locks, and daily token budgets.</p>
+          <span className="management-home-card-action">Open limits</span>
+        </Link>
+
         <Link to="/management/llm-evaluation" className="management-home-card">
           <span className="management-eyebrow">Quality</span>
           <h2>LLM evaluation</h2>

@@ -4,6 +4,8 @@ import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import type { ChatProps, ChatResponse, ConversationResponse, Message } from './chat.types';
 
+const HTTP_TOO_MANY_REQUESTS = 429;
+
 const createMessage = (role: Message['role'], content: string): Message => ({
     id: crypto.randomUUID(),
     role,
@@ -61,6 +63,36 @@ const readConversationResponse = async (response: Response): Promise<Conversatio
         return null;
     }
     return payload as ConversationResponse;
+};
+
+const readChatErrorMessage = async (response: Response): Promise<string> => {
+    const payload: unknown = await response.json().catch(() => null);
+    if (typeof payload !== 'object' || payload === null) {
+        return 'I could not reach the chat service. Please try again.';
+    }
+
+    const record = payload as Record<string, unknown>;
+    const retryAfterMs = typeof record.retryAfterMs === 'number' ? record.retryAfterMs : null;
+    const retryText = retryAfterMs && retryAfterMs > 0
+        ? ` Try again in ${Math.max(1, Math.ceil(retryAfterMs / 1000))} seconds.`
+        : '';
+    if (record.errorCode === 'CHAT_REQUEST_IN_PROGRESS') {
+        return 'I am still generating the previous response. Please wait for it to finish.';
+    }
+    if (record.errorCode === 'CHAT_MESSAGE_TOO_LONG') {
+        return typeof record.error === 'string' ? record.error : 'That message is too long. Please shorten it and try again.';
+    }
+    if (record.errorCode === 'CHAT_TOKEN_BUDGET_EXCEEDED') {
+        return `The chat token budget has been reached for now.${retryText}`;
+    }
+    if (record.errorCode === 'CHAT_DAILY_LIMIT_EXCEEDED') {
+        return `The daily chat limit has been reached.${retryText}`;
+    }
+    if (record.errorCode === 'CHAT_RATE_LIMITED') {
+        return `Too many chat messages were sent too quickly.${retryText}`;
+    }
+
+    return typeof record.error === 'string' ? record.error : 'I could not reach the chat service. Please try again.';
 };
 
 export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps) => {
@@ -152,7 +184,11 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
                 body: JSON.stringify({ userId, conversationId, message: text, userProfile })
             });
             if (!response.ok) {
-                setMessages(prev => [...prev, createMessage('assistant', 'I could not reach the chat service. Please try again.')]);
+                const errorMessage = await readChatErrorMessage(response);
+                if (response.status === HTTP_TOO_MANY_REQUESTS) {
+                    setInput(text);
+                }
+                setMessages(prev => [...prev, createMessage('assistant', errorMessage)]);
                 return;
             }
 

@@ -6,8 +6,8 @@
         "dev": "tsx watch src/index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
-        "test": "tsx --test src/routes/chat/chat.direction.utils.test.ts",
-        "test:run": "tsx --test src/routes/chat/chat.direction.utils.test.ts"
+        "test": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts",
+        "test:run": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts"
     },
     "keywords": [],
     "author": "",

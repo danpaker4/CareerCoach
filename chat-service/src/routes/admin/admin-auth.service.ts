@@ -1,20 +1,20 @@
-export type BenchmarkAdminSession = {
+export type AdminSession = {
     readonly adminUserId: string;
     readonly adminUserName?: string;
     readonly adminUserEmail?: string;
 };
 
-export type BenchmarkAdminAuthFailure = {
+export type AdminAuthFailure = {
     readonly statusCode: number;
     readonly error: string;
     readonly errorCode?: string;
 };
 
-export type BenchmarkAdminAuthResult =
-    | { readonly status: "success"; readonly session: BenchmarkAdminSession }
-    | { readonly status: "failure"; readonly failure: BenchmarkAdminAuthFailure };
+export type AdminAuthResult =
+    | { readonly status: "success"; readonly session: AdminSession }
+    | { readonly status: "failure"; readonly failure: AdminAuthFailure };
 
-const isAdminSession = (value: unknown): value is BenchmarkAdminSession => {
+const isAdminSession = (value: unknown): value is AdminSession => {
     if (typeof value !== "object" || value === null) {
         return false;
     }
@@ -28,7 +28,7 @@ const isAdminSession = (value: unknown): value is BenchmarkAdminSession => {
     );
 };
 
-const readAuthFailure = (payload: unknown, statusCode: number): BenchmarkAdminAuthFailure => {
+const readAuthFailure = (payload: unknown, statusCode: number): AdminAuthFailure => {
     if (typeof payload !== "object" || payload === null) {
         return { statusCode, error: "Admin access required" };
     }
@@ -41,10 +41,10 @@ const readAuthFailure = (payload: unknown, statusCode: number): BenchmarkAdminAu
     };
 };
 
-export class BenchmarkAdminAuthService {
+export class AdminAuthService {
     constructor(private readonly usersServiceBaseUrl: string) { }
 
-    verifyAdmin = async (authorizationHeader: string | undefined): Promise<BenchmarkAdminAuthResult> => {
+    verifyAdmin = async (authorizationHeader: string | undefined): Promise<AdminAuthResult> => {
         if (!authorizationHeader) {
             return {
                 status: "failure",
