@@ -6,6 +6,7 @@ export const ADMIN_ROUTE_PATHS = {
     admins: "/admins",
     adminById: "/admins/:userId",
     llmTokenUsage: "/llm-token-usage",
+    session: "/session",
 } as const;
 
 export const ADMIN_USERS_DEFAULT_PAGE = 1;

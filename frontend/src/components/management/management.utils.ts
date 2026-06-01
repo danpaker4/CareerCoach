@@ -1,5 +1,6 @@
 import { apiFetch } from '../../lib/apiClient';
 import {
+  ADMIN_BENCHMARKS_PATH,
   ADMIN_DELETE_USER_PATH,
   ADMIN_DEMOTE_PATH,
   ADMIN_LLM_TOKEN_USAGE_PATH,
@@ -18,6 +19,16 @@ import type {
   AdminUsersPagination,
   AdminUsersResult,
   AdminUserSummary,
+  BenchmarkCandidate,
+  BenchmarkCandidateId,
+  BenchmarkCandidateRunResult,
+  BenchmarkCaseResult,
+  BenchmarkCaseSummary,
+  BenchmarkConfig,
+  BenchmarkMetricBreakdown,
+  BenchmarkParseEvent,
+  BenchmarkRubricItem,
+  BenchmarkRunSummary,
   EvaluationCaseSummary,
   EvaluationCheckResult,
   EvaluationExpected,
@@ -182,11 +193,7 @@ export const parseTokenUsage = (value: unknown): AdminLlmTokenUsageResult | null
   }
 
   const rangeRecord = range as Record<string, unknown>;
-  if (
-    typeof rangeRecord.from !== 'string' ||
-    typeof rangeRecord.to !== 'string' ||
-    !isNumber(rangeRecord.days)
-  ) {
+  if (typeof rangeRecord.from !== 'string' || typeof rangeRecord.to !== 'string' || !isNumber(rangeRecord.days)) {
     return null;
   }
 
@@ -214,8 +221,250 @@ export const buildAdminLlmTokenUsageUrl = (days: TokenUsageDays): string => {
   return `${ADMIN_LLM_TOKEN_USAGE_PATH}?${params.toString()}`;
 };
 
+const isBenchmarkCandidateId = (value: unknown): value is BenchmarkCandidateId =>
+  value === 'ollama-llama' || value === 'gemini';
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const isBenchmarkCandidate = (value: unknown): value is BenchmarkCandidate => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    isBenchmarkCandidateId(candidate.id) &&
+    typeof candidate.label === 'string' &&
+    isLlmProvider(candidate.provider) &&
+    typeof candidate.model === 'string' &&
+    typeof candidate.available === 'boolean' &&
+    (candidate.unavailableReason === undefined || typeof candidate.unavailableReason === 'string')
+  );
+};
+
+const isBenchmarkCaseSummary = (value: unknown): value is BenchmarkCaseSummary => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const benchmarkCase = value as Record<string, unknown>;
+  return (
+    typeof benchmarkCase.id === 'string' &&
+    typeof benchmarkCase.title === 'string' &&
+    typeof benchmarkCase.description === 'string'
+  );
+};
+
+const isBenchmarkRubricItem = (value: unknown): value is BenchmarkRubricItem => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const item = value as Record<string, unknown>;
+  return typeof item.label === 'string' && isNumber(item.weight) && typeof item.description === 'string';
+};
+
+export const parseBenchmarkConfig = (value: unknown): BenchmarkConfig | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (!Array.isArray(payload.candidates) || !Array.isArray(payload.cases) || !Array.isArray(payload.rubric)) {
+    return null;
+  }
+
+  return {
+    candidates: payload.candidates.filter(isBenchmarkCandidate),
+    cases: payload.cases.filter(isBenchmarkCaseSummary),
+    rubric: payload.rubric.filter(isBenchmarkRubricItem),
+  };
+};
+
+const isBenchmarkMetricBreakdown = (value: unknown): value is BenchmarkMetricBreakdown => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const metric = value as Record<string, unknown>;
+  const hasCurrentMetricShape =
+    isNumber(metric.responseCoverageScore) &&
+    isNumber(metric.latencyScore) &&
+    isNumber(metric.tokenEfficiencyScore);
+  const hasLegacyMetricShape =
+    isNumber(metric.workflowScore) &&
+    isNumber(metric.structuredOutputScore) &&
+    isNumber(metric.guardrailScore) &&
+    isNumber(metric.reliabilityScore) &&
+    isNumber(metric.tokenEfficiencyScore);
+
+  return hasCurrentMetricShape || hasLegacyMetricShape;
+};
+
+const clampBenchmarkScore = (score: number): number => Math.max(0, Math.min(100, Math.round(score)));
+
+const normalizeBenchmarkMetricBreakdown = (metricBreakdown: BenchmarkMetricBreakdown): BenchmarkMetricBreakdown => {
+  const metric = metricBreakdown as unknown as Record<string, unknown>;
+  if (
+    isNumber(metric.responseCoverageScore) &&
+    isNumber(metric.latencyScore) &&
+    isNumber(metric.tokenEfficiencyScore)
+  ) {
+    return metricBreakdown;
+  }
+
+  const workflowScore = isNumber(metric.workflowScore) ? metric.workflowScore : 0;
+  const structuredOutputScore = isNumber(metric.structuredOutputScore) ? metric.structuredOutputScore : 0;
+  const guardrailScore = isNumber(metric.guardrailScore) ? metric.guardrailScore : 0;
+  const reliabilityScore = isNumber(metric.reliabilityScore) ? metric.reliabilityScore : 0;
+  const tokenEfficiencyScore = isNumber(metric.tokenEfficiencyScore) ? metric.tokenEfficiencyScore : 0;
+  return {
+    responseCoverageScore: clampBenchmarkScore((workflowScore + structuredOutputScore + guardrailScore) / 3),
+    latencyScore: clampBenchmarkScore(reliabilityScore),
+    tokenEfficiencyScore: clampBenchmarkScore(tokenEfficiencyScore),
+  };
+};
+
+const calculateBenchmarkAutomaticScore = (metricBreakdown: BenchmarkMetricBreakdown): number =>
+  clampBenchmarkScore(
+    (metricBreakdown.responseCoverageScore + metricBreakdown.latencyScore + metricBreakdown.tokenEfficiencyScore) / 3,
+  );
+
+const normalizeBenchmarkCaseResult = (result: BenchmarkCaseResult): BenchmarkCaseResult => {
+  const metricBreakdown = normalizeBenchmarkMetricBreakdown(result.metricBreakdown);
+  const resultRecord = result as unknown as Record<string, unknown>;
+  const caseDescription = typeof resultRecord.caseDescription === 'string' ? resultRecord.caseDescription : result.caseTitle;
+  return {
+    ...result,
+    caseDescription,
+    metricBreakdown,
+    automaticScore: calculateBenchmarkAutomaticScore(metricBreakdown),
+  };
+};
+
+const normalizeBenchmarkCandidateRunResult = (result: BenchmarkCandidateRunResult): BenchmarkCandidateRunResult => {
+  const caseResults = result.caseResults.map(normalizeBenchmarkCaseResult);
+  const automaticScore = caseResults.length > 0
+    ? clampBenchmarkScore(caseResults.reduce((sum, caseResult) => sum + caseResult.automaticScore, 0) / caseResults.length)
+    : result.automaticScore;
+
+  return {
+    ...result,
+    caseResults,
+    successRate: caseResults.length > 0
+      ? caseResults.filter((caseResult) => caseResult.success).length / caseResults.length
+      : result.successRate,
+    automaticScore,
+    overallScore: automaticScore,
+  };
+};
+
+const normalizeBenchmarkRunSummary = (run: BenchmarkRunSummary): BenchmarkRunSummary => ({
+  ...run,
+  candidateResults: run.candidateResults.map(normalizeBenchmarkCandidateRunResult),
+});
+
+const isBenchmarkParseEvent = (value: unknown): value is BenchmarkParseEvent => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const event = value as Record<string, unknown>;
+  return (
+    typeof event.operation === 'string' &&
+    typeof event.rawText === 'string' &&
+    (event.parseStatus === 'success' || event.parseStatus === 'fallback')
+  );
+};
+
+const isBenchmarkCaseResult = (value: unknown): value is BenchmarkCaseResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const result = value as Record<string, unknown>;
+  return (
+    typeof result.caseId === 'string' &&
+    typeof result.caseTitle === 'string' &&
+    (result.caseDescription === undefined || typeof result.caseDescription === 'string') &&
+    typeof result.success === 'boolean' &&
+    isNumber(result.responseCount) &&
+    typeof result.finalReply === 'string' &&
+    isStringArray(result.replies) &&
+    isStringArray(result.failedAssertions) &&
+    Array.isArray(result.parseEvents) &&
+    result.parseEvents.every(isBenchmarkParseEvent) &&
+    isNumber(result.latencyMs) &&
+    isNumber(result.totalTokens) &&
+    (result.errorMessage === undefined || typeof result.errorMessage === 'string') &&
+    isBenchmarkMetricBreakdown(result.metricBreakdown) &&
+    isNumber(result.automaticScore)
+  );
+};
+
+const isBenchmarkCandidateRunResult = (value: unknown): value is BenchmarkCandidateRunResult => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const result = value as Record<string, unknown>;
+  return (
+    isBenchmarkCandidateId(result.candidateId) &&
+    isLlmProvider(result.provider) &&
+    typeof result.model === 'string' &&
+    typeof result.available === 'boolean' &&
+    (result.unavailableReason === undefined || typeof result.unavailableReason === 'string') &&
+    Array.isArray(result.caseResults) &&
+    result.caseResults.every(isBenchmarkCaseResult) &&
+    isNumber(result.successRate) &&
+    isNumber(result.averageLatencyMs) &&
+    isNumber(result.totalTokens) &&
+    isNumber(result.errorCount) &&
+    isNumber(result.automaticScore) &&
+    isNumber(result.overallScore) &&
+    result.scoreStatus === 'automatic'
+  );
+};
+
+const isBenchmarkRunSummary = (value: unknown): value is BenchmarkRunSummary => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const run = value as Record<string, unknown>;
+  return (
+    typeof run.id === 'string' &&
+    typeof run.createdAt === 'string' &&
+    (run.status === 'completed' || run.status === 'completed_with_errors') &&
+    isStringArray(run.selectedCaseIds) &&
+    Array.isArray(run.candidateResults) &&
+    run.candidateResults.every(isBenchmarkCandidateRunResult)
+  );
+};
+
+export const parseBenchmarkRun = (value: unknown): BenchmarkRunSummary | null =>
+  isBenchmarkRunSummary(value) ? normalizeBenchmarkRunSummary(value) : null;
+
+export const parseBenchmarkRuns = (value: unknown): BenchmarkRunSummary[] | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  return Array.isArray(payload.runs) ? payload.runs.filter(isBenchmarkRunSummary).map(normalizeBenchmarkRunSummary) : null;
+};
+
+export const buildBenchmarksRunsUrl = (limit: number): string => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  return `${ADMIN_BENCHMARKS_PATH}/runs?${params.toString()}`;
+};
+
 const isEvaluationMessageRole = (value: unknown): value is EvaluationMessageRole =>
   value === 'user' || value === 'assistant' || value === 'system';
+
+const isEvaluationMode = (value: unknown): value is EvaluationExpected['mode'] =>
+  value === 'FAST_SEARCH' || value === 'GUIDED' || value === 'DEEP_DISCOVERY';
 
 const isEvaluationMessage = (value: unknown): value is EvaluationMessage => {
   if (typeof value !== 'object' || value === null) {
@@ -239,8 +488,8 @@ const isEvaluationExpected = (value: unknown): value is EvaluationExpected => {
 
   const expected = value as Record<string, unknown>;
   const optionalFieldsValid =
-    (expected.mode === undefined || typeof expected.mode === 'string') &&
-    (expected.maxLines === undefined || typeof expected.maxLines === 'number') &&
+    (expected.mode === undefined || isEvaluationMode(expected.mode)) &&
+    (expected.maxLines === undefined || isNumber(expected.maxLines)) &&
     (expected.mustAskQuestion === undefined || typeof expected.mustAskQuestion === 'boolean') &&
     (expected.forbiddenWords === undefined ||
       (Array.isArray(expected.forbiddenWords) && expected.forbiddenWords.every((word) => typeof word === 'string')));
@@ -318,7 +567,7 @@ export const formatExpectedFieldDisplay = (value: string | number | boolean | st
 
 export const formatGotFieldDisplay = (value: string | number | boolean | string[] | undefined): string => {
   if (value === undefined) {
-    return '—';
+    return '-';
   }
 
   if (Array.isArray(value)) {
@@ -377,8 +626,7 @@ export const buildEvaluationComparisonRowsFromChecks = (
 ): EvaluationComparisonRow[] =>
   checks.map((check) => ({
     key: check.name as ExpectedFieldKey,
-    expectedDisplay:
-      check.expected !== undefined ? formatExpectedFieldDisplay(check.expected) : '—',
+    expectedDisplay: check.expected !== undefined ? formatExpectedFieldDisplay(check.expected) : '-',
     gotDisplay: formatGotFieldDisplay(check.actual),
     passed: check.passed,
   }));
@@ -427,8 +675,8 @@ export const parseEvaluationRunResult = (value: unknown): EvaluationRunResult | 
   if (
     typeof metadataRecord.userId !== 'string' ||
     typeof metadataRecord.conversationId !== 'string' ||
-    typeof metadataRecord.userTurnCount !== 'number' ||
-    typeof metadataRecord.durationMs !== 'number' ||
+    !isNumber(metadataRecord.userTurnCount) ||
+    !isNumber(metadataRecord.durationMs) ||
     typeof metadataRecord.ranAt !== 'string'
   ) {
     return null;
