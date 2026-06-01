@@ -279,6 +279,13 @@
   letter-spacing: 0.02em;
 }
 
+.step-timeframe {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-400);
+  font-weight: 500;
+  margin-left: auto;
+}
+
 .step-heading {
   font-size: var(--fz-base);
   font-weight: 700;
@@ -445,6 +452,95 @@
   background: var(--clr-slate-400);
 }
 
+/* Resource cards */
+.step-resources {
+  margin-top: 12px;
+}
+
+.step-resources-label {
+  font-weight: 600;
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.step-resource-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resource-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--platform-bg, var(--clr-slate-50));
+  border: 1px solid var(--clr-slate-200);
+  border-left: 3px solid var(--platform-accent, var(--clr-primary));
+  border-radius: var(--r-md);
+  text-decoration: none;
+  min-width: 180px;
+  max-width: 260px;
+  flex: 1 1 180px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
+  cursor: pointer;
+}
+
+.resource-card:hover {
+  border-color: var(--platform-accent, var(--clr-primary));
+  border-left-color: var(--platform-accent, var(--clr-primary));
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.resource-card-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.resource-card-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.resource-platform {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--platform-accent, var(--clr-primary));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.resource-title {
+  font-size: var(--fz-xs);
+  color: var(--clr-slate-700);
+  font-weight: 500;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.resource-type-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  width: fit-content;
+  line-height: 1.6;
+}
+
 .roadmap-empty {
   display: flex;
   flex-direction: column;
@@ -543,4 +639,13 @@
 .roadmap-tab-bar + .main-roadmap-card {
   border-top-left-radius: 0;
   border-top: none;
+}
+
+/* Dark mode: neutralize tinted backgrounds, keep colored left border */
+:root[data-theme='dark'] .resource-card {
+  --platform-bg: var(--surface-muted);
+}
+
+:root[data-theme='dark'] .resource-type-badge {
+  opacity: 0.85;
 }

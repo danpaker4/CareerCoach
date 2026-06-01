@@ -7,6 +7,7 @@ export const mockUser: User = {
     lastName: "Doe",
     email: "john.doe@example.com",
     role: "user",
+    profileEmbedding: [],
     password: "hashedpassword",
     birthDate: new Date("1990-01-01"),
     achievements: [],
