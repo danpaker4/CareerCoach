@@ -6,6 +6,7 @@ import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
 import { UploadJobModal } from './UploadJobModal';
+import { AiAnalysisLoader } from './AiAnalysisLoader';
 import './JobSuggestions.css';
 import type { User } from '../../types/user';
 
@@ -110,6 +111,7 @@ const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
 export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [jobs, setJobs] = useState<JobResult[]>([]);
+  const [pendingJobs, setPendingJobs] = useState<JobResult[] | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
@@ -137,29 +139,31 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const fetchJobs = useCallback((query: string) => {
     if (!user?.id) return;
+    setPendingJobs(null);
     setFetchState('loading');
-    const userSkills = [
-      ...(user.knownSkills ?? []),
-      ...(user.technologies ?? []),
-      ...(user.githubSkills ?? []),
-    ].filter(Boolean);
-    const skillsParam = userSkills.length > 0 ? `&skills=${encodeURIComponent(userSkills.join(','))}` : '';
     const url = query.trim()
-      ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}${skillsParam}`
-      : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}${skillsParam}`;
+      ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}`
+      : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}`;
     apiFetch(url, { credentials: 'include' })
       .then(async (res) => {
-        if (res.status === 404) { setJobs([]); setFetchState('success'); return; }
+        if (res.status === 404) { setPendingJobs([]); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
-        setJobs(parseJobs(data));
-        setFetchState('success');
+        setPendingJobs(parseJobs(data));
       })
       .catch((err: unknown) => {
         setErrorMessage(err instanceof Error ? err.message : 'Failed to load jobs');
         setFetchState('error');
       });
-  }, [user?.id, user?.knownSkills, user?.technologies, user?.githubSkills]);
+  }, [user?.id]);
+
+  const handleAnalysisComplete = useCallback(() => {
+    if (pendingJobs !== null) {
+      setJobs(pendingJobs);
+      setPendingJobs(null);
+      setFetchState('success');
+    }
+  }, [pendingJobs]);
 
   useEffect(() => {
     void loadPipelineJobHashes();
@@ -265,10 +269,10 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         </div>
 
         {fetchState === 'loading' && (
-          <div className="page-loading">
-            <div className="spinner" />
-            <p>Finding jobs for you...</p>
-          </div>
+          <AiAnalysisLoader
+            isDataReady={pendingJobs !== null}
+            onComplete={handleAnalysisComplete}
+          />
         )}
 
         {fetchState === 'error' && (

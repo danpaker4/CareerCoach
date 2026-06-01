@@ -4,26 +4,35 @@ import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { AdaptedJob } from "../../poller/job-poller-api-stack/stages/adapt/adapt-resource.types";
-import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
 import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
-import { computeJobScore } from "../jobScores/job-score.service";
+import type { UserEmbeddingCache } from "../../cache/user-embedding.cache";
+import { computeVectorMatchScore } from "../jobScores/vector-score.service";
+import { fetchUserProfileEmbedding } from "./user-profile.client";
 import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/enrich-by-gemini";
 import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
 import type { CreateJobBody } from "./jobs.schema";
 
-type GetJobsQuery = { search?: string; userId?: string; skills?: string };
+type GetJobsQuery = { search?: string; userId?: string };
 
-export const JobsHandler = (
-  jobsCollection: Collection<EnrichedJob>,
-  skillMatchersCollection: Collection<SkillMatcher>,
-  tokenUsageRecorder?: LlmTokenUsageRecorder
-) => ({
+interface JobsHandlerDeps {
+  jobsCollection: Collection<EnrichedJob>;
+  tokenUsageRecorder?: LlmTokenUsageRecorder;
+  usersServiceBaseUrl?: string;
+  embeddingCache?: UserEmbeddingCache;
+}
+
+export const JobsHandler = ({
+  jobsCollection,
+  tokenUsageRecorder,
+  usersServiceBaseUrl,
+  embeddingCache,
+}: JobsHandlerDeps) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
     reply: FastifyReply
   ) => {
     try {
-      const { search, userId, skills } = request.query;
+      const { search, userId } = request.query;
 
       const filter: Record<string, unknown> = {};
       if (search && search.trim()) {
@@ -37,12 +46,15 @@ export const JobsHandler = (
 
       const jobs = await jobsCollection.find(filter).limit(50).toArray();
 
-      let allSkills: string[] = [];
-      if (userId) {
-        const matchers = await skillMatchersCollection.find({ userId }).toArray();
-        const matcherSkills = matchers.flatMap((m) => m.skillToImprove.map((s) => s.skill));
-        const profileSkills = skills ? skills.split(",").map((s) => s.trim()).filter(Boolean) : [];
-        allSkills = [...new Set([...matcherSkills, ...profileSkills])];
+      let userEmbedding: number[] | null = null;
+      if (userId && embeddingCache) {
+        userEmbedding = embeddingCache.get(userId);
+        if (!userEmbedding && usersServiceBaseUrl) {
+          userEmbedding = await fetchUserProfileEmbedding(usersServiceBaseUrl, userId);
+          if (userEmbedding) {
+            embeddingCache.set(userId, userEmbedding);
+          }
+        }
       }
 
       const result = jobs.map((job) => ({
@@ -55,8 +67,8 @@ export const JobsHandler = (
         salary: job.salary,
         requirements: job.requirements,
         benefits: job.benefits,
-        matchPct: userId && allSkills.length > 0
-          ? computeJobScore(job, allSkills).overallScore
+        matchPct: userEmbedding && job.searchEmbedding?.length
+          ? computeVectorMatchScore(userEmbedding, job.searchEmbedding)
           : undefined,
       }));
 
