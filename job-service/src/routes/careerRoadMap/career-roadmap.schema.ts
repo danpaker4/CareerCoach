@@ -36,6 +36,7 @@ export const createCareerRoadMapSchema = {
         userId: z.string().uuid("userId must be a valid UUID"),
         dreamJob: z.string().min(1, "dreamJob cannot be empty"),
         stagesToDreamJob: z.array(StageToDreamJobSchema),
+        generatedAt: z.coerce.date().optional(),
     }),
 } satisfies FastifySchema;
 
