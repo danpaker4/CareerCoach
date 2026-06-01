@@ -27,6 +27,13 @@ export const Management = () => (
           <span className="management-home-card-action">Open users</span>
         </Link>
 
+        <Link to="/management/benchmarks" className="management-home-card">
+          <span className="management-eyebrow">Evaluation</span>
+          <h2>Chat LLM benchmark</h2>
+          <p>Run randomized chat benchmark samples against Llama/Ollama and Gemini, then compare model metrics.</p>
+          <span className="management-home-card-action">Open benchmarks</span>
+        </Link>
+
         <Link to="/management/llm-evaluation" className="management-home-card">
           <span className="management-eyebrow">Quality</span>
           <h2>LLM evaluation</h2>

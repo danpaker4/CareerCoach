@@ -37,6 +37,10 @@ export type DeleteAdminUserResult = {
     deletedUserId: string;
 };
 
+export type AdminSessionResult = {
+    adminUserId: string;
+};
+
 export type AdminLlmTokenUsageSeriesItem = {
     date: string;
     provider: LlmProvider;

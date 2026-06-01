@@ -9,6 +9,7 @@ export const buildAuthSessionAdminUser = async (): Promise<User> => ({
     lastName: "Session",
     email: AUTH_SESSION_ADMIN_EMAIL,
     role: "admin",
+    profileEmbedding: [],
     password: await bcrypt.hash(AUTH_SESSION_ADMIN_PASSWORD, 10),
     birthDate: new Date("1990-01-01"),
     achievements: [],

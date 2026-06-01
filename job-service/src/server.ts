@@ -2,7 +2,9 @@ import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
 
-import { MongoClient } from "./mongo/mongo"; 
+import { MongoClient } from "./mongo/mongo";
+import { UserEmbeddingCache } from "./cache/user-embedding.cache";
+import { startUserChangeStream } from "./cache/user-change-stream";
 import { pipelineRouter } from "./routes/MyPipline/pipeline.router";
 import { pipelineJobRouter } from "./routes/jobsInPipeline/pipeline-job.router";
 import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
@@ -18,6 +20,7 @@ export class Server {
     readonly app: FastifyInstance;
     private readonly config: ServerConfig;
     readonly DBClient: MongoClient;
+    readonly embeddingCache = new UserEmbeddingCache();
 
     constructor(config: ServerConfig) {
         this.config = config;
@@ -34,6 +37,12 @@ export class Server {
             await this.DBClient.start();
             console.log(" MongoDB Connected");
 
+            try {
+                startUserChangeStream(this.DBClient.database, this.embeddingCache);
+            } catch (err) {
+                console.warn("Change Stream not available (requires replica set):", err);
+            }
+
             await this.app.register(cors, {
                 origin: true,
                 credentials: true,
@@ -46,7 +55,11 @@ export class Server {
             await this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
             await this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps));
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
-            await this.app.register(jobsRouter(this.DBClient.jobs, this.DBClient.llmTokenUsage));
+            await this.app.register(jobsRouter(
+                this.DBClient.jobs,
+                this.DBClient.llmTokenUsage,
+                this.embeddingCache
+            ));
 
             const address = await this.app.listen({
                 port: this.config.port,
