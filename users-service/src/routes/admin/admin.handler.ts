@@ -4,9 +4,17 @@ import type { Collection, Filter } from "mongodb";
 import type { SchematicRequest } from "../../types/fastify";
 import type { LlmTokenUsageDocument } from "./admin-token-usage.model";
 import type { UserDocument } from "../users/user.model";
-import { deleteAdminUserSchema, demoteAdminSchema, getAdminLlmTokenUsageSchema, getAdminUsersSchema, promoteAdminSchema } from "./admin.schema";
+import {
+    deleteAdminUserSchema,
+    demoteAdminSchema,
+    getAdminLlmTokenUsageSchema,
+    getAdminSessionSchema,
+    getAdminUsersSchema,
+    promoteAdminSchema,
+} from "./admin.schema";
 import type {
     AdminAuthenticatedRequest,
+    AdminSessionResult,
     AdminLlmTokenUsageOperationItem,
     AdminLlmTokenUsageOperationSeriesItem,
     AdminLlmTokenUsageResult,
@@ -170,6 +178,18 @@ export const deleteAdminUser = (usersCollection: Collection<UserDocument>) =>
             deletedUserId: userId,
         };
 
+        reply.status(StatusCodes.OK).send(result);
+    };
+
+export const getAdminSession = () =>
+    async (request: AdminAuthenticatedRequest<typeof getAdminSessionSchema>, reply: FastifyReply): Promise<void> => {
+        const adminUserId = request.authUser?.userId;
+        if (!adminUserId) {
+            reply.status(StatusCodes.UNAUTHORIZED).send({ error: "Unauthorized", errorCode: "UNAUTHORIZED" });
+            return;
+        }
+
+        const result: AdminSessionResult = { adminUserId };
         reply.status(StatusCodes.OK).send(result);
     };
 

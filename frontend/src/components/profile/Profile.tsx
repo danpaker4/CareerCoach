@@ -176,6 +176,7 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
   const githubUrlTrimmed = (form.githubUrl || user.githubUrl || '').trim();
   const isGithubConnected = githubUrlTrimmed.length > 0;
   const githubUsername = getGithubUsername(githubUrlTrimmed || undefined);
+  const currentExtractedSkillCount = user.achievements?.length ?? 0;
 
   return (
     <div className="profile-page">
@@ -230,92 +231,108 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
               )}
             </div>
 
-            <div className="cv-card surface-card">
-              <div className="cv-card-header">
-                <img src={iconZap} alt="" aria-hidden="true" className="cv-card-icon" />
-                <h3 className="cv-card-title">Skills from CV</h3>
+            <div className="cv-card profile-import-card surface-card">
+              <div className="profile-import-card-header">
+                <h3 className="profile-import-card-title">Skill imports</h3>
+                <p className="profile-import-card-subtitle">Refresh your profile skills from CV and GitHub.</p>
               </div>
-              <p className="cv-card-sub">
-                Upload your CV to extract skills and achievements with the same flow used during registration.
-              </p>
-              <p className="cv-card-sub">
-                Uploading a new CV replaces your current extracted skills and achievements.
-              </p>
 
-              {user.achievements && user.achievements.length > 0 && (
-                <p className="cv-card-current">
-                  {user.achievements.length} skills currently extracted
-                </p>
-              )}
+              <div className="profile-import-source">
+                <div className="profile-source-header">
+                  <span className="profile-source-icon-shell profile-source-icon-shell--cv">
+                    <img src={iconZap} alt="" aria-hidden="true" className="profile-source-icon" />
+                  </span>
+                  <div className="profile-source-heading">
+                    <h4 className="cv-card-title">Skills from CV</h4>
+                    <p className="profile-source-kicker">Upload a new CV to refresh CV skills</p>
+                  </div>
+                </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf"
-                className="cv-file-input"
-                id="cv-upload"
-                onChange={(e) => {
-                  setCvFile(e.target.files?.[0] ?? null);
-                  setCvSuccess(false);
-                  setCvError('');
-                }}
-              />
-              <label htmlFor="cv-upload" className="cv-file-label">
-                {cvFile ? cvFile.name : 'Choose PDF file'}
-              </label>
-
-              {cvError && <p className="cv-error">{cvError}</p>}
-              {cvSuccess && (
-                <p className="cv-success">
-                  <img src={iconCheck} alt="" aria-hidden="true" />
-                  Latest CV processed. {cvSkillCount} skills extracted.
-                </p>
-              )}
-
-              <button
-                type="button"
-                className="btn-primary cv-extract-btn"
-                onClick={handleCvExtract}
-                disabled={!cvFile || cvExtracting}
-              >
-                {cvExtracting ? 'Extracting...' : 'Extract Skills'}
-              </button>
-            </div>
-
-            <div className="cv-card surface-card">
-              <div className="cv-card-header">
-                <img src={githubIcon} alt="" aria-hidden="true" className="cv-card-icon profile-github-card-icon" />
-                <h3 className="cv-card-title">Skills from GitHub</h3>
-              </div>
-              {isGithubConnected ? (
-                <>
-                  <p className="cv-card-sub">
-                    Your GitHub profile is linked. Programming languages from your public repositories appear on the
-                    Skills page.
-                  </p>
+                {currentExtractedSkillCount > 0 && (
                   <p className="cv-card-current">
-                    {githubUsername ? `Connected as @${githubUsername}` : 'GitHub profile connected'}
+                    <img src={iconCheck} alt="" aria-hidden="true" />
+                    {currentExtractedSkillCount} skills currently extracted
                   </p>
-                </>
-              ) : (
-                <>
-                  <p className="cv-card-sub">
-                    Connect your GitHub account to extract technologies from your repositories into the Skills page.
-                  </p>
-                  <p className="profile-github-pending">Not connected yet.</p>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="cv-file-input"
+                  id="cv-upload"
+                  onChange={(e) => {
+                    setCvFile(e.target.files?.[0] ?? null);
+                    setCvSuccess(false);
+                    setCvError('');
+                  }}
+                />
+                <div className="profile-import-actions">
+                  <label htmlFor="cv-upload" className="cv-file-label">
+                    <span className="cv-file-label-kind">PDF</span>
+                    <span className="cv-file-label-text">{cvFile ? cvFile.name : 'Choose'}</span>
+                  </label>
+
                   <button
                     type="button"
                     className="btn-primary cv-extract-btn"
-                    onClick={connectGithubAccount}
-                    disabled={!ENV.GITHUB_CLIENT_ID}
-                  >
-                    Connect GitHub
-                  </button>
-                  {!ENV.GITHUB_CLIENT_ID && (
-                    <p className="cv-error">GitHub OAuth is not configured. Set `VITE_CLIENT_ID` in `frontend/.env`.</p>
-                  )}
-                </>
-              )}
+                    onClick={handleCvExtract}
+                    disabled={!cvFile || cvExtracting}
+                >
+                  {cvExtracting ? 'Extracting...' : 'Extract'}
+                </button>
+              </div>
+
+                {cvError && <p className="cv-error">{cvError}</p>}
+                {cvSuccess && (
+                  <p className="cv-success">
+                    <img src={iconCheck} alt="" aria-hidden="true" />
+                    Latest CV processed. {cvSkillCount} skills extracted.
+                  </p>
+                )}
+              </div>
+
+              <div className="profile-import-divider" />
+
+              <div className="profile-import-source">
+                <div className="profile-source-header">
+                  <span className="profile-source-icon-shell profile-source-icon-shell--github">
+                    <img src={githubIcon} alt="" aria-hidden="true" className="profile-source-icon profile-github-card-icon" />
+                  </span>
+                  <div className="profile-source-heading">
+                    <h4 className="cv-card-title">Skills from GitHub</h4>
+                    <p className="profile-source-kicker">Repository scan</p>
+                  </div>
+                </div>
+                {isGithubConnected ? (
+                  <>
+                    <p className="cv-card-current">
+                      <img src={iconCheck} alt="" aria-hidden="true" />
+                      {githubUsername ? `Connected as @${githubUsername}` : 'GitHub profile connected'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="profile-import-actions">
+                      <p className="profile-github-pending">
+                        <span aria-hidden="true" className="profile-github-pending-dot" />
+                        Disconnected
+                      </p>
+                      <button
+                        type="button"
+                        className="btn-primary cv-extract-btn"
+                        onClick={() => connectGithubAccount('profile')}
+                      disabled={!ENV.GITHUB_CLIENT_ID}
+                    >
+                      Connect
+                    </button>
+                    </div>
+                    {!ENV.GITHUB_CLIENT_ID && (
+                      <p className="cv-error">GitHub OAuth is not configured. Set `VITE_CLIENT_ID` in `frontend/.env`.</p>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </aside>
 

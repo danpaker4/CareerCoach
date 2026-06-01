@@ -29,6 +29,8 @@ export type ManagementUserAction = 'promote' | 'demote' | 'delete';
 
 export type LlmProvider = 'gemini' | 'openai' | 'custom' | 'ollama';
 
+export type BenchmarkCandidateId = 'ollama-llama' | 'gemini';
+
 export type TokenUsageDays = typeof MANAGEMENT_TOKEN_USAGE_DAYS[number];
 
 export interface AdminLlmTokenUsageSeriesItem {
@@ -98,6 +100,88 @@ export interface TokenUsageGraphProps {
   selectedDays: TokenUsageDays;
   onSelectedDaysChange: (days: TokenUsageDays) => void;
 }
+
+export interface BenchmarkCandidate {
+  id: BenchmarkCandidateId;
+  label: string;
+  provider: LlmProvider;
+  model: string;
+  available: boolean;
+  unavailableReason?: string;
+}
+
+export interface BenchmarkCaseSummary {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface BenchmarkRubricItem {
+  label: string;
+  weight: number;
+  description: string;
+}
+
+export interface BenchmarkConfig {
+  candidates: BenchmarkCandidate[];
+  cases: BenchmarkCaseSummary[];
+  rubric: BenchmarkRubricItem[];
+}
+
+export interface BenchmarkMetricBreakdown {
+  responseCoverageScore: number;
+  latencyScore: number;
+  tokenEfficiencyScore: number;
+}
+
+export interface BenchmarkParseEvent {
+  operation: string;
+  rawText: string;
+  parseStatus: 'success' | 'fallback';
+}
+
+export interface BenchmarkCaseResult {
+  caseId: string;
+  caseTitle: string;
+  caseDescription: string;
+  success: boolean;
+  responseCount: number;
+  finalReply: string;
+  replies: string[];
+  failedAssertions: string[];
+  parseEvents: BenchmarkParseEvent[];
+  latencyMs: number;
+  totalTokens: number;
+  errorMessage?: string;
+  metricBreakdown: BenchmarkMetricBreakdown;
+  automaticScore: number;
+}
+
+export interface BenchmarkCandidateRunResult {
+  candidateId: BenchmarkCandidateId;
+  provider: LlmProvider;
+  model: string;
+  available: boolean;
+  unavailableReason?: string;
+  caseResults: BenchmarkCaseResult[];
+  successRate: number;
+  averageLatencyMs: number;
+  totalTokens: number;
+  errorCount: number;
+  automaticScore: number;
+  overallScore: number;
+  scoreStatus: 'automatic';
+}
+
+export interface BenchmarkRunSummary {
+  id: string;
+  createdAt: string;
+  status: 'completed' | 'completed_with_errors';
+  selectedCaseIds: string[];
+  candidateResults: BenchmarkCandidateRunResult[];
+}
+
+export type BenchmarkStatus = 'loading' | 'success' | 'error';
 
 export type EvaluationMessageRole = 'user' | 'assistant' | 'system';
 
