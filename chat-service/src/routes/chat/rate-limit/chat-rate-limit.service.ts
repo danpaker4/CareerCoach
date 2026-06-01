@@ -37,6 +37,15 @@ type ChatRateLimitCheckParams = {
     readonly message: string;
 };
 
+type ChatRateLimitQueueState = {
+    readonly queuedRequestsForUser: number;
+    readonly queuedRequestsGlobal: number;
+};
+
+type ChatRateLimitEnqueueCheckParams = ChatRateLimitCheckParams & {
+    readonly queueState: ChatRateLimitQueueState;
+};
+
 type CounterRuleParams = {
     readonly rule: ChatRateLimitRuleKey;
     readonly identity: string;
@@ -132,32 +141,32 @@ export class ChatRateLimitService {
         return null;
     };
 
-    getConfig = async (): Promise<ChatRateLimitConfigResponse> =>
-        toChatRateLimitConfigResponse(await this.readConfig(true));
+    private checkQueueBudgets = async (
+        rules: ChatRateLimitRules,
+        queueState: ChatRateLimitQueueState
+    ): Promise<ChatRateLimitBlockedDecision | null> => {
+        if (rules.queuedRequestsPerUser.enabled && queueState.queuedRequestsForUser >= rules.queuedRequestsPerUser.limit) {
+            return createBlockedDecision(
+                "CHAT_RATE_LIMITED",
+                "Too many chat messages are already queued for this user."
+            );
+        }
 
-    updateConfig = async (input: unknown, updatedByAdmin: AdminSession): Promise<ChatRateLimitConfigResponse> => {
-        const parsed = (() => {
-            try {
-                return parseChatRateLimitUpdateInput(input);
-            } catch (error) {
-                if (error instanceof ZodError) {
-                    throw new ChatRateLimitValidationError(error.issues.map((issue) => issue.message).join("; "));
-                }
-                throw error;
-            }
-        })();
-        const config = await this.repository.updateConfig(parsed.rules, updatedByAdmin);
-        this.cachedConfig = {
-            config,
-            expiresAtMs: Date.now() + CHAT_RATE_LIMIT_CONFIG_CACHE_MS,
-        };
-        return toChatRateLimitConfigResponse(config);
+        if (rules.queuedRequestsGlobal.enabled && queueState.queuedRequestsGlobal >= rules.queuedRequestsGlobal.limit) {
+            return createBlockedDecision(
+                "CHAT_RATE_LIMITED",
+                "The chat queue is currently full. Try again shortly."
+            );
+        }
+
+        return null;
     };
 
-    checkAndAcquire = async (params: ChatRateLimitCheckParams): Promise<ChatRateLimitDecision> => {
-        const config = await this.readConfig();
-        const { rules } = config;
-        const now = new Date();
+    private checkMessageAndTokenBudgets = async (
+        rules: ChatRateLimitRules,
+        params: ChatRateLimitCheckParams,
+        now: Date
+    ): Promise<ChatRateLimitBlockedDecision | null> => {
         const messageLength = params.message.trim().length;
 
         if (rules.maxMessageCharacters.enabled && messageLength > rules.maxMessageCharacters.limit) {
@@ -167,27 +176,15 @@ export class ChatRateLimitService {
             );
         }
 
-        const tokenBudgetDecision = await this.checkTokenBudgets(rules, params.userId, now);
-        if (tokenBudgetDecision) {
-            return tokenBudgetDecision;
-        }
+        return await this.checkTokenBudgets(rules, params.userId, now);
+    };
 
-        const acquiredActiveRequest = rules.activeRequestsPerUser.enabled
-            ? await this.repository.acquireActiveRequest(params.userId, rules.activeRequestsPerUser.limit)
-            : true;
-        if (!acquiredActiveRequest) {
-            return createBlockedDecision(
-                "CHAT_REQUEST_IN_PROGRESS",
-                "A chat response is already being generated for this user."
-            );
-        }
-
-        const release = rules.activeRequestsPerUser.enabled
-            ? async (): Promise<void> => {
-                await this.repository.releaseActiveRequest(params.userId);
-            }
-            : noopRelease;
-
+    private checkSubmissionCounters = async (
+        rules: ChatRateLimitRules,
+        params: ChatRateLimitCheckParams,
+        now: Date,
+        release: () => Promise<void>
+    ): Promise<ChatRateLimitBlockedDecision | null> => {
         const minuteStart = startOfUtcMinute(now);
         const dayStart = startOfUtcDay(now);
         const userMinuteDecision = await this.checkCounterRule({
@@ -229,7 +226,123 @@ export class ChatRateLimitService {
             return userDayDecision;
         }
 
+        return null;
+    };
+
+    getConfig = async (): Promise<ChatRateLimitConfigResponse> =>
+        toChatRateLimitConfigResponse(await this.readConfig(true));
+
+    getWorkerConcurrency = async (): Promise<number> => {
+        const { rules } = await this.readConfig();
+        return rules.workerConcurrency.enabled ? rules.workerConcurrency.limit : 1;
+    };
+
+    updateConfig = async (input: unknown, updatedByAdmin: AdminSession): Promise<ChatRateLimitConfigResponse> => {
+        const parsed = (() => {
+            try {
+                return parseChatRateLimitUpdateInput(input);
+            } catch (error) {
+                if (error instanceof ZodError) {
+                    throw new ChatRateLimitValidationError(error.issues.map((issue) => issue.message).join("; "));
+                }
+                throw error;
+            }
+        })();
+        const config = await this.repository.updateConfig(parsed.rules, updatedByAdmin);
+        this.cachedConfig = {
+            config,
+            expiresAtMs: Date.now() + CHAT_RATE_LIMIT_CONFIG_CACHE_MS,
+        };
+        return toChatRateLimitConfigResponse(config);
+    };
+
+    checkAndAcquire = async (params: ChatRateLimitCheckParams): Promise<ChatRateLimitDecision> => {
+        const config = await this.readConfig();
+        const { rules } = config;
+        const now = new Date();
+
+        const budgetDecision = await this.checkMessageAndTokenBudgets(rules, params, now);
+        if (budgetDecision) {
+            return budgetDecision;
+        }
+
+        const acquiredActiveRequest = rules.activeRequestsPerUser.enabled
+            ? await this.repository.acquireActiveRequest(params.userId, rules.activeRequestsPerUser.limit)
+            : true;
+        if (!acquiredActiveRequest) {
+            return createBlockedDecision(
+                "CHAT_REQUEST_IN_PROGRESS",
+                "A chat response is already being generated for this user."
+            );
+        }
+
+        const release = rules.activeRequestsPerUser.enabled
+            ? async (): Promise<void> => {
+                await this.repository.releaseActiveRequest(params.userId);
+            }
+            : noopRelease;
+
+        const counterDecision = await this.checkSubmissionCounters(rules, params, now, release);
+        if (counterDecision) {
+            return counterDecision;
+        }
+
         return { status: "allowed", release };
+    };
+
+    checkBeforeEnqueue = async (params: ChatRateLimitEnqueueCheckParams): Promise<ChatRateLimitDecision> => {
+        const config = await this.readConfig();
+        const { rules } = config;
+        const now = new Date();
+
+        const budgetDecision = await this.checkMessageAndTokenBudgets(rules, params, now);
+        if (budgetDecision) {
+            return budgetDecision;
+        }
+
+        const activeRequestCount = rules.activeRequestsPerUser.enabled
+            ? await this.repository.countActiveRequests(params.userId)
+            : 0;
+        if (rules.activeRequestsPerUser.enabled && activeRequestCount >= rules.activeRequestsPerUser.limit) {
+            return createBlockedDecision(
+                "CHAT_REQUEST_IN_PROGRESS",
+                "A chat response is already being generated for this user."
+            );
+        }
+
+        const queueDecision = await this.checkQueueBudgets(rules, params.queueState);
+        if (queueDecision) {
+            return queueDecision;
+        }
+
+        const counterDecision = await this.checkSubmissionCounters(rules, params, now, noopRelease);
+        if (counterDecision) {
+            return counterDecision;
+        }
+
+        return { status: "allowed", release: noopRelease };
+    };
+
+    acquireWorkerRequest = async (userId: string): Promise<ChatRateLimitDecision> => {
+        const { rules } = await this.readConfig();
+        if (!rules.activeRequestsPerUser.enabled) {
+            return { status: "allowed", release: noopRelease };
+        }
+
+        const acquiredActiveRequest = await this.repository.acquireActiveRequest(userId, rules.activeRequestsPerUser.limit);
+        if (!acquiredActiveRequest) {
+            return createBlockedDecision(
+                "CHAT_REQUEST_IN_PROGRESS",
+                "A chat response is already being generated for this user."
+            );
+        }
+
+        return {
+            status: "allowed",
+            release: async (): Promise<void> => {
+                await this.repository.releaseActiveRequest(userId);
+            },
+        };
     };
 }
 

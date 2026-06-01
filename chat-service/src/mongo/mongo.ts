@@ -11,6 +11,7 @@ import type {
     ChatRateLimitConfigHistoryDocument,
     ChatRateLimitCounterDocument,
 } from "../routes/chat/rate-limit/chat-rate-limit.types";
+import type { ChatRequestDocument, ChatSocketTicketDocument } from "../routes/chat/request/chat-request.types";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -25,6 +26,8 @@ export class MongoClient implements Service {
     private chatRateLimitConfigHistoryCollection: Collection<ChatRateLimitConfigHistoryDocument> | null = null;
     private chatRateLimitCountersCollection: Collection<ChatRateLimitCounterDocument> | null = null;
     private chatActiveRequestsCollection: Collection<ChatActiveRequestDocument> | null = null;
+    private chatRequestsCollection: Collection<ChatRequestDocument> | null = null;
+    private chatSocketTicketsCollection: Collection<ChatSocketTicketDocument> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -48,6 +51,8 @@ export class MongoClient implements Service {
             this.chatRateLimitConfigHistoryCollection = this.db.collection<ChatRateLimitConfigHistoryDocument>("chatRateLimitConfigHistory");
             this.chatRateLimitCountersCollection = this.db.collection<ChatRateLimitCounterDocument>("chatRateLimitCounters");
             this.chatActiveRequestsCollection = this.db.collection<ChatActiveRequestDocument>("chatActiveRequests");
+            this.chatRequestsCollection = this.db.collection<ChatRequestDocument>("chatRequests");
+            this.chatSocketTicketsCollection = this.db.collection<ChatSocketTicketDocument>("chatSocketTickets");
             await this.ensureIndexes();
             
             console.log('MongoDb Connection Succeeded');
@@ -69,6 +74,8 @@ export class MongoClient implements Service {
         this.chatRateLimitConfigHistoryCollection = null;
         this.chatRateLimitCountersCollection = null;
         this.chatActiveRequestsCollection = null;
+        this.chatRequestsCollection = null;
+        this.chatSocketTicketsCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
@@ -82,7 +89,9 @@ export class MongoClient implements Service {
             !this.chatRateLimitConfigCollection ||
             !this.chatRateLimitConfigHistoryCollection ||
             !this.chatRateLimitCountersCollection ||
-            !this.chatActiveRequestsCollection
+            !this.chatActiveRequestsCollection ||
+            !this.chatRequestsCollection ||
+            !this.chatSocketTicketsCollection
         ) {
             return;
         }
@@ -99,6 +108,11 @@ export class MongoClient implements Service {
         await this.chatRateLimitCountersCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
         await this.chatActiveRequestsCollection.createIndex({ key: 1 }, { unique: true });
         await this.chatActiveRequestsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+        await this.chatRequestsCollection.createIndex({ requestId: 1 }, { unique: true });
+        await this.chatRequestsCollection.createIndex({ userId: 1, status: 1, updatedAt: -1 });
+        await this.chatRequestsCollection.createIndex({ status: 1, updatedAt: -1 });
+        await this.chatSocketTicketsCollection.createIndex({ ticketId: 1 }, { unique: true });
+        await this.chatSocketTicketsCollection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
         await Promise.all([
             this.createVectorSearchIndex(this.careerProfilesCollection.collectionName, "profileSummaryEmbedding", process.env.CAREER_PROFILE_VECTOR_INDEX_NAME || "career_profile_vector_index"),
@@ -196,6 +210,20 @@ export class MongoClient implements Service {
             throw new Error("Chat active requests collection is not initialized");
         }
         return this.chatActiveRequestsCollection;
+    }
+
+    get chatRequests(): Collection<ChatRequestDocument> {
+        if (!this.chatRequestsCollection) {
+            throw new Error("Chat requests collection is not initialized");
+        }
+        return this.chatRequestsCollection;
+    }
+
+    get chatSocketTickets(): Collection<ChatSocketTicketDocument> {
+        if (!this.chatSocketTicketsCollection) {
+            throw new Error("Chat socket tickets collection is not initialized");
+        }
+        return this.chatSocketTicketsCollection;
     }
 }
 

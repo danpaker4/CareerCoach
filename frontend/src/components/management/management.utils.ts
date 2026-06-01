@@ -52,6 +52,9 @@ export const CHAT_RATE_LIMIT_RULE_KEYS = [
   'dailyTokensPerUser',
   'dailyTokensGlobal',
   'maxMessageCharacters',
+  'queuedRequestsPerUser',
+  'queuedRequestsGlobal',
+  'workerConcurrency',
 ] as const satisfies readonly ChatRateLimitRuleKey[];
 
 export const CHAT_RATE_LIMIT_RULE_LABELS: Record<ChatRateLimitRuleKey, string> = {
@@ -62,6 +65,9 @@ export const CHAT_RATE_LIMIT_RULE_LABELS: Record<ChatRateLimitRuleKey, string> =
   dailyTokensPerUser: 'Daily tokens per user',
   dailyTokensGlobal: 'Daily tokens global',
   maxMessageCharacters: 'Max message characters',
+  queuedRequestsPerUser: 'Queued requests per user',
+  queuedRequestsGlobal: 'Queued requests global',
+  workerConcurrency: 'Worker concurrency',
 };
 
 export const CHAT_RATE_LIMIT_RULE_DESCRIPTIONS: Record<ChatRateLimitRuleKey, string> = {
@@ -72,6 +78,9 @@ export const CHAT_RATE_LIMIT_RULE_DESCRIPTIONS: Record<ChatRateLimitRuleKey, str
   dailyTokensPerUser: 'Known LLM tokens allowed for one user in the current UTC day.',
   dailyTokensGlobal: 'Known LLM tokens allowed globally for chat in the current UTC day.',
   maxMessageCharacters: 'Maximum characters accepted in one chat message.',
+  queuedRequestsPerUser: 'Queued chat requests allowed for one user before new messages are blocked.',
+  queuedRequestsGlobal: 'Queued chat requests allowed globally before new messages are blocked.',
+  workerConcurrency: 'Chat jobs the worker may process at the same time.',
 };
 
 export const CHAT_RATE_LIMIT_RULE_MEANINGS: Record<ChatRateLimitRuleKey, string> = {
@@ -82,6 +91,9 @@ export const CHAT_RATE_LIMIT_RULE_MEANINGS: Record<ChatRateLimitRuleKey, string>
   dailyTokensPerUser: 'tokens per user per UTC day',
   dailyTokensGlobal: 'global chat tokens per UTC day',
   maxMessageCharacters: 'characters per chat message',
+  queuedRequestsPerUser: 'queued requests per user',
+  queuedRequestsGlobal: 'queued requests globally',
+  workerConcurrency: 'parallel worker jobs',
 };
 
 export const isAdminUserSummary = (value: unknown): value is AdminUserSummary => {
@@ -188,6 +200,9 @@ const parseChatRateLimitRules = (value: unknown): ChatRateLimitRules | null => {
   const dailyTokensPerUser = rules.dailyTokensPerUser;
   const dailyTokensGlobal = rules.dailyTokensGlobal;
   const maxMessageCharacters = rules.maxMessageCharacters;
+  const queuedRequestsPerUser = rules.queuedRequestsPerUser;
+  const queuedRequestsGlobal = rules.queuedRequestsGlobal;
+  const workerConcurrency = rules.workerConcurrency;
   if (
     !isChatRateLimitRuleConfig(perUserPerMinute) ||
     !isChatRateLimitRuleConfig(perUserPerDay) ||
@@ -195,7 +210,10 @@ const parseChatRateLimitRules = (value: unknown): ChatRateLimitRules | null => {
     !isChatRateLimitRuleConfig(activeRequestsPerUser) ||
     !isChatRateLimitRuleConfig(dailyTokensPerUser) ||
     !isChatRateLimitRuleConfig(dailyTokensGlobal) ||
-    !isChatRateLimitRuleConfig(maxMessageCharacters)
+    !isChatRateLimitRuleConfig(maxMessageCharacters) ||
+    !isChatRateLimitRuleConfig(queuedRequestsPerUser) ||
+    !isChatRateLimitRuleConfig(queuedRequestsGlobal) ||
+    !isChatRateLimitRuleConfig(workerConcurrency)
   ) {
     return null;
   }
@@ -208,6 +226,9 @@ const parseChatRateLimitRules = (value: unknown): ChatRateLimitRules | null => {
     dailyTokensPerUser,
     dailyTokensGlobal,
     maxMessageCharacters,
+    queuedRequestsPerUser,
+    queuedRequestsGlobal,
+    workerConcurrency,
   };
 };
 

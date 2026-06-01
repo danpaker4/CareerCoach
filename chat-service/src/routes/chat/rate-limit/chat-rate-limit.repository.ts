@@ -180,6 +180,15 @@ export class ChatRateLimitRepository {
         await this.activeRequestsCollection.deleteOne({ key });
     };
 
+    countActiveRequests = async (userId: string): Promise<number> => {
+        const key = buildActiveRequestKey(userId);
+        const activeRequest = await this.activeRequestsCollection.findOne({
+            key,
+            expiresAt: { $gt: new Date() },
+        });
+        return activeRequest?.count ?? 0;
+    };
+
     sumUserDailyTokens = async (userId: string, from: Date, to: Date): Promise<number> => {
         const result = await this.tokenUsageCollection.aggregate<{ totalTokens: number }>([
             {

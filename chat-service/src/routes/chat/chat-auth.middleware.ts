@@ -54,6 +54,17 @@ export const createValidateAuthenticatedChatBody = (authService: ChatAuthService
         request.authUser = authResult.user;
     };
 
+export const createValidateAuthenticatedChatSession = (authService: ChatAuthService) =>
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        const authResult = await authService.verifyUser(readAuthorizationHeader(request));
+        if (authResult.status === "failure") {
+            sendAuthFailure(reply, authResult.failure);
+            return;
+        }
+
+        request.authUser = authResult.user;
+    };
+
 export const createValidateAuthenticatedChatParams = (authService: ChatAuthService) =>
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         const authResult = await authService.verifyUser(readAuthorizationHeader(request));
@@ -73,4 +84,3 @@ export const createValidateAuthenticatedChatParams = (authService: ChatAuthServi
 
         request.authUser = authResult.user;
     };
-

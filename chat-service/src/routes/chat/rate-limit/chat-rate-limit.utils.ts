@@ -31,6 +31,9 @@ const ChatRateLimitRulesSchema = z
         dailyTokensPerUser: ChatRateLimitRuleConfigSchema,
         dailyTokensGlobal: ChatRateLimitRuleConfigSchema,
         maxMessageCharacters: ChatRateLimitRuleConfigSchema,
+        queuedRequestsPerUser: ChatRateLimitRuleConfigSchema,
+        queuedRequestsGlobal: ChatRateLimitRuleConfigSchema,
+        workerConcurrency: ChatRateLimitRuleConfigSchema,
     })
     .strict();
 

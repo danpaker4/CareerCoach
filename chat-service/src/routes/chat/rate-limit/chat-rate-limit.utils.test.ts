@@ -9,6 +9,9 @@ describe("parseChatRateLimitUpdateInput", () => {
 
         assert.equal(parsed.rules.perUserPerMinute.limit, 10);
         assert.equal(parsed.rules.maxMessageCharacters.enabled, true);
+        assert.equal(parsed.rules.queuedRequestsPerUser.limit, 3);
+        assert.equal(parsed.rules.queuedRequestsGlobal.limit, 1_000);
+        assert.equal(parsed.rules.workerConcurrency.limit, 5);
     });
 
     it("rejects unknown rule keys", () => {
@@ -29,4 +32,3 @@ describe("parseChatRateLimitUpdateInput", () => {
         }));
     });
 });
-

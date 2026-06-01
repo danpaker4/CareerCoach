@@ -18,6 +18,9 @@ export const CHAT_RATE_LIMIT_RULE_KEYS = [
     "dailyTokensPerUser",
     "dailyTokensGlobal",
     "maxMessageCharacters",
+    "queuedRequestsPerUser",
+    "queuedRequestsGlobal",
+    "workerConcurrency",
 ] as const satisfies readonly ChatRateLimitRuleKey[];
 
 export const DEFAULT_CHAT_RATE_LIMIT_RULES: ChatRateLimitRules = {
@@ -28,5 +31,7 @@ export const DEFAULT_CHAT_RATE_LIMIT_RULES: ChatRateLimitRules = {
     dailyTokensPerUser: { enabled: true, limit: 150_000 },
     dailyTokensGlobal: { enabled: true, limit: 2_000_000 },
     maxMessageCharacters: { enabled: true, limit: 4_000 },
+    queuedRequestsPerUser: { enabled: true, limit: 3 },
+    queuedRequestsGlobal: { enabled: true, limit: 1_000 },
+    workerConcurrency: { enabled: true, limit: 5 },
 };
-

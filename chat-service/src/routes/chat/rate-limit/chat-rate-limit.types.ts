@@ -5,7 +5,10 @@ export type ChatRateLimitRuleKey =
     | "activeRequestsPerUser"
     | "dailyTokensPerUser"
     | "dailyTokensGlobal"
-    | "maxMessageCharacters";
+    | "maxMessageCharacters"
+    | "queuedRequestsPerUser"
+    | "queuedRequestsGlobal"
+    | "workerConcurrency";
 
 export type ChatRateLimitRuleConfig = {
     readonly enabled: boolean;

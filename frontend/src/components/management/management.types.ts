@@ -32,7 +32,10 @@ export type ChatRateLimitRuleKey =
   | 'activeRequestsPerUser'
   | 'dailyTokensPerUser'
   | 'dailyTokensGlobal'
-  | 'maxMessageCharacters';
+  | 'maxMessageCharacters'
+  | 'queuedRequestsPerUser'
+  | 'queuedRequestsGlobal'
+  | 'workerConcurrency';
 
 export interface ChatRateLimitRuleConfig {
   enabled: boolean;
