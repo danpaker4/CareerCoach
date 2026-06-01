@@ -53,42 +53,6 @@ const parseJobs = (data: unknown): JobResult[] => {
   });
 };
 
-const matchColor = (pct: number): string => {
-  if (pct >= 75) return 'match-ring--green';
-  if (pct >= 40) return 'match-ring--yellow';
-  return 'match-ring--red';
-};
-
-const MatchRing = ({ pct }: { pct: number }) => {
-  const radius = 28;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
-  const colorClass = matchColor(pct);
-  const strokeColor =
-    pct >= 75 ? 'var(--clr-success)' : pct >= 40 ? 'var(--clr-warning)' : 'var(--clr-error)';
-
-  return (
-    <svg
-      className={`match-ring-svg ${colorClass}`}
-      viewBox="0 0 70 70"
-      width="70"
-      height="70"
-      aria-label={`${pct}% match`}
-    >
-      <circle cx="35" cy="35" r={radius} fill="none" stroke="var(--clr-slate-200)" strokeWidth="6" />
-      <circle
-        cx="35" cy="35" r={radius} fill="none"
-        stroke={strokeColor} strokeWidth="6" strokeLinecap="round"
-        strokeDasharray={circumference} strokeDashoffset={offset}
-        transform="rotate(-90 35 35)"
-        style={{ transition: 'stroke-dashoffset 0.8s ease' }}
-      />
-      <text x="35" y="31" textAnchor="middle" fontSize="13" fontWeight="800" fill={strokeColor}>{pct}%</text>
-      <text x="35" y="44" textAnchor="middle" fontSize="8" fill="var(--clr-slate-500)">match</text>
-    </svg>
-  );
-};
-
 const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
   if (!Array.isArray(data)) {
     return new Map();
@@ -141,9 +105,12 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     if (!user?.id) return;
     setPendingJobs(null);
     setFetchState('loading');
-    const url = query.trim()
-      ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}`
-      : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}`;
+    const params = new URLSearchParams({ userId: user.id });
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      params.set('search', trimmedQuery);
+    }
+    const url = `${ENV.JOB_SERVICE_BASE_URL}/jobs?${params.toString()}`;
     apiFetch(url, { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) { setPendingJobs([]); return; }
@@ -179,7 +146,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchJobs(value);
-    }, 400);
+    }, 600);
   };
 
   const togglePipeline = async (job: JobResult) => {
@@ -261,7 +228,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
           <input
             type="search"
             className="jobs-search-input"
-            placeholder="Search jobs, companies, skills..."
+            placeholder="Search by role, skill, or keyword... (AI-powered)"
             value={searchQuery}
             onChange={handleSearchChange}
             aria-label="Search jobs"
@@ -314,11 +281,6 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                           <p className="job-company">{job.company}</p>
                           <span className="badge badge-blue job-seniority">{job.seniority}</span>
                         </div>
-                        {job.matchPct !== undefined && (
-                          <div className="job-match-ring">
-                            <MatchRing pct={job.matchPct} />
-                          </div>
-                        )}
                       </div>
 
                       {firstTwo.length > 0 && (

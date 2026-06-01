@@ -44,6 +44,7 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     id: randomUUID(),
                     ...userData,
                     role: "user",
+                    profileEmbedding: [],
                     githubSkills: userData.githubSkills ?? [],
                     achievements: userData.achievements ?? [],
                     technologies: userData.technologies ?? [],

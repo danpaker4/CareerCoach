@@ -277,6 +277,7 @@ export const loginOrCreateGithubUser = async (
                 lastName,
                 email: emailLower,
                 role: "user",
+                profileEmbedding: [],
                 achievements: [],
                 technologies: [],
                 interests: [],
