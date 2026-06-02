@@ -24,6 +24,7 @@ interface JobsHandlerDeps {
   tokenUsageRecorder?: LlmTokenUsageRecorder;
   usersServiceBaseUrl?: string;
   embeddingCache?: UserEmbeddingCache;
+  onJobCreated?: (job: EnrichedJob) => Promise<void>;
 }
 
 const escapeRegex = (value: string): string =>
@@ -118,6 +119,7 @@ export const JobsHandler = ({
   tokenUsageRecorder,
   usersServiceBaseUrl,
   embeddingCache,
+  onJobCreated,
 }: JobsHandlerDeps) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
@@ -180,6 +182,12 @@ export const JobsHandler = ({
         : enriched;
 
       await saveEnrichedJobs(jobsCollection, [finalJob]);
+
+      if (onJobCreated) {
+        void onJobCreated(finalJob).catch((err) => {
+          request.log.warn({ err }, "onJobCreated dispatch failed");
+        });
+      }
 
       reply.code(StatusCodes.CREATED).send({
         id: finalJob.id,

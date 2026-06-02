@@ -1,8 +1,9 @@
 import type { Collection } from "mongodb";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import type { Notification } from "./notification.model";
 import type { PipelineJob } from "../jobsInPipeline/pipeline-job.model";
+import type { NotificationBroker } from "./notification.broker";
 import { NotificationHandler } from "./notification.handler";
 import {
   checkPipelineRemindersSchema,
@@ -16,7 +17,8 @@ import {
 
 export const notificationsRouter = (
   notificationsCollection: Collection<Notification>,
-  pipelineJobsCollection: Collection<PipelineJob>
+  pipelineJobsCollection: Collection<PipelineJob>,
+  broker: NotificationBroker
 ) => async (fastify: FastifyInstance) => {
   const handler = NotificationHandler(notificationsCollection, pipelineJobsCollection);
   const typed = fastify.withTypeProvider<ZodTypeProvider>();
@@ -31,5 +33,18 @@ export const notificationsRouter = (
     "/notifications/:userId/check-pipeline-reminders",
     { schema: checkPipelineRemindersSchema },
     handler.checkPipelineRemindersHandler
+  );
+
+  fastify.get(
+    "/notifications/:userId/stream",
+    async (request: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
+      const { userId } = request.params;
+      if (!userId || userId.length === 0) {
+        reply.code(400).send({ message: "userId is required" });
+        return;
+      }
+      broker.register(userId, reply);
+      reply.hijack();
+    }
   );
 };

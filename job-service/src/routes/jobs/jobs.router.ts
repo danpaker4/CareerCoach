@@ -11,7 +11,8 @@ import { createJobSchema } from "./jobs.schema";
 export const jobsRouter = (
   jobsCollection: Collection<EnrichedJob>,
   tokenUsageCollection: Collection<LlmTokenUsageDocument>,
-  embeddingCache: UserEmbeddingCache
+  embeddingCache: UserEmbeddingCache,
+  onJobCreated?: (job: EnrichedJob) => Promise<void>
 ) => async (fastify: FastifyInstance) => {
   const tokenUsageRecorder = new LlmTokenUsageRepository(tokenUsageCollection);
   const handler = JobsHandler({
@@ -19,6 +20,7 @@ export const jobsRouter = (
     tokenUsageRecorder,
     usersServiceBaseUrl: process.env.USERS_SERVICE_BASE_URL,
     embeddingCache,
+    onJobCreated,
   });
 
   fastify.get("/jobs", handler.getJobsHandler);

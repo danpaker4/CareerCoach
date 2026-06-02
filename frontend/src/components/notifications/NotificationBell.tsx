@@ -120,6 +120,32 @@ export const NotificationBell = ({ userId }: NotificationBellProps) => {
   }, [userId, fetchUnread, checkPipelineReminders]);
 
   useEffect(() => {
+    if (!userId) return;
+    const url = `${ENV.JOB_SERVICE_BASE_URL}/notifications/${userId}/stream`;
+    const source = new EventSource(url, { withCredentials: true });
+    source.addEventListener("notification", (event) => {
+      try {
+        const data = JSON.parse((event as MessageEvent).data) as unknown;
+        if (typeof data !== "object" || data === null) return;
+        const item = data as NotificationItem;
+        if (
+          typeof item.id !== "string" ||
+          typeof item.userId !== "string" ||
+          typeof item.title !== "string"
+        ) return;
+        setItems((prev) => (prev.some((existing) => existing.id === item.id) ? prev : [item, ...prev]));
+        if (!item.read) setUnread((prev) => prev + 1);
+      } catch {
+        // ignore malformed events
+      }
+    });
+    source.onerror = () => {
+      // EventSource auto-reconnects on transient errors; no-op
+    };
+    return () => source.close();
+  }, [userId]);
+
+  useEffect(() => {
     if (open) {
       void fetchList();
       void fetchUnread();
