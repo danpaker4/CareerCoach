@@ -14,8 +14,9 @@ import iconMoon from '../../assets/icon-moon.svg';
 import './Header.css';
 import type { HeaderProps } from './header.types';
 import { getInitials } from './header.utils';
+import { NotificationBell } from '../notifications/NotificationBell';
 
-export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: HeaderProps) => {
+export const Header = ({ userId, userName, isAdmin = false, theme, onToggleTheme }: HeaderProps) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -114,6 +115,7 @@ export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: Head
         {userName ? (
           <div className="user-area">
             {renderThemeToggle()}
+            {userId && <NotificationBell userId={userId} />}
             <Link
               to="/profile"
               className={`user-profile-link${isActive('/profile') ? ' user-profile-link--active' : ''}`}

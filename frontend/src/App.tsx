@@ -151,6 +151,7 @@ export const App = () => {
     <Router>
       <div className="App">
         <Header
+          userId={currentUser?.id}
           userName={userDisplayName}
           isAdmin={sessionVerified && currentUser?.role === 'admin'}
           theme={theme}

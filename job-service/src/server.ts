@@ -13,6 +13,7 @@ import { jobSearchRouter } from "./routes/jobSearch/job-search.router";
 import { startJobPollerSchedule } from "./poller/job-poller";
 import { jobsRouter } from "./routes/jobs/jobs.router";
 import { wantedJobsRouter } from "./routes/wantedJobs/wanted-job.router";
+import { notificationsRouter } from "./routes/notifications/notification.router";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -62,6 +63,7 @@ export class Server {
                 this.embeddingCache
             ));
             await this.app.register(wantedJobsRouter(this.DBClient.wantedJobs));
+            await this.app.register(notificationsRouter(this.DBClient.notifications, this.DBClient.pipelineJobs));
 
             const address = await this.app.listen({
                 port: this.config.port,

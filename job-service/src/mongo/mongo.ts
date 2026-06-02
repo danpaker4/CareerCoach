@@ -13,6 +13,7 @@ import type {
 } from "../routes/careerKnowledge/career-knowledge.types";
 import type { LlmTokenUsageDocument } from "../llm-token-usage/llm-token-usage.types";
 import type { WantedJob } from "../routes/wantedJobs/wanted-job.model";
+import type { Notification } from "../routes/notifications/notification.model";
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
@@ -28,6 +29,7 @@ export class MongoClient implements Service {
     private careerDirectionExamplesCollection: Collection<CareerDirectionExample> | null = null;
     private llmTokenUsageCollection: Collection<LlmTokenUsageDocument> | null = null;
     private wantedJobsCollection: Collection<WantedJob> | null = null;
+    private notificationsCollection: Collection<Notification> | null = null;
 
     constructor(config: DatabaseConfig) {
        const dbKeyPathOption = (config.mongoKeyPath && config.mongoKeyPath !== 'none') 
@@ -57,6 +59,10 @@ export class MongoClient implements Service {
             await this.wantedJobsCollection.createIndex({ userId: 1, createdAt: -1 });
             await this.wantedJobsCollection.createIndex({ id: 1 }, { unique: true });
             await this.wantedJobsCollection.createIndex({ status: 1, createdAt: -1 });
+            this.notificationsCollection = this.db.collection<Notification>("notifications");
+            await this.notificationsCollection.createIndex({ userId: 1, createdAt: -1 });
+            await this.notificationsCollection.createIndex({ id: 1 }, { unique: true });
+            await this.notificationsCollection.createIndex({ userId: 1, read: 1, createdAt: -1 });
 
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -79,6 +85,7 @@ export class MongoClient implements Service {
         this.careerDirectionExamplesCollection = null;
         this.llmTokenUsageCollection = null;
         this.wantedJobsCollection = null;
+        this.notificationsCollection = null;
         console.log('MongoDb Connection Closed');
     };
 
@@ -162,6 +169,13 @@ export class MongoClient implements Service {
             throw new Error("Wanted jobs collection is not initialized");
         }
         return this.wantedJobsCollection;
+    }
+
+    get notifications(): Collection<Notification> {
+        if (!this.notificationsCollection) {
+            throw new Error("Notifications collection is not initialized");
+        }
+        return this.notificationsCollection;
     }
 
 }
