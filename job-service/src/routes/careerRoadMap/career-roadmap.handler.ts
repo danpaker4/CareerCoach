@@ -17,9 +17,15 @@ export const CareerRoadMapHandler = (careerRoadMapsCollection: Collection<Career
     return {
         // Added: create a new career roadmap for a user
         createCareerRoadMapHandler: async (request: SchematicRequest<typeof createCareerRoadMapSchema>, reply: FastifyReply) => {
-            const { userId, dreamJob, stagesToDreamJob } = request.body;
+            const { userId, dreamJob, stagesToDreamJob, generatedAt } = request.body;
             try {
-                const newRoadMap: CareerRoadMap = { id: uuidv4(), userId, dreamJob, stagesToDreamJob };
+                const newRoadMap: CareerRoadMap = {
+                    id: uuidv4(),
+                    userId,
+                    dreamJob,
+                    stagesToDreamJob,
+                    ...(generatedAt ? { generatedAt } : {}),
+                };
                 await careerRoadMapsCollection.insertOne(newRoadMap);
                 reply.code(StatusCodes.CREATED).send(newRoadMap);
             } catch (error) {

@@ -125,7 +125,7 @@ export const MySkills = ({ user }: MySkillsProps) => {
               <button
                 type="button"
                 className="btn-outline myskills-connect-btn"
-                onClick={connectGithubAccount}
+                onClick={() => connectGithubAccount('profile')}
                 disabled={!githubOauthConfigured}
               >
                 Connect GitHub

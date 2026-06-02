@@ -19,9 +19,17 @@ import {
 import type { DreamJobLlmDecision } from "../dream-job/chat.dream-job.types";
 import type { DreamJobFlow } from "../../conversation/conversation.model";
 import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
+import type { ChatLlmObservedOperation, ChatLlmObserver } from "./chat.llm.types";
 
 export class ChatLlmService {
-    constructor(private readonly textCompletion: TextCompletionPort) { }
+    constructor(
+        private readonly textCompletion: TextCompletionPort,
+        private readonly observer?: ChatLlmObserver
+    ) { }
+
+    private recordParseEvent = (operation: ChatLlmObservedOperation, rawText: string, parseStatus: "success" | "fallback"): void => {
+        this.observer?.recordParseEvent({ operation, rawText, parseStatus });
+    };
 
     decideNextStep = async (
         conversation: Conversation,
@@ -36,8 +44,11 @@ export class ChatLlmService {
         );
 
         try {
-            return parseLlmDecisionFromJson(rawText);
+            const parsed = parseLlmDecisionFromJson(rawText);
+            this.recordParseEvent("chat.decision", rawText, "success");
+            return parsed;
         } catch {
+            this.recordParseEvent("chat.decision", rawText, "fallback");
             return {
                 reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
@@ -60,8 +71,11 @@ export class ChatLlmService {
         );
 
         try {
-            return parseLlmDecisionFromJson(rawText);
+            const parsed = parseLlmDecisionFromJson(rawText);
+            this.recordParseEvent("chat.job_aware_reply", rawText, "success");
+            return parsed;
         } catch {
+            this.recordParseEvent("chat.job_aware_reply", rawText, "fallback");
             return {
                 reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
@@ -106,8 +120,11 @@ export class ChatLlmService {
             { operation: "chat.stage_reply", userId: conversation.userId }
         );
         try {
-            return parseStageLlmDecisionFromJson(rawText);
+            const parsed = parseStageLlmDecisionFromJson(rawText);
+            this.recordParseEvent("chat.stage_reply", rawText, "success");
+            return parsed;
         } catch {
+            this.recordParseEvent("chat.stage_reply", rawText, "fallback");
             return {
                 reply: LLM_STAGE_PARSE_FALLBACK_REPLY,
                 shouldAdvanceStage: false,
