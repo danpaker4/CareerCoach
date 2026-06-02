@@ -218,8 +218,36 @@ export class ChatService {
         const searchedJobs = await this.externalService.searchJobsByPlan(broaderPlan);
         const filteredJobs = searchedJobs.filter((j) => !excluded.has(j.id));
         if (filteredJobs.length === 0) {
-            const reply =
-                "I do not have another stored match right now, and a broader search did not surface a new role yet. Try naming a nearby title or domain you are curious about, and I will search again.";
+            const userMessages = conversation.messages
+                .filter((m) => m.role === "user")
+                .map((m) => m.content.trim())
+                .filter((text) => text.length > 0);
+            const priorUserMessages = userMessages.slice(0, -1);
+            const originalUserMessage = [...priorUserMessages]
+                .reverse()
+                .find((text) => text.length >= 15) ?? jobContext.lastSearchQuery?.trim() ?? normalizedMessage;
+            const wantedJobInput = buildWantedJobInputFromSearch({
+                userId,
+                normalizedMessage: originalUserMessage,
+                searchFilters: broaderFilters,
+            });
+            let wantedSavedTitle: string | null = null;
+            if (wantedJobInput) {
+                const saveResult = await this.wantedJobService.create(wantedJobInput);
+                if (saveResult.status === "error") {
+                    console.warn(
+                        `[CHAT][WANTED_JOB] userId=${userId} trigger=BROADER_SEARCH_EMPTY status=error message=${saveResult.message}`
+                    );
+                } else {
+                    wantedSavedTitle = saveResult.jobTitle;
+                    console.info(
+                        `[CHAT][WANTED_JOB] userId=${userId} trigger=BROADER_SEARCH_EMPTY status=${saveResult.status} title=${saveResult.jobTitle}`
+                    );
+                }
+            }
+            const reply = wantedSavedTitle
+                ? `I do not have another stored match right now, and a broader search did not surface a new role yet. I have saved "${wantedSavedTitle}" to your wanted jobs and will alert you when a matching role is added. Try naming a nearby title or domain you are curious about, and I will search again.`
+                : "I do not have another stored match right now, and a broader search did not surface a new role yet. Try naming a nearby title or domain you are curious about, and I will search again.";
             const now = new Date();
             await this.conversationService.saveJobContext(userId, conversationId, {
                 ...jobContext,
