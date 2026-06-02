@@ -6,6 +6,7 @@ import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
 import { UploadJobModal } from './UploadJobModal';
+import { AiAnalysisLoader } from './AiAnalysisLoader';
 import './JobSuggestions.css';
 import type { User } from '../../types/user';
 
@@ -52,42 +53,6 @@ const parseJobs = (data: unknown): JobResult[] => {
   });
 };
 
-const matchColor = (pct: number): string => {
-  if (pct >= 75) return 'match-ring--green';
-  if (pct >= 40) return 'match-ring--yellow';
-  return 'match-ring--red';
-};
-
-const MatchRing = ({ pct }: { pct: number }) => {
-  const radius = 28;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
-  const colorClass = matchColor(pct);
-  const strokeColor =
-    pct >= 75 ? 'var(--clr-success)' : pct >= 40 ? 'var(--clr-warning)' : 'var(--clr-error)';
-
-  return (
-    <svg
-      className={`match-ring-svg ${colorClass}`}
-      viewBox="0 0 70 70"
-      width="70"
-      height="70"
-      aria-label={`${pct}% match`}
-    >
-      <circle cx="35" cy="35" r={radius} fill="none" stroke="var(--clr-slate-200)" strokeWidth="6" />
-      <circle
-        cx="35" cy="35" r={radius} fill="none"
-        stroke={strokeColor} strokeWidth="6" strokeLinecap="round"
-        strokeDasharray={circumference} strokeDashoffset={offset}
-        transform="rotate(-90 35 35)"
-        style={{ transition: 'stroke-dashoffset 0.8s ease' }}
-      />
-      <text x="35" y="31" textAnchor="middle" fontSize="13" fontWeight="800" fill={strokeColor}>{pct}%</text>
-      <text x="35" y="44" textAnchor="middle" fontSize="8" fill="var(--clr-slate-500)">match</text>
-    </svg>
-  );
-};
-
 const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
   if (!Array.isArray(data)) {
     return new Map();
@@ -110,6 +75,7 @@ const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
 export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [jobs, setJobs] = useState<JobResult[]>([]);
+  const [pendingJobs, setPendingJobs] = useState<JobResult[] | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
@@ -137,29 +103,34 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const fetchJobs = useCallback((query: string) => {
     if (!user?.id) return;
+    setPendingJobs(null);
     setFetchState('loading');
-    const userSkills = [
-      ...(user.knownSkills ?? []),
-      ...(user.technologies ?? []),
-      ...(user.githubSkills ?? []),
-    ].filter(Boolean);
-    const skillsParam = userSkills.length > 0 ? `&skills=${encodeURIComponent(userSkills.join(','))}` : '';
-    const url = query.trim()
-      ? `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}&search=${encodeURIComponent(query.trim())}${skillsParam}`
-      : `${ENV.JOB_SERVICE_BASE_URL}/jobs?userId=${user.id}${skillsParam}`;
+    const params = new URLSearchParams({ userId: user.id });
+    const trimmedQuery = query.trim();
+    if (trimmedQuery) {
+      params.set('search', trimmedQuery);
+    }
+    const url = `${ENV.JOB_SERVICE_BASE_URL}/jobs?${params.toString()}`;
     apiFetch(url, { credentials: 'include' })
       .then(async (res) => {
-        if (res.status === 404) { setJobs([]); setFetchState('success'); return; }
+        if (res.status === 404) { setPendingJobs([]); return; }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
-        setJobs(parseJobs(data));
-        setFetchState('success');
+        setPendingJobs(parseJobs(data));
       })
       .catch((err: unknown) => {
         setErrorMessage(err instanceof Error ? err.message : 'Failed to load jobs');
         setFetchState('error');
       });
-  }, [user?.id, user?.knownSkills, user?.technologies, user?.githubSkills]);
+  }, [user?.id]);
+
+  const handleAnalysisComplete = useCallback(() => {
+    if (pendingJobs !== null) {
+      setJobs(pendingJobs);
+      setPendingJobs(null);
+      setFetchState('success');
+    }
+  }, [pendingJobs]);
 
   useEffect(() => {
     void loadPipelineJobHashes();
@@ -175,7 +146,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchJobs(value);
-    }, 400);
+    }, 600);
   };
 
   const togglePipeline = async (job: JobResult) => {
@@ -257,7 +228,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
           <input
             type="search"
             className="jobs-search-input"
-            placeholder="Search jobs, companies, skills..."
+            placeholder="Search by role, skill, or keyword... (AI-powered)"
             value={searchQuery}
             onChange={handleSearchChange}
             aria-label="Search jobs"
@@ -265,10 +236,10 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         </div>
 
         {fetchState === 'loading' && (
-          <div className="page-loading">
-            <div className="spinner" />
-            <p>Finding jobs for you...</p>
-          </div>
+          <AiAnalysisLoader
+            isDataReady={pendingJobs !== null}
+            onComplete={handleAnalysisComplete}
+          />
         )}
 
         {fetchState === 'error' && (
@@ -310,11 +281,6 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                           <p className="job-company">{job.company}</p>
                           <span className="badge badge-blue job-seniority">{job.seniority}</span>
                         </div>
-                        {job.matchPct !== undefined && (
-                          <div className="job-match-ring">
-                            <MatchRing pct={job.matchPct} />
-                          </div>
-                        )}
                       </div>
 
                       {firstTwo.length > 0 && (

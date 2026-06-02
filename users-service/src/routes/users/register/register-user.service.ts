@@ -111,6 +111,7 @@ export const registerUser = async (
     lastName,
     email,
     role: "user",
+    profileEmbedding: [],
     password: hashedPassword,
     birthDate: new Date(birthDate),
     currentJob: currentJob || undefined,

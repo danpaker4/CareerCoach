@@ -34,6 +34,7 @@ export const UserSchema = z.object({
     knownSkills: z.array(z.string()).default([]),
     roleExperience: z.array(RoleExperienceEntrySchema).default([]),
     currentJob: z.string().nullish(),
+    dreamJob: z.string().nullish(),
     linkedInUrl: z.string().nullish(),
     githubUrl: z.string().nullish(),
     githubSkills: z.array(z.string()).default([]),
@@ -43,6 +44,8 @@ export const UserSchema = z.object({
     bio: z.string().nullish(),
     location: z.string().nullish(),
     company: z.string().nullish(),
+    profileEmbedding: z.array(z.number()).default([]),
+    profileEmbeddingUpdatedAt: z.coerce.date().optional(),
     /** Set when chat-service first creates the linked `userCareerProfiles` document for this `id`. */
     coachProfileMaterializedAt: z.coerce.date().optional(),
 });

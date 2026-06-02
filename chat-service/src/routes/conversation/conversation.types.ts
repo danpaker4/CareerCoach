@@ -10,6 +10,8 @@ export type EnsureConversationExistsResult = {
 export type ConversationResponse = {
     conversationId: string;
     userId: string;
+    /** Active conversation stage id (`achievements` | `timeline` | `preferences`), aligned with evaluation cases. */
+    currentStageId: string | null;
     achievements: UserAchievement[];
     messages: {
         role: "system" | "user" | "assistant";

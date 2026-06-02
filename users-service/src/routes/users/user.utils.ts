@@ -15,6 +15,7 @@ export const toUser = (userDocument: UserDocument): User => {
     return {
         id: _id,
         ...rest,
+        profileEmbedding: rest.profileEmbedding ?? [],
         role: role ?? "user",
     };
 };

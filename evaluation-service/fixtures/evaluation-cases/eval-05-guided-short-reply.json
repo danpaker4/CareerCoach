@@ -1,0 +1,12 @@
+{
+  "id": "eval-05-guided-short-reply",
+  "messages": [
+    { "role": "user", "content": "hello im a devops engineer with aws and kubernetes" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 5,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["I recommend"]
+  }
+}
