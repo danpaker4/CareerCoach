@@ -1,8 +1,27 @@
+import { context, propagation } from "@opentelemetry/api";
 import { connect, type Channel, type ChannelModel, type ConsumeMessage } from "amqplib";
 import type { ChatQueueConfig, ChatQueueJob, ChatRequestEvent } from "./chat-queue.types";
 import { parseChatQueueJob, parseChatRequestEvent, serializeChatQueuePayload } from "./chat-queue.utils";
 
 type ChatQueueMessageHandler<T> = (payload: T) => Promise<void>;
+type TraceHeaders = Record<string, string>;
+
+const toTraceHeaders = (headers: unknown): TraceHeaders => {
+    if (typeof headers !== "object" || headers === null) {
+        return {};
+    }
+
+    return Object.entries(headers as Record<string, unknown>).reduce<TraceHeaders>(
+        (traceHeaders, [key, value]) => typeof value === "string" ? { ...traceHeaders, [key]: value } : traceHeaders,
+        {}
+    );
+};
+
+const injectTraceHeaders = (): TraceHeaders => {
+    const headers: TraceHeaders = {};
+    propagation.inject(context.active(), headers);
+    return headers;
+};
 
 export class ChatQueueClient {
     private connection: ChannelModel | null = null;
@@ -37,6 +56,7 @@ export class ChatQueueClient {
         channel.sendToQueue(this.config.requestQueueName, serializeChatQueuePayload(job), {
             persistent: true,
             contentType: "application/json",
+            headers: injectTraceHeaders(),
         });
     };
 
@@ -45,6 +65,7 @@ export class ChatQueueClient {
         channel.publish(this.config.eventsExchangeName, "", serializeChatQueuePayload(event), {
             persistent: false,
             contentType: "application/json",
+            headers: injectTraceHeaders(),
         });
     };
 
@@ -78,20 +99,23 @@ export class ChatQueueClient {
             return;
         }
 
-        const channel = this.getChannel();
-        try {
-            const payload = parsePayload(message.content);
-            if (!payload) {
-                channel.ack(message);
-                return;
-            }
+        const parentContext = propagation.extract(context.active(), toTraceHeaders(message.properties.headers));
+        await context.with(parentContext, async () => {
+            const channel = this.getChannel();
+            try {
+                const payload = parsePayload(message.content);
+                if (!payload) {
+                    channel.ack(message);
+                    return;
+                }
 
-            await handler(payload);
-            channel.ack(message);
-        } catch (error) {
-            channel.nack(message, false, false);
-            console.error("Failed handling chat queue message", error);
-        }
+                await handler(payload);
+                channel.ack(message);
+            } catch (error) {
+                channel.nack(message, false, false);
+                console.error("Failed handling chat queue message", error);
+            }
+        });
     };
 
     private getChannel = (): Channel => {

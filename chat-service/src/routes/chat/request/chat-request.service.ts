@@ -4,6 +4,7 @@ import type { ChatMessageRequestBody } from "../chat.types";
 import type { ChatQueueClient } from "../queue/chat-queue.client";
 import type { ChatQueueJob } from "../queue/chat-queue.types";
 import type { ChatRateLimitService } from "../rate-limit/chat-rate-limit.service";
+import { withSpan } from "../../../observability/tracing";
 import { CHAT_SOCKET_TICKET_TTL_MS } from "./chat-request.consts";
 import { ChatRequestRepository } from "./chat-request.repository";
 import type {
@@ -54,13 +55,20 @@ export class ChatRequestService {
         };
 
         try {
-            await this.queueClient.publishJob(job);
-            await this.queueClient.publishEvent({
-                type: "queued",
-                requestId,
-                userId: body.userId,
-                conversationId,
-                status: "queued",
+            await withSpan("chat.request.enqueue", {
+                "chat.request.id": requestId,
+                "conversation.id": conversationId,
+                "enduser.id": body.userId,
+                "messaging.destination.name": "chat.message.requests",
+            }, async () => {
+                await this.queueClient.publishJob(job);
+                await this.queueClient.publishEvent({
+                    type: "queued",
+                    requestId,
+                    userId: body.userId,
+                    conversationId,
+                    status: "queued",
+                });
             });
         } catch (error) {
             await this.repository.markFailed(requestId, readErrorMessage(error));
