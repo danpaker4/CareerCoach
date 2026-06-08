@@ -181,7 +181,7 @@ export const deleteAdminUser = (usersCollection: Collection<UserDocument>) =>
         reply.status(StatusCodes.OK).send(result);
     };
 
-export const getAdminSession = () =>
+export const getAdminSession = (usersCollection: Collection<UserDocument>) =>
     async (request: AdminAuthenticatedRequest<typeof getAdminSessionSchema>, reply: FastifyReply): Promise<void> => {
         const adminUserId = request.authUser?.userId;
         if (!adminUserId) {
@@ -189,7 +189,19 @@ export const getAdminSession = () =>
             return;
         }
 
-        const result: AdminSessionResult = { adminUserId };
+        const adminUser = await usersCollection.findOne({ _id: adminUserId });
+        if (!adminUser) {
+            reply.status(StatusCodes.UNAUTHORIZED).send({ error: "User not found", errorCode: "ACCESS_TOKEN_INVALID" });
+            return;
+        }
+
+        const adminSummary = toAdminUserSummary(adminUser);
+        const adminUserName = `${adminSummary.firstName} ${adminSummary.lastName}`.trim() || adminSummary.email;
+        const result: AdminSessionResult = {
+            adminUserId,
+            adminUserName,
+            adminUserEmail: adminSummary.email,
+        };
         reply.status(StatusCodes.OK).send(result);
     };
 

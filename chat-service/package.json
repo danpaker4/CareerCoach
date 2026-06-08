@@ -4,10 +4,12 @@
     "main": "index.js",
     "scripts": {
         "dev": "tsx watch src/index.ts",
+        "dev:worker": "tsx watch src/chat-worker.ts",
         "build": "tsc",
         "start": "node dist/index.js",
-        "test": "tsx --test src/routes/chat/chat.direction.utils.test.ts",
-        "test:run": "tsx --test src/routes/chat/chat.direction.utils.test.ts"
+        "start:worker": "node dist/chat-worker.js",
+        "test": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts src/routes/chat/queue/chat-queue.utils.test.ts",
+        "test:run": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts src/routes/chat/queue/chat-queue.utils.test.ts"
     },
     "keywords": [],
     "author": "",
@@ -18,7 +20,10 @@
     },
     "dependencies": {
         "@fastify/cors": "^11.2.0",
+        "@fastify/websocket": "^11.2.0",
         "@google/generative-ai": "^0.24.1",
+        "@types/amqplib": "^0.10.8",
+        "amqplib": "^2.0.1",
         "dotenv": "^17.2.3",
         "fastify": "^5.6.2",
         "fastify-type-provider-zod": "^5.1.0",

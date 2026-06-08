@@ -14,6 +14,7 @@ import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { Management } from './components/management/Management';
 import { ManagementBenchmarks } from './components/management/ManagementBenchmarks';
 import { ManagementLlmEvaluation } from './components/management/ManagementLlmEvaluation';
+import { ManagementRateLimits } from './components/management/ManagementRateLimits';
 import { ManagementUsage } from './components/management/ManagementUsage';
 import { ManagementUsers } from './components/management/ManagementUsers';
 import { GithubCallback } from './components/github-callback/GithubCallback';
@@ -277,6 +278,15 @@ export const App = () => {
               element={
                 <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
                   <ManagementBenchmarks />
+                </AdminRoute>
+              }
+            />
+
+            <Route
+              path="/management/rate-limits"
+              element={
+                <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
+                  <ManagementRateLimits />
                 </AdminRoute>
               }
             />

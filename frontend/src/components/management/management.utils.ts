@@ -4,6 +4,7 @@ import {
   ADMIN_DELETE_USER_PATH,
   ADMIN_DEMOTE_PATH,
   ADMIN_LLM_TOKEN_USAGE_PATH,
+  ADMIN_RATE_LIMITS_PATH,
   ADMIN_USERS_PATH,
   buildEvaluationCaseRunUrl,
   EVALUATION_CASES_PATH,
@@ -29,6 +30,10 @@ import type {
   BenchmarkParseEvent,
   BenchmarkRubricItem,
   BenchmarkRunSummary,
+  ChatRateLimitConfig,
+  ChatRateLimitRuleConfig,
+  ChatRateLimitRuleKey,
+  ChatRateLimitRules,
   EvaluationCaseSummary,
   EvaluationCheckResult,
   EvaluationExpected,
@@ -38,6 +43,58 @@ import type {
   LlmProvider,
   TokenUsageDays,
 } from './management.types';
+
+export const CHAT_RATE_LIMIT_RULE_KEYS = [
+  'perUserPerMinute',
+  'perUserPerDay',
+  'perIpPerMinute',
+  'activeRequestsPerUser',
+  'dailyTokensPerUser',
+  'dailyTokensGlobal',
+  'maxMessageCharacters',
+  'queuedRequestsPerUser',
+  'queuedRequestsGlobal',
+  'workerConcurrency',
+] as const satisfies readonly ChatRateLimitRuleKey[];
+
+export const CHAT_RATE_LIMIT_RULE_LABELS: Record<ChatRateLimitRuleKey, string> = {
+  perUserPerMinute: 'Per user per minute',
+  perUserPerDay: 'Per user per day',
+  perIpPerMinute: 'Per IP per minute',
+  activeRequestsPerUser: 'Active requests per user',
+  dailyTokensPerUser: 'Daily tokens per user',
+  dailyTokensGlobal: 'Daily tokens global',
+  maxMessageCharacters: 'Max message characters',
+  queuedRequestsPerUser: 'Queued requests per user',
+  queuedRequestsGlobal: 'Queued requests global',
+  workerConcurrency: 'Worker concurrency',
+};
+
+export const CHAT_RATE_LIMIT_RULE_DESCRIPTIONS: Record<ChatRateLimitRuleKey, string> = {
+  perUserPerMinute: 'Chat requests allowed for one user in a fixed 60-second window.',
+  perUserPerDay: 'Chat requests allowed for one user in the current UTC day.',
+  perIpPerMinute: 'Chat requests allowed from one IP address in a fixed 60-second window.',
+  activeRequestsPerUser: 'Chat responses that can be generated at the same time for one user.',
+  dailyTokensPerUser: 'Known LLM tokens allowed for one user in the current UTC day.',
+  dailyTokensGlobal: 'Known LLM tokens allowed globally for chat in the current UTC day.',
+  maxMessageCharacters: 'Maximum characters accepted in one chat message.',
+  queuedRequestsPerUser: 'Queued chat requests allowed for one user before new messages are blocked.',
+  queuedRequestsGlobal: 'Queued chat requests allowed globally before new messages are blocked.',
+  workerConcurrency: 'Chat jobs the worker may process at the same time.',
+};
+
+export const CHAT_RATE_LIMIT_RULE_MEANINGS: Record<ChatRateLimitRuleKey, string> = {
+  perUserPerMinute: 'requests per user per minute',
+  perUserPerDay: 'requests per user per UTC day',
+  perIpPerMinute: 'requests per IP per minute',
+  activeRequestsPerUser: 'running requests per user',
+  dailyTokensPerUser: 'tokens per user per UTC day',
+  dailyTokensGlobal: 'global chat tokens per UTC day',
+  maxMessageCharacters: 'characters per chat message',
+  queuedRequestsPerUser: 'queued requests per user',
+  queuedRequestsGlobal: 'queued requests globally',
+  workerConcurrency: 'parallel worker jobs',
+};
 
 export const isAdminUserSummary = (value: unknown): value is AdminUserSummary => {
   if (typeof value !== 'object' || value === null) {
@@ -120,6 +177,86 @@ const isLlmProvider = (value: unknown): value is LlmProvider =>
   value === 'gemini' || value === 'openai' || value === 'custom' || value === 'ollama';
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+const isChatRateLimitRuleConfig = (value: unknown): value is ChatRateLimitRuleConfig => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const rule = value as Record<string, unknown>;
+  return typeof rule.enabled === 'boolean' && isNumber(rule.limit);
+};
+
+const parseChatRateLimitRules = (value: unknown): ChatRateLimitRules | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const rules = value as Record<string, unknown>;
+  const perUserPerMinute = rules.perUserPerMinute;
+  const perUserPerDay = rules.perUserPerDay;
+  const perIpPerMinute = rules.perIpPerMinute;
+  const activeRequestsPerUser = rules.activeRequestsPerUser;
+  const dailyTokensPerUser = rules.dailyTokensPerUser;
+  const dailyTokensGlobal = rules.dailyTokensGlobal;
+  const maxMessageCharacters = rules.maxMessageCharacters;
+  const queuedRequestsPerUser = rules.queuedRequestsPerUser;
+  const queuedRequestsGlobal = rules.queuedRequestsGlobal;
+  const workerConcurrency = rules.workerConcurrency;
+  if (
+    !isChatRateLimitRuleConfig(perUserPerMinute) ||
+    !isChatRateLimitRuleConfig(perUserPerDay) ||
+    !isChatRateLimitRuleConfig(perIpPerMinute) ||
+    !isChatRateLimitRuleConfig(activeRequestsPerUser) ||
+    !isChatRateLimitRuleConfig(dailyTokensPerUser) ||
+    !isChatRateLimitRuleConfig(dailyTokensGlobal) ||
+    !isChatRateLimitRuleConfig(maxMessageCharacters) ||
+    !isChatRateLimitRuleConfig(queuedRequestsPerUser) ||
+    !isChatRateLimitRuleConfig(queuedRequestsGlobal) ||
+    !isChatRateLimitRuleConfig(workerConcurrency)
+  ) {
+    return null;
+  }
+
+  return {
+    perUserPerMinute,
+    perUserPerDay,
+    perIpPerMinute,
+    activeRequestsPerUser,
+    dailyTokensPerUser,
+    dailyTokensGlobal,
+    maxMessageCharacters,
+    queuedRequestsPerUser,
+    queuedRequestsGlobal,
+    workerConcurrency,
+  };
+};
+
+export const parseChatRateLimitConfig = (value: unknown): ChatRateLimitConfig | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const rules = parseChatRateLimitRules(payload.rules);
+  if (!rules || typeof payload.updatedAt !== 'string') {
+    return null;
+  }
+
+  return {
+    rules,
+    updatedAt: payload.updatedAt,
+    ...(typeof payload.updatedByAdminUserId === 'string' ? { updatedByAdminUserId: payload.updatedByAdminUserId } : {}),
+    ...(typeof payload.updatedByAdminUserName === 'string' ? { updatedByAdminUserName: payload.updatedByAdminUserName } : {}),
+    ...(typeof payload.updatedByAdminUserEmail === 'string' ? { updatedByAdminUserEmail: payload.updatedByAdminUserEmail } : {}),
+  };
+};
+
+export const buildRateLimitConfigPayload = (config: ChatRateLimitConfig): { rules: ChatRateLimitRules } => ({
+  rules: config.rules,
+});
+
+export const rateLimitConfigUrl = (): string => ADMIN_RATE_LIMITS_PATH;
 
 const isTokenUsageSeriesItem = (value: unknown): value is AdminLlmTokenUsageSeriesItem => {
   if (typeof value !== 'object' || value === null) {

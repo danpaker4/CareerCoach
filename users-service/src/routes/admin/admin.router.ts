@@ -24,7 +24,7 @@ export const adminRouter = (
 
     fastify.get(ADMIN_ROUTE_PATHS.users, { schema: getAdminUsersSchema, preHandler }, getAdminUsers(usersCollection));
     fastify.get(ADMIN_ROUTE_PATHS.llmTokenUsage, { schema: getAdminLlmTokenUsageSchema, preHandler }, getAdminLlmTokenUsage(tokenUsageCollection));
-    fastify.get(ADMIN_ROUTE_PATHS.session, { schema: getAdminSessionSchema, preHandler }, getAdminSession());
+    fastify.get(ADMIN_ROUTE_PATHS.session, { schema: getAdminSessionSchema, preHandler }, getAdminSession(usersCollection));
     fastify.post(ADMIN_ROUTE_PATHS.admins, { schema: promoteAdminSchema, preHandler }, promoteAdmin(usersCollection));
     fastify.delete(ADMIN_ROUTE_PATHS.adminById, { schema: demoteAdminSchema, preHandler }, demoteAdmin(usersCollection));
     fastify.delete(ADMIN_ROUTE_PATHS.userById, { schema: deleteAdminUserSchema, preHandler }, deleteAdminUser(usersCollection));
