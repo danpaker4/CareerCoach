@@ -36,6 +36,8 @@ export type ChatMessageRequestBody = {
     /** When set, the message is stored on this conversation thread (must belong to userId). */
     conversationId?: string;
     userProfile?: ProfileInput;
+    /** Fallback when Authorization header is not forwarded to chat-service. */
+    accessToken?: string;
 };
 
 export type ChatJobMatchRow = {
@@ -108,6 +110,7 @@ export type PrepareSendMessageContextParams = {
     normalizedMessage: string;
     profile: ProfileInput | undefined;
     requestedConversationId: string | undefined;
+    authorization?: string;
 };
 
 export type SendMessagePreparedContext = {
@@ -124,6 +127,7 @@ export type SendMessagePreparedContext = {
     mode: ConversationMode;
     followUpIntent: JobFollowUpIntentResult;
     jobContext: Conversation["jobContext"];
+    authorization?: string;
 };
 
 export type StageFlowSendMessageResult =

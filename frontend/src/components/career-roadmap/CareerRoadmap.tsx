@@ -12,7 +12,7 @@ import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import { getPlatformStyle, getResourceTypeStyle } from './platform-config';
 import './CareerRoadmap.css';
-import type { CareerRoadmapData, CareerRoadmapProps, FetchState } from './career-roadmap.types';
+import type { CareerRoadmapData, CareerRoadmapProps, FetchState, StageContent } from './career-roadmap.types';
 
 const ROADMAP_URL = (userId: string) =>
   `${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${userId}`;
@@ -61,7 +61,7 @@ const loadDefaultChatConversationId = async (userId: string): Promise<string | n
   return null;
 };
 
-const GENERIC_STAGE_CONTENT = [
+const GENERIC_STAGE_CONTENT: StageContent[] = [
   { label: 'Foundation & Fundamentals', description: 'Build the core skills and knowledge base required for your target role.', actions: ['Master core programming fundamentals', 'Complete foundational courses or certifications', 'Build small practice projects'] },
   { label: 'Intermediate Growth', description: 'Apply your knowledge on real projects and deepen your technical expertise.', actions: ['Contribute to real-world projects', 'Build a portfolio with meaningful use cases', 'Learn testing, CI/CD, and best practices'] },
   { label: 'Advanced Proficiency', description: 'Develop deep expertise in your domain and tackle complex engineering challenges.', actions: ['Solve complex architectural problems', 'Lead technical discussions and design reviews', 'Study advanced patterns and system design'] },
@@ -273,7 +273,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
 
                   <div className="steps-list">
                     {activeRoadmap.stagesToDreamJob.map((stage, idx) => {
-                      const content = stage.content ?? GENERIC_STAGE_CONTENT[idx] ?? { label: `Step ${idx + 1}`, description: '', actions: [] };
+                      const content: StageContent = stage.content ?? GENERIC_STAGE_CONTENT[idx] ?? { label: `Step ${idx + 1}`, description: '', actions: [] };
                       const isNext = !stage.isDone && (idx === 0 || activeRoadmap.stagesToDreamJob[idx - 1]?.isDone);
                       const isLocked = !stage.isDone && !isNext;
 

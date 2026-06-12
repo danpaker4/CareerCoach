@@ -1,4 +1,5 @@
 import type { ConversationMode } from "./chat-mode/conversation-mode.types";
+import { hasDreamJobIntent } from "./chat-mode/conversation-mode.utils";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
 import type { Conversation } from "../conversation/conversation.model";
 import type { JobSearchRequest } from "./chat.types";
@@ -35,6 +36,9 @@ export const shouldRunJobSearch = (
     discoveryConfidence: number,
     forceDomainExplorationSearch: boolean
 ): boolean => {
+    if (mode === "DREAMJOB") {
+        return false;
+    }
     if (forceDomainExplorationSearch) {
         return true;
     }
@@ -137,6 +141,9 @@ export const extractWorkDirectionQuery = (message: string): string | null => {
 };
 
 export const isWorkDirectionIntent = (message: string): boolean => {
+    if (hasDreamJobIntent(message)) {
+        return false;
+    }
     const lowered = message.toLowerCase();
     const extractedDirection = extractWorkDirectionQuery(message);
     if (extractedDirection) {

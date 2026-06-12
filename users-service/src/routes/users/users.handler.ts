@@ -88,9 +88,17 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
             }
         },
 
-        updateDreamJobHandler: async (request: SchematicRequest<typeof updateDreamJobSchema>, reply: FastifyReply) => {
+        updateDreamJobHandler: async (
+            request: SchematicRequest<typeof updateDreamJobSchema> & Pick<FastifyRequest, "authUser">,
+            reply: FastifyReply,
+        ) => {
             const { userId } = request.params;
             const { dreamJob } = request.body;
+
+            if (request.authUser?.userId !== userId) {
+                reply.code(StatusCodes.FORBIDDEN).send({ error: "Forbidden" });
+                return;
+            }
 
             try {
                 const result = await usersCollection.updateOne(

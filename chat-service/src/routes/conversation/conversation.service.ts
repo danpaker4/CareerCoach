@@ -15,7 +15,7 @@ import {
     tryParseConversationObjectId,
 } from "./conversation.utils";
 import { ConversationStageService } from "./conversation.stage.service";
-import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, DreamJobFlow } from "./conversation.model";
 import type { JobSearchResultItem } from "../chat/chat.types";
 import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../../job-in-conversation.types";
 
@@ -123,6 +123,10 @@ export class ChatConversationService {
 
     saveJobContext = async (userId: string, conversationId: string, jobContext: ConversationJobContext): Promise<void> => {
         await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
+    };
+
+    updateDreamJobFlow = async (userId: string, conversationId: string, dreamJobFlow: DreamJobFlow | undefined): Promise<void> => {
+        await this.repository.updateDreamJobFlow(userId, parseConversationObjectIdOrThrow(conversationId), dreamJobFlow);
     };
 
     setJobContextAfterSearch = async (

@@ -67,6 +67,38 @@ const extractJsonFromResponse = (raw: string): string => {
     return codeBlockMatch ? codeBlockMatch[1].trim() : raw.trim();
 };
 
+const extractObjectLikeJson = (raw: string): string | null => {
+    const firstBraceIndex = raw.indexOf("{");
+    const lastBraceIndex = raw.lastIndexOf("}");
+    if (firstBraceIndex === -1 || lastBraceIndex === -1 || lastBraceIndex <= firstBraceIndex) {
+        return null;
+    }
+    return raw.slice(firstBraceIndex, lastBraceIndex + 1).trim();
+};
+
+const tryParseJsonCandidates = (rawText: string): unknown => {
+    const trimmed = rawText.trim();
+    const extractedFromCodeBlock = extractJsonFromResponse(rawText);
+    const objectLike = extractObjectLikeJson(trimmed);
+    const candidates = [...new Set([extractedFromCodeBlock, trimmed, objectLike].filter((item): item is string => Boolean(item)))];
+
+    const parsed = candidates
+        .map((candidate) => {
+            try {
+                return { ok: true as const, value: JSON.parse(candidate) };
+            } catch {
+                return { ok: false as const };
+            }
+        })
+        .find((result) => result.ok === true);
+
+    if (parsed && parsed.ok) {
+        return parsed.value;
+    }
+
+    throw new Error("LLM returned invalid JSON roadmap payload");
+};
+
 const parseResources = (raw: unknown): GeneratedResource[] => {
     if (!Array.isArray(raw)) {
         return [];
@@ -94,8 +126,7 @@ export const parseRoadmapGenerationResponse = (
     rawText: string,
     expectedStageCount: number
 ): RoadmapGenerationResponse => {
-    const json = extractJsonFromResponse(rawText);
-    const parsed: unknown = JSON.parse(json);
+    const parsed = tryParseJsonCandidates(rawText);
 
     if (typeof parsed !== "object" || parsed === null) {
         throw new Error("LLM returned non-object roadmap payload");

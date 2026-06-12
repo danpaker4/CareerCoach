@@ -31,6 +31,16 @@ import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
 import type { PrepareSendMessageContextParams, SendMessagePreparedContext, StageFlowSendMessageResult } from "./chat.types";
 import {
+    conversationHasDreamJobContext,
+    shouldEnterDreamJobMode,
+} from "./chat-mode/conversation-mode.utils";
+import {
+    inferDreamJobTitleFromMessage,
+    isAffirmativeConfirmation,
+    isNegativeConfirmation,
+    normalizeDreamJobTitle,
+} from "./dream-job/chat.dream-job.utils";
+import {
     buildBroaderJobSearchFilters,
     buildDomainExplorationFilters,
     buildDiscoveryQuestion,
@@ -426,7 +436,7 @@ export class ChatService {
             ? this.stageService.completeAllStages(stageProgressWithNote)
             : stageProgressWithNote;
 
-        if (!currentStage || shouldSkipStages || mode === "FAST_SEARCH") {
+        if (!currentStage || shouldSkipStages || mode === "FAST_SEARCH" || mode === "DREAMJOB") {
             return { kind: "continue_main_flow", progress: initialProgress };
         }
 
@@ -634,8 +644,87 @@ export class ChatService {
         };
     };
 
+    private readExistingDreamJob = (serverUser: Record<string, unknown> | null): string | null => {
+        if (serverUser === null) {
+            return null;
+        }
+        const value = serverUser.dreamJob;
+        if (typeof value !== "string") {
+            return null;
+        }
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+    };
+
+    private runDreamJobFlow = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse> => {
+        const dreamJobFlow = ctx.conversationAfterUserMessage.dreamJobFlow;
+        const decision = await this.llmService.decideDreamJobStep(
+            ctx.conversationAfterUserMessage,
+            ctx.normalizedMessage,
+            ctx.userAccountContext,
+            dreamJobFlow
+        );
+
+        const inferredTitle = inferDreamJobTitleFromMessage(ctx.normalizedMessage);
+        const pendingTitle =
+            decision.proposedDreamJobTitle !== undefined && decision.proposedDreamJobTitle.length > 0
+                ? normalizeDreamJobTitle(decision.proposedDreamJobTitle)
+                : dreamJobFlow?.proposedTitle !== undefined && dreamJobFlow.proposedTitle.length > 0
+                  ? dreamJobFlow.proposedTitle
+                  : inferredTitle !== undefined
+                    ? inferredTitle
+                    : undefined;
+
+        const rulesConfirmed =
+            dreamJobFlow?.awaitingConfirmation === true &&
+            isAffirmativeConfirmation(ctx.normalizedMessage) &&
+            !isNegativeConfirmation(ctx.normalizedMessage);
+
+        const userConfirmed =
+            pendingTitle !== undefined &&
+            (decision.userConfirmed || rulesConfirmed) &&
+            !isNegativeConfirmation(ctx.normalizedMessage);
+
+        if (userConfirmed && pendingTitle !== undefined) {
+            const saved = await this.externalService.updateDreamJob(ctx.userId, pendingTitle, ctx.authorization);
+            if (!saved) {
+                const failureReply =
+                    "I couldn't save your dream job right now. Please try again from your profile, or confirm once more.";
+                await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, failureReply);
+                return { reply: failureReply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
+            }
+
+            await this.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, undefined);
+            const successReply = `Saved ${pendingTitle} as your dream job. You can build a career roadmap toward it anytime.`;
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, successReply);
+            return { reply: successReply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
+        }
+
+        if (isNegativeConfirmation(ctx.normalizedMessage) && dreamJobFlow?.awaitingConfirmation === true) {
+            await this.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, {
+                awaitingConfirmation: false,
+            });
+        } else if (pendingTitle !== undefined && (decision.awaitingConfirmation || inferredTitle !== undefined)) {
+            await this.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, {
+                proposedTitle: pendingTitle,
+                awaitingConfirmation: true,
+            });
+        }
+
+        const sanitizedReply = this.validationService.sanitizeReply(decision.reply);
+        const reply =
+            pendingTitle !== undefined &&
+            inferredTitle !== undefined &&
+            dreamJobFlow?.awaitingConfirmation !== true &&
+            !decision.awaitingConfirmation
+                ? `It sounds like your long-term dream role is ${pendingTitle}. Should I save "${pendingTitle}" as your dream job?`
+                : sanitizedReply;
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+        return { reply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
+    };
+
     private prepareSendMessageContext = async (params: PrepareSendMessageContextParams): Promise<SendMessagePreparedContext> => {
-        const { userId, normalizedMessage, profile, requestedConversationId } = params;
+        const { userId, normalizedMessage, profile, requestedConversationId, authorization } = params;
         const { conversationId } = await this.conversationService.ensureConversationExists(userId, requestedConversationId);
         await this.profileService.updateProfileFromInput(userId, profile);
         await this.conversationService.appendUserMessage(userId, conversationId, normalizedMessage);
@@ -660,7 +749,17 @@ export class ChatService {
         await this.updateUserRoleExperience(userId, inferredRoleExperience);
         const userRoleExperience = mergeRoleExperience(existingRoleExperience, inferredRoleExperience);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile, userRoleExperience);
-        const mode = this.modeService.detectMode(normalizedMessage, confidenceSummary);
+        const existingDreamJob = this.readExistingDreamJob(serverUser);
+        const detectedMode = this.modeService.detectMode({
+            message: normalizedMessage,
+            confidence: confidenceSummary,
+            existingDreamJob,
+        });
+        const shouldUseDreamJobMode =
+            conversationAfterUserMessage.dreamJobFlow !== undefined ||
+            shouldEnterDreamJobMode(normalizedMessage, existingDreamJob) ||
+            (conversationHasDreamJobContext(conversationAfterUserMessage.messages) && detectedMode !== "FAST_SEARCH");
+        const mode = shouldUseDreamJobMode ? "DREAMJOB" : detectedMode;
         const followUpIntent = this.followUpAnswerService.detectFollowUpIntent(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
         return {
@@ -677,6 +776,7 @@ export class ChatService {
             mode,
             followUpIntent,
             jobContext,
+            authorization,
         };
     };
 
@@ -748,6 +848,9 @@ export class ChatService {
         extractedWorkDirection: string | null,
         domainExplorationTarget: ReturnType<typeof detectDomainExplorationTarget>
     ): Promise<ChatMessageResponse | null> => {
+        if (ctx.mode === "DREAMJOB") {
+            return null;
+        }
         if (!isWorkDirectionIntent(ctx.normalizedMessage)) {
             return null;
         }
@@ -913,7 +1016,13 @@ export class ChatService {
         });
     };
 
-    sendMessage = async (userId: string, message: string, profile?: ProfileInput, conversationId?: string): Promise<ChatMessageResponse> => {
+    sendMessage = async (
+        userId: string,
+        message: string,
+        profile?: ProfileInput,
+        conversationId?: string,
+        authorization?: string
+    ): Promise<ChatMessageResponse> => {
         const normalizedMessage = message.trim();
         if (normalizedMessage.length === 0) {
             throw new Error("Message is required");
@@ -924,7 +1033,14 @@ export class ChatService {
             normalizedMessage,
             profile,
             requestedConversationId: conversationId,
+            authorization,
         });
+
+        if (ctx.mode === "DREAMJOB") {
+            console.info(`[CHAT][DREAMJOB] userId=${userId} routing to dream job flow`);
+            return await this.runDreamJobFlow(ctx);
+        }
+
         const pipelineResponse = await this.tryPipelineShortcutResponse(ctx);
         if (pipelineResponse) {
             return pipelineResponse;
