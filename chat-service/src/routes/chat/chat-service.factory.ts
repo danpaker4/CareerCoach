@@ -34,7 +34,11 @@ export const createChatServiceDependencies = (
 ): ChatServiceDependencies => {
     const repository = new ConversationRepository(dbClient.conversations);
     const tokenUsageRepository = new LlmTokenUsageRepository(dbClient.llmTokenUsage);
-    const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
+    const externalService = new ChatExternalService(
+        chatConfig.usersServiceBaseUrl,
+        chatConfig.jobServiceBaseUrl,
+        chatConfig.internalServiceApiKey,
+    );
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
     const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain, tokenUsageRepository);

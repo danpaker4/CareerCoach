@@ -1,0 +1,19 @@
+{
+  "id": "eval-27-dreamjob-founder-aspiration",
+  "messages": [
+    { "role": "user", "content": "my dream job long term is to build my own company" },
+    { "role": "assistant", "content": "What kind of company or impact do you want most?" },
+    { "role": "user", "content": "i want to be a founder and create products people love" }
+  ],
+  "expected": {
+    "mode": "DREAMJOB",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": [
+      "here are open jobs",
+      "I found these jobs",
+      "apply now",
+      "job listings"
+    ]
+  }
+}

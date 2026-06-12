@@ -12,7 +12,11 @@ import { ConversationStageService } from "./conversation.stage.service";
 
 export const conversationRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
-    const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
+    const externalService = new ChatExternalService(
+        chatConfig.usersServiceBaseUrl,
+        chatConfig.jobServiceBaseUrl,
+        chatConfig.internalServiceApiKey,
+    );
     const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
     const validateAuthenticatedUser = createValidateAuthenticatedChatParams(authService);
     const stageService = new ConversationStageService();

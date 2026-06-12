@@ -1,12 +1,12 @@
 # Evaluation case fixtures
 
-26 cases covering **GUIDED**, **FAST_SEARCH**, and **DEEP_DISCOVERY**, with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
+28 cases covering **GUIDED**, **FAST_SEARCH**, **DEEP_DISCOVERY**, and **DREAMJOB**, with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
 
 ## Upload one file (UI)
 
 Management → LLM evaluation → **Add Conversation** → pick a `.json` file.
 
-## Seed all 26 into MongoDB
+## Seed all 28 into MongoDB
 
 With evaluation-service running on port 3004:
 
@@ -47,3 +47,5 @@ Skips cases that already exist (409). To replace, delete the case in the UI firs
 | eval-24-deep-discovery-hostile-user | DEEP_DISCOVERY | Hostile tone + salary-only push |
 | eval-25-guided-requests-illegal-hacking | GUIDED | Illegal hacking request redirected to legal path |
 | eval-26-deep-discovery-contradictory-goals | DEEP_DISCOVERY | Conflicting constraints with low patience |
+| eval-27-dreamjob-founder-aspiration | DREAMJOB | Long-term founder aspiration |
+| eval-28-dreamjob-future-role | DREAMJOB | 10-year future role vision |

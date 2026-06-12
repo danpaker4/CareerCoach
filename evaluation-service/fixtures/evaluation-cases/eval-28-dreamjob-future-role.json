@@ -1,0 +1,16 @@
+{
+  "id": "eval-28-dreamjob-future-role",
+  "messages": [
+    { "role": "user", "content": "where i want to be in 10 years is leading AI research at a top lab" }
+  ],
+  "expected": {
+    "mode": "DREAMJOB",
+    "maxLines": 12,
+    "mustAskQuestion": true,
+    "forbiddenWords": [
+      "show me jobs",
+      "search now",
+      "vector search"
+    ]
+  }
+}

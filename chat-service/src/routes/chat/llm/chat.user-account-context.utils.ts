@@ -60,6 +60,7 @@ export const buildUserAccountContext = (params: {
     const displayName = [firstName, lastName].filter(Boolean).join(" ").trim();
 
     const currentJob = readString(profile?.currentJob) ?? readString(server.currentJob);
+    const dreamJob = readString(server.dreamJob);
     const company = readString(server.company);
     const location = readString(server.location);
     const bio = readString(server.bio);
@@ -79,6 +80,9 @@ export const buildUserAccountContext = (params: {
     }
     if (currentJob !== null) {
         lines.push(`Current role / headline: ${currentJob}`);
+    }
+    if (dreamJob !== null) {
+        lines.push(`Saved dream job (long-term target): ${dreamJob}`);
     }
     if (company !== null) {
         lines.push(`Company: ${company}`);

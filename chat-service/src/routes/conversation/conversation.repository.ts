@@ -1,7 +1,7 @@
 import type { Collection } from "mongodb";
 import { ObjectId } from "mongodb";
 import type { ChatMessage } from "../chat/chat.model";
-import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, DreamJobFlow } from "./conversation.model";
 import type { ConversationListRow } from "./conversation.types";
 import { conversationFilter } from "./conversation.utils";
 import type { ConversationJobContext } from "../../job-in-conversation.types";
@@ -72,6 +72,23 @@ export class ConversationRepository {
         await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
             $set: {
                 jobContext,
+                updatedAt: new Date(),
+            },
+        });
+    };
+
+    updateDreamJobFlow = async (userId: string, conversationId: ObjectId, dreamJobFlow: DreamJobFlow | undefined): Promise<void> => {
+        if (dreamJobFlow === undefined) {
+            await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+                $unset: { dreamJobFlow: "" },
+                $set: { updatedAt: new Date() },
+            });
+            return;
+        }
+
+        await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+            $set: {
+                dreamJobFlow,
                 updatedAt: new Date(),
             },
         });
