@@ -1,3 +1,4 @@
+import "./observability/register";
 import dotenv from "dotenv";
 import { createConfigFromEnv } from "./config";
 import { MongoClient } from "./mongo/mongo";

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
 import './Chat.css';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
@@ -254,7 +254,7 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
         scrollToBottom();
     }, [messages]);
 
-    const resolvePendingRequest = (requestId: string, response: ChatResponse): void => {
+    const resolvePendingRequest = useCallback((requestId: string, response: ChatResponse): void => {
         const pendingRequest = pendingRequestsRef.current.get(requestId);
         if (!pendingRequest) {
             return;
@@ -263,9 +263,9 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
         pendingRequestsRef.current.delete(requestId);
         fallbackPollingRequestIdsRef.current.delete(requestId);
         pendingRequest.resolve(response);
-    };
+    }, []);
 
-    const rejectPendingRequest = (requestId: string, error: Error): void => {
+    const rejectPendingRequest = useCallback((requestId: string, error: Error): void => {
         const pendingRequest = pendingRequestsRef.current.get(requestId);
         if (!pendingRequest) {
             return;
@@ -274,9 +274,9 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
         pendingRequestsRef.current.delete(requestId);
         fallbackPollingRequestIdsRef.current.delete(requestId);
         pendingRequest.reject(error);
-    };
+    }, []);
 
-    const handleSocketMessage = (event: MessageEvent): void => {
+    const handleSocketMessage = useCallback((event: MessageEvent): void => {
         const payload = typeof event.data === 'string' ? parseJsonOrNull(event.data) : null;
         if (!isChatRequestEvent(payload) || payload.userId !== userId) {
             return;
@@ -295,9 +295,12 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
         if (payload.type === 'failed') {
             rejectPendingRequest(payload.requestId, new Error(payload.error));
         }
-    };
+    }, [rejectPendingRequest, resolvePendingRequest, userId]);
 
-    const pollChatRequest = async (requestId: string, attemptsLeft = CHAT_REQUEST_POLL_ATTEMPTS): Promise<ChatResponse> => {
+    const pollChatRequest = useCallback(async (
+        requestId: string,
+        attemptsLeft = CHAT_REQUEST_POLL_ATTEMPTS
+    ): Promise<ChatResponse> => {
         const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/requests/${encodeURIComponent(requestId)}`);
         if (!response.ok) {
             throw new Error('Unable to read queued chat response.');
@@ -322,9 +325,9 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
 
         await sleep(CHAT_REQUEST_POLL_INTERVAL_MS);
         return await pollChatRequest(requestId, attemptsLeft - 1);
-    };
+    }, []);
 
-    const startFallbackPolling = (requestId: string): void => {
+    const startFallbackPolling = useCallback((requestId: string): void => {
         if (!pendingRequestsRef.current.has(requestId) || fallbackPollingRequestIdsRef.current.has(requestId)) {
             return;
         }
@@ -337,17 +340,17 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
             .catch((error: unknown) => {
                 rejectPendingRequest(requestId, error instanceof Error ? error : new Error(String(error)));
             });
-    };
+    }, [pollChatRequest, rejectPendingRequest, resolvePendingRequest]);
 
-    const handleSocketClose = (socket: WebSocket): void => {
+    const handleSocketClose = useCallback((socket: WebSocket): void => {
         if (websocketRef.current === socket) {
             websocketRef.current = null;
         }
 
         Array.from(pendingRequestsRef.current.keys()).forEach(startFallbackPolling);
-    };
+    }, [startFallbackPolling]);
 
-    const connectChatSocket = async (): Promise<boolean> => {
+    const connectChatSocket = useCallback(async (): Promise<boolean> => {
         const existingSocket = websocketRef.current;
         if (existingSocket?.readyState === WebSocket.OPEN) {
             return true;
@@ -385,17 +388,17 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
 
         socketConnectionPromiseRef.current = connectionPromise;
         return await connectionPromise;
-    };
+    }, [handleSocketClose, handleSocketMessage]);
 
     const waitForQueuedResponse = async (requestId: string): Promise<ChatResponse> => {
         const socketOrPollResponse = new Promise<ChatResponse>((resolve, reject) => {
             pendingRequestsRef.current.set(requestId, { resolve, reject });
         });
-        const socketConnected = await connectChatSocket();
         setLoadingLabel('Queued...');
-        const socketIsOpen = websocketRef.current?.readyState === WebSocket.OPEN;
+        const socketConnected = await connectChatSocket();
+        const socketIsOpen = socketConnected && websocketRef.current?.readyState === WebSocket.OPEN;
 
-        if (!socketConnected || !socketIsOpen) {
+        if (!socketIsOpen) {
             startFallbackPolling(requestId);
         }
 
@@ -410,16 +413,22 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
         }
     };
 
-    useEffect(() => () => {
-        websocketRef.current?.close();
-        websocketRef.current = null;
-        socketConnectionPromiseRef.current = null;
-        pendingRequestsRef.current.forEach((pendingRequest) => {
-            pendingRequest.reject(new Error('Chat connection closed.'));
-        });
-        pendingRequestsRef.current.clear();
-        fallbackPollingRequestIdsRef.current.clear();
-    }, [userId]);
+    useEffect(() => {
+        const pendingRequests = pendingRequestsRef.current;
+        const fallbackPollingRequestIds = fallbackPollingRequestIdsRef.current;
+        void connectChatSocket();
+
+        return () => {
+            websocketRef.current?.close();
+            websocketRef.current = null;
+            socketConnectionPromiseRef.current = null;
+            pendingRequests.forEach((pendingRequest) => {
+                pendingRequest.reject(new Error('Chat connection closed.'));
+            });
+            pendingRequests.clear();
+            fallbackPollingRequestIds.clear();
+        };
+    }, [connectChatSocket, userId]);
 
     useEffect(() => {
         const loadConversation = async () => {

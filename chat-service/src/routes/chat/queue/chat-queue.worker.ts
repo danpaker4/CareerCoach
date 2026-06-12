@@ -4,6 +4,7 @@ import { ChatRequestRepository } from "../request/chat-request.repository";
 import { readErrorMessage } from "../request/chat-request.utils";
 import { ChatQueueClient } from "./chat-queue.client";
 import type { ChatQueueJob, ChatRequestEvent } from "./chat-queue.types";
+import { withSpan } from "../../../observability/tracing";
 
 const ACTIVE_REQUEST_RETRY_DELAY_MS = 1_000;
 const ACTIVE_REQUEST_MAX_ATTEMPTS = 60;
@@ -72,7 +73,17 @@ export class ChatQueueWorker {
         });
     };
 
-    private handleJob = async (job: ChatQueueJob): Promise<void> => {
+    private handleJob = async (job: ChatQueueJob): Promise<void> =>
+        await withSpan("chat.worker.handle_job", {
+            "chat.request.id": job.requestId,
+            "conversation.id": job.conversationId,
+            "enduser.id": job.userId,
+            "messaging.destination.name": "chat.message.requests",
+        }, async () => {
+            await this.processJob(job);
+        });
+
+    private processJob = async (job: ChatQueueJob): Promise<void> => {
         const existingRequest = await this.requestRepository.findByRequestId(job.requestId);
         if (!existingRequest || existingRequest.status === "completed") {
             return;

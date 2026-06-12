@@ -1,3 +1,4 @@
+import { withSpan } from "../../../observability/tracing";
 import type { EmbeddingPort } from "../../ports/embedding.types";
 
 type CustomEmbeddingPayload = {
@@ -18,18 +19,27 @@ const toVector = (payload: unknown): number[] => {
 export class HttpCustomEmbeddingAdapter implements EmbeddingPort {
     constructor(private readonly endpointUrl: string) { }
 
-    readonly embedText = async (text: string): Promise<number[]> => {
+    readonly embedText = async (text: string): Promise<number[]> => withSpan("llm.embedding", {
+        "llm.provider": "custom",
+        "llm.model": "custom",
+        "llm.operation": "embedding",
+    }, async (span) => {
         const response = await fetch(this.endpointUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text }),
         });
         const payload: unknown = await response.json().catch(() => null);
+        span.setAttribute("http.response.status_code", response.status);
+
         if (!response.ok) {
+            span.setAttribute("llm.request.status", "error");
             return [];
         }
-        return toVector(payload);
-    };
+        const vector = toVector(payload);
+        span.setAttribute("llm.request.status", vector.length > 0 ? "success" : "error");
+        return vector;
+    });
 
     readonly embedJob = (jobText: string): Promise<number[]> => this.embedText(jobText);
     readonly embedCareerProfile = (profileText: string): Promise<number[]> => this.embedText(profileText);
