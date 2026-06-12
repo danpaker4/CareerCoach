@@ -15,6 +15,9 @@ const EnvSchema = z
         MONGO_KEY_PATH: z.string().optional(),
         USERS_SERVICE_BASE_URL: envString("USERS_SERVICE_BASE_URL"),
         JOB_SERVICE_BASE_URL: envString("JOB_SERVICE_BASE_URL"),
+        RABBITMQ_URL: envString("RABBITMQ_URL"),
+        CHAT_REQUEST_QUEUE_NAME: z.string().min(1).default("chat.message.requests"),
+        CHAT_EVENTS_EXCHANGE_NAME: z.string().min(1).default("chat.request.events"),
         LLM_PROVIDER: LlmProviderSchema.default("ollama"),
         GEMINI_API_KEY: z.string().optional(),
         GEMINI_MODEL: z.string().optional(),
@@ -99,6 +102,11 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
             careerProfileVectorIndexName: parsed.CAREER_PROFILE_VECTOR_INDEX_NAME,
             careerDirectionVectorIndexName: parsed.CAREER_DIRECTION_VECTOR_INDEX_NAME,
             internalServiceApiKey: parsed.INTERNAL_SERVICE_API_KEY,
+        },
+        queueConfig: {
+            rabbitMqUrl: parsed.RABBITMQ_URL,
+            requestQueueName: parsed.CHAT_REQUEST_QUEUE_NAME,
+            eventsExchangeName: parsed.CHAT_EVENTS_EXCHANGE_NAME,
         },
     };
 };

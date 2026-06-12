@@ -80,3 +80,58 @@ export interface ChatResponse {
         matchScore: number;
     }>;
 }
+
+export type ChatRequestStatus = 'queued' | 'started' | 'completed' | 'failed';
+
+export interface ChatQueuedResponse {
+    requestId: string;
+    conversationId: string;
+    status: 'queued';
+}
+
+export interface ChatRequestResponse {
+    requestId: string;
+    userId: string;
+    conversationId: string;
+    status: ChatRequestStatus;
+    createdAt: string;
+    updatedAt: string;
+    queuedAt: string;
+    startedAt?: string;
+    completedAt?: string;
+    failedAt?: string;
+    response?: ChatResponse;
+    error?: string;
+}
+
+export type ChatRequestEvent =
+    | {
+        type: 'queued';
+        requestId: string;
+        userId: string;
+        conversationId: string;
+        status: 'queued';
+      }
+    | {
+        type: 'started';
+        requestId: string;
+        userId: string;
+        conversationId: string;
+        status: 'started';
+      }
+    | {
+        type: 'completed';
+        requestId: string;
+        userId: string;
+        conversationId: string;
+        status: 'completed';
+        response: ChatResponse;
+      }
+    | {
+        type: 'failed';
+        requestId: string;
+        userId: string;
+        conversationId: string;
+        status: 'failed';
+        error: string;
+      };

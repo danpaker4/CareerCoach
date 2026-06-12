@@ -93,6 +93,8 @@ export const getAdminSessionSchema = {
     response: {
         [StatusCodes.OK]: z.object({
             adminUserId: z.uuid(),
+            adminUserName: z.string(),
+            adminUserEmail: z.email(),
         }),
         [StatusCodes.UNAUTHORIZED]: errorResponseSchema,
         [StatusCodes.FORBIDDEN]: errorResponseSchema,

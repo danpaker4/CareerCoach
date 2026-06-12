@@ -4,11 +4,29 @@ import { resolveRequestAuthorization } from "./chat.authorization.utils";
 import type { ChatMessageRequestBody } from "./chat.types";
 import { ConversationNotFoundError, InvalidConversationIdError } from "../conversation/conversation.utils";
 import type { ChatService } from "./chat.service";
+import type { ChatRateLimitService } from "./rate-limit/chat-rate-limit.service";
 
 export class ChatController {
-    constructor(private readonly chatService: ChatService) {}
+    constructor(
+        private readonly chatService: ChatService,
+        private readonly rateLimitService: ChatRateLimitService
+    ) {}
 
     sendMessage = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        const rateLimitDecision = await this.rateLimitService.checkAndAcquire({
+            userId: (request.body as ChatMessageRequestBody).userId,
+            ipAddress: request.ip,
+            message: (request.body as ChatMessageRequestBody).message,
+        });
+        if (rateLimitDecision.status === "blocked") {
+            reply.status(StatusCodes.TOO_MANY_REQUESTS).send({
+                error: rateLimitDecision.error,
+                errorCode: rateLimitDecision.errorCode,
+                ...(rateLimitDecision.retryAfterMs !== undefined ? { retryAfterMs: rateLimitDecision.retryAfterMs } : {}),
+            });
+            return;
+        }
+
         try {
             const body = request.body as ChatMessageRequestBody;
             const authorization = resolveRequestAuthorization(request.headers.authorization, body.accessToken);
@@ -38,6 +56,10 @@ export class ChatController {
             reply.status(StatusCodes.INTERNAL_SERVER_ERROR).send({
                 error: "Failed sending chat message",
                 details: error instanceof Error ? error.message : String(error),
+            });
+        } finally {
+            await rateLimitDecision.release().catch((releaseError: unknown) => {
+                request.log.error({ error: releaseError }, "Failed releasing chat rate-limit lock");
             });
         }
     };

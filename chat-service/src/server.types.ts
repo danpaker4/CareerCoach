@@ -18,4 +18,9 @@ export interface ServerConfig {
         careerDirectionVectorIndexName: string;
         internalServiceApiKey?: string;
     };
+    queueConfig: {
+        rabbitMqUrl: string;
+        requestQueueName: string;
+        eventsExchangeName: string;
+    };
 }

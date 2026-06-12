@@ -75,7 +75,11 @@ describe("Admin Router", () => {
         });
 
         expect(response.statusCode).toBe(StatusCodes.OK);
-        expect(response.json()).toEqual({ adminUserId: adminUser.id });
+        expect(response.json()).toEqual({
+            adminUserId: adminUser.id,
+            adminUserName: `${adminUser.firstName} ${adminUser.lastName}`,
+            adminUserEmail: adminUser.email,
+        });
     });
 
     it("returns 403 for admin session when authenticated user is not an admin", async () => {
