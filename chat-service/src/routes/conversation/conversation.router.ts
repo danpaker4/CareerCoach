@@ -18,7 +18,7 @@ export const conversationRouter = (dbClient: MongoClient, chatConfig: ServerConf
         chatConfig.internalServiceApiKey,
     );
     const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
-    const validateAuthenticatedUser = createValidateAuthenticatedChatParams(authService);
+    const validateAuthenticatedUser = createValidateAuthenticatedChatParams(authService, chatConfig.internalServiceApiKey);
     const stageService = new ConversationStageService();
     const conversationService = new ChatConversationService(repository, externalService, stageService);
     const controller = new ConversationController(conversationService);

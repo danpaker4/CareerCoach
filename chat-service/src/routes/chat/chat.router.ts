@@ -27,13 +27,13 @@ export const chatRouter = (
 
     app.post(
         "/chat/message",
-        { preHandler: [validateChatMessageBody, createValidateAuthenticatedChatBody(authService)] },
+        { preHandler: [validateChatMessageBody, createValidateAuthenticatedChatBody(authService, chatConfig.internalServiceApiKey)] },
         controller.submitMessage
     );
 
     app.get(
         "/chat/requests/:requestId",
-        { preHandler: [createValidateAuthenticatedChatSession(authService)] },
+        { preHandler: [createValidateAuthenticatedChatSession(authService, chatConfig.internalServiceApiKey)] },
         controller.getRequest
     );
 

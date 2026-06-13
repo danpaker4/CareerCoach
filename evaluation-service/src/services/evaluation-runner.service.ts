@@ -1,7 +1,9 @@
 import { randomUUID } from "crypto";
+import { setTimeout as delay } from "timers/promises";
 import type { RunnerConfig } from "../server.types";
 import type { EvaluationCaseResponse, EvaluationExpected } from "../schemas/evaluation-case.schema";
 import { CONVERSATION_MODES } from "../evaluation-case.mode.consts";
+import { CHAT_REQUEST_POLL_INTERVAL_MS, CHAT_REQUEST_POLL_TIMEOUT_MS } from "./evaluation-runner.consts";
 import { getEvaluationCaseById } from "./evaluation-case.service";
 import {
     aggregatePassed,
@@ -10,6 +12,18 @@ import {
     hasCheckableExpected,
 } from "./evaluation-runner.utils";
 import type { ChatMessageResponse, EvaluationRunMessage, EvaluationRunResult } from "./evaluation-runner.types";
+
+type ChatRequestStatus = "queued" | "started" | "completed" | "failed";
+
+type ChatQueuedResponse = {
+    requestId: string;
+};
+
+type ChatRequestStatusResponse = {
+    status: ChatRequestStatus;
+    response?: ChatMessageResponse;
+    error?: string;
+};
 
 export class EvaluationRunnerError extends Error {
     constructor(
@@ -47,10 +61,22 @@ const isConversationCreateResponse = (value: unknown): value is ConversationCrea
     "conversationId" in value &&
     typeof (value as ConversationCreateResponse).conversationId === "string";
 
+const isChatQueuedResponse = (value: unknown): value is ChatQueuedResponse =>
+    typeof value === "object" &&
+    value !== null &&
+    "requestId" in value &&
+    typeof (value as ChatQueuedResponse).requestId === "string";
+
+const isChatRequestStatusResponse = (value: unknown): value is ChatRequestStatusResponse =>
+    typeof value === "object" &&
+    value !== null &&
+    "status" in value &&
+    typeof (value as ChatRequestStatusResponse).status === "string";
+
 const createEvaluationConversation = async (config: RunnerConfig): Promise<string> => {
     const response = await fetch(
         `${config.chatServiceBaseUrl}/chat/users/${encodeURIComponent(config.evaluationUserId)}/conversations`,
-        { method: "POST" },
+        { method: "POST", headers: { "X-Internal-Service-Key": config.internalServiceApiKey } },
     );
 
     if (!response.ok) {
@@ -65,14 +91,13 @@ const createEvaluationConversation = async (config: RunnerConfig): Promise<strin
     return payload.conversationId;
 };
 
-const sendChatMessage = async (
-    config: RunnerConfig,
-    conversationId: string,
-    message: string,
-): Promise<ChatMessageResponse> => {
+const enqueueChatMessage = async (config: RunnerConfig, conversationId: string, message: string): Promise<string> => {
     const response = await fetch(`${config.chatServiceBaseUrl}/chat/message`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            "X-Internal-Service-Key": config.internalServiceApiKey,
+        },
         body: JSON.stringify({
             userId: config.evaluationUserId,
             conversationId,
@@ -85,11 +110,62 @@ const sendChatMessage = async (
     }
 
     const payload = await parseJsonResponse(response);
-    if (!isChatMessageResponse(payload)) {
-        throw new EvaluationRunnerError(502, "Chat service returned an invalid message response");
+    if (!isChatQueuedResponse(payload)) {
+        throw new EvaluationRunnerError(502, "Chat service returned an invalid queued message response");
+    }
+
+    return payload.requestId;
+};
+
+const fetchChatRequestStatus = async (config: RunnerConfig, requestId: string): Promise<ChatRequestStatusResponse> => {
+    const params = new URLSearchParams({ userId: config.evaluationUserId });
+    const response = await fetch(
+        `${config.chatServiceBaseUrl}/chat/requests/${encodeURIComponent(requestId)}?${params.toString()}`,
+        { headers: { "X-Internal-Service-Key": config.internalServiceApiKey } },
+    );
+
+    if (!response.ok) {
+        throw new EvaluationRunnerError(response.status, await readChatErrorMessage(response));
+    }
+
+    const payload = await parseJsonResponse(response);
+    if (!isChatRequestStatusResponse(payload)) {
+        throw new EvaluationRunnerError(502, "Chat service returned an invalid request status response");
     }
 
     return payload;
+};
+
+const waitForChatReply = async (config: RunnerConfig, requestId: string): Promise<ChatMessageResponse> => {
+    const deadline = Date.now() + CHAT_REQUEST_POLL_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+        const status = await fetchChatRequestStatus(config, requestId);
+
+        if (status.status === "completed") {
+            if (!status.response || !isChatMessageResponse(status.response)) {
+                throw new EvaluationRunnerError(502, "Chat service completed without a valid reply");
+            }
+            return status.response;
+        }
+
+        if (status.status === "failed") {
+            throw new EvaluationRunnerError(502, status.error ?? "Chat service failed to process the message");
+        }
+
+        await delay(CHAT_REQUEST_POLL_INTERVAL_MS);
+    }
+
+    throw new EvaluationRunnerError(504, "Timed out waiting for chat service reply");
+};
+
+const sendChatMessage = async (
+    config: RunnerConfig,
+    conversationId: string,
+    message: string,
+): Promise<ChatMessageResponse> => {
+    const requestId = await enqueueChatMessage(config, conversationId, message);
+    return waitForChatReply(config, requestId);
 };
 
 const replayUserTurns = async (
@@ -130,6 +206,7 @@ const fetchRunConversation = async (config: RunnerConfig, conversationId: string
     const params = new URLSearchParams({ conversationId });
     const response = await fetch(
         `${config.chatServiceBaseUrl}/chat/${encodeURIComponent(config.evaluationUserId)}?${params.toString()}`,
+        { headers: { "X-Internal-Service-Key": config.internalServiceApiKey } },
     );
 
     if (!response.ok) {
