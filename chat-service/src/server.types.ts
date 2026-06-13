@@ -10,6 +10,7 @@ export interface ServerConfig {
     chatConfig: {
         usersServiceBaseUrl: string;
         jobServiceBaseUrl: string;
+        roadmapServiceBaseUrl: string;
         llm: ResolvedLlmConfig;
         llmTextCompletionChain: readonly ResolvedLlmConfig[];
         embeddingModel?: string;

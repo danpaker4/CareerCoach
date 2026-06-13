@@ -17,6 +17,8 @@ import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-a
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
 import { ChatLlmService } from "./llm/chat.llm.service";
 import { ChatValidationService } from "./llm/chat.validation.service";
+import { DreamJobRoadmapService } from "./dream-job/chat.dream-job-roadmap.service";
+import { DreamJobRoadmapHttpGenerator } from "./dream-job/chat.dream-job-roadmap-http.service";
 
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
@@ -63,6 +65,8 @@ export const createChatServiceDependencies = (
         embedding,
         chatConfig.careerDirectionVectorIndexName
     );
+    const roadmapGenerator = new DreamJobRoadmapHttpGenerator(chatConfig.roadmapServiceBaseUrl);
+    const dreamJobRoadmapService = new DreamJobRoadmapService(roadmapGenerator, externalService);
 
     return {
         conversationService,
@@ -82,7 +86,8 @@ export const createChatServiceDependencies = (
             knowledgeService,
             followUpAnswerService,
             pipelineIntentService,
-            pipelineService
+            pipelineService,
+            dreamJobRoadmapService
         ),
     };
 };

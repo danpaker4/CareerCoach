@@ -20,6 +20,7 @@ import { JobRankingService } from "../chat/ranking/job-ranking.service";
 import { JobFollowUpAnswerService } from "../chat/job-follow-up-answer/job-follow-up-answer.service";
 import { PipelineIntentService } from "../chat/pipeline/pipeline-intent.service";
 import { PipelineService } from "../chat/pipeline/pipeline.service";
+import type { DreamJobRoadmapCreator } from "../chat/dream-job/chat.dream-job-roadmap.types";
 import { BenchmarkFixtureExternalService } from "./benchmark-fixture.external-service";
 import { BenchmarkNoopCareerKnowledgeService, BenchmarkNoopEmbeddingPort } from "./benchmark-noop.services";
 import { BenchmarkRunRepository } from "./benchmark.repository";
@@ -281,6 +282,9 @@ export class BenchmarkService {
         const profileRepository = new CareerProfileRepository(this.dbClient.careerProfiles);
         const profileService = new CareerProfileService(profileRepository, new BenchmarkNoopEmbeddingPort(), null);
         const knowledgeService = new BenchmarkNoopCareerKnowledgeService(this.dbClient.careerDirectionExamples);
+        const dreamJobRoadmapCreator: DreamJobRoadmapCreator = {
+            create: async () => ({ created: true }),
+        };
 
         return new ChatService(
             conversationService,
@@ -297,7 +301,8 @@ export class BenchmarkService {
             knowledgeService,
             new JobFollowUpAnswerService(),
             new PipelineIntentService(),
-            new PipelineService(this.chatConfig.jobServiceBaseUrl)
+            new PipelineService(this.chatConfig.jobServiceBaseUrl),
+            dreamJobRoadmapCreator
         );
     };
 

@@ -15,6 +15,7 @@ const EnvSchema = z
         MONGO_KEY_PATH: z.string().optional(),
         USERS_SERVICE_BASE_URL: envString("USERS_SERVICE_BASE_URL"),
         JOB_SERVICE_BASE_URL: envString("JOB_SERVICE_BASE_URL"),
+        ROADMAP_SERVICE_BASE_URL: envString("ROADMAP_SERVICE_BASE_URL"),
         RABBITMQ_URL: envString("RABBITMQ_URL"),
         CHAT_REQUEST_QUEUE_NAME: z.string().min(1).default("chat.message.requests"),
         CHAT_EVENTS_EXCHANGE_NAME: z.string().min(1).default("chat.request.events"),
@@ -95,6 +96,7 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
         chatConfig: {
             usersServiceBaseUrl: parsed.USERS_SERVICE_BASE_URL,
             jobServiceBaseUrl: parsed.JOB_SERVICE_BASE_URL,
+            roadmapServiceBaseUrl: parsed.ROADMAP_SERVICE_BASE_URL,
             llm,
             llmTextCompletionChain,
             embeddingModel: parsed.EMBEDDING_MODEL,

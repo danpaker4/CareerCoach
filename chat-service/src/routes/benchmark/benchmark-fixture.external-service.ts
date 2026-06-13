@@ -1,6 +1,10 @@
 import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse } from "../chat/chat.types";
 import { ChatExternalService } from "../external-chat/chat.external.service";
-import type { ApplyInferredAchievementSignalsParams, ApplyInferredRoleExperienceParams } from "../external-chat/chat.external.types";
+import type {
+    ApplyInferredAchievementSignalsParams,
+    ApplyInferredRoleExperienceParams,
+    CreateCareerRoadmapParams,
+} from "../external-chat/chat.external.types";
 import type { RoleExperienceEntry } from "../external-chat/role-experience.types";
 import type { BenchmarkCase } from "./benchmark.types";
 
@@ -37,6 +41,10 @@ export class BenchmarkFixtureExternalService extends ChatExternalService {
     });
 
     override notifyCoachProfileMaterialized = async (): Promise<void> => undefined;
+
+    override updateDreamJob = async (): Promise<boolean> => true;
+
+    override createCareerRoadmap = async (_params: CreateCareerRoadmapParams): Promise<boolean> => true;
 
     override applyInferredAchievementSignals = async (_userId: string, _params: ApplyInferredAchievementSignalsParams): Promise<void> =>
         undefined;

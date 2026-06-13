@@ -35,6 +35,7 @@ import {
     isNegativeConfirmation,
     normalizeDreamJobTitle,
 } from "./dream-job/chat.dream-job.utils";
+import type { DreamJobRoadmapCreator } from "./dream-job/chat.dream-job-roadmap.types";
 import {
     buildBroaderJobSearchFilters,
     buildWorkDirectionFilters,
@@ -66,7 +67,8 @@ export class ChatService {
         private readonly knowledgeService: CareerKnowledgeService,
         private readonly followUpAnswerService: JobFollowUpAnswerService,
         private readonly pipelineIntentService: PipelineIntentService,
-        private readonly pipelineService: PipelineService
+        private readonly pipelineService: PipelineService,
+        private readonly dreamJobRoadmapCreator: DreamJobRoadmapCreator
     ) { }
 
     private toSignalUpdateFromInferences = (
@@ -666,7 +668,12 @@ export class ChatService {
             }
 
             await this.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, undefined);
-            const successReply = `Saved ${pendingTitle} as your dream job. You can build a career roadmap toward it anytime.`;
+            const roadmapResult = await this.dreamJobRoadmapCreator
+                .create(ctx.userId, pendingTitle)
+                .catch(() => ({ created: false as const, reason: "generation_failed" as const }));
+            const successReply = roadmapResult.created
+                ? `Saved ${pendingTitle} as your dream job and created a 4-stage roadmap toward it. You can review it on My Roadmap.`
+                : `Saved ${pendingTitle} as your dream job, but I couldn't create the roadmap right now. You can create it from My Roadmap.`;
             await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, successReply);
             return { reply: successReply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
         }
