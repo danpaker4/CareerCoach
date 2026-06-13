@@ -36,7 +36,8 @@ export class ChatExternalService {
     };
 
     searchJobs = async (filters: JobSearchRequest): Promise<JobSearchResultItem[]> => {
-        const response = await fetch(`${this.jobServiceBaseUrl}/jobs/search`, {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}/jobs/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(normalizeFilters(filters)),
@@ -56,7 +57,8 @@ export class ChatExternalService {
     };
 
     searchJobsByPlan = async (plan: JobSearchPlanRequest): Promise<JobSearchResultItem[]> => {
-        const response = await fetch(`${this.jobServiceBaseUrl}/jobs/search`, {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}/jobs/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(normalizeSearchPlan(plan)),
