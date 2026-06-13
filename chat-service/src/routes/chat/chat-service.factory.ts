@@ -17,7 +17,7 @@ import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-a
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
 import { ChatLlmService } from "./llm/chat.llm.service";
 import { ChatValidationService } from "./llm/chat.validation.service";
-import { ConversationModeService } from "./chat-mode/conversation-mode.service";
+
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
 import { JobRankingService } from "./ranking/job-ranking.service";
@@ -50,7 +50,7 @@ export const createChatServiceDependencies = (
         notifyProfileMaterialized: (userId) => externalService.notifyCoachProfileMaterialized(userId),
     });
     const confidenceService = new ConfidenceService();
-    const modeService = new ConversationModeService();
+
     const achievementInferenceService = new AchievementInferenceService();
     const seniorityInferenceService = new SeniorityInferenceService();
     const searchPlanService = new JobSearchPlanService();
@@ -74,7 +74,7 @@ export const createChatServiceDependencies = (
             validationService,
             profileService,
             confidenceService,
-            modeService,
+
             achievementInferenceService,
             seniorityInferenceService,
             searchPlanService,

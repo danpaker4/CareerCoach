@@ -87,7 +87,6 @@ export type JobSearchPlanRequest = {
 };
 
 export type LlmDecision = {
-    mode: ConversationMode;
     reply: string;
     shouldSearchJobs: boolean;
     recommendedJobIds: string[];
@@ -126,6 +125,7 @@ export type SendMessagePreparedContext = {
     userRoleExperience: RoleExperienceEntry[];
     confidenceSummary: ConfidenceSummary;
     mode: ConversationMode;
+    fastSearchQuery?: string;
     followUpIntent: JobFollowUpIntentResult;
     jobContext: Conversation["jobContext"];
     authorization?: string;

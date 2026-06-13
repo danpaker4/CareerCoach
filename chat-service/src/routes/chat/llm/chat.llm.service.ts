@@ -3,7 +3,7 @@ import type { UserAchievement } from "../chat.model";
 import type { Conversation } from "../../conversation/conversation.model";
 import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
-import type { ConversationMode } from "../chat-mode/conversation-mode.types";
+import type { ConversationMode, ConversationModeDetectionResult } from "../chat-mode/conversation-mode.types";
 import { DEFAULT_CONVERSATION_MODE } from "../chat-mode/conversation-mode.consts";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
@@ -19,8 +19,9 @@ import {
 } from "../dream-job/chat.dream-job.llm.utils";
 import type { DreamJobLlmDecision } from "../dream-job/chat.dream-job.types";
 import type { DreamJobFlow } from "../../conversation/conversation.model";
-import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
+import { buildModeDetectionPrompt, buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
 import type { ChatLlmObservedOperation, ChatLlmObserver } from "./chat.llm.types";
+import { isConversationMode } from "../chat-mode/conversation-mode.utils";
 
 export class ChatLlmService {
     constructor(
@@ -32,15 +33,39 @@ export class ChatLlmService {
         this.observer?.recordParseEvent({ operation, rawText, parseStatus });
     };
 
+    detectConversationMode = async (
+        conversation: Conversation,
+        latestUserMessage: string,
+        userAchievements: readonly UserAchievement[],
+        userAccountContext?: string
+    ): Promise<ConversationModeDetectionResult> => {
+        const rawText = await this.textCompletion.complete(
+            buildModeDetectionPrompt(conversation, latestUserMessage, userAchievements, userAccountContext),
+            { operation: "chat.decision", userId: conversation.userId } // Re-using chat.decision operation logic
+        );
+
+        try {
+            const parsed = JSON.parse(rawText);
+            if (parsed && typeof parsed === "object" && isConversationMode(parsed.mode)) {
+                return {
+                    mode: parsed.mode,
+                    fastSearchQuery: typeof parsed.fastSearchQuery === "string" ? parsed.fastSearchQuery : undefined,
+                };
+            }
+            return { mode: DEFAULT_CONVERSATION_MODE };
+        } catch {
+            return { mode: DEFAULT_CONVERSATION_MODE };
+        }
+    };
+
     decideNextStep = async (
         conversation: Conversation,
         latestUserMessage: string,
         userAchievements: readonly UserAchievement[],
-        mode: ConversationMode = "GUIDED",
         userAccountContext?: string
     ): Promise<LlmDecision> => {
         const rawText = await this.textCompletion.complete(
-            buildDecisionPrompt(conversation, latestUserMessage, userAchievements, mode, userAccountContext),
+            buildDecisionPrompt(conversation, latestUserMessage, userAchievements, userAccountContext),
             { operation: "chat.decision", userId: conversation.userId }
         );
 
@@ -51,7 +76,6 @@ export class ChatLlmService {
         } catch {
             this.recordParseEvent("chat.decision", rawText, "fallback");
             return {
-                mode: DEFAULT_CONVERSATION_MODE,
                 reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: [],
@@ -79,7 +103,6 @@ export class ChatLlmService {
         } catch {
             this.recordParseEvent("chat.job_aware_reply", rawText, "fallback");
             return {
-                mode: DEFAULT_CONVERSATION_MODE,
                 reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: jobs.map((job) => job.id),

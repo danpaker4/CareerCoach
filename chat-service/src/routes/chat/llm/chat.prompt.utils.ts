@@ -43,17 +43,53 @@ const achievementsText = (userAchievements: readonly UserAchievement[]): string 
 const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
 
-export const buildDecisionPrompt = (
+export const buildModeDetectionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     userAchievements: readonly UserAchievement[],
-    mode: ConversationMode = "GUIDED",
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are CareerCoach AI.
 Respond ONLY with valid JSON in this exact structure:
 {
-  "mode": "GUIDED",
+  "mode": "FAST_SEARCH",
+  "fastSearchQuery": "string (optional, only if mode is FAST_SEARCH, extract the core job title, skill, or domain)"
+}
+
+Rules:
+- Set mode to exactly one value from the available modes JSON below.
+- FAST_SEARCH is an INSTANT bypass mode. Use FAST_SEARCH **ONLY** when the user's LATEST message explicitly commands a job search right now (e.g., "Find me a job as a frontend developer", "Show me backend roles", "Search for data analyst").
+- NEVER use FAST_SEARCH if the user is answering a question the assistant asked them.
+- NEVER use FAST_SEARCH to "continue" an existing search or add details to a previous conversation.
+- Use GUIDED for almost all conversations, including answering questions about background, interests, or education. GUIDED is perfectly capable of naturally searching for jobs when the time is right.
+- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what fits them.
+- Use DREAMJOB only for long-term aspiration, dream-role, or future-career identity discussion.
+
+User achievements:
+${achievementsText(userAchievements)}
+
+Available conversation modes JSON:
+${JSON.stringify(CONVERSATION_MODE_OPTIONS, null, 2)}
+
+Known account context (registration profile, CV excerpt, GitHub skills):
+${userAccountContext}
+
+Conversation so far:
+${buildHistory(conversation)}
+
+Latest user message:
+${latestUserMessage}
+`;
+
+export const buildDecisionPrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+    userAchievements: readonly UserAchievement[],
+    userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
+): string => `
+You are CareerCoach AI.
+Respond ONLY with valid JSON in this exact structure:
+{
   "reply": "string",
   "shouldSearchJobs": boolean,
   "recommendedJobIds": ["string"],
@@ -66,12 +102,6 @@ Respond ONLY with valid JSON in this exact structure:
 }
 
 Rules:
-- Set mode to exactly one value from the available modes JSON below.
-- Use FAST_SEARCH when the user names a concrete target role, role family, field, or domain, including backend, frontend, full-stack, development, QA, data, cloud, DevOps, cybersecurity, or a first job in one of those areas.
-- Use FAST_SEARCH when conversation history already contains a concrete target role or domain and the latest message adds timing, experience level, education, or another detail.
-- Use GUIDED only when the user has not provided a concrete target role/domain and has not asked to find jobs yet.
-- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what fits them.
-- Use DREAMJOB only for long-term aspiration, dream-role, or future-career identity discussion.
 - Keep conversation continuous.
 - Do NOT restart conversation if there is existing history.
 - Reply in the same language as the latest user message unless the user asks otherwise.
@@ -99,14 +129,8 @@ Rules:
 User achievements:
 ${achievementsText(userAchievements)}
 
-Available conversation modes JSON:
-${JSON.stringify(CONVERSATION_MODE_OPTIONS, null, 2)}
-
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}
-
-Current backend fallback mode:
-${mode}
 
 Conversation so far:
 ${buildHistory(conversation)}

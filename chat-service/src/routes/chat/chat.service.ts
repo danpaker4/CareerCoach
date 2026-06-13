@@ -8,7 +8,6 @@ import { ChatValidationService } from "./llm/chat.validation.service";
 import { ChatExternalService } from "../external-chat/chat.external.service";
 import { CareerProfileService } from "../career-profile/career-profile.service";
 import { ConfidenceService } from "./confidence/confidence.service";
-import { ConversationModeService } from "./chat-mode/conversation-mode.service";
 import { AchievementInferenceService } from "./inference/achievement-inference/achievement-inference.service";
 import type { AchievementInferenceResult } from "./inference/achievement-inference/achievement-inference.types";
 import { toUserAchievementFromInferred } from "./inference/achievement-inference/achievement-inference.utils";
@@ -38,13 +37,6 @@ import {
 } from "./dream-job/chat.dream-job.utils";
 import {
     buildBroaderJobSearchFilters,
-    buildDomainExplorationFilters,
-    buildDiscoveryQuestion,
-    detectDomainExplorationTarget,
-    extractWorkDirectionQuery,
-    isStageSkipRequested,
-    isWorkDirectionIntent,
-    shouldRunJobSearch,
     buildWorkDirectionFilters,
 } from "./chat.direction.utils";
 import {
@@ -67,7 +59,6 @@ export class ChatService {
         private readonly validationService: ChatValidationService,
         private readonly profileService: CareerProfileService,
         private readonly confidenceService: ConfidenceService,
-        private readonly modeService: ConversationModeService,
         private readonly achievementInferenceService: AchievementInferenceService,
         private readonly seniorityInferenceService: SeniorityInferenceService,
         private readonly searchPlanService: JobSearchPlanService,
@@ -563,7 +554,6 @@ export class ChatService {
         userAchievements: SendMessagePreparedContext["userAchievements"];
         mode: ConversationMode;
         confidenceSummary: ConfidenceSummary;
-        domainExplorationTarget: ReturnType<typeof detectDomainExplorationTarget>;
     }): Promise<ChatMessageResponse> => {
         const {
             userId,
@@ -577,7 +567,6 @@ export class ChatService {
             userAchievements,
             mode,
             confidenceSummary,
-            domainExplorationTarget,
         } = params;
         const rejectedIds = new Set(conversationForDecision.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
         const acceptedIds = new Set(conversationForDecision.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
@@ -617,11 +606,9 @@ export class ChatService {
             topRankedJobs,
             selectedJob,
             normalizedMessage,
-            domainExplorationTarget ? "DOMAIN_EXPLORATION" : "SEARCH_PLAN"
+            "SEARCH_PLAN"
         );
-        const replyWithDomainContext = domainExplorationTarget
-            ? `${domainExplorationTarget.intro}\n${sanitizedReply}`
-            : sanitizedReply;
+        const replyWithDomainContext = sanitizedReply;
         const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
         const primaryJobId = presentationJobs[0]?.id;
         const jobMatches = rankedJobs
@@ -733,9 +720,12 @@ export class ChatService {
         await this.updateUserRoleExperience(userId, inferredRoleExperience);
         const userRoleExperience = mergeRoleExperience(existingRoleExperience, inferredRoleExperience);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile, userRoleExperience);
-        const mode = this.modeService.detectMode({
-            hasActiveDreamJobFlow: conversationAfterUserMessage.dreamJobFlow !== undefined,
-        });
+        const detectionResult = await this.llmService.detectConversationMode(
+            conversationAfterUserMessage,
+            normalizedMessage,
+            userAchievements,
+            userAccountContext
+        );
         const followUpIntent = this.followUpAnswerService.detectFollowUpIntent(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
         return {
@@ -749,7 +739,8 @@ export class ChatService {
             userCareerProfile,
             userRoleExperience,
             confidenceSummary,
-            mode,
+            mode: detectionResult.mode,
+            fastSearchQuery: detectionResult.fastSearchQuery,
             followUpIntent,
             jobContext,
             authorization,
@@ -819,76 +810,19 @@ export class ChatService {
         return { reply: followUpReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
     };
 
-    private tryWorkDirectionShortcutResponse = async (
-        ctx: SendMessagePreparedContext,
-        extractedWorkDirection: string | null,
-        domainExplorationTarget: ReturnType<typeof detectDomainExplorationTarget>
-    ): Promise<ChatMessageResponse | null> => {
-        if (ctx.mode === "DREAMJOB") {
-            return null;
-        }
-        if (!isWorkDirectionIntent(ctx.normalizedMessage)) {
-            return null;
-        }
-        const normalizedQuery = extractedWorkDirection ?? domainExplorationTarget?.domain ?? ctx.normalizedMessage;
-        const workDirectionFilters = buildWorkDirectionFilters(normalizedQuery);
-        const searchPlan = this.searchPlanService.buildPlan(ctx.userCareerProfile, workDirectionFilters, ctx.userRoleExperience);
-        console.info(
-            `[CHAT][SEARCH] userId=${ctx.userId} trigger=WORK_DIRECTION_INTENT query="${normalizedQuery}" filters=${JSON.stringify(workDirectionFilters)} planSearches=${searchPlan.searches.length}`
-        );
-        const jobs = await this.externalService.searchJobsByPlan(searchPlan);
-        console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=WORK_DIRECTION_INTENT results=${jobs.length}`);
-        if (jobs.length === 0) {
-            const fallback = normalizedQuery.toLowerCase().includes("cyber")
-                ? `I searched for ${normalizedQuery} roles but didn’t find exact matches. I can broaden it to beginner-friendly cybersecurity roles like SOC Analyst, Cybersecurity Analyst, Security QA, or Vulnerability Analyst.`
-                : `I searched for ${normalizedQuery} roles but didn’t find exact matches. I can broaden this to related beginner-friendly roles and adjacent directions.`;
-            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, fallback);
-            return { reply: fallback, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
-        }
 
-        return await this.respondAfterWorkDirectionSearch({
-            userId: ctx.userId,
-            conversationId: ctx.conversationId,
-            normalizedMessage: ctx.normalizedMessage,
-            conversationAfterUserMessage: ctx.conversationAfterUserMessage,
-            userCareerProfile: ctx.userCareerProfile,
-            userRoleExperience: ctx.userRoleExperience,
-            normalizedQuery,
-            jobs,
-            userAccountContext: ctx.userAccountContext,
-            userAchievements: ctx.userAchievements,
-            mode: ctx.mode,
-            confidenceSummary: ctx.confidenceSummary,
-        });
-    };
 
     private finalizeSendMessageFromLlmDecision = async (params: {
         ctx: SendMessagePreparedContext;
         conversationForDecision: Conversation;
         llmDecision: LlmDecision;
-        domainExplorationTarget: ReturnType<typeof detectDomainExplorationTarget>;
-        forceDomainExplorationSearch: boolean;
     }): Promise<ChatMessageResponse> => {
-        const { ctx, conversationForDecision, llmDecision, domainExplorationTarget, forceDomainExplorationSearch } = params;
-        const effectiveSearchFilters = domainExplorationTarget
-            ? buildDomainExplorationFilters(domainExplorationTarget, llmDecision.searchFilters, ctx.userCareerProfile.technologies)
-            : llmDecision.searchFilters;
-        const shouldSearchJobs = shouldRunJobSearch(
-            ctx.mode,
-            llmDecision.shouldSearchJobs,
-            ctx.confidenceSummary.searchReadinessConfidence,
-            ctx.confidenceSummary.discoveryConfidence,
-            forceDomainExplorationSearch
-        );
+        const { ctx, conversationForDecision, llmDecision } = params;
+        const effectiveSearchFilters = llmDecision.searchFilters;
+        const shouldSearchJobs = llmDecision.shouldSearchJobs;
         console.info(
-            `[CHAT][SEARCH] userId=${ctx.userId} trigger=LLM_OR_RULE shouldSearchJobs=${shouldSearchJobs} llmShouldSearch=${llmDecision.shouldSearchJobs} mode=${ctx.mode} filters=${JSON.stringify(effectiveSearchFilters)}`
+            `[CHAT][SEARCH] userId=${ctx.userId} trigger=LLM_OR_RULE shouldSearchJobs=${shouldSearchJobs} mode=${ctx.mode} filters=${JSON.stringify(effectiveSearchFilters)}`
         );
-
-        if (ctx.mode === "DEEP_DISCOVERY" && !shouldSearchJobs && ctx.confidenceSummary.discoveryConfidence < JOB_SEARCH_DEEP_DISCOVERY_DISCOVERY_MIN) {
-            const question = buildDiscoveryQuestion(ctx.normalizedMessage);
-            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, question);
-            return { reply: question, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
-        }
 
         if (!shouldSearchJobs) {
             const sanitizedReply = this.validationService.sanitizeReply(llmDecision.reply);
@@ -900,10 +834,17 @@ export class ChatService {
         console.info(
             `[CHAT][SEARCH] userId=${ctx.userId} trigger=SEARCH_PLAN planSearches=${searchPlan.searches.length} plan=${JSON.stringify(searchPlan.searches.map((item) => ({ type: item.type, query: item.query })))}`
         );
-        const jobs = await this.externalService.searchJobsByPlan(searchPlan);
+        let jobs = await this.externalService.searchJobsByPlan(searchPlan);
         console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=SEARCH_PLAN results=${jobs.length}`);
+        
         if (jobs.length === 0) {
-            const noJobsReply = "I could not find matching jobs yet. Want me to broaden the search toward adjacent roles based on what you enjoy?";
+            console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=SEARCH_PLAN broader search fallback`);
+            const broaderPlan = this.searchPlanService.buildBroaderPlan(ctx.userCareerProfile, effectiveSearchFilters, ctx.userRoleExperience);
+            jobs = await this.externalService.searchJobsByPlan(broaderPlan);
+        }
+
+        if (jobs.length === 0) {
+            const noJobsReply = "I looked for matches based on what we discussed, but couldn't find open roles right now. Could you share a different title or skill area to lean into?";
             await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, noJobsReply);
             return { reply: noJobsReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
@@ -920,61 +861,105 @@ export class ChatService {
             userAchievements: ctx.userAchievements,
             mode: ctx.mode,
             confidenceSummary: ctx.confidenceSummary,
-            domainExplorationTarget,
         });
     };
 
-    private runLlmStageAndSearchFlow = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse> => {
-        const extractedWorkDirection = extractWorkDirectionQuery(ctx.normalizedMessage);
-        const domainExplorationTarget = detectDomainExplorationTarget(ctx.normalizedMessage);
-        const workDirectionIntent = isWorkDirectionIntent(ctx.normalizedMessage);
-        const forceDomainExplorationSearch = domainExplorationTarget !== null || workDirectionIntent;
+    private runFastSearchFlow = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse> => {
+        const query = ctx.fastSearchQuery && ctx.fastSearchQuery.trim() !== "" ? ctx.fastSearchQuery : ctx.normalizedMessage;
+        const searchFilters = buildWorkDirectionFilters(query);
+        const searchPlan = this.searchPlanService.buildPlan(ctx.userCareerProfile, searchFilters, ctx.userRoleExperience);
         console.info(
-            `[CHAT][INTENT] userId=${ctx.userId} mode=${ctx.mode} workDirectionIntent=${workDirectionIntent} domainExploration=${domainExplorationTarget?.domain ?? "none"} extractedWorkDirection=${extractedWorkDirection ?? "none"} forceSearch=${forceDomainExplorationSearch}`
+            `[CHAT][SEARCH] userId=${ctx.userId} trigger=FAST_SEARCH query="${query}" filters=${JSON.stringify(searchFilters)} planSearches=${searchPlan.searches.length}`
         );
+        let jobs = await this.externalService.searchJobsByPlan(searchPlan);
+        console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=FAST_SEARCH results=${jobs.length}`);
+
+        if (jobs.length === 0) {
+            console.info(`[CHAT][SEARCH] userId=${ctx.userId} trigger=FAST_SEARCH broader search fallback`);
+            const broaderPlan = this.searchPlanService.buildBroaderPlan(ctx.userCareerProfile, searchFilters, ctx.userRoleExperience);
+            jobs = await this.externalService.searchJobsByPlan(broaderPlan);
+        }
+
+        if (jobs.length === 0) {
+            const fallback = `I searched for ${query} roles but couldn't find any open positions matching that right now. Could you share a different role or field you'd like to explore?`;
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, fallback);
+            return { reply: fallback, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        const rankedJobs = this.rankingService.rankJobs(ctx.userCareerProfile, jobs, ctx.userRoleExperience);
+        const topRankedJobs = rankedJobs.map((item) => item.job);
+        const focusJob = topRankedJobs[0];
+
+        const fallbackPack = applyValidatedJobsFallback(
+            topRankedJobs.slice(0, 10),
+            "",
+            focusJob
+        );
+        const sanitizedReply = withPipelineClosing(fallbackPack.sanitizedReply);
+
+        await this.conversationService.setJobContextAfterSearch(
+            ctx.userId,
+            ctx.conversationId,
+            topRankedJobs,
+            focusJob,
+            ctx.normalizedMessage,
+            "SEARCH_PLAN"
+        );
+
+        const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
+        const primaryJobId = presentationJobs[0]?.id;
+        const jobMatches = rankedJobs
+            .filter((item) => item.jobId === primaryJobId)
+            .map((item) => mapRankedJobResultToChatMatchRow(item));
+
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, sanitizedReply, presentationJobs);
+
+        return {
+            reply: sanitizedReply,
+            jobs: presentationJobs,
+            jobMatches,
+            mode: ctx.mode,
+            confidenceSummary: ctx.confidenceSummary,
+        };
+    };
+
+    private runLlmStageAndSearchFlow = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse> => {
+        if (ctx.mode === "DREAMJOB") {
+            console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow from LLM mode`);
+            return await this.runDreamJobFlow({ ...ctx, mode: "DREAMJOB" });
+        }
+
+        if (ctx.mode === "FAST_SEARCH") {
+            console.info(`[CHAT][FAST_SEARCH] userId=${ctx.userId} routing to fast search flow`);
+            return await this.runFastSearchFlow(ctx);
+        }
 
         const llmDecision = await this.llmService.decideNextStep(
             ctx.conversationAfterUserMessage,
             ctx.normalizedMessage,
             ctx.userAchievements,
-            ctx.mode,
             ctx.userAccountContext
         );
-        const ctxWithLlmMode = { ...ctx, mode: llmDecision.mode };
-        console.info(
-            `[CHAT][MODE] userId=${ctx.userId} fallbackMode=${ctx.mode} llmMode=${llmDecision.mode}`
-        );
 
-        if (ctxWithLlmMode.mode === "DREAMJOB") {
-            console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow from LLM mode`);
-            return await this.runDreamJobFlow(ctxWithLlmMode);
-        }
 
-        const workDirectionResponse = await this.tryWorkDirectionShortcutResponse(ctxWithLlmMode, extractedWorkDirection, domainExplorationTarget);
-        if (workDirectionResponse) {
-            return workDirectionResponse;
-        }
 
-        const currentStage = this.stageService.getCurrentStage(ctxWithLlmMode.conversationAfterUserMessage, ctxWithLlmMode.normalizedMessage);
+        const currentStage = this.stageService.getCurrentStage(ctx.conversationAfterUserMessage, ctx.normalizedMessage);
         const stageProgressWithNote = currentStage
-            ? this.stageService.recordStageMessage(ctxWithLlmMode.conversationAfterUserMessage, ctxWithLlmMode.normalizedMessage, currentStage.id)
-            : ctxWithLlmMode.conversationAfterUserMessage.stageProgress;
-        const shouldSkipStages =
-            isStageSkipRequested(ctxWithLlmMode.normalizedMessage)
-            || forceDomainExplorationSearch
-            || llmDecision.shouldSearchJobs;
+            ? this.stageService.recordStageMessage(ctx.conversationAfterUserMessage, ctx.normalizedMessage, currentStage.id)
+            : ctx.conversationAfterUserMessage.stageProgress;
+        const shouldSkipStages = llmDecision.shouldSearchJobs;
         const stageFlow = await this.resolveStageFlowForSendMessage({
-            userId: ctxWithLlmMode.userId,
-            conversationId: ctxWithLlmMode.conversationId,
-            normalizedMessage: ctxWithLlmMode.normalizedMessage,
-            conversationAfterUserMessage: ctxWithLlmMode.conversationAfterUserMessage,
+            userId: ctx.userId,
+            conversationId: ctx.conversationId,
+            normalizedMessage: ctx.normalizedMessage,
+            conversationAfterUserMessage: ctx.conversationAfterUserMessage,
             currentStage,
             shouldSkipStages,
-            mode: ctxWithLlmMode.mode,
-            userAccountContext: ctxWithLlmMode.userAccountContext,
-            userAchievements: ctxWithLlmMode.userAchievements,
+            mode: ctx.mode,
+            userAccountContext: ctx.userAccountContext,
+            userAchievements: ctx.userAchievements,
             stageProgressWithNote,
-            confidenceSummary: ctxWithLlmMode.confidenceSummary,
+            confidenceSummary: ctx.confidenceSummary,
         });
 
         if (stageFlow.kind === "stage_reply_only") {
@@ -985,25 +970,23 @@ export class ChatService {
             };
         }
 
-        await this.conversationService.updateStageProgress(ctxWithLlmMode.userId, ctxWithLlmMode.conversationId, stageFlow.progress);
+        await this.conversationService.updateStageProgress(ctx.userId, ctx.conversationId, stageFlow.progress);
 
         const conversationForDecision = {
-            ...ctxWithLlmMode.conversationAfterUserMessage,
+            ...ctx.conversationAfterUserMessage,
             stageProgress: stageFlow.progress,
         };
 
         const updatedAchievements = await this.externalService
-            .upsertAchievementFromUserMessage(ctxWithLlmMode.userId, ctxWithLlmMode.normalizedMessage, ctxWithLlmMode.userAchievements)
+            .upsertAchievementFromUserMessage(ctx.userId, ctx.normalizedMessage, ctx.userAchievements)
             .catch(() => null);
 
-        const ctxForDecision = updatedAchievements ? { ...ctxWithLlmMode, userAchievements: updatedAchievements } : ctxWithLlmMode;
+        const ctxForDecision = updatedAchievements ? { ...ctx, userAchievements: updatedAchievements } : ctx;
 
         return await this.finalizeSendMessageFromLlmDecision({
             ctx: ctxForDecision,
             conversationForDecision,
             llmDecision,
-            domainExplorationTarget,
-            forceDomainExplorationSearch,
         });
     };
 

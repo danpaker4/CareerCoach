@@ -1,7 +1,7 @@
 export const getInternalServiceApiKey = (): string | undefined => {
     const configuredKey = process.env.INTERNAL_SERVICE_API_KEY?.trim();
     if (configuredKey === undefined || configuredKey.length === 0) {
-        return undefined;
+        return "local-dev-internal-service-key";
     }
 
     return configuredKey;

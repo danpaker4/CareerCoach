@@ -12,7 +12,7 @@ import { ChatService } from "../chat/chat.service";
 import { CareerProfileRepository } from "../career-profile/career-profile.repository";
 import { CareerProfileService } from "../career-profile/career-profile.service";
 import { ConfidenceService } from "../chat/confidence/confidence.service";
-import { ConversationModeService } from "../chat/chat-mode/conversation-mode.service";
+
 import { AchievementInferenceService } from "../chat/inference/achievement-inference/achievement-inference.service";
 import { SeniorityInferenceService } from "../chat/inference/seniority-inference/seniority-inference.service";
 import { JobSearchPlanService } from "../chat/search/job-search-plan.service";
@@ -290,7 +290,6 @@ export class BenchmarkService {
             new ChatValidationService(),
             profileService,
             new ConfidenceService(),
-            new ConversationModeService(),
             new AchievementInferenceService(),
             new SeniorityInferenceService(),
             new JobSearchPlanService(),

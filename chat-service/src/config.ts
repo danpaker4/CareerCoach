@@ -31,7 +31,7 @@ const EnvSchema = z
         CUSTOM_EMBEDDING_URL: z.string().url().optional(),
         CAREER_PROFILE_VECTOR_INDEX_NAME: z.string().default("career_profile_vector_index"),
         CAREER_DIRECTION_VECTOR_INDEX_NAME: z.string().default("career_direction_vector_index"),
-        INTERNAL_SERVICE_API_KEY: z.string().optional(),
+        INTERNAL_SERVICE_API_KEY: z.string().default("local-dev-internal-service-key"),
     })
     .superRefine((data, ctx) => {
         const chain = buildTextCompletionLlmChain({
