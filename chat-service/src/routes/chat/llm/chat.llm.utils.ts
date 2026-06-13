@@ -1,4 +1,6 @@
 import type { JobSearchRequest, LlmDecision, StageLlmDecision } from "../chat.types";
+import { DEFAULT_CONVERSATION_MODE } from "../chat-mode/conversation-mode.consts";
+import { isConversationMode } from "../chat-mode/conversation-mode.utils";
 
 const parseSearchFiltersFromUnknown = (value: unknown): JobSearchRequest => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -25,6 +27,7 @@ export const parseLlmDecisionFromJson = (rawText: string): LlmDecision => {
 
     const obj = parsed as Record<string, unknown>;
     return {
+        mode: isConversationMode(obj.mode) ? obj.mode : DEFAULT_CONVERSATION_MODE,
         reply: typeof obj.reply === "string" ? obj.reply : "I need a bit more information to guide you.",
         shouldSearchJobs: obj.shouldSearchJobs === true,
         recommendedJobIds: Array.isArray(obj.recommendedJobIds)

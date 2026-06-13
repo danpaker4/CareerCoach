@@ -1,4 +1,8 @@
-import { DREAMJOB_CHANGE_SIGNALS, DREAMJOB_SIGNALS } from "./conversation-mode.consts";
+import { CONVERSATION_MODE_VALUES, DREAMJOB_CHANGE_SIGNALS, DREAMJOB_SIGNALS } from "./conversation-mode.consts";
+import type { ConversationMode } from "./conversation-mode.types";
+
+export const isConversationMode = (value: unknown): value is ConversationMode =>
+    typeof value === "string" && (CONVERSATION_MODE_VALUES as readonly string[]).includes(value);
 
 const DREAMJOB_ASPIRATION_PATTERNS: readonly RegExp[] = [
     /\bi want to be (a )?founder\b/i,

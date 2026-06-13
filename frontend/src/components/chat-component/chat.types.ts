@@ -7,6 +7,7 @@ export type ConversationSummary = {
 export interface ChatProps {
     userId: string;
     conversationId: string;
+    onExportSnapshotChange?: (snapshot: ChatExportSnapshot) => void;
     userProfile?: {
         firstName?: string;
         lastName?: string;
@@ -40,6 +41,21 @@ export interface Message {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
+
+export type ChatExportSnapshot = {
+    readonly conversationId: string;
+    readonly messages: readonly Message[];
+};
+
+export type ExportedChatTurn = {
+    readonly user: string;
+    readonly chatbot: string;
+};
+
+export type ExportedChatConversation = {
+    readonly id: string;
+    readonly chat: readonly ExportedChatTurn[];
+};
 
 export interface ConversationResponse {
     conversationId: string;

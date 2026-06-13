@@ -233,7 +233,7 @@ const parseJsonOrNull = (value: string): unknown => {
     }
 };
 
-export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps) => {
+export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, userProfile }: ChatProps) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -253,6 +253,10 @@ export const ChatInterface = ({ userId, conversationId, userProfile }: ChatProps
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    useEffect(() => {
+        onExportSnapshotChange?.({ conversationId, messages });
+    }, [conversationId, messages, onExportSnapshotChange]);
 
     const resolvePendingRequest = useCallback((requestId: string, response: ChatResponse): void => {
         const pendingRequest = pendingRequestsRef.current.get(requestId);
