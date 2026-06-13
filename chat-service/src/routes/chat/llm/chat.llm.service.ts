@@ -4,6 +4,7 @@ import type { Conversation } from "../../conversation/conversation.model";
 import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../chat.types";
 import type { ConversationMode } from "../chat-mode/conversation-mode.types";
+import { DEFAULT_CONVERSATION_MODE } from "../chat-mode/conversation-mode.consts";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,
@@ -50,6 +51,7 @@ export class ChatLlmService {
         } catch {
             this.recordParseEvent("chat.decision", rawText, "fallback");
             return {
+                mode: DEFAULT_CONVERSATION_MODE,
                 reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: [],
@@ -77,6 +79,7 @@ export class ChatLlmService {
         } catch {
             this.recordParseEvent("chat.job_aware_reply", rawText, "fallback");
             return {
+                mode: DEFAULT_CONVERSATION_MODE,
                 reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
                 shouldSearchJobs: false,
                 recommendedJobIds: jobs.map((job) => job.id),

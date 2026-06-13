@@ -1,6 +1,6 @@
 import type { ProfileInput } from "../conversation/conversation.types";
 import type { Conversation } from "../conversation/conversation.model";
-import type { ChatMessageResponse } from "./chat.types";
+import type { ChatMessageResponse, LlmDecision } from "./chat.types";
 import { ChatConversationService } from "../conversation/conversation.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
 import { ChatLlmService } from "./llm/chat.llm.service";
@@ -30,10 +30,6 @@ import { resolveJobSelectionFromFollowUpMessage } from "./job-follow-up-answer/j
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
 import type { PrepareSendMessageContextParams, SendMessagePreparedContext, StageFlowSendMessageResult } from "./chat.types";
-import {
-    conversationHasDreamJobContext,
-    shouldEnterDreamJobMode,
-} from "./chat-mode/conversation-mode.utils";
 import {
     inferDreamJobTitleFromMessage,
     isAffirmativeConfirmation,
@@ -644,18 +640,6 @@ export class ChatService {
         };
     };
 
-    private readExistingDreamJob = (serverUser: Record<string, unknown> | null): string | null => {
-        if (serverUser === null) {
-            return null;
-        }
-        const value = serverUser.dreamJob;
-        if (typeof value !== "string") {
-            return null;
-        }
-        const trimmed = value.trim();
-        return trimmed.length > 0 ? trimmed : null;
-    };
-
     private runDreamJobFlow = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse> => {
         const dreamJobFlow = ctx.conversationAfterUserMessage.dreamJobFlow;
         const decision = await this.llmService.decideDreamJobStep(
@@ -749,17 +733,9 @@ export class ChatService {
         await this.updateUserRoleExperience(userId, inferredRoleExperience);
         const userRoleExperience = mergeRoleExperience(existingRoleExperience, inferredRoleExperience);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile, userRoleExperience);
-        const existingDreamJob = this.readExistingDreamJob(serverUser);
-        const detectedMode = this.modeService.detectMode({
-            message: normalizedMessage,
-            confidence: confidenceSummary,
-            existingDreamJob,
+        const mode = this.modeService.detectMode({
+            hasActiveDreamJobFlow: conversationAfterUserMessage.dreamJobFlow !== undefined,
         });
-        const shouldUseDreamJobMode =
-            conversationAfterUserMessage.dreamJobFlow !== undefined ||
-            shouldEnterDreamJobMode(normalizedMessage, existingDreamJob) ||
-            (conversationHasDreamJobContext(conversationAfterUserMessage.messages) && detectedMode !== "FAST_SEARCH");
-        const mode = shouldUseDreamJobMode ? "DREAMJOB" : detectedMode;
         const followUpIntent = this.followUpAnswerService.detectFollowUpIntent(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
         return {
@@ -889,17 +865,11 @@ export class ChatService {
     private finalizeSendMessageFromLlmDecision = async (params: {
         ctx: SendMessagePreparedContext;
         conversationForDecision: Conversation;
+        llmDecision: LlmDecision;
         domainExplorationTarget: ReturnType<typeof detectDomainExplorationTarget>;
         forceDomainExplorationSearch: boolean;
     }): Promise<ChatMessageResponse> => {
-        const { ctx, conversationForDecision, domainExplorationTarget, forceDomainExplorationSearch } = params;
-        const llmDecision = await this.llmService.decideNextStep(
-            conversationForDecision,
-            ctx.normalizedMessage,
-            ctx.userAchievements,
-            ctx.mode,
-            ctx.userAccountContext
-        );
+        const { ctx, conversationForDecision, llmDecision, domainExplorationTarget, forceDomainExplorationSearch } = params;
         const effectiveSearchFilters = domainExplorationTarget
             ? buildDomainExplorationFilters(domainExplorationTarget, llmDecision.searchFilters, ctx.userCareerProfile.technologies)
             : llmDecision.searchFilters;
@@ -963,28 +933,48 @@ export class ChatService {
             `[CHAT][INTENT] userId=${ctx.userId} mode=${ctx.mode} workDirectionIntent=${workDirectionIntent} domainExploration=${domainExplorationTarget?.domain ?? "none"} extractedWorkDirection=${extractedWorkDirection ?? "none"} forceSearch=${forceDomainExplorationSearch}`
         );
 
-        const workDirectionResponse = await this.tryWorkDirectionShortcutResponse(ctx, extractedWorkDirection, domainExplorationTarget);
+        const llmDecision = await this.llmService.decideNextStep(
+            ctx.conversationAfterUserMessage,
+            ctx.normalizedMessage,
+            ctx.userAchievements,
+            ctx.mode,
+            ctx.userAccountContext
+        );
+        const ctxWithLlmMode = { ...ctx, mode: llmDecision.mode };
+        console.info(
+            `[CHAT][MODE] userId=${ctx.userId} fallbackMode=${ctx.mode} llmMode=${llmDecision.mode}`
+        );
+
+        if (ctxWithLlmMode.mode === "DREAMJOB") {
+            console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow from LLM mode`);
+            return await this.runDreamJobFlow(ctxWithLlmMode);
+        }
+
+        const workDirectionResponse = await this.tryWorkDirectionShortcutResponse(ctxWithLlmMode, extractedWorkDirection, domainExplorationTarget);
         if (workDirectionResponse) {
             return workDirectionResponse;
         }
 
-        const currentStage = this.stageService.getCurrentStage(ctx.conversationAfterUserMessage, ctx.normalizedMessage);
+        const currentStage = this.stageService.getCurrentStage(ctxWithLlmMode.conversationAfterUserMessage, ctxWithLlmMode.normalizedMessage);
         const stageProgressWithNote = currentStage
-            ? this.stageService.recordStageMessage(ctx.conversationAfterUserMessage, ctx.normalizedMessage, currentStage.id)
-            : ctx.conversationAfterUserMessage.stageProgress;
-        const shouldSkipStages = isStageSkipRequested(ctx.normalizedMessage) || forceDomainExplorationSearch;
+            ? this.stageService.recordStageMessage(ctxWithLlmMode.conversationAfterUserMessage, ctxWithLlmMode.normalizedMessage, currentStage.id)
+            : ctxWithLlmMode.conversationAfterUserMessage.stageProgress;
+        const shouldSkipStages =
+            isStageSkipRequested(ctxWithLlmMode.normalizedMessage)
+            || forceDomainExplorationSearch
+            || llmDecision.shouldSearchJobs;
         const stageFlow = await this.resolveStageFlowForSendMessage({
-            userId: ctx.userId,
-            conversationId: ctx.conversationId,
-            normalizedMessage: ctx.normalizedMessage,
-            conversationAfterUserMessage: ctx.conversationAfterUserMessage,
+            userId: ctxWithLlmMode.userId,
+            conversationId: ctxWithLlmMode.conversationId,
+            normalizedMessage: ctxWithLlmMode.normalizedMessage,
+            conversationAfterUserMessage: ctxWithLlmMode.conversationAfterUserMessage,
             currentStage,
             shouldSkipStages,
-            mode: ctx.mode,
-            userAccountContext: ctx.userAccountContext,
-            userAchievements: ctx.userAchievements,
+            mode: ctxWithLlmMode.mode,
+            userAccountContext: ctxWithLlmMode.userAccountContext,
+            userAchievements: ctxWithLlmMode.userAchievements,
             stageProgressWithNote,
-            confidenceSummary: ctx.confidenceSummary,
+            confidenceSummary: ctxWithLlmMode.confidenceSummary,
         });
 
         if (stageFlow.kind === "stage_reply_only") {
@@ -995,22 +985,23 @@ export class ChatService {
             };
         }
 
-        await this.conversationService.updateStageProgress(ctx.userId, ctx.conversationId, stageFlow.progress);
+        await this.conversationService.updateStageProgress(ctxWithLlmMode.userId, ctxWithLlmMode.conversationId, stageFlow.progress);
 
         const conversationForDecision = {
-            ...ctx.conversationAfterUserMessage,
+            ...ctxWithLlmMode.conversationAfterUserMessage,
             stageProgress: stageFlow.progress,
         };
 
         const updatedAchievements = await this.externalService
-            .upsertAchievementFromUserMessage(ctx.userId, ctx.normalizedMessage, ctx.userAchievements)
+            .upsertAchievementFromUserMessage(ctxWithLlmMode.userId, ctxWithLlmMode.normalizedMessage, ctxWithLlmMode.userAchievements)
             .catch(() => null);
 
-        const ctxForDecision = updatedAchievements ? { ...ctx, userAchievements: updatedAchievements } : ctx;
+        const ctxForDecision = updatedAchievements ? { ...ctxWithLlmMode, userAchievements: updatedAchievements } : ctxWithLlmMode;
 
         return await this.finalizeSendMessageFromLlmDecision({
             ctx: ctxForDecision,
             conversationForDecision,
+            llmDecision,
             domainExplorationTarget,
             forceDomainExplorationSearch,
         });

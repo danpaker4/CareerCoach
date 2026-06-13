@@ -3,6 +3,7 @@ import type { Conversation } from "../../conversation/conversation.model";
 import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
 import type { ConversationMode } from "../chat-mode/conversation-mode.types";
+import { CONVERSATION_MODE_OPTIONS } from "../chat-mode/conversation-mode.consts";
 
 const MAX_JOB_DESCRIPTION_CHARS = 1200;
 
@@ -52,6 +53,7 @@ export const buildDecisionPrompt = (
 You are CareerCoach AI.
 Respond ONLY with valid JSON in this exact structure:
 {
+  "mode": "GUIDED",
   "reply": "string",
   "shouldSearchJobs": boolean,
   "recommendedJobIds": ["string"],
@@ -64,8 +66,16 @@ Respond ONLY with valid JSON in this exact structure:
 }
 
 Rules:
+- Set mode to exactly one value from the available modes JSON below.
+- Use FAST_SEARCH when the user names a concrete target role, role family, field, or domain, including backend, frontend, full-stack, development, QA, data, cloud, DevOps, cybersecurity, or a first job in one of those areas.
+- Use FAST_SEARCH when conversation history already contains a concrete target role or domain and the latest message adds timing, experience level, education, or another detail.
+- Use GUIDED only when the user has not provided a concrete target role/domain and has not asked to find jobs yet.
+- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what fits them.
+- Use DREAMJOB only for long-term aspiration, dream-role, or future-career identity discussion.
 - Keep conversation continuous.
 - Do NOT restart conversation if there is existing history.
+- Reply in the same language as the latest user message unless the user asks otherwise.
+- Do not ask for a target role, field, or domain if it already appears in conversation history.
 - Two implicit ways to reach job search (never ask the user to pick between them):
   (1) Clear path: user names or implies a target role or field plus enough context (skills, experience, domain) to search meaningfully.
   (2) Discovery path: user is unsure what they want next—still set shouldSearchJobs=true once the conversation gives enough signal from what they love, enjoy, care about, or want in the future; then fill searchFilters.interests and searchFilters.keywords richly from their words (and skills when mentioned). A specific job title is not required for this path.
@@ -89,10 +99,13 @@ Rules:
 User achievements:
 ${achievementsText(userAchievements)}
 
+Available conversation modes JSON:
+${JSON.stringify(CONVERSATION_MODE_OPTIONS, null, 2)}
+
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}
 
-Conversation mode:
+Current backend fallback mode:
 ${mode}
 
 Conversation so far:
@@ -179,6 +192,7 @@ Respond ONLY with valid JSON:
 
 Rules:
 - Speak naturally like a human, not robotic.
+- Reply in the same language as the latest user message unless the user asks otherwise.
 - Do NOT repeat the same sentence every turn.
 - Ask follow-up questions when more detail is needed.
 - Set shouldAdvanceStage=true only when you have enough information for the current objective.

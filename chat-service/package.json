@@ -8,8 +8,8 @@
         "build": "tsc",
         "start": "node dist/index.js",
         "start:worker": "node dist/chat-worker.js",
-        "test": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/chat-mode/conversation-mode.service.test.ts src/routes/chat/chat-mode/conversation-mode.utils.test.ts src/routes/chat/dream-job/chat.dream-job.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts src/routes/chat/queue/chat-queue.utils.test.ts",
-        "test:run": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/chat-mode/conversation-mode.service.test.ts src/routes/chat/chat-mode/conversation-mode.utils.test.ts src/routes/chat/dream-job/chat.dream-job.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts src/routes/chat/queue/chat-queue.utils.test.ts"
+        "test": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/chat-mode/conversation-mode.service.test.ts src/routes/chat/chat-mode/conversation-mode.utils.test.ts src/routes/chat/dream-job/chat.dream-job.utils.test.ts src/routes/chat/llm/chat.llm.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts src/routes/chat/queue/chat-queue.utils.test.ts",
+        "test:run": "tsx --test src/routes/chat/chat.direction.utils.test.ts src/routes/chat/chat-mode/conversation-mode.service.test.ts src/routes/chat/chat-mode/conversation-mode.utils.test.ts src/routes/chat/dream-job/chat.dream-job.utils.test.ts src/routes/chat/llm/chat.llm.utils.test.ts src/routes/chat/rate-limit/chat-rate-limit.utils.test.ts src/routes/chat/queue/chat-queue.utils.test.ts"
     },
     "keywords": [],
     "author": "",

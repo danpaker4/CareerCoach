@@ -1,3 +1,31 @@
+import type { ConversationMode } from "./conversation-mode.types";
+
+export const DEFAULT_CONVERSATION_MODE: ConversationMode = "GUIDED";
+
+export const CONVERSATION_MODE_OPTIONS: readonly {
+    readonly mode: ConversationMode;
+    readonly description: string;
+}[] = [
+    {
+        mode: "GUIDED",
+        description: "Default career-coach guidance when the user is still sharing background, skills, preferences, or goals.",
+    },
+    {
+        mode: "FAST_SEARCH",
+        description: "Immediate job-search mode when the user asks to find, show, or search jobs now, or gives a concrete role/domain to search.",
+    },
+    {
+        mode: "DEEP_DISCOVERY",
+        description: "Discovery mode when the user is unsure, exploring options, or needs help identifying what career direction fits them.",
+    },
+    {
+        mode: "DREAMJOB",
+        description: "Long-term aspiration mode when the user describes, changes, or confirms their dream job, dream role, or future career identity.",
+    },
+] as const;
+
+export const CONVERSATION_MODE_VALUES: readonly ConversationMode[] = CONVERSATION_MODE_OPTIONS.map((option) => option.mode);
+
 export const DREAMJOB_SIGNALS = [
     "dream job",
     "dream role",
@@ -27,7 +55,3 @@ export const DREAMJOB_CHANGE_SIGNALS = [
     "update my dream job",
     "different dream job",
 ] as const;
-
-export const FAST_SEARCH_SIGNALS = ["show me jobs", "find jobs", "jobs now", "search now", "skip to jobs"] as const;
-
-export const DEEP_DISCOVERY_SIGNALS = ["don't know", "not sure", "no idea", "help me choose", "what fits me", "unsure"] as const;

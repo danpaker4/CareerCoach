@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChatInterface } from '../chat-component/Chat';
 import type { User } from '../../types/user';
-import type { ConversationSummary } from '../chat-component/chat.types';
+import type { ChatExportSnapshot, ConversationSummary } from '../chat-component/chat.types';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { formatChatJsonExport } from '../chat-component/chat-export.utils';
 import './ChatPage.css';
 
 const MAX_CV_EXCERPT_CHARS = 4000;
@@ -52,6 +53,8 @@ export const ChatPage = ({ user }: ChatPageProps) => {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [tabsLoading, setTabsLoading] = useState(true);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [exportSnapshot, setExportSnapshot] = useState<ChatExportSnapshot | null>(null);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
 
   const userProfile = {
     firstName: user.firstName,
@@ -67,6 +70,36 @@ export const ChatPage = ({ user }: ChatPageProps) => {
         ? user.cv.trim().slice(0, MAX_CV_EXCERPT_CHARS)
         : undefined,
   } as const;
+
+  const activeExportSnapshot = exportSnapshot?.conversationId === activeConversationId ? exportSnapshot : null;
+  const copyChatJsonDisabled = !activeExportSnapshot || activeExportSnapshot.messages.length === 0 || copyStatus === 'copying';
+  const copyChatJsonLabel = copyStatus === 'copied'
+    ? 'Copied'
+    : copyStatus === 'copying'
+      ? 'Copying...'
+      : copyStatus === 'error'
+        ? 'Copy failed'
+        : 'Copy JSON';
+
+  const handleExportSnapshotChange = useCallback((snapshot: ChatExportSnapshot): void => {
+    setExportSnapshot(snapshot);
+    setCopyStatus((currentStatus) => currentStatus === 'copying' ? currentStatus : 'idle');
+  }, []);
+
+  const handleCopyChatJson = useCallback(async (): Promise<void> => {
+    if (!activeExportSnapshot) {
+      return;
+    }
+
+    setCopyStatus('copying');
+
+    try {
+      await navigator.clipboard.writeText(formatChatJsonExport(activeExportSnapshot.conversationId, activeExportSnapshot.messages));
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('error');
+    }
+  }, [activeExportSnapshot]);
 
   const refreshConversationTabs = useCallback(async (): Promise<ConversationSummary[]> => {
     const response = await apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/chat/users/${encodeURIComponent(user.id)}/conversations`);
@@ -101,6 +134,20 @@ export const ChatPage = ({ user }: ChatPageProps) => {
     };
     bootstrap().catch(() => setTabsLoading(false));
   }, [user.id, refreshConversationTabs]);
+
+  useEffect(() => {
+    setCopyStatus('idle');
+    setExportSnapshot(null);
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    if (copyStatus !== 'copied') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => setCopyStatus('idle'), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [copyStatus]);
 
   const selectTab = (conversationId: string) => {
     setActiveConversationId(conversationId);
@@ -204,6 +251,17 @@ export const ChatPage = ({ user }: ChatPageProps) => {
               <h1 className="chat-main-heading">AI Career Coach</h1>
               <p className="chat-main-sub">Ask me anything about your career, skills, or job search</p>
             </div>
+            <button
+              type="button"
+              className={`chat-export-json-button${copyStatus === 'error' ? ' chat-export-json-button--error' : ''}`}
+              onClick={() => {
+                handleCopyChatJson().catch(() => setCopyStatus('error'));
+              }}
+              disabled={copyChatJsonDisabled}
+              aria-label="Copy current chat as JSON"
+            >
+              {copyChatJsonLabel}
+            </button>
           </div>
         </div>
 
@@ -251,8 +309,10 @@ export const ChatPage = ({ user }: ChatPageProps) => {
             <div className="chat-loading-placeholder">Loading your conversations…</div>
           ) : (
             <ChatInterface
+              key={activeConversationId}
               userId={user.id}
               conversationId={activeConversationId}
+              onExportSnapshotChange={handleExportSnapshotChange}
               userProfile={userProfile}
             />
           )}

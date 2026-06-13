@@ -87,6 +87,7 @@ export type JobSearchPlanRequest = {
 };
 
 export type LlmDecision = {
+    mode: ConversationMode;
     reply: string;
     shouldSearchJobs: boolean;
     recommendedJobIds: string[];
