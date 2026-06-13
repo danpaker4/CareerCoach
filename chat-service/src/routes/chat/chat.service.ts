@@ -22,6 +22,7 @@ import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
 import type { CareerProfileSignalUpdate, UserCareerProfile } from "../career-profile/career-profile.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { ConversationMode } from "./chat-mode/conversation-mode.types";
+import { shouldEnterDreamJobMode, conversationHasDreamJobContext } from "./chat-mode/conversation-mode.utils";
 import type { JobSearchResultItem } from "./chat.types";
 import type { SanitizedJob, JobRecommendationContextState } from "../../job-in-conversation.types";
 import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
@@ -685,9 +686,8 @@ export class ChatService {
         const sanitizedReply = this.validationService.sanitizeReply(decision.reply);
         const reply =
             pendingTitle !== undefined &&
-            inferredTitle !== undefined &&
             dreamJobFlow?.awaitingConfirmation !== true &&
-            !decision.awaitingConfirmation
+            (decision.awaitingConfirmation || inferredTitle !== undefined)
                 ? `It sounds like your long-term dream role is ${pendingTitle}. Should I save "${pendingTitle}" as your dream job?`
                 : sanitizedReply;
         await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
@@ -726,6 +726,13 @@ export class ChatService {
             userAchievements,
             userAccountContext
         );
+        const serverDreamJob = typeof serverUser?.dreamJob === "string" ? serverUser.dreamJob : null;
+        const existingDreamJob = conversationAfterUserMessage.dreamJobFlow?.proposedTitle ?? serverDreamJob;
+        const isDreamJobRule = shouldEnterDreamJobMode(normalizedMessage, existingDreamJob) ||
+            conversationAfterUserMessage.dreamJobFlow !== undefined ||
+            (conversationHasDreamJobContext(conversationAfterUserMessage.messages) && serverDreamJob === null);
+        const mode = isDreamJobRule ? "DREAMJOB" : detectionResult.mode;
+
         const followUpIntent = this.followUpAnswerService.detectFollowUpIntent(normalizedMessage);
         const jobContext = conversationAfterUserMessage.jobContext;
         return {
@@ -739,7 +746,7 @@ export class ChatService {
             userCareerProfile,
             userRoleExperience,
             confidenceSummary,
-            mode: detectionResult.mode,
+            mode,
             fastSearchQuery: detectionResult.fastSearchQuery,
             followUpIntent,
             jobContext,

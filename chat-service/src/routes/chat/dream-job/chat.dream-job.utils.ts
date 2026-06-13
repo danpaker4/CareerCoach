@@ -46,6 +46,9 @@ export const inferDreamJobTitleFromMessage = (message: string): string | undefin
     if (/\bchief technology officer\b|\bcto\b/.test(normalized)) {
         return "Chief Technology Officer";
     }
+    if (/\bchief executive officer\b|\bceo\b/.test(normalized)) {
+        return "Chief Executive Officer";
+    }
     if (/\bproduct manager\b/.test(normalized)) {
         return "Product Manager";
     }
