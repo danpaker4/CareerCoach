@@ -39,6 +39,7 @@ export class RoadmapGenerationController {
             request.log.error({ err: error }, "Roadmap generation failed");
             reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
                 error: "Failed to generate roadmap. Please try again.",
+                details: error instanceof Error ? error.message : String(error),
             });
         }
     };

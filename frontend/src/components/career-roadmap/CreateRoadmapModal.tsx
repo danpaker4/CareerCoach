@@ -63,7 +63,7 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
     setGenerationState('generating');
     setGenerationError('');
 
-    apiFetch(`${ENV.CHAT_SERVICE_BASE_URL}/roadmap/generate`, {
+    apiFetch(`${ENV.ROADMAP_SERVICE_BASE_URL}/roadmap/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

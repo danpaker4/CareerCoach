@@ -1,4 +1,4 @@
-import { buildUserAccountContext } from "../chat/llm/chat.user-account-context.utils";
+import { buildUserAccountContext } from "./user-account-context.utils";
 
 export const formatSkillGapContext = (
     userSkills: string[],
@@ -58,7 +58,7 @@ export const buildRoadmapGenerationPrompt = (params: {
     careerDirectionContext: string;
 }): string => {
     const { dreamJob, stageCount, userProfile, skillGapContext, careerDirectionContext } = params;
-    const userContext = buildUserAccountContext({ serverUser: userProfile });
+    const userContext = buildUserAccountContext(userProfile);
 
     return `You are CareerCoach AI, a career development expert.
 Generate a personalized ${stageCount}-stage career roadmap for reaching the dream job: "${dreamJob}".

@@ -6,7 +6,6 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 import { MongoClient } from "./mongo/mongo"; 
 import { chatRouter } from "./routes/chat/chat.router";
 import { conversationRouter } from "./routes/conversation/conversation.router";
-import { roadmapGenerationRouter } from "./routes/roadmap-generation/roadmap-generation.router";
 import { benchmarkRouter } from "./routes/benchmark/benchmark.router";
 import { ChatRateLimitRepository } from "./routes/chat/rate-limit/chat-rate-limit.repository";
 import { ChatRateLimitService } from "./routes/chat/rate-limit/chat-rate-limit.service";
@@ -67,7 +66,6 @@ export class Server {
             await this.app.register(conversationRouter(this.DBClient, this.config.chatConfig));
             await this.app.register(chatRouter(this.DBClient, this.config.chatConfig, rateLimitService, queueClient, realtimeService));
             await this.app.register(chatRateLimitRouter(rateLimitService, this.config.chatConfig));
-            await this.app.register(roadmapGenerationRouter(this.DBClient, this.config.chatConfig));
             await this.app.register(benchmarkRouter(this.DBClient, this.config.chatConfig));
 
             const address = await this.app.listen({ 

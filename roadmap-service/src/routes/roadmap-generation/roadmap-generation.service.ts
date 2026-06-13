@@ -1,8 +1,8 @@
 import type { Collection } from "mongodb";
 import type { TextCompletionPort } from "../../ai/ports/text-completion.types";
 import type { EmbeddingPort } from "../../ai/ports/embedding.types";
-import type { ChatExternalService } from "../external-chat/chat.external.service";
-import type { CareerDirectionExample } from "../chat/knowledge/career-knowledge.types";
+import type { RoadmapExternalService } from "../external/roadmap.external.service";
+import type { CareerDirectionExample } from "../knowledge/career-direction.types";
 import type { RoadmapGenerationResponse } from "./roadmap-generation.types";
 import {
     buildRoadmapGenerationPrompt,
@@ -19,7 +19,7 @@ type CareerDirectionProjection = Pick<
 export class RoadmapGenerationService {
     constructor(
         private readonly textCompletion: TextCompletionPort,
-        private readonly externalService: ChatExternalService,
+        private readonly externalService: RoadmapExternalService,
         private readonly directionCollection: Collection<CareerDirectionExample>,
         private readonly embedding: EmbeddingPort,
         private readonly directionVectorIndexName: string
