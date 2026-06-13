@@ -17,11 +17,36 @@ interface DashboardProps {
 }
 
 interface QuickStats {
-  roadmaps: number | null;
+  roadmapPct: number | null;
   skills: number | null;
   skillsDone: number | null;
   jobs: number | null;
 }
+
+const computeRoadmapProgress = (data: unknown): number | null => {
+  if (!Array.isArray(data) || data.length === 0) return null;
+  let totalStages = 0;
+  let progressSum = 0;
+  for (const roadmap of data) {
+    const stages = (roadmap as { stagesToDreamJob?: unknown }).stagesToDreamJob;
+    if (!Array.isArray(stages)) continue;
+    for (const stage of stages) {
+      const s = stage as { isDone?: boolean; content?: { actions?: unknown }; completedActions?: unknown };
+      totalStages += 1;
+      if (s.isDone) {
+        progressSum += 1;
+        continue;
+      }
+      const actions = Array.isArray(s.content?.actions) ? (s.content?.actions as string[]) : [];
+      if (actions.length === 0) continue;
+      const completed = Array.isArray(s.completedActions) ? (s.completedActions as string[]) : [];
+      const doneCount = completed.filter((action) => actions.includes(action)).length;
+      progressSum += doneCount / actions.length;
+    }
+  }
+  if (totalStages === 0) return 0;
+  return Math.round((progressSum / totalStages) * 100);
+};
 
 const getInitials = (u: User) =>
   (u.firstName.charAt(0) + u.lastName.charAt(0)).toUpperCase();
@@ -41,8 +66,8 @@ const FEATURE_CARDS = [
     description: 'Track your personalized path to your dream role. See completed milestones and what comes next.',
     icon: iconRoadmap,
     colorClass: 'dash-card--blue',
-    statKey: 'roadmaps' as keyof QuickStats,
-    statLabel: 'active roadmaps',
+    statKey: 'roadmapPct' as keyof QuickStats,
+    statLabel: 'complete',
   },
   {
     id: 'skills',
@@ -99,7 +124,7 @@ const FEATURE_CARDS = [
 export const Dashboard = ({ user }: DashboardProps) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<QuickStats>({
-    roadmaps: null,
+    roadmapPct: null,
     skills: null,
     skillsDone: null,
     jobs: null,
@@ -112,8 +137,8 @@ export const Dashboard = ({ user }: DashboardProps) => {
       `${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${user.id}`, headers
     ).then(async (r) => {
       if (!r.ok) return null;
-      const d = await r.json() as unknown[];
-      return Array.isArray(d) ? d.length : null;
+      const d: unknown = await r.json();
+      return computeRoadmapProgress(d);
     }).catch(() => null);
 
     const fetchSkills = apiFetch(
@@ -136,9 +161,9 @@ export const Dashboard = ({ user }: DashboardProps) => {
     }).catch(() => null);
 
     Promise.all([fetchRoadmaps, fetchSkills, fetchJobs]).then(
-      ([roadmaps, skillsResult, jobs]) => {
+      ([roadmapPct, skillsResult, jobs]) => {
         setStats({
-          roadmaps: typeof roadmaps === 'number' ? roadmaps : null,
+          roadmapPct: typeof roadmapPct === 'number' ? roadmapPct : null,
           skills: skillsResult && typeof skillsResult === 'object' ? skillsResult.total : null,
           skillsDone: skillsResult && typeof skillsResult === 'object' ? skillsResult.done : null,
           jobs: typeof jobs === 'number' ? jobs : null,
@@ -151,6 +176,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
     if (!card.statKey) return null;
     const val = stats[card.statKey];
     if (val === null) return null;
+    if (card.statKey === 'roadmapPct') return `${val}% complete`;
     return `${val} ${card.statLabel}`;
   };
 
@@ -169,12 +195,12 @@ export const Dashboard = ({ user }: DashboardProps) => {
           </div>
         </div>
 
-        {(stats.roadmaps !== null || stats.skills !== null || stats.jobs !== null) && (
+        {(stats.roadmapPct !== null || stats.skills !== null || stats.jobs !== null) && (
           <div className="dashboard-stats-bar">
-            {stats.roadmaps !== null && (
+            {stats.roadmapPct !== null && (
               <div className="dash-stat">
-                <span className="dash-stat-val">{stats.roadmaps}</span>
-                <span className="dash-stat-lbl">Roadmaps</span>
+                <span className="dash-stat-val">{stats.roadmapPct}%</span>
+                <span className="dash-stat-lbl">Roadmap Done</span>
               </div>
             )}
             {stats.skills !== null && (

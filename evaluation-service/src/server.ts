@@ -15,6 +15,7 @@ const start = async (): Promise<void> => {
         const app = await buildApp({
             chatServiceBaseUrl: env.CHAT_SERVICE_BASE_URL.replace(/\/$/, ""),
             evaluationUserId: env.EVALUATION_USER_ID,
+            internalServiceApiKey: env.INTERNAL_SERVICE_API_KEY,
         });
 
         const address = await app.listen({

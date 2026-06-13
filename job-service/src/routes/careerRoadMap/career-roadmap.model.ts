@@ -19,6 +19,7 @@ export const StageToDreamJobSchema = z.object({
     jobId: z.number(),
     isDone: z.boolean(),
     content: StageContentSchema.optional(),
+    completedActions: z.array(z.string()).optional(),
 });
 
 export const CareerRoadMapSchema = z.object({

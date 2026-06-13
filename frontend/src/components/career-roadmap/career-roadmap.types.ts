@@ -21,6 +21,7 @@ export interface RoadmapStage {
   jobId: number;
   isDone: boolean;
   content?: StageContent;
+  completedActions?: string[];
 }
 
 export interface CareerRoadmapData {

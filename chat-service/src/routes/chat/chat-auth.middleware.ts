@@ -2,10 +2,22 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { ChatAuthFailure, ChatAuthService } from "./chat-auth.service";
 
+const INTERNAL_SERVICE_EMAIL = "internal@careercoach.local";
+
 const readAuthorizationHeader = (request: FastifyRequest): string | undefined => {
     const header = request.headers.authorization;
     return typeof header === "string" ? header : undefined;
 };
+
+const readInternalServiceKey = (request: FastifyRequest): string | undefined => {
+    const header = request.headers["x-internal-service-key"];
+    return typeof header === "string" ? header : undefined;
+};
+
+const isInternalServiceRequest = (request: FastifyRequest, internalServiceApiKey?: string): boolean =>
+    internalServiceApiKey !== undefined &&
+    internalServiceApiKey.length > 0 &&
+    readInternalServiceKey(request) === internalServiceApiKey;
 
 const sendAuthFailure = (reply: FastifyReply, failure: ChatAuthFailure): void => {
     reply.status(failure.statusCode).send({
@@ -34,8 +46,29 @@ const readParamsUserId = (request: FastifyRequest): string | null => {
     return typeof userId === "string" ? userId : null;
 };
 
-export const createValidateAuthenticatedChatBody = (authService: ChatAuthService) =>
+const readQueryUserId = (request: FastifyRequest): string | null => {
+    const query = request.query;
+    if (typeof query !== "object" || query === null || !("userId" in query)) {
+        return null;
+    }
+
+    const userId = (query as { userId?: unknown }).userId;
+    return typeof userId === "string" ? userId : null;
+};
+
+export const createValidateAuthenticatedChatBody = (authService: ChatAuthService, internalServiceApiKey?: string) =>
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        if (isInternalServiceRequest(request, internalServiceApiKey)) {
+            const internalUserId = readBodyUserId(request);
+            if (!internalUserId) {
+                reply.status(StatusCodes.BAD_REQUEST).send({ error: "userId is required", errorCode: "USER_ID_REQUIRED" });
+                return;
+            }
+
+            request.authUser = { userId: internalUserId, email: INTERNAL_SERVICE_EMAIL };
+            return;
+        }
+
         const authResult = await authService.verifyUser(readAuthorizationHeader(request));
         if (authResult.status === "failure") {
             sendAuthFailure(reply, authResult.failure);
@@ -54,8 +87,19 @@ export const createValidateAuthenticatedChatBody = (authService: ChatAuthService
         request.authUser = authResult.user;
     };
 
-export const createValidateAuthenticatedChatSession = (authService: ChatAuthService) =>
+export const createValidateAuthenticatedChatSession = (authService: ChatAuthService, internalServiceApiKey?: string) =>
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        if (isInternalServiceRequest(request, internalServiceApiKey)) {
+            const internalUserId = readQueryUserId(request);
+            if (!internalUserId) {
+                reply.status(StatusCodes.BAD_REQUEST).send({ error: "userId is required", errorCode: "USER_ID_REQUIRED" });
+                return;
+            }
+
+            request.authUser = { userId: internalUserId, email: INTERNAL_SERVICE_EMAIL };
+            return;
+        }
+
         const authResult = await authService.verifyUser(readAuthorizationHeader(request));
         if (authResult.status === "failure") {
             sendAuthFailure(reply, authResult.failure);
@@ -65,8 +109,19 @@ export const createValidateAuthenticatedChatSession = (authService: ChatAuthServ
         request.authUser = authResult.user;
     };
 
-export const createValidateAuthenticatedChatParams = (authService: ChatAuthService) =>
+export const createValidateAuthenticatedChatParams = (authService: ChatAuthService, internalServiceApiKey?: string) =>
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+        if (isInternalServiceRequest(request, internalServiceApiKey)) {
+            const internalUserId = readParamsUserId(request);
+            if (!internalUserId) {
+                reply.status(StatusCodes.BAD_REQUEST).send({ error: "userId is required", errorCode: "USER_ID_REQUIRED" });
+                return;
+            }
+
+            request.authUser = { userId: internalUserId, email: INTERNAL_SERVICE_EMAIL };
+            return;
+        }
+
         const authResult = await authService.verifyUser(readAuthorizationHeader(request));
         if (authResult.status === "failure") {
             sendAuthFailure(reply, authResult.failure);
