@@ -32,4 +32,35 @@ describe("gap-analysis.service", () => {
         assert.ok(gap.leadershipGaps.length > 0);
         assert.ok(gap.experienceGapSummary.length > 0);
     });
+
+    it("reflects demonstrated skills for entry-level users with GitHub skills", () => {
+        const gap = buildGapAnalysis({
+            dreamJob: "CEO of a startup",
+            market: {
+                roleCategory: "Startup CEO",
+                commonSkills: ["TypeScript", "Fundraising", "Product Strategy"],
+                responsibilities: ["Lead product vision"],
+                leadershipSignals: ["Team leadership"],
+                architectureSignals: [],
+                seniorityDistribution: { senior: 1 },
+            },
+            user: {
+                currentJob: "Not yet employed",
+                currentRoleSummary: "Builder with GitHub skills",
+                userSkills: ["TypeScript", "React"],
+                demonstratedResponsibilities: [],
+                roleExperienceYears: 0,
+                roleExperienceLevel: "entry",
+                preferredDomains: [],
+                senioritySignal: null,
+                longTermGoals: [],
+                isEntryLevel: true,
+            },
+        });
+
+        assert.ok(gap.skillsPresent.includes("TypeScript"));
+        assert.ok(gap.skillsMissing.includes("Fundraising"));
+        assert.match(gap.experienceGapSummary, /demonstrated skills/i);
+        assert.match(gap.experienceGapSummary, /TypeScript/);
+    });
 });

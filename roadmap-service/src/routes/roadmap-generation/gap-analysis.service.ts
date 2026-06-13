@@ -33,8 +33,12 @@ const estimateExperienceGap = (
     userYears: number,
     userLevel: string,
     seniorityDistribution: Record<string, number>,
-    isEntryLevel: boolean
+    isEntryLevel: boolean,
+    userSkills: readonly string[]
 ): string => {
+    if (isEntryLevel && userSkills.length > 0) {
+        return `No professional work experience yet, but the user has demonstrated skills (${userSkills.slice(0, 8).join(", ")}${userSkills.length > 8 ? ", …" : ""}) from GitHub/profile. Close leadership, business, and responsibility gaps on top of this foundation.`;
+    }
     if (isEntryLevel) {
         return "User recently finished high school with no professional experience. Expect foundational learning stages before experience-based roles.";
     }
@@ -81,7 +85,8 @@ export const buildGapAnalysis = (input: GapAnalysisInput): GapAnalysisSnapshot =
         input.user.roleExperienceYears,
         input.user.roleExperienceLevel,
         market?.seniorityDistribution ?? {},
-        input.user.isEntryLevel === true
+        input.user.isEntryLevel === true,
+        input.user.userSkills
     );
 
     return {

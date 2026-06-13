@@ -27,12 +27,15 @@ export class RoadmapExternalService {
         private readonly internalServiceApiKey: string
     ) {}
 
-    private internalHeaders = (): Record<string, string> => ({
+    private internalHeaders = (userId?: string): Record<string, string> => ({
         "X-Internal-Service-Key": this.internalServiceApiKey,
+        ...(userId ? { "X-Service-User-Id": userId } : {}),
     });
 
     readUserPublicProfile = async (userId: string): Promise<Record<string, unknown> | null> => {
-        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${encodeURIComponent(userId)}`, {
+            headers: this.internalHeaders(userId),
+        });
         if (!response.ok) return null;
         const payload: unknown = await response.json().catch(() => null);
         if (typeof payload !== "object" || payload === null) return null;
