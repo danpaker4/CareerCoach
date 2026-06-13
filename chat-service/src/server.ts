@@ -7,6 +7,7 @@ import { MongoClient } from "./mongo/mongo";
 import { chatRouter } from "./routes/chat/chat.router";
 import { conversationRouter } from "./routes/conversation/conversation.router";
 import { benchmarkRouter } from "./routes/benchmark/benchmark.router";
+import { internalRouter } from "./routes/internal/internal.router";
 import { ChatRateLimitRepository } from "./routes/chat/rate-limit/chat-rate-limit.repository";
 import { ChatRateLimitService } from "./routes/chat/rate-limit/chat-rate-limit.service";
 import { chatRateLimitRouter } from "./routes/chat/rate-limit/chat-rate-limit.router";
@@ -67,6 +68,7 @@ export class Server {
             await this.app.register(chatRouter(this.DBClient, this.config.chatConfig, rateLimitService, queueClient, realtimeService));
             await this.app.register(chatRateLimitRouter(rateLimitService, this.config.chatConfig));
             await this.app.register(benchmarkRouter(this.DBClient, this.config.chatConfig));
+            await this.app.register(internalRouter(this.DBClient, this.config.chatConfig));
 
             const address = await this.app.listen({ 
                 port: this.config.port, 

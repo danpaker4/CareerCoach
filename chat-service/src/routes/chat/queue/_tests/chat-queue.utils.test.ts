@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseChatQueueJob, parseChatRequestEvent, serializeChatQueuePayload } from "./chat-queue.utils";
-import type { ChatQueueJob, ChatRequestEvent } from "./chat-queue.types";
+import { parseChatQueueJob, parseChatRequestEvent, serializeChatQueuePayload } from "../chat-queue.utils";
+import type { ChatQueueJob, ChatRequestEvent } from "../chat-queue.types";
 
 describe("chat queue payload utils", () => {
     it("round-trips chat queue jobs", () => {

@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { RoadmapGenerationService } from "./roadmap-generation.service";
 import type { RoadmapGenerationRequestBody } from "./roadmap-generation.types";
+import { MAX_TARGET_YEARS, MIN_TARGET_YEARS } from "./roadmap-generation.consts";
 
 export class RoadmapGenerationController {
     constructor(private readonly service: RoadmapGenerationService) {}
@@ -16,24 +17,24 @@ export class RoadmapGenerationController {
             return;
         }
 
-        const { userId, dreamJob, stageCount } = body;
+        const { userId, dreamJob, targetYears } = body;
 
         if (
             !userId ||
             !dreamJob?.trim() ||
-            !stageCount ||
-            !Number.isInteger(stageCount) ||
-            stageCount < 2 ||
-            stageCount > 5
+            !targetYears ||
+            !Number.isInteger(targetYears) ||
+            targetYears < MIN_TARGET_YEARS ||
+            targetYears > MAX_TARGET_YEARS
         ) {
             reply.code(StatusCodes.BAD_REQUEST).send({
-                error: "userId (UUID), dreamJob (non-empty string), and stageCount (integer 2-5) are required",
+                error: `userId (UUID), dreamJob (non-empty string), and targetYears (integer ${MIN_TARGET_YEARS}-${MAX_TARGET_YEARS}) are required`,
             });
             return;
         }
 
         try {
-            const result = await this.service.generate(userId, dreamJob.trim(), stageCount);
+            const result = await this.service.generate(userId, dreamJob.trim(), targetYears);
             reply.code(StatusCodes.OK).send(result);
         } catch (error) {
             request.log.error({ err: error }, "Roadmap generation failed");

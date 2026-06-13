@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { JobSearchHandler } from "./job-search.handler";
+import { JobSearchHandler } from "../job-search.handler";
 
 describe("JobSearchHandler", () => {
     it("accepts multi-search plan payload and deduplicates by jobId", async () => {

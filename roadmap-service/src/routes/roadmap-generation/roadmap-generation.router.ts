@@ -25,7 +25,9 @@ export const roadmapGenerationRouter = (
         );
         const externalService = new RoadmapExternalService(
             roadmapConfig.usersServiceBaseUrl,
-            roadmapConfig.jobServiceBaseUrl
+            roadmapConfig.jobServiceBaseUrl,
+            roadmapConfig.chatServiceBaseUrl,
+            roadmapConfig.internalServiceApiKey
         );
         const service = new RoadmapGenerationService(
             textCompletion,

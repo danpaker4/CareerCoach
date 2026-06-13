@@ -3,21 +3,27 @@ import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { SchematicRequest } from "../../types/fastify";
 import type { CareerRoadMap } from "./career-roadmap.model";
+import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import { v4 as uuidv4 } from "uuid";
-import { createCareerRoadMapSchema, deleteDreamJobSchema, editStagesSchema, getCareerRoadMapByUserIdSchema } from "./career-roadmap.schema";
+import { createCareerRoadMapSchema, deleteDreamJobSchema, discoverOpportunitiesSchema, editStagesSchema, getCareerRoadMapByUserIdSchema } from "./career-roadmap.schema";
+import { discoverStageOpportunities } from "./career-roadmap-opportunities.utils";
 
 type CareerRoadMapHandlerType = {
     getCareerRoadMapByUserIdHandler: (request: SchematicRequest<typeof getCareerRoadMapByUserIdSchema>, reply: FastifyReply) => Promise<void>;
     createCareerRoadMapHandler: (request: SchematicRequest<typeof createCareerRoadMapSchema>, reply: FastifyReply) => Promise<void>;
     deleteDreamJobHandler: (request: SchematicRequest<typeof deleteDreamJobSchema>, reply: FastifyReply) => Promise<void>;
     editStagesHandler: (request: SchematicRequest<typeof editStagesSchema>, reply: FastifyReply) => Promise<void>;
+    discoverOpportunitiesHandler: (request: SchematicRequest<typeof discoverOpportunitiesSchema>, reply: FastifyReply) => Promise<void>;
 };
 
-export const CareerRoadMapHandler = (careerRoadMapsCollection: Collection<CareerRoadMap>): CareerRoadMapHandlerType => {
+export const CareerRoadMapHandler = (
+    careerRoadMapsCollection: Collection<CareerRoadMap>,
+    jobsCollection: Collection<EnrichedJob>
+): CareerRoadMapHandlerType => {
     return {
         // Added: create a new career roadmap for a user
         createCareerRoadMapHandler: async (request: SchematicRequest<typeof createCareerRoadMapSchema>, reply: FastifyReply) => {
-            const { userId, dreamJob, stagesToDreamJob, generatedAt } = request.body;
+            const { userId, dreamJob, stagesToDreamJob, generatedAt, progressionMeta } = request.body;
             try {
                 const newRoadMap: CareerRoadMap = {
                     id: uuidv4(),
@@ -25,6 +31,7 @@ export const CareerRoadMapHandler = (careerRoadMapsCollection: Collection<Career
                     dreamJob,
                     stagesToDreamJob,
                     ...(generatedAt ? { generatedAt } : {}),
+                    ...(progressionMeta ? { progressionMeta } : {}),
                 };
                 await careerRoadMapsCollection.insertOne(newRoadMap);
                 reply.code(StatusCodes.CREATED).send(newRoadMap);
@@ -80,6 +87,23 @@ export const CareerRoadMapHandler = (careerRoadMapsCollection: Collection<Career
                 reply.code(StatusCodes.OK).send(result);
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error", status: "ERROR" });
+            }
+        },
+
+        discoverOpportunitiesHandler: async (request, reply) => {
+            const { roleCategories, userSkills, limit } = request.body;
+            try {
+                const opportunities = await discoverStageOpportunities(jobsCollection, {
+                    roleCategories,
+                    ...(userSkills ? { userSkills } : {}),
+                    ...(limit ? { limit } : {}),
+                });
+                reply.code(StatusCodes.OK).send({ opportunities });
+            } catch (error) {
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+                    error: "Failed to discover opportunities",
+                    details: error instanceof Error ? error.message : String(error),
+                });
             }
         },
     };

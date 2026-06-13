@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StatusCodes } from "http-status-codes";
 import { Server, type ServerConfig } from "../../../server";
 import { toUserDocument } from "../../users/user.utils";
-import { authHeadersForUser, dropLegacyUsernameIndex } from "../../users/test/users-test-utils";
-import { testServerConfig } from "../../users/test/users-mocks";
+import { authHeadersForUser, dropLegacyUsernameIndex } from "../../users/_tests/users-test-utils";
+import { testServerConfig } from "../../users/_tests/users-mocks";
 import { ADMIN_TEST_EMAILS } from "./admin-router-test.consts";
 import { buildAdminTestUser, buildLegacyUserDocument } from "./admin-router-test.utils";
 

@@ -5,7 +5,7 @@ import {
     isAffirmativeConfirmation,
     isNegativeConfirmation,
     normalizeDreamJobTitle,
-} from "./chat.dream-job.utils";
+} from "../chat.dream-job.utils";
 
 describe("chat.dream-job.utils", () => {
     it("detects affirmative confirmations", () => {

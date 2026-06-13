@@ -8,7 +8,10 @@ import iconTrophy from '../../assets/icon-trophy.svg';
 import iconMessage from '../../assets/icon-message.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
+import iconX from '../../assets/icon-x.svg';
 import { getPlatformStyle, getResourceTypeStyle } from './platform-config';
+import { StageOpportunitiesPanel } from './StageOpportunitiesPanel';
+import { DestinationJobSearch } from './DestinationJobSearch';
 import './CareerRoadmap.css';
 import type { CareerRoadmapData, CareerRoadmapProps, FetchState, StageContent } from './career-roadmap.types';
 
@@ -17,7 +20,7 @@ const ROADMAP_URL = (userId: string) =>
 
 const parseRoadmapResponse = (data: unknown): CareerRoadmapData[] => {
   if (!Array.isArray(data)) return [];
-  return data.filter((item): item is CareerRoadmapData => {
+    return data.filter((item): item is CareerRoadmapData => {
     if (typeof item !== 'object' || item === null) return false;
     const obj = item as Record<string, unknown>;
     return (
@@ -77,6 +80,8 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const [floatingChatConversationId, setFloatingChatConversationId] = useState<string | null>(null);
   const [togglingStageJobId, setTogglingStageJobId] = useState<number | null>(null);
   const [expandedDoneStages, setExpandedDoneStages] = useState<ReadonlySet<number>>(new Set());
+  const [gapExpanded, setGapExpanded] = useState(false);
+  const [deletingRoadmapId, setDeletingRoadmapId] = useState<string | null>(null);
 
   const toggleExpandedStage = (jobId: number) => {
     setExpandedDoneStages((prev) => {
@@ -88,6 +93,31 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
       }
       return next;
     });
+  };
+
+  const deleteRoadmap = async (roadmap: CareerRoadmapData) => {
+    const confirmed = window.confirm(
+      `Delete your roadmap for "${roadmap.dreamJob}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingRoadmapId(roadmap.id);
+    setErrorMessage('');
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${roadmap.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete roadmap');
+      setRoadmaps((prev) => prev.filter((item) => item.id !== roadmap.id));
+      setActiveTab(0);
+      setExpandedDoneStages(new Set());
+      setGapExpanded(false);
+    } catch {
+      setErrorMessage('Could not delete roadmap. Please try again.');
+    } finally {
+      setDeletingRoadmapId(null);
+    }
   };
 
   const toggleStage = async (roadmap: CareerRoadmapData, stageIndex: number, currentDone: boolean) => {
@@ -246,6 +276,18 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
             <h1 className="roadmap-title">Career Roadmap</h1>
             <p className="roadmap-subtitle">Your personalized path to your dream role</p>
           </div>
+          {fetchState === 'success' && activeRoadmap && (
+            <button
+              type="button"
+              className="btn-outline roadmap-delete-btn"
+              onClick={() => deleteRoadmap(activeRoadmap)}
+              disabled={deletingRoadmapId === activeRoadmap.id}
+              aria-label={`Delete roadmap for ${activeRoadmap.dreamJob}`}
+            >
+              <img src={iconX} alt="" aria-hidden="true" className="roadmap-delete-icon" />
+              {deletingRoadmapId === activeRoadmap.id ? 'Deleting...' : 'Delete Roadmap'}
+            </button>
+          )}
         </div>
 
         {fetchState === 'loading' && (
@@ -315,6 +357,55 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
 
               return (
                 <div className="roadmap-journey" key={activeRoadmap.id}>
+                  {activeRoadmap.progressionMeta && (
+                    <div className="journey-context-bar">
+                      {activeRoadmap.progressionMeta.currentRoleSummary && (
+                        <p className="journey-context-today">
+                          <strong>Where you are:</strong> {activeRoadmap.progressionMeta.currentRoleSummary}
+                        </p>
+                      )}
+                      <p className="journey-context-target">
+                        <strong>Target role:</strong>{' '}
+                        {activeRoadmap.progressionMeta.dreamRoleCategory ?? activeRoadmap.dreamJob}
+                        {activeRoadmap.progressionMeta.estimatedYearsToGoal && (
+                          <span> · {activeRoadmap.progressionMeta.estimatedYearsToGoal}</span>
+                        )}
+                      </p>
+                      {activeRoadmap.progressionMeta.progressionReasoning && (
+                        <p className="journey-context-reasoning">{activeRoadmap.progressionMeta.progressionReasoning}</p>
+                      )}
+                      {activeRoadmap.progressionMeta.gapAnalysis && (
+                        <div className="journey-gap-summary">
+                          <button
+                            type="button"
+                            className="journey-gap-toggle"
+                            onClick={() => setGapExpanded((prev) => !prev)}
+                            aria-expanded={gapExpanded}
+                          >
+                            Gap analysis
+                          </button>
+                          {gapExpanded && (
+                            <ul className="journey-gap-list">
+                              {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.length > 0 && (
+                                <li><strong>Skills to build:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.join(', ')}</li>
+                              )}
+                              {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.length > 0 && (
+                                <li><strong>Responsibilities:</strong> {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.slice(0, 4).join('; ')}</li>
+                              )}
+                              {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.length > 0 && (
+                                <li><strong>Leadership:</strong> {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.slice(0, 3).join('; ')}</li>
+                              )}
+                              {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.length > 0 && (
+                                <li><strong>Architecture:</strong> {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.slice(0, 3).join('; ')}</li>
+                              )}
+                              <li>{activeRoadmap.progressionMeta.gapAnalysis.experienceGapSummary}</li>
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className={`journey-goal${allDone ? ' journey-goal--reached' : ''}`}>
                     <div className="journey-goal-text">
                       <span className="journey-goal-eyebrow">Your destination</span>
@@ -336,6 +427,10 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                       </div>
                     </div>
                   </div>
+
+                  {user?.id && (
+                    <DestinationJobSearch userId={user.id} defaultJobTitle={activeRoadmap.dreamJob} />
+                  )}
 
                   <div className="journey-timeline">
                     {activeRoadmap.stagesToDreamJob.map((stage, idx) => {
@@ -380,6 +475,9 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                               <div className="journey-card-badges">
                                 {stage.isDone && <span className="badge badge-green">Completed</span>}
                                 {isLocked && <span className="badge badge-blue">Upcoming</span>}
+                                {content.progressionType && (
+                                  <span className="badge badge-purple">{content.progressionType}</span>
+                                )}
                                 {content.estimatedTimeframe && (
                                   <span className="journey-timeframe">{content.estimatedTimeframe}</span>
                                 )}
@@ -408,7 +506,39 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                                 )}
                               </div>
                             </div>
+                            {showDetails && content.whyItMatters && (
+                              <p className="journey-card-why"><strong>Why it matters:</strong> {content.whyItMatters}</p>
+                            )}
                             {showDetails && <p className="journey-card-desc">{content.description}</p>}
+                            {showDetails && (content.requiredCapabilities?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Required capabilities</span>
+                                <ul className="journey-detail-list">
+                                  {content.requiredCapabilities!.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {showDetails && (content.skillsToBuild?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Skills to build</span>
+                                <ul className="journey-detail-list">
+                                  {content.skillsToBuild!.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {showDetails && (content.responsibilitiesToGain?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Responsibilities to gain</span>
+                                <ul className="journey-detail-list">
+                                  {content.responsibilitiesToGain!.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {showDetails && content.experienceAccumulation && (
+                              <p className="journey-experience-target">
+                                <strong>Experience target:</strong> {content.experienceAccumulation}
+                              </p>
+                            )}
                             {showDetails && content.actions.length > 0 && (
                               <ul className="journey-subtasks">
                                 {content.actions.map((action) => {
@@ -436,6 +566,23 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                                   );
                                 })}
                               </ul>
+                            )}
+                            {showDetails && (content.futureOpportunities?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Future role categories</span>
+                                <div className="journey-role-chips">
+                                  {content.futureOpportunities!.map((role) => (
+                                    <span key={role} className="journey-role-chip">{role}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {showDetails &&
+                              (content.progressionType === 'experience' || content.progressionType === 'hybrid') && (
+                              <StageOpportunitiesPanel
+                                roleCategories={content.roleCategories ?? content.futureOpportunities ?? []}
+                                userSkills={user?.technologies}
+                              />
                             )}
                             {showDetails && content.resources && content.resources.length > 0 && (
                               <div className="step-resources">
