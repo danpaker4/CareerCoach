@@ -8,9 +8,10 @@
     "dev:chat-service": "npm --prefix chat-service run dev",
     "dev:chat-worker": "npm --prefix chat-service run dev:worker",
     "dev:job-service": "npm --prefix job-service run dev",
+    "dev:roadmap-service": "npm --prefix roadmap-service run dev",
     "dev:evaluation-service": "npm --prefix evaluation-service run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,EVAL,FRONT \"npm run dev:users-service\" \"npm run dev:chat-service\" \"npm run dev:chat-worker\" \"npm run dev:job-service\" \"npm run dev:evaluation-service\" \"npm run dev:frontend\""
+    "dev": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,ROADMAP,EVAL,FRONT \"npm run dev:users-service\" \"npm run dev:chat-service\" \"npm run dev:chat-worker\" \"npm run dev:job-service\" \"npm run dev:roadmap-service\" \"npm run dev:evaluation-service\" \"npm run dev:frontend\""
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
