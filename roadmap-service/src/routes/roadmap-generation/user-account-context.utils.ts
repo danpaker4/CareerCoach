@@ -100,6 +100,30 @@ export const buildUserAccountContext = (serverUser: Record<string, unknown> | nu
     if (githubUrl !== null) {
         lines.push(`GitHub: ${githubUrl}`);
     }
+    const roleExperience = Array.isArray(server.roleExperience) ? server.roleExperience : [];
+    if (roleExperience.length > 0) {
+        const expLines = roleExperience
+            .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+            .map((entry) => {
+                const label = readString(entry.displayLabel) ?? readString(entry.roleKey) ?? "role";
+                const years = typeof entry.years === "number" ? entry.years : 0;
+                const level = readString(entry.level) ?? "mid";
+                return `${label} (${years}y, ${level})`;
+            });
+        if (expLines.length > 0) lines.push(`Role experience: ${expLines.join("; ")}`);
+    }
+    const achievementsRaw = server.achievements;
+    if (Array.isArray(achievementsRaw)) {
+        const achievementNames = achievementsRaw
+            .filter((a): a is { name: string } =>
+                typeof a === "object" && a !== null && "name" in a && typeof (a as { name: unknown }).name === "string"
+            )
+            .map((a) => a.name.trim())
+            .filter((name) => name.length > 0);
+        if (achievementNames.length > 0) {
+            lines.push(`Achievements: ${achievementNames.slice(0, 10).join(", ")}`);
+        }
+    }
     if (cvExcerpt !== null) {
         lines.push(`CV excerpt (truncated): ${cvExcerpt}`);
     }

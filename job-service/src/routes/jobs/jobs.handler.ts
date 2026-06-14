@@ -12,6 +12,7 @@ import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/
 import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
 import { fetchUserProfileEmbedding } from "./user-profile.client";
 import type { CreateJobBody } from "./jobs.schema";
+import { MIN_MATCH_FIT_PCT } from "./jobs.consts";
 
 const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
 const NUM_CANDIDATES = 150;
@@ -145,8 +146,11 @@ export const JobsHandler = ({
       const sortedResult = userEmbedding
         ? [...result].sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0))
         : result;
+      const filteredResult = userEmbedding
+        ? sortedResult.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
+        : sortedResult;
 
-      reply.code(StatusCodes.OK).send(sortedResult);
+      reply.code(StatusCodes.OK).send(filteredResult);
     } catch (error) {
       request.log.error({ err: error }, "Failed to fetch jobs");
       reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({

@@ -18,6 +18,8 @@ const EnvSchema = z
         MONGO_KEY_PATH: z.string().optional(),
         USERS_SERVICE_BASE_URL: envString("USERS_SERVICE_BASE_URL"),
         JOB_SERVICE_BASE_URL: envString("JOB_SERVICE_BASE_URL"),
+        CHAT_SERVICE_BASE_URL: envString("CHAT_SERVICE_BASE_URL"),
+        INTERNAL_SERVICE_API_KEY: z.string().default("local-dev-internal-service-key"),
         LLM_PROVIDER: LlmProviderSchema.default("ollama"),
         GEMINI_API_KEY: z.preprocess(optionalEmptyString, z.string().optional()),
         GEMINI_MODEL: z.preprocess(optionalEmptyString, z.string().optional()),
@@ -93,6 +95,8 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
         roadmapConfig: {
             usersServiceBaseUrl: parsed.USERS_SERVICE_BASE_URL,
             jobServiceBaseUrl: parsed.JOB_SERVICE_BASE_URL,
+            chatServiceBaseUrl: parsed.CHAT_SERVICE_BASE_URL,
+            internalServiceApiKey: parsed.INTERNAL_SERVICE_API_KEY,
             llm,
             llmTextCompletionChain,
             embeddingModel: parsed.EMBEDDING_MODEL,

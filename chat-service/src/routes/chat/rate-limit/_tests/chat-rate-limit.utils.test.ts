@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { DEFAULT_CHAT_RATE_LIMIT_RULES } from "./chat-rate-limit.consts";
-import { parseChatRateLimitUpdateInput } from "./chat-rate-limit.utils";
+import { DEFAULT_CHAT_RATE_LIMIT_RULES } from "../chat-rate-limit.consts";
+import { parseChatRateLimitUpdateInput } from "../chat-rate-limit.utils";
 
 describe("parseChatRateLimitUpdateInput", () => {
     it("accepts the predefined rate-limit rules", () => {

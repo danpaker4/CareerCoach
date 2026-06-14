@@ -3,8 +3,8 @@ import { StatusCodes } from "http-status-codes";
 import { randomUUID } from "crypto";
 import { Server, type ServerConfig } from "../../../server";
 import { toUserDocument } from "../../users/user.utils";
-import { authHeadersForUser, dropLegacyUsernameIndex } from "../../users/test/users-test-utils";
-import { testServerConfig } from "../../users/test/users-mocks";
+import { authHeadersForUser, dropLegacyUsernameIndex } from "../../users/_tests/users-test-utils";
+import { testServerConfig } from "../../users/_tests/users-mocks";
 import {
     AUTH_SESSION_ADMIN_EMAIL,
     AUTH_SESSION_ADMIN_PASSWORD,

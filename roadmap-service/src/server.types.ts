@@ -10,6 +10,8 @@ export type ServerConfig = {
     roadmapConfig: {
         usersServiceBaseUrl: string;
         jobServiceBaseUrl: string;
+        chatServiceBaseUrl: string;
+        internalServiceApiKey: string;
         llm: ResolvedLlmConfig;
         llmTextCompletionChain: readonly ResolvedLlmConfig[];
         embeddingModel?: string;

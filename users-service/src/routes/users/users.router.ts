@@ -11,7 +11,7 @@ type registerRouter = (fastify: TypedFastify) => void;
 export const usersRouter = (usersCollection: Collection<UserDocument>): registerRouter => (fastify: TypedFastify): void => {
     const handler = UsersHandler(usersCollection);
 
-    fastify.get("/users/:userId", { schema: getUserSchema, preHandler: authenticateRequest }, handler.getUserHandler);
+    fastify.get("/users/:userId", { schema: getUserSchema, preHandler: authenticateUserOrInternalService }, handler.getUserHandler);
     fastify.post("/users", { schema: createUserSchema, preHandler: authenticateRequest }, handler.createUserHandler);
     fastify.patch("/users/:userId", { schema: updateUserSchema, preHandler: authenticateRequest }, handler.updateUserHandler);
     fastify.patch(

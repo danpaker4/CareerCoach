@@ -6,15 +6,31 @@ import type { CareerDirectionExample } from "../knowledge/career-direction.types
 import type { RoadmapGenerationResponse } from "./roadmap-generation.types";
 import {
     buildRoadmapGenerationPrompt,
-    formatSkillGapContext,
     formatCareerDirectionContext,
+    formatCareerPathsContext,
 } from "./roadmap-generation.prompt.utils";
 import { parseRoadmapGenerationResponse } from "./roadmap-generation.utils";
+import { buildGapAnalysis } from "./gap-analysis.service";
+import { resolveUserStartingPoint } from "./user-starting-point.utils";
+import type { UserCareerContext } from "./gap-analysis.types";
+import { resolveStageCountFromTargetYears, formatTargetTimelineLabel } from "./roadmap-stage-count.utils";
 
 type CareerDirectionProjection = Pick<
     CareerDirectionExample,
     "directionName" | "relatedSkills" | "exampleTasks" | "exampleRoles"
 >;
+
+const formatMarketContext = (market: Awaited<ReturnType<RoadmapExternalService["getMarketRequirements"]>>): string => {
+    if (!market) return "No structured market requirements available.";
+    return [
+        `Role category: ${market.roleCategory}`,
+        `Common skills: ${market.commonSkills.join(", ")}`,
+        `Responsibilities: ${market.responsibilities.join("; ")}`,
+        `Leadership signals: ${market.leadershipSignals.join("; ")}`,
+        `Architecture signals: ${market.architectureSignals.join("; ")}`,
+        `Seniority distribution: ${JSON.stringify(market.seniorityDistribution)}`,
+    ].join("\n");
+};
 
 export class RoadmapGenerationService {
     constructor(
@@ -25,13 +41,13 @@ export class RoadmapGenerationService {
         private readonly directionVectorIndexName: string
     ) {}
 
-    generate = async (
-        userId: string,
-        dreamJob: string,
-        stageCount: number
-    ): Promise<RoadmapGenerationResponse> => {
-        const [userProfile, jobs, directions] = await Promise.all([
+    generate = async (userId: string, dreamJob: string, targetYears: number): Promise<RoadmapGenerationResponse> => {
+        const stageCount = resolveStageCountFromTargetYears(targetYears);
+        await this.externalService.refreshCareerKnowledge();
+
+        const [userProfile, careerProfile, jobs, directions] = await Promise.all([
             this.externalService.readUserPublicProfile(userId).catch(() => null),
+            this.externalService.readCareerProfile(userId).catch(() => null),
             this.externalService
                 .searchJobs({
                     skills: [],
@@ -43,19 +59,42 @@ export class RoadmapGenerationService {
             this.searchCareerDirections(dreamJob).catch(() => []),
         ]);
 
-        const userSkills = this.extractUserSkills(userProfile);
-        const jobRequirements = jobs.flatMap((j) => j.requirements);
-        const mustKnowSkills = jobs.flatMap((j) => j.mustKnowSkills);
+        const startingPoint = resolveUserStartingPoint(userProfile, careerProfile);
+        const userContext: UserCareerContext = {
+            currentJob: startingPoint.currentJob,
+            currentRoleSummary: startingPoint.currentRoleSummary,
+            userSkills: startingPoint.userSkills,
+            demonstratedResponsibilities: startingPoint.demonstratedResponsibilities,
+            roleExperienceYears: startingPoint.roleExperienceYears,
+            roleExperienceLevel: startingPoint.roleExperienceLevel,
+            preferredDomains: startingPoint.preferredDomains,
+            senioritySignal: startingPoint.isEntryLevel ? null : startingPoint.roleExperienceLevel,
+            longTermGoals: startingPoint.longTermGoals,
+            isEntryLevel: startingPoint.isEntryLevel,
+        };
 
-        const skillGapContext = formatSkillGapContext(userSkills, jobRequirements, mustKnowSkills);
-        const careerDirectionContext = formatCareerDirectionContext(directions);
+        const market = await this.externalService.getMarketRequirements(dreamJob).catch(() => null);
+        const careerPaths = await this.externalService
+            .getCareerPaths(userContext.currentJob, dreamJob)
+            .catch(() => []);
+
+        const gapAnalysis = buildGapAnalysis({
+            user: userContext,
+            market,
+            dreamJob,
+        });
 
         const prompt = buildRoadmapGenerationPrompt({
             dreamJob,
             stageCount,
+            targetYears,
             userProfile,
-            skillGapContext,
-            careerDirectionContext,
+            careerProfile,
+            gapAnalysis,
+            startingPoint,
+            careerDirectionContext: formatCareerDirectionContext(directions),
+            careerPathsContext: formatCareerPathsContext(careerPaths),
+            marketContext: formatMarketContext(market),
         });
 
         const rawText = await this.textCompletion.complete(prompt, {
@@ -63,30 +102,23 @@ export class RoadmapGenerationService {
             userId,
         });
 
-        return parseRoadmapGenerationResponse(rawText, stageCount);
+        const result = parseRoadmapGenerationResponse(rawText, stageCount, dreamJob, gapAnalysis);
+        return {
+            ...result,
+            progressionMeta: {
+                ...result.progressionMeta,
+                currentRoleSummary: startingPoint.currentRoleSummary,
+                estimatedYearsToGoal: `Up to ${formatTargetTimelineLabel(targetYears)}`,
+                ...(startingPoint.isEntryLevel
+                    ? { progressionReasoning: result.progressionMeta.progressionReasoning ?? "Path designed for someone starting after high school with no prior professional experience." }
+                    : {}),
+            },
+        };
     };
 
-    private extractUserSkills = (profile: Record<string, unknown> | null): string[] => {
-        if (!profile) {
-            return [];
-        }
-        const skillKeys = ["technologies", "knownSkills", "githubSkills", "interests"];
-        const merged = skillKeys.flatMap((key) => {
-            const val = profile[key];
-            return Array.isArray(val)
-                ? val.filter((s): s is string => typeof s === "string")
-                : [];
-        });
-        return [...new Set(merged)];
-    };
-
-    private searchCareerDirections = async (
-        dreamJob: string
-    ): Promise<CareerDirectionProjection[]> => {
+    private searchCareerDirections = async (dreamJob: string): Promise<CareerDirectionProjection[]> => {
         const vector = await this.embedding.embedCareerDirection(dreamJob);
-        if (vector.length === 0) {
-            return [];
-        }
+        if (vector.length === 0) return [];
         const results = await this.directionCollection
             .aggregate([
                 {

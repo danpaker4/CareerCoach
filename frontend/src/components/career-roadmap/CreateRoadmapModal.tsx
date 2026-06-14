@@ -6,7 +6,7 @@ import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import { getPlatformStyle } from './platform-config';
 import './CreateRoadmapModal.css';
-import type { StageContent, RoadmapGenerationResponse } from './career-roadmap.types';
+import type { CareerProgressionMeta, GapAnalysisSnapshot, StageContent, RoadmapGenerationResponse } from './career-roadmap.types';
 
 interface CreateRoadmapModalProps {
   userId: string;
@@ -28,6 +28,16 @@ const PRESET_ROLES = [
   'Mobile Developer',
 ];
 
+const MIN_TARGET_YEARS = 1;
+const MAX_TARGET_YEARS = 15;
+const DEFAULT_TARGET_YEARS = 3;
+
+const resolveFallbackStageCount = (targetYears: number): number =>
+  Math.min(12, Math.max(2, Math.ceil((targetYears * 12) / 6)));
+
+const formatTargetYearsLabel = (years: number): string =>
+  years === 1 ? '1 year' : `${years} years`;
+
 const isValidGenerationResponse = (data: unknown): data is RoadmapGenerationResponse => {
   if (typeof data !== 'object' || data === null) return false;
   const obj = data as Record<string, unknown>;
@@ -42,11 +52,13 @@ const isValidGenerationResponse = (data: unknown): data is RoadmapGenerationResp
 export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmapModalProps) => {
   const [step, setStep] = useState<Step>(1);
   const [dreamJob, setDreamJob] = useState('');
-  const [stageCount, setStageCount] = useState(4);
+  const [targetYears, setTargetYears] = useState(DEFAULT_TARGET_YEARS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const [generatedStages, setGeneratedStages] = useState<StageContent[]>([]);
+  const [generatedMeta, setGeneratedMeta] = useState<CareerProgressionMeta | null>(null);
+  const [generatedGap, setGeneratedGap] = useState<GapAnalysisSnapshot | null>(null);
   const [generationState, setGenerationState] = useState<GenerationState>('idle');
   const [generationError, setGenerationError] = useState('');
   const [generationKey, setGenerationKey] = useState(0);
@@ -67,7 +79,7 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ userId, dreamJob: dreamJob.trim(), stageCount }),
+      body: JSON.stringify({ userId, dreamJob: dreamJob.trim(), targetYears }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -78,6 +90,8 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
           throw new Error('Invalid generation response');
         }
         setGeneratedStages(data.stages);
+        setGeneratedMeta(data.progressionMeta ?? null);
+        setGeneratedGap(data.gapAnalysis ?? data.progressionMeta?.gapAnalysis ?? null);
         setGenerationState('success');
       })
       .catch((err: unknown) => {
@@ -95,6 +109,8 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
     abortRef.current?.abort();
     setGenerationState('idle');
     setGeneratedStages([]);
+    setGeneratedMeta(null);
+    setGeneratedGap(null);
     setGenerationError('');
     setGenerationKey((k) => k + 1);
   };
@@ -103,9 +119,10 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
     setSubmitting(true);
     setError('');
     try {
+      const fallbackStageCount = resolveFallbackStageCount(targetYears);
       const stages = generatedStages.length > 0
         ? generatedStages.map((content, i) => ({ jobId: i + 1, isDone: false, content }))
-        : Array.from({ length: stageCount }, (_, i) => ({ jobId: i + 1, isDone: false }));
+        : Array.from({ length: fallbackStageCount }, (_, i) => ({ jobId: i + 1, isDone: false }));
 
       const body: Record<string, unknown> = {
         userId,
@@ -114,6 +131,17 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
       };
       if (generatedStages.length > 0) {
         body.generatedAt = new Date().toISOString();
+      }
+      if (generatedMeta || generatedGap) {
+        body.progressionMeta = {
+          dreamRoleCategory: generatedMeta?.dreamRoleCategory ?? dreamJob.trim(),
+          ...(generatedMeta?.currentRoleSummary ? { currentRoleSummary: generatedMeta.currentRoleSummary } : {}),
+          ...(generatedMeta?.estimatedYearsToGoal
+            ? { estimatedYearsToGoal: generatedMeta.estimatedYearsToGoal }
+            : { estimatedYearsToGoal: `Up to ${formatTargetYearsLabel(targetYears)}` }),
+          ...(generatedMeta?.progressionReasoning ? { progressionReasoning: generatedMeta.progressionReasoning } : {}),
+          ...(generatedGap ? { gapAnalysis: generatedGap } : {}),
+        };
       }
 
       const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap`, {
@@ -197,36 +225,33 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
           </div>
         )}
 
-        {/* Step 2 — Stage count */}
+        {/* Step 2 — Target timeline */}
         {step === 2 && (
           <div className="modal-body step-body">
-            <h3 className="step-question">How many milestones do you want?</h3>
-            <p className="step-hint">Each milestone is a step on your journey to <strong>{dreamJob}</strong>.</p>
+            <h3 className="step-question">How many years do you want to reach this role?</h3>
+            <p className="step-hint">
+              We&apos;ll create the milestones you need to reach <strong>{dreamJob}</strong> within{' '}
+              <strong>{formatTargetYearsLabel(targetYears)}</strong> or sooner.
+            </p>
 
             <div className="stage-count-row">
               <button
                 type="button"
                 className="stage-count-btn"
-                onClick={() => setStageCount((c) => Math.max(2, c - 1))}
-                disabled={stageCount <= 2}
+                onClick={() => setTargetYears((years) => Math.max(MIN_TARGET_YEARS, years - 1))}
+                disabled={targetYears <= MIN_TARGET_YEARS}
               >−</button>
-              <span className="stage-count-num">{stageCount}</span>
+              <span className="stage-count-num">{targetYears}</span>
               <button
                 type="button"
                 className="stage-count-btn"
-                onClick={() => setStageCount((c) => Math.min(5, c + 1))}
-                disabled={stageCount >= 5}
+                onClick={() => setTargetYears((years) => Math.min(MAX_TARGET_YEARS, years + 1))}
+                disabled={targetYears >= MAX_TARGET_YEARS}
               >+</button>
             </div>
-
-            <div className="stage-preview">
-              {Array.from({ length: stageCount }, (_, i) => (
-                <div key={i} className="stage-preview-item">
-                  <div className="stage-preview-num">{i + 1}</div>
-                  <span>Stage {i + 1}</span>
-                </div>
-              ))}
-            </div>
+            <p className="step-hint timeline-years-caption">
+              {targetYears === 1 ? 'year' : 'years'} to your destination
+            </p>
           </div>
         )}
 
@@ -238,7 +263,8 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
                 <div className="spinner" />
                 <h3 className="generation-loading-title">Generating your personalized roadmap</h3>
                 <p className="generation-loading-hint">
-                  Analyzing your skills, real job requirements, and career paths for <strong>{dreamJob}</strong>...
+                  Building milestones to reach <strong>{dreamJob}</strong> within{' '}
+                  <strong>{formatTargetYearsLabel(targetYears)}</strong>...
                 </p>
               </div>
             )}
@@ -260,8 +286,30 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
 
             {generationState === 'success' && generatedStages.length > 0 && (
               <div className="generation-preview">
-                <h3 className="step-question">Your personalized roadmap</h3>
-                <p className="step-hint">Review the AI-generated stages for <strong>{dreamJob}</strong>.</p>
+                <h3 className="step-question">Your career progression roadmap</h3>
+                <p className="step-hint">Review capability milestones for <strong>{dreamJob}</strong>.</p>
+
+                {generatedMeta && (
+                  <div className="generation-meta-card">
+                    {generatedMeta.currentRoleSummary && (
+                      <p><strong>Today:</strong> {generatedMeta.currentRoleSummary}</p>
+                    )}
+                    {generatedMeta.estimatedYearsToGoal && (
+                      <p><strong>Estimated timeline:</strong> {generatedMeta.estimatedYearsToGoal}</p>
+                    )}
+                    {generatedMeta.progressionReasoning && (
+                      <p>{generatedMeta.progressionReasoning}</p>
+                    )}
+                  </div>
+                )}
+
+                {generatedGap && (
+                  <div className="generation-gap-card">
+                    <strong>Key gaps to close</strong>
+                    <p>Skills: {generatedGap.skillsMissing.slice(0, 5).join(', ') || 'None identified'}</p>
+                    <p>{generatedGap.experienceGapSummary}</p>
+                  </div>
+                )}
 
                 <div className="generation-stage-list">
                   {generatedStages.map((stage, i) => (
@@ -273,8 +321,12 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
                           {stage.estimatedTimeframe && (
                             <span className="timeframe-badge">{stage.estimatedTimeframe}</span>
                           )}
+                          {stage.progressionType && (
+                            <span className="progression-type-badge">{stage.progressionType}</span>
+                          )}
                         </div>
                       </div>
+                      {stage.whyItMatters && <p className="generation-stage-why">{stage.whyItMatters}</p>}
                       <p className="generation-stage-desc">{stage.description}</p>
                       {stage.actions.length > 0 && (
                         <ul className="generation-stage-actions">
@@ -321,7 +373,10 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
             {generationState === 'success' && generatedStages.length === 0 && (
               <div className="generation-preview">
                 <h3 className="step-question">Ready to create your roadmap?</h3>
-                <p className="step-hint">Your roadmap for <strong>{dreamJob}</strong> will be created with {stageCount} generic stages.</p>
+                <p className="step-hint">
+                  Your roadmap for <strong>{dreamJob}</strong> will be created with generic milestones for{' '}
+                  {formatTargetYearsLabel(targetYears)}.
+                </p>
               </div>
             )}
 

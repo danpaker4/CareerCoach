@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { conversationHasDreamJobContext, hasDreamJobIntent } from "./conversation-mode.utils";
+import { conversationHasDreamJobContext, hasDreamJobIntent } from "../conversation-mode.utils";
 
 describe("hasDreamJobIntent", () => {
     it("detects founder startup messages", () => {
