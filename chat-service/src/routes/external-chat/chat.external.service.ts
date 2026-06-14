@@ -7,7 +7,11 @@ import {
     readUserStringArrayField,
     toAchievementFromMessage,
 } from "./chat.external.utils";
-import type { ApplyInferredAchievementSignalsParams, ApplyInferredRoleExperienceParams } from "./chat.external.types";
+import type {
+    ApplyInferredAchievementSignalsParams,
+    ApplyInferredRoleExperienceParams,
+    CreateCareerRoadmapParams,
+} from "./chat.external.types";
 import type { RoleExperienceEntry } from "./role-experience.types";
 import { mergeRoleExperience, readUserRoleExperienceField } from "./role-experience.utils";
 
@@ -183,6 +187,17 @@ export class ChatExternalService {
             method: "PATCH",
             headers,
             body: JSON.stringify({ dreamJob }),
+        });
+
+        return response.ok;
+    };
+
+    createCareerRoadmap = async (params: CreateCareerRoadmapParams): Promise<boolean> => {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}/career-roadmap`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(params),
         });
 
         return response.ok;
