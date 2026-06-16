@@ -30,10 +30,24 @@ const REJECT_PHRASES = [
     "i dont like this",
     "i don't like this",
     "not for me",
+    "none of these",
+    "none of them",
+    "none of those",
+    "none fit",
+    "not interested",
+    "neither",
     "skip",
     "next",
     "pass",
 ];
+
+const isStandaloneNone = (normalized: string): boolean =>
+    normalized === "none" || /^none[,.!]?$/i.test(normalized);
+
+// A selection like "add the first one" / "add the Intel role" / "the 2nd one" means accept.
+const isPipelineSelection = (normalized: string): boolean =>
+    /\badd\b/.test(normalized) ||
+    /\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\b/.test(normalized);
 
 const normalize = (message: string): string =>
     message
@@ -66,11 +80,15 @@ export class PipelineIntentService {
             return "PIPELINE_REJECT";
         }
 
-        if (isStandaloneNo(normalized)) {
+        if (isStandaloneNo(normalized) || isStandaloneNone(normalized)) {
             return "PIPELINE_REJECT";
         }
 
         if (ACCEPT_PHRASES.some((phrase) => normalized.includes(phrase))) {
+            return "PIPELINE_ACCEPT";
+        }
+
+        if (isPipelineSelection(normalized)) {
             return "PIPELINE_ACCEPT";
         }
 

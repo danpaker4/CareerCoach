@@ -18,6 +18,14 @@ export class JobSearchPlanService {
         const keywords = [...new Set([...baseFilters.keywords, ...interests, ...roleKeywords])];
         const strictQueryFallback = [...keywords, ...baseFilters.interests, ...baseFilters.skills].join(" ").trim();
 
+        // The role the user explicitly asked for must drive the strict search — not their profile.
+        const requestedQuery = [...baseFilters.keywords, ...baseFilters.skills, ...baseFilters.interests]
+            .map((term) => term.trim())
+            .filter((term) => term.length > 0)
+            .join(" ");
+        const profileQuery = `${roleKeywords.join(" ")} ${technologies.join(" ")}`.trim();
+        const strictQuery = requestedQuery.length > 0 ? requestedQuery : (profileQuery || strictQueryFallback);
+
         const strictFilters: JobSearchRequest = {
             ...baseFilters,
             skills: [...new Set([...baseFilters.skills, ...technologies])],
@@ -34,7 +42,7 @@ export class JobSearchPlanService {
             searches: [
                 {
                     type: "STRICT_MATCH",
-                    query: `${roleKeywords.join(" ")} ${technologies.join(" ")}`.trim() || strictQueryFallback,
+                    query: strictQuery,
                     filters: strictFilters,
                 },
                 {
