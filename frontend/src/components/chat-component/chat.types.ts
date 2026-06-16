@@ -36,10 +36,19 @@ export type AttachedJobSnapshot = {
     salary: number;
 };
 
+export interface ChatJobCard {
+    id: string;
+    title: string;
+    company: string;
+    seniority: string;
+    location: string | null;
+}
+
 export interface Message {
     id: string;
     role: 'system' | 'user' | 'assistant';
     content: string;
+    jobs?: ChatJobCard[];
 }
 
 export type ChatExportSnapshot = {

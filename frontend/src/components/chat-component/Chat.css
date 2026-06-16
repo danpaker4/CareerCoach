@@ -27,7 +27,75 @@
 
 .message-wrapper {
   display: flex;
+  flex-wrap: wrap;
   width: 100%;
+}
+
+.chat-job-cards {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chat-job-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 80%;
+  background: #fff;
+  border: 1px solid var(--clr-slate-200, #e2e8f0);
+  border-radius: var(--r-lg, 12px);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.chat-job-card__index {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full, 999px);
+  background: var(--clr-primary, #2563eb);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-job-card__title {
+  font-weight: 600;
+  color: var(--clr-slate-900, #0f172a);
+  font-size: var(--fz-sm, 14px);
+}
+
+.chat-job-card__company {
+  color: var(--clr-slate-500, #64748b);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.chat-job-card__meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.chat-job-card__chip {
+  background: var(--clr-primary-50, #eff6ff);
+  color: var(--clr-primary, #2563eb);
+  border-radius: var(--r-full, 999px);
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.chat-job-card__loc {
+  color: var(--clr-slate-500, #64748b);
+  font-size: 12px;
 }
 
 .message-wrapper.user  { justify-content: flex-end; }

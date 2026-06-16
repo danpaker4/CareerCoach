@@ -26,7 +26,7 @@ import { apiFetch, refreshAccessToken } from './lib/apiClient';
 import { ENV } from './config';
 import type { User } from './types/user';
 import { normalizeUser } from './lib/authResponse';
-import { clearStoredAccessToken } from './lib/authSession';
+import { clearStoredAccessToken, getStoredAccessToken } from './lib/authSession';
 import { applyTheme, readInitialTheme, type ThemeMode } from './lib/theme';
 
 const AUTH_LOGOUT_PATH = `${ENV.USERS_SERVICE_BASE_URL}/api/auth/logout`;
@@ -109,16 +109,33 @@ export const App = () => {
 
     const loadCurrentUser = async () => {
       const user = await refreshAccessToken();
-      if (!user) {
-        clearStoredAccessToken();
-        persistUser(null);
-        setCurrentUser(null);
+      if (user) {
+        persistUser(user);
+        setCurrentUser(user);
         setSessionVerified(true);
         return;
       }
 
-      persistUser(user);
-      setCurrentUser(user);
+      // Cookie-based refresh failed (it can fail cross-origin in dev). If we still hold a
+      // valid access token from sessionStorage, validate it and keep the user signed in
+      // so a page reload doesn't force a re-login.
+      if (getStoredAccessToken()) {
+        try {
+          const res = await apiFetch(`${ENV.USERS_SERVICE_BASE_URL}/api/auth/session`);
+          const storedUser = readStoredUser();
+          if (res.ok && storedUser) {
+            setCurrentUser(storedUser);
+            setSessionVerified(true);
+            return;
+          }
+        } catch {
+          /* fall through to logout */
+        }
+      }
+
+      clearStoredAccessToken();
+      persistUser(null);
+      setCurrentUser(null);
       setSessionVerified(true);
     };
 

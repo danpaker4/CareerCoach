@@ -24,10 +24,11 @@ type PendingRequestHandler = {
     readonly reject: (error: Error) => void;
 };
 
-const createMessage = (role: Message['role'], content: string): Message => ({
+const createMessage = (role: Message['role'], content: string, jobs?: Message['jobs']): Message => ({
     id: crypto.randomUUID(),
     role,
     content,
+    ...(jobs && jobs.length > 0 ? { jobs } : {}),
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -186,20 +187,18 @@ const readChatErrorMessage = async (response: Response): Promise<string> => {
     return typeof record.error === 'string' ? record.error : 'I could not reach the chat service. Please try again.';
 };
 
-const formatAssistantResponse = (data: ChatResponse): string => {
-    const assistantReply = data.reply;
-    const jobsFromResponse = data.jobs ?? [];
-    const jobsSummary = jobsFromResponse.length > 0
-        ? `\n\nReal jobs found:\n${jobsFromResponse.slice(0, 5).map((job) => {
-            const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
-            return `- ${job.title}${company} (${job.seniority})`;
-        }).join('\n')}`
-        : (data.jobMatches && data.jobMatches.length > 0
-            ? `\n\nTop matches:\n${data.jobMatches.slice(0, 5).map((match) => `- ${match.title}`).join('\n')}`
-            : '');
+// The reply text now carries the readable summary; jobs are rendered as styled cards separately.
+const formatAssistantResponse = (data: ChatResponse): string =>
+    data.reply ? data.reply : "I couldn't understand that.";
 
-    return assistantReply ? `${assistantReply}${jobsSummary}` : "I couldn't understand that.";
-};
+const extractJobCards = (data: ChatResponse): Message['jobs'] =>
+    (data.jobs ?? []).slice(0, 5).map((job) => ({
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        seniority: job.seniority,
+        location: job.location,
+    }));
 
 const buildChatWebSocketUrl = (ticket: string): string => {
     const url = new URL(ENV.CHAT_SERVICE_BASE_URL || window.location.origin);
@@ -450,17 +449,18 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
                     return;
                 }
                 setMessages(conversation.messages.map((message) => {
-                    const jobsFromHistory = message.attachedJobs ?? [];
-                    const historyJobsSummary = jobsFromHistory.length > 0
-                        ? `\n\nReal jobs found:\n${jobsFromHistory.slice(0, 5).map((job) => {
-                            const company = job.company && job.company.trim().length > 0 ? ` at ${job.company.trim()}` : '';
-                            return `- ${job.jobTitle}${company} (${job.seniority})`;
-                        }).join('\n')}`
-                        : '';
+                    const jobsFromHistory = (message.attachedJobs ?? []).slice(0, 5).map((job) => ({
+                        id: job.jobId ?? crypto.randomUUID(),
+                        title: job.jobTitle,
+                        company: job.company ?? '',
+                        seniority: job.seniority ?? '',
+                        location: null,
+                    }));
                     return {
                         id: crypto.randomUUID(),
                         role: message.role,
-                        content: `${message.content}${historyJobsSummary}`,
+                        content: message.content,
+                        ...(jobsFromHistory.length > 0 ? { jobs: jobsFromHistory } : {}),
                     };
                 }));
             } finally {
@@ -530,12 +530,12 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
                 }
 
                 const data = await waitForQueuedResponse(queued.requestId);
-                setMessages(prev => [...prev, createMessage('assistant', formatAssistantResponse(data))]);
+                setMessages(prev => [...prev, createMessage('assistant', formatAssistantResponse(data), extractJobCards(data))]);
                 return;
             }
 
             const data = await readChatResponse(response);
-            setMessages(prev => [...prev, createMessage('assistant', formatAssistantResponse(data))]);
+            setMessages(prev => [...prev, createMessage('assistant', formatAssistantResponse(data), extractJobCards(data))]);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Server connection error.';
             setMessages(prev => [...prev, createMessage('assistant', errorMessage || 'Server connection error.')]);
@@ -551,6 +551,23 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
                 {messages.map((msg) => (
                     <div key={msg.id} className={`message-wrapper ${msg.role}`}>
                         <div className="message-bubble">{msg.content}</div>
+                        {msg.jobs && msg.jobs.length > 0 && (
+                            <div className="chat-job-cards">
+                                {msg.jobs.map((job, index) => (
+                                    <div key={job.id} className="chat-job-card">
+                                        <span className="chat-job-card__index">{index + 1}</span>
+                                        <div className="chat-job-card__body">
+                                            <div className="chat-job-card__title">{job.title}</div>
+                                            <div className="chat-job-card__company">{job.company}</div>
+                                            <div className="chat-job-card__meta">
+                                                {job.seniority && <span className="chat-job-card__chip">{job.seniority}</span>}
+                                                {job.location && <span className="chat-job-card__loc">{job.location}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ))}
                 {isLoading && <div className="message-wrapper assistant"><div className="message-bubble">{loadingLabel}</div></div>}
