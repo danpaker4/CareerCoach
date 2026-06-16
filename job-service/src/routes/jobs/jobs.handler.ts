@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyBaseLogger, FastifyReply, FastifyRequest } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
@@ -13,9 +13,8 @@ import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/
 import { fetchUserProfileEmbedding } from "./user-profile.client";
 import type { CreateJobBody } from "./jobs.schema";
 import { MIN_MATCH_FIT_PCT } from "./jobs.consts";
+import { semanticSearchJobs } from "./semantic-search";
 
-const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
-const NUM_CANDIDATES = 150;
 const SEARCH_LIMIT = 50;
 
 type GetJobsQuery = { search?: string; userId?: string };
@@ -30,6 +29,8 @@ interface JobsHandlerDeps {
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// Keyword fallback, used only when semantic search is unavailable (no embedding
+// model configured, or no jobs have embeddings yet).
 const regexSearch = async (
   collection: Collection<EnrichedJob>,
   term: string
@@ -47,37 +48,31 @@ const regexSearch = async (
     .toArray();
 };
 
-const vectorSearch = async (
-  collection: Collection<EnrichedJob>,
-  queryVector: number[]
-): Promise<EnrichedJob[]> =>
-  collection
-    .aggregate<EnrichedJob>([
-      {
-        $vectorSearch: {
-          index: VECTOR_INDEX_NAME,
-          path: "searchEmbedding",
-          queryVector,
-          numCandidates: NUM_CANDIDATES,
-          limit: SEARCH_LIMIT,
-        },
-      },
-    ])
-    .toArray();
-
-const vectorSearchWithFallback = async (
+// Real, in-app vector search: embed the query, then rank embedded jobs by
+// cosine similarity. Returns null when no embedding model is configured, so the
+// caller can fall back to keyword search. No Atlas / $vectorSearch index needed.
+const semanticSearch = async (
   collection: Collection<EnrichedJob>,
   term: string
+): Promise<EnrichedJob[] | null> => {
+  const queryVector = await generateQueryVector(term);
+  if (!queryVector) return null;
+
+  return semanticSearchJobs(collection, queryVector, SEARCH_LIMIT);
+};
+
+const searchJobs = async (
+  collection: Collection<EnrichedJob>,
+  term: string,
+  logger?: FastifyBaseLogger
 ): Promise<EnrichedJob[]> => {
   try {
-    const queryVector = await generateQueryVector(term);
-
-    if (queryVector) {
-      const results = await vectorSearch(collection, queryVector);
-      if (results.length > 0) return results;
-    }
-  } catch {
-    // Fall through to regex search when vector search cannot be used.
+    const semantic = await semanticSearch(collection, term);
+    if (semantic && semantic.length > 0) return semantic;
+  } catch (error) {
+    // Genuine faults (bad API key, Mongo errors) shouldn't silently masquerade
+    // as keyword results — log before degrading so misconfiguration is visible.
+    logger?.warn({ err: error }, "Semantic search failed; falling back to keyword search");
   }
 
   return regexSearch(collection, term);
@@ -127,8 +122,9 @@ export const JobsHandler = ({
     try {
       const { search, userId } = request.query;
       const term = search?.trim();
+      const isBrowse = !term;
       const jobs = term
-        ? await vectorSearchWithFallback(jobsCollection, term)
+        ? await searchJobs(jobsCollection, term, request.log)
         : await jobsCollection.find({}).limit(SEARCH_LIMIT).toArray();
       const userEmbedding = await getUserEmbedding(userId, embeddingCache, usersServiceBaseUrl);
       const result = jobs.map((job) => ({
@@ -143,10 +139,14 @@ export const JobsHandler = ({
         benefits: job.benefits,
         matchPct: getMatchPct(userEmbedding, job.searchEmbedding),
       }));
-      const sortedResult = userEmbedding
+      // When the user is browsing (no query), order and filter by profile fit.
+      // When they typed a query, honor the search: keep the cosine relevance
+      // order and don't hide jobs just because they aren't an 80% profile match
+      // (matchPct stays on each result as informational metadata).
+      const sortedResult = userEmbedding && isBrowse
         ? [...result].sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0))
         : result;
-      const filteredResult = userEmbedding
+      const filteredResult = userEmbedding && isBrowse
         ? sortedResult.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
         : sortedResult;
 

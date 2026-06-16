@@ -135,11 +135,15 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const handleAnalysisComplete = useCallback(() => {
     if (pendingJobs !== null) {
-      setJobs(filterByMatchFit(pendingJobs));
+      // When the user is actively searching, honor the query: show all
+      // relevance-ranked results instead of hiding jobs that aren't an 80%
+      // profile match. The profile-fit filter only applies to the browse view.
+      const isSearching = searchQuery.trim().length > 0;
+      setJobs(isSearching ? pendingJobs : filterByMatchFit(pendingJobs));
       setPendingJobs(null);
       setFetchState('success');
     }
-  }, [pendingJobs]);
+  }, [pendingJobs, searchQuery]);
 
   useEffect(() => {
     void loadPipelineJobHashes();
