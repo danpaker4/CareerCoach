@@ -1,4 +1,19 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-careercoach
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   minio:
     image: minio/minio:latest
     container_name: minio-careercoach
@@ -34,5 +49,28 @@ services:
       mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" --api S3v4
       mc mb -p local/"$$MINIO_BUCKET" || true
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    container_name: jaeger-careercoach
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.153.0
+    container_name: otel-collector-careercoach
+    command: ["--config=/etc/otelcol/config.yml"]
+    depends_on:
+      - jaeger
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./otel-collector-config.yml:/etc/otelcol/config.yml:ro
+    restart: unless-stopped
+
 volumes:
+  rabbitmq_data:
   minio_data:

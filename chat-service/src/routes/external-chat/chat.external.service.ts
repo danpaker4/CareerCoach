@@ -7,12 +7,20 @@ import {
     readUserStringArrayField,
     toAchievementFromMessage,
 } from "./chat.external.utils";
-import type { ApplyInferredAchievementSignalsParams, ApplyInferredRoleExperienceParams } from "./chat.external.types";
+import type {
+    ApplyInferredAchievementSignalsParams,
+    ApplyInferredRoleExperienceParams,
+    CreateCareerRoadmapParams,
+} from "./chat.external.types";
 import type { RoleExperienceEntry } from "./role-experience.types";
 import { mergeRoleExperience, readUserRoleExperienceField } from "./role-experience.utils";
 
 export class ChatExternalService {
-    constructor(private readonly usersServiceBaseUrl: string, private readonly jobServiceBaseUrl: string) { }
+    constructor(
+        private readonly usersServiceBaseUrl: string,
+        private readonly jobServiceBaseUrl: string,
+        private readonly internalServiceApiKey?: string,
+    ) { }
 
     readUserAchievements = async (userId: string): Promise<UserAchievementResponse[]> => {
         const achievementsResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/achievements`);
@@ -32,7 +40,8 @@ export class ChatExternalService {
     };
 
     searchJobs = async (filters: JobSearchRequest): Promise<JobSearchResultItem[]> => {
-        const response = await fetch(`${this.jobServiceBaseUrl}/jobs/search`, {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}/jobs/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(normalizeFilters(filters)),
@@ -52,7 +61,8 @@ export class ChatExternalService {
     };
 
     searchJobsByPlan = async (plan: JobSearchPlanRequest): Promise<JobSearchResultItem[]> => {
-        const response = await fetch(`${this.jobServiceBaseUrl}/jobs/search`, {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}/jobs/search`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(normalizeSearchPlan(plan)),
@@ -162,6 +172,35 @@ export class ChatExternalService {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(patchBody),
         }).catch(() => null);
+    };
+
+    updateDreamJob = async (userId: string, dreamJob: string, authorization?: string): Promise<boolean> => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (authorization !== undefined && authorization.trim().length > 0) {
+            headers.Authorization = authorization;
+        } else if (this.internalServiceApiKey !== undefined && this.internalServiceApiKey.length > 0) {
+            headers["X-Internal-Service-Key"] = this.internalServiceApiKey;
+            headers["X-Service-User-Id"] = userId;
+        }
+
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/dream-job`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ dreamJob }),
+        });
+
+        return response.ok;
+    };
+
+    createCareerRoadmap = async (params: CreateCareerRoadmapParams): Promise<boolean> => {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        const response = await fetch(`${baseUrl}/career-roadmap`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(params),
+        });
+
+        return response.ok;
     };
 
     applyInferredRoleExperience = async (userId: string, params: ApplyInferredRoleExperienceParams): Promise<void> => {

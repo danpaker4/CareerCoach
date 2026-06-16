@@ -1,3 +1,4 @@
+import "./observability/register";
 import { Server } from "./server";
 import dotenv from 'dotenv';
 import { createConfigFromEnv } from "./config";

@@ -1,5 +1,7 @@
 export type BenchmarkAdminSession = {
     readonly adminUserId: string;
+    readonly adminUserName?: string;
+    readonly adminUserEmail?: string;
 };
 
 export type BenchmarkAdminAuthFailure = {
@@ -18,7 +20,12 @@ const isAdminSession = (value: unknown): value is BenchmarkAdminSession => {
     }
 
     const record = value as Record<string, unknown>;
-    return typeof record.adminUserId === "string" && record.adminUserId.trim().length > 0;
+    return (
+        typeof record.adminUserId === "string" &&
+        record.adminUserId.trim().length > 0 &&
+        (!("adminUserName" in record) || typeof record.adminUserName === "string") &&
+        (!("adminUserEmail" in record) || typeof record.adminUserEmail === "string")
+    );
 };
 
 const readAuthFailure = (payload: unknown, statusCode: number): BenchmarkAdminAuthFailure => {

@@ -39,7 +39,7 @@ export class Server {
                 origin: true,
                 credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-                allowedHeaders: ['Content-Type', 'Authorization']
+                allowedHeaders: ["Content-Type", "Authorization", "X-Internal-Service-Key", "X-Service-User-Id"],
             });
             await this.app.register(cookie);
             await this.app.register(multipart, {

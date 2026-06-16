@@ -12,7 +12,7 @@ import { ChatService } from "../chat/chat.service";
 import { CareerProfileRepository } from "../career-profile/career-profile.repository";
 import { CareerProfileService } from "../career-profile/career-profile.service";
 import { ConfidenceService } from "../chat/confidence/confidence.service";
-import { ConversationModeService } from "../chat/chat-mode/conversation-mode.service";
+
 import { AchievementInferenceService } from "../chat/inference/achievement-inference/achievement-inference.service";
 import { SeniorityInferenceService } from "../chat/inference/seniority-inference/seniority-inference.service";
 import { JobSearchPlanService } from "../chat/search/job-search-plan.service";
@@ -21,6 +21,7 @@ import { JobFollowUpAnswerService } from "../chat/job-follow-up-answer/job-follo
 import { PipelineIntentService } from "../chat/pipeline/pipeline-intent.service";
 import { PipelineService } from "../chat/pipeline/pipeline.service";
 import { WantedJobService } from "../chat/wanted-jobs/wanted-job.service";
+import type { DreamJobRoadmapCreator } from "../chat/dream-job/chat.dream-job-roadmap.types";
 import { BenchmarkFixtureExternalService } from "./benchmark-fixture.external-service";
 import { BenchmarkNoopCareerKnowledgeService, BenchmarkNoopEmbeddingPort } from "./benchmark-noop.services";
 import { BenchmarkRunRepository } from "./benchmark.repository";
@@ -282,6 +283,9 @@ export class BenchmarkService {
         const profileRepository = new CareerProfileRepository(this.dbClient.careerProfiles);
         const profileService = new CareerProfileService(profileRepository, new BenchmarkNoopEmbeddingPort(), null);
         const knowledgeService = new BenchmarkNoopCareerKnowledgeService(this.dbClient.careerDirectionExamples);
+        const dreamJobRoadmapCreator: DreamJobRoadmapCreator = {
+            create: async () => ({ created: true }),
+        };
 
         return new ChatService(
             conversationService,
@@ -291,7 +295,6 @@ export class BenchmarkService {
             new ChatValidationService(),
             profileService,
             new ConfidenceService(),
-            new ConversationModeService(),
             new AchievementInferenceService(),
             new SeniorityInferenceService(),
             new JobSearchPlanService(),
@@ -300,7 +303,8 @@ export class BenchmarkService {
             new JobFollowUpAnswerService(),
             new PipelineIntentService(),
             new PipelineService(this.chatConfig.jobServiceBaseUrl),
-            new WantedJobService(this.chatConfig.jobServiceBaseUrl)
+            new WantedJobService(this.chatConfig.jobServiceBaseUrl),
+            dreamJobRoadmapCreator
         );
     };
 

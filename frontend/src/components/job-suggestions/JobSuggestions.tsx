@@ -10,6 +10,8 @@ import { AiAnalysisLoader } from './AiAnalysisLoader';
 import './JobSuggestions.css';
 import type { User } from '../../types/user';
 
+const MIN_MATCH_FIT_PCT = 80;
+
 interface JobResult {
   id: string;
   jobTitle: string;
@@ -51,6 +53,13 @@ const parseJobs = (data: unknown): JobResult[] => {
       typeof obj.url === 'string'
     );
   });
+};
+
+const filterByMatchFit = (jobs: JobResult[]): JobResult[] => {
+  const hasMatchScores = jobs.some((job) => job.matchPct !== undefined);
+  return hasMatchScores
+    ? jobs.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
+    : jobs;
 };
 
 const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
@@ -126,7 +135,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const handleAnalysisComplete = useCallback(() => {
     if (pendingJobs !== null) {
-      setJobs(pendingJobs);
+      setJobs(filterByMatchFit(pendingJobs));
       setPendingJobs(null);
       setFetchState('success');
     }

@@ -15,6 +15,10 @@ const EnvSchema = z
         MONGO_KEY_PATH: z.string().optional(),
         USERS_SERVICE_BASE_URL: envString("USERS_SERVICE_BASE_URL"),
         JOB_SERVICE_BASE_URL: envString("JOB_SERVICE_BASE_URL"),
+        ROADMAP_SERVICE_BASE_URL: envString("ROADMAP_SERVICE_BASE_URL"),
+        RABBITMQ_URL: envString("RABBITMQ_URL"),
+        CHAT_REQUEST_QUEUE_NAME: z.string().min(1).default("chat.message.requests"),
+        CHAT_EVENTS_EXCHANGE_NAME: z.string().min(1).default("chat.request.events"),
         LLM_PROVIDER: LlmProviderSchema.default("ollama"),
         GEMINI_API_KEY: z.string().optional(),
         GEMINI_MODEL: z.string().optional(),
@@ -28,6 +32,7 @@ const EnvSchema = z
         CUSTOM_EMBEDDING_URL: z.string().url().optional(),
         CAREER_PROFILE_VECTOR_INDEX_NAME: z.string().default("career_profile_vector_index"),
         CAREER_DIRECTION_VECTOR_INDEX_NAME: z.string().default("career_direction_vector_index"),
+        INTERNAL_SERVICE_API_KEY: z.string().default("local-dev-internal-service-key"),
     })
     .superRefine((data, ctx) => {
         const chain = buildTextCompletionLlmChain({
@@ -91,12 +96,19 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
         chatConfig: {
             usersServiceBaseUrl: parsed.USERS_SERVICE_BASE_URL,
             jobServiceBaseUrl: parsed.JOB_SERVICE_BASE_URL,
+            roadmapServiceBaseUrl: parsed.ROADMAP_SERVICE_BASE_URL,
             llm,
             llmTextCompletionChain,
             embeddingModel: parsed.EMBEDDING_MODEL,
             customEmbeddingUrl: parsed.CUSTOM_EMBEDDING_URL,
             careerProfileVectorIndexName: parsed.CAREER_PROFILE_VECTOR_INDEX_NAME,
             careerDirectionVectorIndexName: parsed.CAREER_DIRECTION_VECTOR_INDEX_NAME,
+            internalServiceApiKey: parsed.INTERNAL_SERVICE_API_KEY,
+        },
+        queueConfig: {
+            rabbitMqUrl: parsed.RABBITMQ_URL,
+            requestQueueName: parsed.CHAT_REQUEST_QUEUE_NAME,
+            eventsExchangeName: parsed.CHAT_EVENTS_EXCHANGE_NAME,
         },
     };
 };

@@ -46,7 +46,7 @@ const formatDateTime = (value: string): string => {
 };
 
 const formatDuration = (durationMs: number): string => `${(durationMs / 1000).toFixed(1)}s`;
-const EVALUATION_MODE_FILTER_ORDER: EvaluationMode[] = ['GUIDED', 'FAST_SEARCH', 'DEEP_DISCOVERY'];
+const EVALUATION_MODE_FILTER_ORDER: EvaluationMode[] = ['GUIDED', 'FAST_SEARCH', 'DEEP_DISCOVERY', 'DREAMJOB'];
 
 const formatMessageRoleLabel = (role: EvaluationMessage['role']): string => {
   if (role === 'user') {

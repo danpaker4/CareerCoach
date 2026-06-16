@@ -52,7 +52,7 @@ export class MongoClient implements Service {
             this.careerRoleProfilesCollection = this.db.collection<CareerRoleProfile>("career_role_profiles");
             this.careerSkillProfilesCollection = this.db.collection<CareerSkillProfile>("career_skill_profiles");
             this.careerPathProfilesCollection = this.db.collection<CareerPathProfile>("career_path_profiles");
-            this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("career_direction_examples");
+            this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("careerDirectionExamples");
             this.llmTokenUsageCollection = this.db.collection<LlmTokenUsageDocument>("llmTokenUsage");
             await this.llmTokenUsageCollection.createIndex({ createdAt: -1, provider: 1, model: 1 });
             this.wantedJobsCollection = this.db.collection<WantedJob>("wantedJobs");

@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { withSpan } from "../../../../observability/tracing";
 
 const DEFAULT_EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"] as const;
 
@@ -53,9 +54,17 @@ export const createEmbedding = async (
   let lastError: unknown = null;
   for (const modelName of client.modelNames) {
     try {
-      const model = client.genAI.getGenerativeModel({ model: modelName });
-      const result = await model.embedContent(text);
-      const values = result.embedding?.values;
+      const values = await withSpan("llm.embedding", {
+        "llm.provider": "gemini",
+        "llm.model": modelName,
+        "llm.operation": "job.embedding",
+      }, async (span) => {
+        const model = client.genAI.getGenerativeModel({ model: modelName });
+        const result = await model.embedContent(text);
+        const embeddingValues = result.embedding?.values;
+        span.setAttribute("llm.request.status", Array.isArray(embeddingValues) ? "success" : "error");
+        return embeddingValues;
+      });
       if (Array.isArray(values)) {
         return values;
       }

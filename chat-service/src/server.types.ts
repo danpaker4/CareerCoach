@@ -10,11 +10,18 @@ export interface ServerConfig {
     chatConfig: {
         usersServiceBaseUrl: string;
         jobServiceBaseUrl: string;
+        roadmapServiceBaseUrl: string;
         llm: ResolvedLlmConfig;
         llmTextCompletionChain: readonly ResolvedLlmConfig[];
         embeddingModel?: string;
         customEmbeddingUrl?: string;
         careerProfileVectorIndexName: string;
         careerDirectionVectorIndexName: string;
+        internalServiceApiKey?: string;
+    };
+    queueConfig: {
+        rabbitMqUrl: string;
+        requestQueueName: string;
+        eventsExchangeName: string;
     };
 }

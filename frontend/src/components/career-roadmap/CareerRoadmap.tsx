@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CreateRoadmapModal } from './CreateRoadmapModal';
 import { ChatInterface } from '../chat-component/Chat';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import iconChart from '../../assets/icon-chart.svg';
 import iconTrophy from '../../assets/icon-trophy.svg';
-import iconList from '../../assets/icon-list.svg';
 import iconMessage from '../../assets/icon-message.svg';
 import iconCheck from '../../assets/icon-check.svg';
 import iconPlus from '../../assets/icon-plus.svg';
+import iconX from '../../assets/icon-x.svg';
 import { getPlatformStyle, getResourceTypeStyle } from './platform-config';
+import { StageOpportunitiesPanel } from './StageOpportunitiesPanel';
+import { DestinationJobSearch } from './DestinationJobSearch';
 import './CareerRoadmap.css';
 import type { CareerRoadmapData, CareerRoadmapProps, FetchState, StageContent } from './career-roadmap.types';
 
@@ -19,7 +20,7 @@ const ROADMAP_URL = (userId: string) =>
 
 const parseRoadmapResponse = (data: unknown): CareerRoadmapData[] => {
   if (!Array.isArray(data)) return [];
-  return data.filter((item): item is CareerRoadmapData => {
+    return data.filter((item): item is CareerRoadmapData => {
     if (typeof item !== 'object' || item === null) return false;
     const obj = item as Record<string, unknown>;
     return (
@@ -61,7 +62,7 @@ const loadDefaultChatConversationId = async (userId: string): Promise<string | n
   return null;
 };
 
-const GENERIC_STAGE_CONTENT = [
+const GENERIC_STAGE_CONTENT: StageContent[] = [
   { label: 'Foundation & Fundamentals', description: 'Build the core skills and knowledge base required for your target role.', actions: ['Master core programming fundamentals', 'Complete foundational courses or certifications', 'Build small practice projects'] },
   { label: 'Intermediate Growth', description: 'Apply your knowledge on real projects and deepen your technical expertise.', actions: ['Contribute to real-world projects', 'Build a portfolio with meaningful use cases', 'Learn testing, CI/CD, and best practices'] },
   { label: 'Advanced Proficiency', description: 'Develop deep expertise in your domain and tackle complex engineering challenges.', actions: ['Solve complex architectural problems', 'Lead technical discussions and design reviews', 'Study advanced patterns and system design'] },
@@ -70,7 +71,6 @@ const GENERIC_STAGE_CONTENT = [
 ];
 
 export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
-  const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [roadmaps, setRoadmaps] = useState<CareerRoadmapData[]>([]);
@@ -78,6 +78,146 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const [activeTab, setActiveTab] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [floatingChatConversationId, setFloatingChatConversationId] = useState<string | null>(null);
+  const [togglingStageJobId, setTogglingStageJobId] = useState<number | null>(null);
+  const [expandedDoneStages, setExpandedDoneStages] = useState<ReadonlySet<number>>(new Set());
+  const [gapExpanded, setGapExpanded] = useState(false);
+  const [deletingRoadmapId, setDeletingRoadmapId] = useState<string | null>(null);
+
+  const toggleExpandedStage = (jobId: number) => {
+    setExpandedDoneStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  const deleteRoadmap = async (roadmap: CareerRoadmapData) => {
+    const confirmed = window.confirm(
+      `Delete your roadmap for "${roadmap.dreamJob}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingRoadmapId(roadmap.id);
+    setErrorMessage('');
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${roadmap.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete roadmap');
+      setRoadmaps((prev) => prev.filter((item) => item.id !== roadmap.id));
+      setActiveTab(0);
+      setExpandedDoneStages(new Set());
+      setGapExpanded(false);
+    } catch {
+      setErrorMessage('Could not delete roadmap. Please try again.');
+    } finally {
+      setDeletingRoadmapId(null);
+    }
+  };
+
+  const toggleStage = async (roadmap: CareerRoadmapData, stageIndex: number, currentDone: boolean) => {
+    const isNext = !currentDone && (stageIndex === 0 || roadmap.stagesToDreamJob[stageIndex - 1]?.isDone);
+    if (!currentDone && !isNext) {
+      return;
+    }
+
+    const updatedStages = roadmap.stagesToDreamJob.map((stage, idx) => {
+      if (currentDone && idx >= stageIndex) {
+        return { ...stage, isDone: false };
+      }
+      if (!currentDone && idx === stageIndex) {
+        return { ...stage, isDone: true };
+      }
+      return stage;
+    });
+
+    const stage = roadmap.stagesToDreamJob[stageIndex];
+    if (!stage) {
+      return;
+    }
+
+    setTogglingStageJobId(stage.jobId);
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${roadmap.id}/stages`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ stagesToDreamJob: updatedStages }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update stage');
+      }
+      const updated: unknown = await res.json();
+      if (
+        typeof updated === 'object' &&
+        updated !== null &&
+        'id' in updated &&
+        'stagesToDreamJob' in updated &&
+        Array.isArray((updated as CareerRoadmapData).stagesToDreamJob)
+      ) {
+        setRoadmaps((prev) =>
+          prev.map((item) => (item.id === roadmap.id ? (updated as CareerRoadmapData) : item))
+        );
+        return;
+      }
+      setRoadmaps((prev) =>
+        prev.map((item) =>
+          item.id === roadmap.id ? { ...item, stagesToDreamJob: updatedStages } : item
+        )
+      );
+    } catch {
+      setErrorMessage('Could not update step progress. Please try again.');
+    } finally {
+      setTogglingStageJobId(null);
+    }
+  };
+
+  const toggleAction = async (roadmap: CareerRoadmapData, stageIndex: number, action: string) => {
+    const stage = roadmap.stagesToDreamJob[stageIndex];
+    if (!stage) {
+      return;
+    }
+
+    const actions = (stage.content ?? GENERIC_STAGE_CONTENT[stageIndex])?.actions ?? [];
+    if (actions.length === 0) {
+      return;
+    }
+
+    const current = stage.isDone ? [...actions] : (stage.completedActions ?? []);
+    const nextCompleted = current.includes(action)
+      ? current.filter((item) => item !== action)
+      : [...current, action];
+
+    const allActionsDone = actions.every((item) => nextCompleted.includes(item));
+
+    const updatedStages = roadmap.stagesToDreamJob.map((item, idx) =>
+      idx === stageIndex ? { ...item, completedActions: nextCompleted, isDone: allActionsDone } : item
+    );
+
+    setRoadmaps((prev) =>
+      prev.map((item) => (item.id === roadmap.id ? { ...item, stagesToDreamJob: updatedStages } : item))
+    );
+
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${roadmap.id}/stages`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ stagesToDreamJob: updatedStages }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to update sub-task');
+      }
+    } catch {
+      setRoadmaps((prev) => prev.map((item) => (item.id === roadmap.id ? roadmap : item)));
+      setErrorMessage('Could not update sub-task. Please try again.');
+    }
+  };
 
   const loadData = useCallback(() => {
     if (!user?.id) return;
@@ -126,11 +266,6 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
     }
   }, [roadmaps.length, activeTab]);
 
-  const totalRoadmaps = roadmaps.length;
-  const completedRoadmaps = roadmaps.filter((r) =>
-    r.stagesToDreamJob.length > 0 && r.stagesToDreamJob.every((s) => s.isDone)
-  ).length;
-
   const activeRoadmap = roadmaps[activeTab] ?? null;
 
   return (
@@ -141,54 +276,18 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
             <h1 className="roadmap-title">Career Roadmap</h1>
             <p className="roadmap-subtitle">Your personalized path to your dream role</p>
           </div>
-          <div className="header-actions">
+          {fetchState === 'success' && activeRoadmap && (
             <button
               type="button"
-              className="btn-add-goal"
-              onClick={() => setShowCreateModal(true)}
+              className="btn-outline roadmap-delete-btn"
+              onClick={() => deleteRoadmap(activeRoadmap)}
+              disabled={deletingRoadmapId === activeRoadmap.id}
+              aria-label={`Delete roadmap for ${activeRoadmap.dreamJob}`}
             >
-              <img src={iconPlus} alt="" aria-hidden="true" className="btn-icon btn-icon--white" />
-              Add Roadmap
+              <img src={iconX} alt="" aria-hidden="true" className="roadmap-delete-icon" />
+              {deletingRoadmapId === activeRoadmap.id ? 'Deleting...' : 'Delete Roadmap'}
             </button>
-            <button
-              type="button"
-              className="btn-ai-guide"
-              onClick={() => navigate('/chat')}
-            >
-              <img src={iconMessage} alt="" aria-hidden="true" className="btn-icon btn-icon--white" />
-              AI Career Guide
-            </button>
-          </div>
-        </div>
-
-        <div className="stats-row">
-          <div className="stat-card">
-            <div className="stat-icon-wrap stat-icon-wrap--blue">
-              <img src={iconChart} alt="" aria-hidden="true" className="stat-icon-img stat-icon-img--blue" />
-            </div>
-            <div className="stat-info">
-              <span className="stat-label">Active Roadmaps</span>
-              <span className="stat-value">{fetchState === 'success' ? totalRoadmaps - completedRoadmaps : '-'}</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon-wrap stat-icon-wrap--green">
-              <img src={iconTrophy} alt="" aria-hidden="true" className="stat-icon-img stat-icon-img--green" />
-            </div>
-            <div className="stat-info">
-              <span className="stat-label">Completed</span>
-              <span className="stat-value">{fetchState === 'success' ? completedRoadmaps : '-'}</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon-wrap stat-icon-wrap--purple">
-              <img src={iconList} alt="" aria-hidden="true" className="stat-icon-img stat-icon-img--purple" />
-            </div>
-            <div className="stat-info">
-              <span className="stat-label">Total Roadmaps</span>
-              <span className="stat-value">{fetchState === 'success' ? totalRoadmaps : '-'}</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {fetchState === 'loading' && (
@@ -213,10 +312,6 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               <button type="button" className="btn-primary" onClick={() => setShowCreateModal(true)}>
                 <img src={iconPlus} alt="" className="btn-icon btn-icon--white" aria-hidden="true" />
                 Create Roadmap
-              </button>
-              <button type="button" className="btn-outline" onClick={() => navigate('/chat')}>
-                <img src={iconMessage} alt="" className="btn-icon" aria-hidden="true" />
-                AI Career Guide
               </button>
             </div>
           </div>
@@ -248,65 +343,248 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
             {activeRoadmap && (() => {
               const doneCount = activeRoadmap.stagesToDreamJob.filter((s) => s.isDone).length;
               const totalStages = activeRoadmap.stagesToDreamJob.length;
-              const pct = totalStages === 0 ? 0 : Math.round((doneCount / totalStages) * 100);
+              const allDone = totalStages > 0 && doneCount === totalStages;
+
+              const stageFraction = (stage: typeof activeRoadmap.stagesToDreamJob[number], idx: number): number => {
+                if (stage.isDone) return 1;
+                const actions = (stage.content ?? GENERIC_STAGE_CONTENT[idx])?.actions ?? [];
+                if (actions.length === 0) return 0;
+                const doneActions = (stage.completedActions ?? []).filter((a) => actions.includes(a)).length;
+                return doneActions / actions.length;
+              };
+              const progressSum = activeRoadmap.stagesToDreamJob.reduce((sum, stage, idx) => sum + stageFraction(stage, idx), 0);
+              const pct = totalStages === 0 ? 0 : Math.round((progressSum / totalStages) * 100);
 
               return (
-                <div className="main-roadmap-card" key={activeRoadmap.id}>
-                  <div className="card-top-info">
-                    <h3 className="roadmap-card-title">
-                      Path to <span className="dream-job-name">{activeRoadmap.dreamJob}</span>
-                    </h3>
-                    <p className="meta-info">
-                      {doneCount} of {totalStages} steps completed
-                    </p>
+                <div className="roadmap-journey" key={activeRoadmap.id}>
+                  {activeRoadmap.progressionMeta && (
+                    <div className="journey-context-bar">
+                      {activeRoadmap.progressionMeta.currentRoleSummary && (
+                        <p className="journey-context-today">
+                          <strong>Where you are:</strong> {activeRoadmap.progressionMeta.currentRoleSummary}
+                        </p>
+                      )}
+                      <p className="journey-context-target">
+                        <strong>Target role:</strong>{' '}
+                        {activeRoadmap.progressionMeta.dreamRoleCategory ?? activeRoadmap.dreamJob}
+                        {activeRoadmap.progressionMeta.estimatedYearsToGoal && (
+                          <span> · {activeRoadmap.progressionMeta.estimatedYearsToGoal}</span>
+                        )}
+                      </p>
+                      {activeRoadmap.progressionMeta.progressionReasoning && (
+                        <p className="journey-context-reasoning">{activeRoadmap.progressionMeta.progressionReasoning}</p>
+                      )}
+                      {activeRoadmap.progressionMeta.gapAnalysis && (
+                        <div className="journey-gap-summary">
+                          <button
+                            type="button"
+                            className="journey-gap-toggle"
+                            onClick={() => setGapExpanded((prev) => !prev)}
+                            aria-expanded={gapExpanded}
+                          >
+                            Gap analysis
+                          </button>
+                          {gapExpanded && (
+                            <ul className="journey-gap-list">
+                              {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.length > 0 && (
+                                <li><strong>Skills to build:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.join(', ')}</li>
+                              )}
+                              {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.length > 0 && (
+                                <li><strong>Responsibilities:</strong> {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.slice(0, 4).join('; ')}</li>
+                              )}
+                              {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.length > 0 && (
+                                <li><strong>Leadership:</strong> {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.slice(0, 3).join('; ')}</li>
+                              )}
+                              {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.length > 0 && (
+                                <li><strong>Architecture:</strong> {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.slice(0, 3).join('; ')}</li>
+                              )}
+                              <li>{activeRoadmap.progressionMeta.gapAnalysis.experienceGapSummary}</li>
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={`journey-goal${allDone ? ' journey-goal--reached' : ''}`}>
+                    <div className="journey-goal-text">
+                      <span className="journey-goal-eyebrow">Your destination</span>
+                      <h3 className="journey-goal-title">{activeRoadmap.dreamJob}</h3>
+                      <p className="journey-goal-meta">{doneCount} of {totalStages} milestones completed</p>
+                    </div>
+                    <div
+                      className={`journey-ring${allDone ? ' journey-ring--complete' : ''}`}
+                      style={{ '--ring-pct': pct } as React.CSSProperties}
+                      role="img"
+                      aria-label={`${pct}% complete`}
+                    >
+                      <div className="journey-ring-inner">
+                        {allDone ? (
+                          <img src={iconTrophy} alt="" className="journey-ring-trophy" aria-hidden="true" />
+                        ) : (
+                          <span className="journey-ring-pct">{pct}<span className="journey-ring-sign">%</span></span>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="progress-section">
-                    <div className="progress-label">
-                      <span>Overall Progress</span>
-                      <span className="progress-pct">{pct}%</span>
-                    </div>
-                    <div className="progress-bar-bg">
-                      <div className="progress-bar-fill" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
+                  {user?.id && (
+                    <DestinationJobSearch userId={user.id} defaultJobTitle={activeRoadmap.dreamJob} />
+                  )}
 
-                  <div className="steps-list">
+                  <div className="journey-timeline">
                     {activeRoadmap.stagesToDreamJob.map((stage, idx) => {
                       const content: StageContent = stage.content ?? GENERIC_STAGE_CONTENT[idx] ?? { label: `Step ${idx + 1}`, description: '', actions: [] };
                       const isNext = !stage.isDone && (idx === 0 || activeRoadmap.stagesToDreamJob[idx - 1]?.isDone);
                       const isLocked = !stage.isDone && !isNext;
+                      const state = stage.isDone ? 'done' : isNext ? 'active' : 'locked';
+                      const prevDone = idx === 0 || activeRoadmap.stagesToDreamJob[idx - 1]?.isDone === true;
+                      const isExpanded = expandedDoneStages.has(stage.jobId);
+                      const showDetails = !stage.isDone || isExpanded;
 
                       return (
                         <div
                           key={stage.jobId}
-                          className={`step-row${isLocked ? ' step-row--locked' : ''}`}
+                          className={`journey-row journey-row--${state}${prevDone ? ' journey-row--line-top' : ''}${stage.isDone ? ' journey-row--line-bottom' : ''}`}
                         >
-                          <div className={`step-circle ${stage.isDone ? 'step-circle--done' : isNext ? 'step-circle--pending' : 'step-circle--locked'}`}>
-                            {stage.isDone
-                              ? <img src={iconCheck} alt="done" className="step-check-img" />
-                              : <span>{idx + 1}</span>}
-                          </div>
-                          <div className="step-body">
-                            <div className="step-meta">
-                              <span className="step-time">Step {idx + 1}</span>
-                              {stage.isDone && <span className="badge badge-green">Completed</span>}
-                              {isNext && <span className="badge badge-yellow">In Progress</span>}
-                              {isLocked && <span className="badge badge-blue">Upcoming</span>}
-                              {content.estimatedTimeframe && (
-                                <span className="step-timeframe">{content.estimatedTimeframe}</span>
+                          <div className="journey-rail">
+                            <button
+                              type="button"
+                              className="journey-dot"
+                              onClick={() => toggleStage(activeRoadmap, idx, stage.isDone)}
+                              disabled={isLocked || togglingStageJobId === stage.jobId}
+                              aria-label={
+                                stage.isDone
+                                  ? `Mark step ${idx + 1} as incomplete`
+                                  : `Mark step ${idx + 1} as complete`
+                              }
+                            >
+                              {stage.isDone ? (
+                                <img src={iconCheck} alt="" className="step-check-img" aria-hidden="true" />
+                              ) : (
+                                <span className="journey-dot-number">{idx + 1}</span>
                               )}
+                            </button>
+                          </div>
+                          <div className={`journey-card${stage.isDone && !isExpanded ? ' journey-card--collapsed' : ''}`}>
+                            <div className="journey-card-head">
+                              <div className="journey-card-titles">
+                                <span className="journey-step-num">Step {idx + 1}</span>
+                                <h4 className="journey-card-title">{content.label}</h4>
+                              </div>
+                              <div className="journey-card-badges">
+                                {stage.isDone && <span className="badge badge-green">Completed</span>}
+                                {isLocked && <span className="badge badge-blue">Upcoming</span>}
+                                {content.progressionType && (
+                                  <span className="badge badge-purple">{content.progressionType}</span>
+                                )}
+                                {content.estimatedTimeframe && (
+                                  <span className="journey-timeframe">{content.estimatedTimeframe}</span>
+                                )}
+                                {isNext && (
+                                  <button
+                                    type="button"
+                                    className="journey-complete-icon"
+                                    onClick={() => toggleStage(activeRoadmap, idx, stage.isDone)}
+                                    disabled={togglingStageJobId === stage.jobId}
+                                    aria-label={`Mark step ${idx + 1} as complete`}
+                                    title="Mark step complete"
+                                  >
+                                    <img src={iconCheck} alt="" aria-hidden="true" />
+                                  </button>
+                                )}
+                                {stage.isDone && (
+                                  <button
+                                    type="button"
+                                    className="journey-collapse-btn"
+                                    onClick={() => toggleExpandedStage(stage.jobId)}
+                                    aria-expanded={isExpanded}
+                                    aria-label={isExpanded ? `Collapse step ${idx + 1}` : `Expand step ${idx + 1}`}
+                                  >
+                                    <span className={`journey-caret${isExpanded ? ' journey-caret--open' : ''}`} aria-hidden="true" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <h4 className="step-heading">{content.label}</h4>
-                            <p className="step-desc">{content.description}</p>
-                            {(stage.isDone || isNext) && content.actions.length > 0 && (
-                              <ul className="step-actions">
-                                {content.actions.map((action) => (
-                                  <li key={action}>{action}</li>
-                                ))}
+                            {showDetails && content.whyItMatters && (
+                              <p className="journey-card-why"><strong>Why it matters:</strong> {content.whyItMatters}</p>
+                            )}
+                            {showDetails && <p className="journey-card-desc">{content.description}</p>}
+                            {showDetails && (content.requiredCapabilities?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Required capabilities</span>
+                                <ul className="journey-detail-list">
+                                  {content.requiredCapabilities!.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {showDetails && (content.skillsToBuild?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Skills to build</span>
+                                <ul className="journey-detail-list">
+                                  {content.skillsToBuild!.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {showDetails && (content.responsibilitiesToGain?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Responsibilities to gain</span>
+                                <ul className="journey-detail-list">
+                                  {content.responsibilitiesToGain!.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {showDetails && content.experienceAccumulation && (
+                              <p className="journey-experience-target">
+                                <strong>Experience target:</strong> {content.experienceAccumulation}
+                              </p>
+                            )}
+                            {showDetails && content.actions.length > 0 && (
+                              <ul className="journey-subtasks">
+                                {content.actions.map((action) => {
+                                  const actionDone = stage.isDone || (stage.completedActions ?? []).includes(action);
+                                  return (
+                                    <li
+                                      key={action}
+                                      className={`journey-subtask${actionDone ? ' journey-subtask--done' : ''}`}
+                                    >
+                                      <button
+                                        type="button"
+                                        className={`journey-subtask-check${actionDone ? ' journey-subtask-check--done' : ''}`}
+                                        onClick={() => toggleAction(activeRoadmap, idx, action)}
+                                        disabled={togglingStageJobId === stage.jobId}
+                                        aria-label={
+                                          actionDone
+                                            ? `Mark "${action}" as not done`
+                                            : `Mark "${action}" as done`
+                                        }
+                                      >
+                                        {actionDone && <img src={iconCheck} alt="" aria-hidden="true" />}
+                                      </button>
+                                      <span className="journey-subtask-label">{action}</span>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             )}
-                            {(stage.isDone || isNext) && content.resources && content.resources.length > 0 && (
+                            {showDetails && (content.futureOpportunities?.length ?? 0) > 0 && (
+                              <div className="journey-detail-block">
+                                <span className="journey-detail-label">Future role categories</span>
+                                <div className="journey-role-chips">
+                                  {content.futureOpportunities!.map((role) => (
+                                    <span key={role} className="journey-role-chip">{role}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {showDetails &&
+                              (content.progressionType === 'experience' || content.progressionType === 'hybrid') && (
+                              <StageOpportunitiesPanel
+                                roleCategories={content.roleCategories ?? content.futureOpportunities ?? []}
+                                userSkills={user?.technologies}
+                              />
+                            )}
+                            {showDetails && content.resources && content.resources.length > 0 && (
                               <div className="step-resources">
                                 <span className="step-resources-label">Learning Resources</span>
                                 <div className="step-resource-cards">
@@ -348,6 +626,23 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                         </div>
                       );
                     })}
+
+                    <div className={`journey-row journey-row--goal${allDone ? ' journey-row--line-top journey-row--goal-reached' : ''}`}>
+                      <div className="journey-rail">
+                        <div className="journey-dot journey-dot--goal">
+                          <img src={iconTrophy} alt="" className="journey-goal-trophy" aria-hidden="true" />
+                        </div>
+                      </div>
+                      <div className="journey-card journey-card--goal">
+                        <span className="journey-step-num">Destination</span>
+                        <h4 className="journey-card-title">{activeRoadmap.dreamJob}</h4>
+                        <p className="journey-card-desc">
+                          {allDone
+                            ? 'Congratulations — you reached your dream role!'
+                            : 'Your dream role awaits at the end of this path. Keep going!'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

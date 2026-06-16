@@ -30,5 +30,6 @@ export const ENV = {
   USERS_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_USERS_SERVICE_BASE_URL) || "",
   CHAT_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_CHAT_SERVICE_BASE_URL) || "",
   JOB_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_JOB_SERVICE_BASE_URL) || "",
+  ROADMAP_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_ROADMAP_SERVICE_BASE_URL) || "",
   EVALUATION_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_EVALUATION_SERVICE_BASE_URL) || "",
 };

@@ -25,6 +25,33 @@ export interface AdminUsersResult {
 
 export type ManagementStatus = 'loading' | 'success' | 'error';
 
+export type ChatRateLimitRuleKey =
+  | 'perUserPerMinute'
+  | 'perUserPerDay'
+  | 'perIpPerMinute'
+  | 'activeRequestsPerUser'
+  | 'dailyTokensPerUser'
+  | 'dailyTokensGlobal'
+  | 'maxMessageCharacters'
+  | 'queuedRequestsPerUser'
+  | 'queuedRequestsGlobal'
+  | 'workerConcurrency';
+
+export interface ChatRateLimitRuleConfig {
+  enabled: boolean;
+  limit: number;
+}
+
+export type ChatRateLimitRules = Record<ChatRateLimitRuleKey, ChatRateLimitRuleConfig>;
+
+export interface ChatRateLimitConfig {
+  rules: ChatRateLimitRules;
+  updatedAt: string;
+  updatedByAdminUserId?: string;
+  updatedByAdminUserName?: string;
+  updatedByAdminUserEmail?: string;
+}
+
 export type ManagementUserAction = 'promote' | 'demote' | 'delete';
 
 export type LlmProvider = 'gemini' | 'openai' | 'custom' | 'ollama';
@@ -190,7 +217,7 @@ export interface EvaluationMessage {
   content: string;
 }
 
-export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY';
+export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY' | 'DREAMJOB';
 
 export interface EvaluationExpected {
   mode?: EvaluationMode;

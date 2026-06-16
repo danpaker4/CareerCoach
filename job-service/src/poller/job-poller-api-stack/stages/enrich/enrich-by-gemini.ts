@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { LlmTokenUsageRecorder } from "../../../../llm-token-usage/llm-token-usage.types";
 import { readGeminiUsage, readOllamaUsage, recordLlmTokenUsage } from "../../../../llm-token-usage/llm-token-usage.utils";
+import { withSpan } from "../../../../observability/tracing";
 import type { AdaptedJob } from "../adapt/adapt-resource.types";
 import type { EnrichedJob } from "./types";
 import { buildEnrichmentPrompt } from "./prompet";
@@ -46,7 +47,11 @@ const generateWithOllama = async (
   prompt: string,
   modelName: string,
   tokenUsageRecorder?: LlmTokenUsageRecorder,
-): Promise<string> => {
+): Promise<string> => withSpan("llm.complete", {
+  "llm.provider": "ollama",
+  "llm.model": modelName,
+  "llm.operation": "job.enrichment",
+}, async (span) => {
   const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
     method: "POST",
@@ -54,22 +59,33 @@ const generateWithOllama = async (
     body: JSON.stringify({ model: modelName, prompt, stream: false }),
   });
   const payload: unknown = await response.json().catch(() => null);
+  span.setAttribute("http.response.status_code", response.status);
+
   if (!response.ok || typeof payload !== "object" || payload === null || !("response" in payload)) {
+    span.setAttribute("llm.request.status", "error");
     throw new Error(`Ollama enrichment failed with status ${response.status}`);
   }
   const text = (payload as { response?: unknown }).response;
   if (typeof text !== "string") {
+    span.setAttribute("llm.request.status", "error");
     throw new Error("Ollama enrichment returned invalid response");
+  }
+  const usage = readOllamaUsage(payload);
+  if (usage) {
+    span.setAttribute("llm.usage.prompt_tokens", usage.promptTokens);
+    span.setAttribute("llm.usage.completion_tokens", usage.completionTokens);
+    span.setAttribute("llm.usage.total_tokens", usage.totalTokens);
   }
   await recordLlmTokenUsage(tokenUsageRecorder, {
     sourceService: "job-service",
     operation: "job.enrichment",
     provider: "ollama",
     model: modelName,
-    usage: readOllamaUsage(payload),
+    usage,
   });
+  span.setAttribute("llm.request.status", "success");
   return text;
-};
+});
 
 const enrichSingleJob = async (
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
@@ -107,16 +123,29 @@ const enrichSingleJob = async (
     const text = llmProvider === "ollama"
       ? await generateWithOllama(prompt, llmModel, tokenUsageRecorder)
       : await (async (): Promise<string> => {
-        const result = await model.generateContent(prompt);
-        const generatedText = result.response.text();
-        await recordLlmTokenUsage(tokenUsageRecorder, {
-          sourceService: "job-service",
-          operation: "job.enrichment",
-          provider: "gemini",
-          model: llmModel,
-          usage: readGeminiUsage(result.response),
+        return await withSpan("llm.complete", {
+          "llm.provider": "gemini",
+          "llm.model": llmModel,
+          "llm.operation": "job.enrichment",
+        }, async (span) => {
+          const result = await model.generateContent(prompt);
+          const usage = readGeminiUsage(result.response);
+          if (usage) {
+            span.setAttribute("llm.usage.prompt_tokens", usage.promptTokens);
+            span.setAttribute("llm.usage.completion_tokens", usage.completionTokens);
+            span.setAttribute("llm.usage.total_tokens", usage.totalTokens);
+          }
+          const generatedText = result.response.text();
+          await recordLlmTokenUsage(tokenUsageRecorder, {
+            sourceService: "job-service",
+            operation: "job.enrichment",
+            provider: "gemini",
+            model: llmModel,
+            usage,
+          });
+          span.setAttribute("llm.request.status", "success");
+          return generatedText;
         });
-        return generatedText;
       })();
     const parsed = parseGeminiJson(text);
     const fallback = inferFallback(job);

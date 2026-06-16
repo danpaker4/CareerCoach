@@ -3,6 +3,7 @@ import type { Conversation } from "../../conversation/conversation.model";
 import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
 import type { ConversationMode } from "../chat-mode/conversation-mode.types";
+import { CONVERSATION_MODE_OPTIONS } from "../chat-mode/conversation-mode.consts";
 
 const MAX_JOB_DESCRIPTION_CHARS = 1200;
 
@@ -42,11 +43,48 @@ const achievementsText = (userAchievements: readonly UserAchievement[]): string 
 const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
 
+export const buildModeDetectionPrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+    userAchievements: readonly UserAchievement[],
+    userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
+): string => `
+You are CareerCoach AI.
+Respond ONLY with valid JSON in this exact structure:
+{
+  "mode": "FAST_SEARCH",
+  "fastSearchQuery": "string (optional, only if mode is FAST_SEARCH, extract the core job title, skill, or domain)"
+}
+
+Rules:
+- Set mode to exactly one value from the available modes JSON below.
+- FAST_SEARCH is an INSTANT bypass mode. Use FAST_SEARCH **ONLY** when the user's LATEST message explicitly commands a job search right now (e.g., "Find me a job as a frontend developer", "Show me backend roles", "Search for data analyst").
+- NEVER use FAST_SEARCH if the user is answering a question the assistant asked them.
+- NEVER use FAST_SEARCH to "continue" an existing search or add details to a previous conversation.
+- Use GUIDED for almost all conversations, including answering questions about background, interests, or education. GUIDED is perfectly capable of naturally searching for jobs when the time is right.
+- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what fits them.
+- Use DREAMJOB only for long-term aspiration, dream-role, or future-career identity discussion.
+
+User achievements:
+${achievementsText(userAchievements)}
+
+Available conversation modes JSON:
+${JSON.stringify(CONVERSATION_MODE_OPTIONS, null, 2)}
+
+Known account context (registration profile, CV excerpt, GitHub skills):
+${userAccountContext}
+
+Conversation so far:
+${buildHistory(conversation)}
+
+Latest user message:
+${latestUserMessage}
+`;
+
 export const buildDecisionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     userAchievements: readonly UserAchievement[],
-    mode: ConversationMode = "GUIDED",
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are CareerCoach AI.
@@ -66,6 +104,8 @@ Respond ONLY with valid JSON in this exact structure:
 Rules:
 - Keep conversation continuous.
 - Do NOT restart conversation if there is existing history.
+- Reply in the same language as the latest user message unless the user asks otherwise.
+- Do not ask for a target role, field, or domain if it already appears in conversation history.
 - Two implicit ways to reach job search (never ask the user to pick between them):
   (1) Clear path: user names or implies a target role or field plus enough context (skills, experience, domain) to search meaningfully.
   (2) Discovery path: user is unsure what they want next—still set shouldSearchJobs=true once the conversation gives enough signal from what they love, enjoy, care about, or want in the future; then fill searchFilters.interests and searchFilters.keywords richly from their words (and skills when mentioned). A specific job title is not required for this path.
@@ -91,9 +131,6 @@ ${achievementsText(userAchievements)}
 
 Known account context (registration profile, CV excerpt, GitHub skills — use to personalize; do not invent beyond this; avoid asking the user to repeat these facts unless you need a specific clarification):
 ${userAccountContext}
-
-Conversation mode:
-${mode}
 
 Conversation so far:
 ${buildHistory(conversation)}
@@ -179,6 +216,7 @@ Respond ONLY with valid JSON:
 
 Rules:
 - Speak naturally like a human, not robotic.
+- Reply in the same language as the latest user message unless the user asks otherwise.
 - Do NOT repeat the same sentence every turn.
 - Ask follow-up questions when more detail is needed.
 - Set shouldAdvanceStage=true only when you have enough information for the current objective.

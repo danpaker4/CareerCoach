@@ -1,81 +1,66 @@
 import type { FastifyInstance } from "fastify";
 import type { ServerConfig } from "../../server.types";
-import { ChatConversationService } from "../conversation/conversation.service";
-import { ConversationRepository } from "../conversation/conversation.repository";
-import { ChatLlmService } from "./llm/chat.llm.service";
-import { ChatValidationService } from "./llm/chat.validation.service";
-import { ChatController } from "./chat.controller";
-import { ChatExternalService } from "../external-chat/chat.external.service";
 import { validateChatMessageBody } from "./chat.middleware";
-import { ChatService } from "./chat.service";
-import { ConversationStageService } from "../conversation/conversation.stage.service";
-import { createTextCompletionPortFromChain } from "../../ai/text-completion.utils";
-import { LlmTokenUsageRepository } from "../../ai/token-usage.repository";
-import { createEmbeddingPort } from "../../ai/embedding.utils";
-import { CareerProfileRepository } from "../career-profile/career-profile.repository";
-import { CareerProfileService } from "../career-profile/career-profile.service";
-import { ConfidenceService } from "./confidence/confidence.service";
-import { ConversationModeService } from "./chat-mode/conversation-mode.service";
-import { AchievementInferenceService } from "./inference/achievement-inference/achievement-inference.service";
-import { SeniorityInferenceService } from "./inference/seniority-inference/seniority-inference.service";
-import { JobSearchPlanService } from "./search/job-search-plan.service";
-import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
-import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
-import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
-import { PipelineService } from "./pipeline/pipeline.service";
-import { WantedJobService } from "./wanted-jobs/wanted-job.service";
+import { ChatAuthService } from "./chat-auth.service";
+import { createValidateAuthenticatedChatBody, createValidateAuthenticatedChatSession } from "./chat-auth.middleware";
 import type { MongoClient } from "../../mongo/mongo";
-import { JobRankingService } from "./ranking/job-ranking.service";
+import type { ChatRateLimitService } from "./rate-limit/chat-rate-limit.service";
+import { createChatServiceDependencies } from "./chat-service.factory";
+import type { ChatQueueClient } from "./queue/chat-queue.client";
+import { ChatRequestController } from "./request/chat-request.controller";
+import { ChatRequestRepository } from "./request/chat-request.repository";
+import { ChatRequestService } from "./request/chat-request.service";
+import { ChatRequestRealtimeService } from "./request/chat-request-realtime.service";
 
-export const chatRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
-    const repository = new ConversationRepository(dbClient.conversations);
-    const tokenUsageRepository = new LlmTokenUsageRepository(dbClient.llmTokenUsage);
-    const externalService = new ChatExternalService(chatConfig.usersServiceBaseUrl, chatConfig.jobServiceBaseUrl);
-    const stageService = new ConversationStageService();
-    const conversationService = new ChatConversationService(repository, externalService, stageService);
-    const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain, tokenUsageRepository);
-    const embedding = createEmbeddingPort(chatConfig.llm, chatConfig.embeddingModel, chatConfig.customEmbeddingUrl);
-    const llmService = new ChatLlmService(textCompletion);
-    const validationService = new ChatValidationService();
-    const profileRepository = new CareerProfileRepository(dbClient.careerProfiles);
-    const profileService = new CareerProfileService(profileRepository, embedding, {
-        notifyProfileMaterialized: (userId) => externalService.notifyCoachProfileMaterialized(userId),
+export const chatRouter = (
+    dbClient: MongoClient,
+    chatConfig: ServerConfig["chatConfig"],
+    rateLimitService: ChatRateLimitService,
+    queueClient: ChatQueueClient,
+    realtimeService: ChatRequestRealtimeService
+) => async (app: FastifyInstance) => {
+    const { conversationService } = createChatServiceDependencies(dbClient, chatConfig);
+    const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
+    const requestRepository = new ChatRequestRepository(dbClient.chatRequests, dbClient.chatSocketTickets);
+    const requestService = new ChatRequestService(requestRepository, conversationService, rateLimitService, queueClient);
+    const controller = new ChatRequestController(requestService);
+
+    app.post(
+        "/chat/message",
+        { preHandler: [validateChatMessageBody, createValidateAuthenticatedChatBody(authService, chatConfig.internalServiceApiKey)] },
+        controller.submitMessage
+    );
+
+    app.get(
+        "/chat/requests/:requestId",
+        { preHandler: [createValidateAuthenticatedChatSession(authService, chatConfig.internalServiceApiKey)] },
+        controller.getRequest
+    );
+
+    app.post(
+        "/chat/ws-ticket",
+        { preHandler: [createValidateAuthenticatedChatSession(authService)] },
+        controller.createSocketTicket
+    );
+
+    app.get("/chat/ws", { websocket: true }, (socket, request) => {
+        const ticket = typeof (request.query as { ticket?: unknown }).ticket === "string"
+            ? (request.query as { ticket: string }).ticket
+            : "";
+        socket.on("message", () => undefined);
+        requestService.consumeSocketTicket(ticket)
+            .then((userId) => {
+                if (!userId) {
+                    socket.close(1008, "Invalid socket ticket");
+                    return;
+                }
+
+                realtimeService.register(userId, socket);
+                socket.send(JSON.stringify({ type: "connected" }));
+            })
+            .catch((error: unknown) => {
+                request.log.error({ error }, "Failed opening chat websocket");
+                socket.close(1011, "Unable to open chat websocket");
+            });
     });
-    const confidenceService = new ConfidenceService();
-    const modeService = new ConversationModeService();
-    const achievementInferenceService = new AchievementInferenceService();
-    const seniorityInferenceService = new SeniorityInferenceService();
-    const searchPlanService = new JobSearchPlanService();
-    const rankingService = new JobRankingService();
-    const followUpAnswerService = new JobFollowUpAnswerService();
-    const pipelineIntentService = new PipelineIntentService();
-    const pipelineService = new PipelineService(chatConfig.jobServiceBaseUrl);
-    const wantedJobService = new WantedJobService(chatConfig.jobServiceBaseUrl);
-    const knowledgeService = new CareerKnowledgeService(
-        dbClient.careerDirectionExamples,
-        embedding,
-        chatConfig.careerDirectionVectorIndexName
-    );
-    const service = new ChatService(
-        conversationService,
-        stageService,
-        externalService,
-        llmService,
-        validationService,
-        profileService,
-        confidenceService,
-        modeService,
-        achievementInferenceService,
-        seniorityInferenceService,
-        searchPlanService,
-        rankingService,
-        knowledgeService,
-        followUpAnswerService,
-        pipelineIntentService,
-        pipelineService,
-        wantedJobService
-    );
-    const controller = new ChatController(service);
-
-    app.post("/chat/message", { preHandler: validateChatMessageBody }, controller.sendMessage);
 };

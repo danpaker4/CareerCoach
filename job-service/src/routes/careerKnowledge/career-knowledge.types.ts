@@ -1,8 +1,12 @@
 export type CareerRoleProfile = {
+    roleCategory: string;
     roleName: string;
     commonSkills: string[];
     relatedRoles: string[];
     commonDomains: string[];
+    responsibilities: string[];
+    leadershipSignals: string[];
+    architectureSignals: string[];
     seniorityDistribution: Record<string, number>;
     sourceJobIds: string[];
     embedding: number[];
@@ -42,4 +46,20 @@ export type CareerDirectionExample = {
     sourceJobIds: string[];
     createdAt: Date;
     updatedAt: Date;
+};
+
+export type MarketRequirementsResponse = {
+    roleCategory: string;
+    commonSkills: string[];
+    responsibilities: string[];
+    leadershipSignals: string[];
+    architectureSignals: string[];
+    seniorityDistribution: Record<string, number>;
+    sampleJobCount: number;
+};
+
+export type CareerPathQueryResponse = {
+    fromRole: string;
+    toRole: string;
+    paths: CareerPathProfile[];
 };
