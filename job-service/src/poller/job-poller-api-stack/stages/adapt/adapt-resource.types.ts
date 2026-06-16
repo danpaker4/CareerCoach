@@ -5,6 +5,7 @@ export type AdaptedJob = {
   company: string;
   seniority: string;
   description: string;
+  location?: string;
   lon: number | null;
   lat: number | null;
 };

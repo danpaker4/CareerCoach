@@ -28,6 +28,8 @@ export const createJobBodySchema = z.object({
   description: z.string().min(1).max(20000),
   seniority: z.string().min(1).max(50),
   salary: z.number().int().nonnegative().optional(),
+  location: z.string().min(1).max(200).optional(),
+  requirements: z.array(z.string().min(1).max(500)).max(50).optional(),
 });
 
 export type CreateJobBody = z.infer<typeof createJobBodySchema>;
