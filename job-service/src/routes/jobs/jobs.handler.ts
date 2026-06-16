@@ -63,61 +63,48 @@ export const JobsHandler = (
 
       if (search && search.trim()) {
         const term = search.trim();
-
-        const regexOr = [
-          { jobTitle: { $regex: escapeRegex(term), $options: "i" } },
-          { company: { $regex: escapeRegex(term), $options: "i" } },
-          { description: { $regex: escapeRegex(term), $options: "i" } },
-        ];
-        const regexPromise = jobsCollection
-          .find({ $or: regexOr }, { projection: projectFields })
-          .limit(50)
-          .toArray();
-
         const embeddingClient = getEmbeddingClient();
-        const vectorPromise: Promise<EnrichedJob[]> = embeddingClient
-          ? (async () => {
-              try {
-                const queryVector = await createEmbedding(embeddingClient, term);
-                const results = await jobsCollection.aggregate([
-                  {
-                    $vectorSearch: {
-                      index: VECTOR_INDEX_NAME,
-                      path: "searchEmbedding",
-                      queryVector,
-                      numCandidates: VECTOR_NUM_CANDIDATES,
-                      limit: VECTOR_SEARCH_LIMIT,
-                    },
-                  },
-                  { $project: projectFields },
-                ]).toArray();
-                return results as unknown as EnrichedJob[];
-              } catch (error) {
-                request.log.warn({ error }, "Vector search failed, falling back to regex");
-                return [];
-              }
-            })()
-          : Promise.resolve([]);
 
-        const [regexResults, vectorResults] = await Promise.all([regexPromise, vectorPromise]);
-
-        const seen = new Set<string>();
-        const merged: EnrichedJob[] = [];
-
-        for (const job of vectorResults) {
-          if (!seen.has(job.id)) {
-            seen.add(job.id);
-            merged.push(job);
+        if (embeddingClient) {
+          try {
+            const queryVector = await createEmbedding(embeddingClient, term);
+            jobs = await jobsCollection.aggregate([
+              {
+                $vectorSearch: {
+                  index: VECTOR_INDEX_NAME,
+                  path: "searchEmbedding",
+                  queryVector,
+                  numCandidates: VECTOR_NUM_CANDIDATES,
+                  limit: VECTOR_SEARCH_LIMIT,
+                },
+              },
+              { $project: projectFields },
+            ]).toArray() as unknown as EnrichedJob[];
+          } catch (error) {
+            request.log.warn({ error }, "Vector search failed, falling back to regex");
+            jobs = await jobsCollection
+              .find({
+                $or: [
+                  { jobTitle: { $regex: escapeRegex(term), $options: "i" } },
+                  { company: { $regex: escapeRegex(term), $options: "i" } },
+                  { description: { $regex: escapeRegex(term), $options: "i" } },
+                ],
+              }, { projection: projectFields })
+              .limit(50)
+              .toArray();
           }
+        } else {
+          jobs = await jobsCollection
+            .find({
+              $or: [
+                { jobTitle: { $regex: escapeRegex(term), $options: "i" } },
+                { company: { $regex: escapeRegex(term), $options: "i" } },
+                { description: { $regex: escapeRegex(term), $options: "i" } },
+              ],
+            }, { projection: projectFields })
+            .limit(50)
+            .toArray();
         }
-        for (const job of regexResults) {
-          if (!seen.has(job.id)) {
-            seen.add(job.id);
-            merged.push(job);
-          }
-        }
-
-        jobs = merged.slice(0, 50);
       } else {
         jobs = await jobsCollection.find({}, { projection: projectFields }).limit(50).toArray();
       }
