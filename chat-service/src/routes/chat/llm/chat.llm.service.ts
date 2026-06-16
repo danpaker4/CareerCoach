@@ -22,6 +22,14 @@ import type { DreamJobFlow } from "../../conversation/conversation.model";
 import { buildModeDetectionPrompt, buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
 import type { ChatLlmObservedOperation, ChatLlmObserver } from "./chat.llm.types";
 import { isConversationMode } from "../chat-mode/conversation-mode.utils";
+import { buildOfferJobPrompt } from "../offer-job/chat.offer-job.prompt.utils";
+import { parseJobOfferFromJson } from "../offer-job/chat.offer-job.llm.utils";
+import type { JobOfferDraft } from "../offer-job/chat.offer-job.types";
+import {
+    buildWishlistDetailsPrompt,
+    parseWishlistDetailsFromJson,
+    type WishlistDetails,
+} from "../wanted-jobs/chat.wishlist.utils";
 
 export class ChatLlmService {
     constructor(
@@ -130,6 +138,30 @@ export class ChatLlmService {
                 awaitingConfirmation: false,
                 userConfirmed: false,
             };
+        }
+    };
+
+    extractJobOffer = async (threadText: string, userId: string): Promise<JobOfferDraft> => {
+        const rawText = await this.textCompletion.complete(
+            buildOfferJobPrompt(threadText),
+            { operation: "chat.offer_job", userId }
+        );
+        try {
+            return parseJobOfferFromJson(rawText);
+        } catch {
+            return { jobTitle: "", company: "", seniority: "", location: "", requirements: [], description: "" };
+        }
+    };
+
+    extractWishlistDetails = async (message: string, proposedTitle: string, userId: string): Promise<WishlistDetails> => {
+        const rawText = await this.textCompletion.complete(
+            buildWishlistDetailsPrompt(message, proposedTitle),
+            { operation: "chat.offer_job", userId }
+        );
+        try {
+            return parseWishlistDetailsFromJson(rawText, proposedTitle);
+        } catch {
+            return { jobTitle: proposedTitle, seniority: "", location: "", company: "" };
         }
     };
 

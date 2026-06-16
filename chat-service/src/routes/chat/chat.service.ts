@@ -30,6 +30,27 @@ import { resolveJobSelectionFromFollowUpMessage } from "./job-follow-up-answer/j
 import { PipelineIntentService } from "./pipeline/pipeline-intent.service";
 import { PipelineService } from "./pipeline/pipeline.service";
 import { WantedJobService, buildWantedJobInputFromSearch } from "./wanted-jobs/wanted-job.service";
+import {
+    OFFER_JOB_COLLECT_MARKER,
+    collectOfferThreadText,
+    findMissingOfferFields,
+    isOfferJobIntent,
+    wasOfferJobCollectionPromptLast,
+} from "./offer-job/chat.offer-job.utils";
+import {
+    buildKeywordsFromTitle,
+    buildWishlistSavePrompt,
+    extractProposedWishlistTitle,
+    isWishlistDecline,
+    isWishlistSaveConfirmation,
+    wasWishlistSavePromptLast,
+} from "./wanted-jobs/chat.wishlist.utils";
+import {
+    buildRefineOfferReply,
+    isAlreadySpecific,
+    isJobWantIntent,
+    wasRefineOfferedBefore,
+} from "./search/chat.refine-search.utils";
 import type { PrepareSendMessageContextParams, SendMessagePreparedContext, StageFlowSendMessageResult } from "./chat.types";
 import {
     inferDreamJobTitleFromMessage,
@@ -226,27 +247,18 @@ export class ChatService {
             const originalUserMessage = [...priorUserMessages]
                 .reverse()
                 .find((text) => text.length >= 15) ?? jobContext.lastSearchQuery?.trim() ?? normalizedMessage;
+            // Don't auto-save — offer to add it to the wishlist and let the user confirm.
             const wantedJobInput = buildWantedJobInputFromSearch({
                 userId,
                 normalizedMessage: originalUserMessage,
                 searchFilters: broaderFilters,
             });
-            let wantedSavedTitle: string | null = null;
-            if (wantedJobInput) {
-                const saveResult = await this.wantedJobService.create(wantedJobInput);
-                if (saveResult.status === "error") {
-                    console.warn(
-                        `[CHAT][WANTED_JOB] userId=${userId} trigger=BROADER_SEARCH_EMPTY status=error message=${saveResult.message}`
-                    );
-                } else {
-                    wantedSavedTitle = saveResult.jobTitle;
-                    console.info(
-                        `[CHAT][WANTED_JOB] userId=${userId} trigger=BROADER_SEARCH_EMPTY status=${saveResult.status} title=${saveResult.jobTitle}`
-                    );
-                }
-            }
-            const reply = wantedSavedTitle
-                ? `I do not have another stored match right now, and a broader search did not surface a new role yet. I have saved "${wantedSavedTitle}" to your wanted jobs and will alert you when a matching role is added. Try naming a nearby title or domain you are curious about, and I will search again.`
+            const proposedTitle = wantedJobInput?.jobTitle ?? null;
+            const reply = proposedTitle
+                ? buildWishlistSavePrompt(
+                    proposedTitle,
+                    "I do not have another stored match right now, and a broader search did not surface a new role yet."
+                )
                 : "I do not have another stored match right now, and a broader search did not surface a new role yet. Try naming a nearby title or domain you are curious about, and I will search again.";
             const now = new Date();
             await this.conversationService.saveJobContext(userId, conversationId, {
@@ -381,7 +393,7 @@ export class ChatService {
         confidenceSummary: ConfidenceSummary;
         userAccountContext: string;
     }): Promise<ChatMessageResponse> => {
-        const { conversationId, userId, normalizedMessage, conversation, jobContext, userCareerProfile, userRoleExperience, mode, confidenceSummary, userAccountContext } = params;
+        const { conversationId, userId, jobContext, mode, confidenceSummary } = params;
         const job = jobContext.selectedJobSnapshot;
         const rec = jobContext.jobRecommendationContext;
         if (!job || !rec) {
@@ -389,41 +401,26 @@ export class ChatService {
             await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
             return { reply, mode, confidenceSummary };
         }
-        const rejectedIds = rec.rejectedJobIds.includes(job.id) ? rec.rejectedJobIds : [...rec.rejectedJobIds, job.id];
-        const excluded = new Set([...rejectedIds, ...rec.acceptedJobIds]);
-        const nextJobId = rec.recommendedJobIds.find((id) => !excluded.has(id));
-        const nextSanitized = nextJobId ? jobContext.lastReturnedJobs.find((j) => j.id === nextJobId) ?? null : null;
 
-        if (nextSanitized) {
-            return await this.pipelineRejectPresentNextSanitizedJob({
-                conversationId,
-                userId,
-                jobContext,
-                nextSanitized,
-                rejectedIds,
-                rec,
-                userCareerProfile,
-                userRoleExperience,
-                mode,
-                confidenceSummary,
-            });
-        }
-
-        return await this.pipelineRejectRunBroaderRefill({
-            conversationId,
-            userId,
-            normalizedMessage,
-            conversation,
-            jobContext,
-            userCareerProfile,
-            userRoleExperience,
-            rejectedIds,
-            rec,
-            excluded,
-            userAccountContext,
-            mode,
-            confidenceSummary,
+        // We now present all matches at once, so a rejection means "none of these fit". Offer to
+        // save the role to the wishlist for alerts (the user confirms) — or they can keep exploring.
+        const proposedTitle = jobContext.lastSearchQuery?.trim() || job.title;
+        const now = new Date();
+        await this.conversationService.saveJobContext(userId, conversationId, {
+            ...jobContext,
+            jobRecommendationContext: {
+                ...rec,
+                awaitingPipelineDecision: false,
+                lastRecommendationAt: now,
+            },
+            updatedAt: now,
         });
+        const reply = buildWishlistSavePrompt(
+            proposedTitle,
+            "No problem — none of those have to be the one. If you'd like, I can keep this role on your radar."
+        );
+        await this.conversationService.appendAssistantMessage(userId, conversationId, reply);
+        return { reply, mode, confidenceSummary };
     };
 
     private resolveStageFlowForSendMessage = async (params: {
@@ -616,43 +613,33 @@ export class ChatService {
         }
         const topRankedJobs = orderedRankedPool.map((item) => item.job);
         const focusJob = topRankedJobs[0] ?? null;
-        const jobsForLlm = focusJob ? [focusJob] : topRankedJobs;
-        const jobAwareDecision = await this.llmService.generateJobAwareReply(
-            conversationForDecision,
-            normalizedMessage,
-            jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
-            userAchievements,
-            userAccountContext
-        );
-        const validJobIds = this.validationService.validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
         const recommendedDirections = await this.knowledgeService.suggestDirections(userCareerProfile, userRoleExperience);
-        const fallbackPack = applyValidatedJobsFallback(
-            topRankedJobs.filter((jobItem) => validJobIds.includes(jobItem.id)).slice(0, 10),
-            this.validationService.sanitizeReply(jobAwareDecision.reply),
-            focusJob
-        );
-        const sanitizedReply = withPipelineClosing(fallbackPack.sanitizedReply);
-        const selectedJob = resolveSelectedJobFromRecommendations(fallbackPack.validatedJobs, validJobIds) ?? focusJob;
+
+        // Present ALL top matches at once (not one-at-a-time), and let the user pick which to add
+        // to their pipeline — or say "none" to be offered a wishlist save.
+        const presentationJobs = topRankedJobs.slice(0, 5);
         await this.conversationService.setJobContextAfterSearch(
             userId,
             conversationId,
             topRankedJobs,
-            selectedJob,
+            focusJob,
             normalizedMessage,
             "SEARCH_PLAN"
         );
-        const replyWithDomainContext = sanitizedReply;
-        const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
-        const primaryJobId = presentationJobs[0]?.id;
-        const jobMatches = rankedJobs
-            .filter((item) => item.jobId === primaryJobId)
+        const reply =
+            `Here are the roles I found that could fit — do any of these work for you? ` +
+            `Tell me which one to add to your pipeline ` +
+            `(e.g. "add the first one" or "add the ${presentationJobs[0]?.company ?? "first"} role"). ` +
+            `If none fit, just say "none" and I can save a role to your wishlist so you're alerted when a better match appears.`;
+        const jobMatches = orderedRankedPool
+            .slice(0, 5)
             .map((item) => mapRankedJobResultToChatMatchRow(item));
 
-        await this.conversationService.appendAssistantMessage(userId, conversationId, replyWithDomainContext, presentationJobs);
+        await this.conversationService.appendAssistantMessage(userId, conversationId, reply, presentationJobs);
 
         return {
-            reply: replyWithDomainContext,
-            jobs: presentationJobs.length > 0 ? presentationJobs : fallbackPack.validatedJobs,
+            reply,
+            jobs: presentationJobs,
             jobMatches,
             recommendedDirections,
             mode,
@@ -791,16 +778,172 @@ export class ChatService {
         };
     };
 
+    private tryRefineSearchOfferResponse = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse | null> => {
+        // Offer once per conversation, only for under-specified job wants.
+        if (wasRefineOfferedBefore(ctx.conversationAfterUserMessage.messages)) {
+            return null;
+        }
+        if (!isJobWantIntent(ctx.normalizedMessage) || isAlreadySpecific(ctx.normalizedMessage)) {
+            return null;
+        }
+        const reply = buildRefineOfferReply();
+        console.info(`[CHAT][REFINE] userId=${ctx.userId} offering search refinement`);
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+        return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+    };
+
+    private tryWishlistConfirmationResponse = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse | null> => {
+        const messages = ctx.conversationAfterUserMessage.messages;
+        if (!wasWishlistSavePromptLast(messages)) {
+            return null;
+        }
+        const declined = isNegativeConfirmation(ctx.normalizedMessage) || isWishlistDecline(ctx.normalizedMessage);
+        if (declined) {
+            const reply = "No problem — I won't save it. Want me to look for something else?";
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+            return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        // Proceed when the user confirms ("yes") or explicitly asks to "save …".
+        // Anything else (a brand new request) falls through to the normal flow.
+        const affirmative = isAffirmativeConfirmation(ctx.normalizedMessage);
+        if (!isWishlistSaveConfirmation(ctx.normalizedMessage, affirmative)) {
+            return null;
+        }
+
+        // Let the LLM parse the role title, experience level, location and preferred company out
+        // of the user's reply (regex would dump everything into the title).
+        const proposed = extractProposedWishlistTitle(messages) ?? "";
+        const details = await this.llmService.extractWishlistDetails(ctx.normalizedMessage, proposed, ctx.userId);
+        const title = details.jobTitle.trim() || proposed;
+        if (!title) {
+            const reply = "Tell me the role title and I'll add it to your wishlist.";
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+            return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        const keywords = Array.from(
+            new Set([
+                ...buildKeywordsFromTitle(title),
+                ...(details.company ? details.company.toLowerCase().split(/\s+/) : []),
+            ])
+        );
+        const saveResult = await this.wantedJobService.create({
+            userId: ctx.userId,
+            jobTitle: title,
+            keywords,
+            rawText: ctx.normalizedMessage,
+            seniority: details.seniority || undefined,
+            location: details.location || undefined,
+        });
+        console.info(
+            `[CHAT][WISHLIST] userId=${ctx.userId} action=save title="${title}" seniority=${details.seniority || "-"} location=${details.location || "-"} company=${details.company || "-"} status=${saveResult.status}`
+        );
+        if (saveResult.status === "error") {
+            const reply = `I couldn't save "${title}" just now — want me to try again?`;
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+            return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        const detailParts = [
+            details.seniority,
+            details.location,
+            details.company ? `at ${details.company}` : "",
+        ].filter((part) => part.length > 0);
+        const detailLine = detailParts.length > 0 ? ` (${detailParts.join(", ")})` : "";
+        const reply = `Saved "${title}"${detailLine} to your wishlist. I'll let you know the moment a matching role is added.`;
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+        return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+    };
+
+    private tryOfferJobShortcutResponse = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse | null> => {
+        const messages = ctx.conversationAfterUserMessage.messages;
+        const isContinuation = wasOfferJobCollectionPromptLast(messages);
+        if (!isOfferJobIntent(ctx.normalizedMessage) && !isContinuation) {
+            return null;
+        }
+
+        const threadText = collectOfferThreadText(messages, ctx.normalizedMessage);
+        const draft = await this.llmService.extractJobOffer(threadText, ctx.userId);
+        // The model sometimes fails to isolate a description from terse input — fall back to
+        // the user's own words (the accumulated offer thread) so we don't nag for what they gave us.
+        const effectiveDescription = draft.description.trim().length >= 40
+            ? draft.description.trim()
+            : threadText.trim();
+        const draftForValidation = {
+            jobTitle: draft.jobTitle,
+            company: draft.company,
+            seniority: draft.seniority,
+            location: draft.location,
+            requirements: draft.requirements,
+            description: effectiveDescription,
+            salary: draft.salary,
+        };
+        const missing = findMissingOfferFields(draftForValidation);
+
+        if (missing.length > 0) {
+            const needList = missing.length > 1
+                ? `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`
+                : missing[0];
+            const reply =
+                `${OFFER_JOB_COLLECT_MARKER}. I can post this opening so other CareerCoach users see it, ` +
+                `and anyone who saved a matching wanted job gets alerted automatically. I still need ${needList}. ` +
+                `Just include that in your next message.`;
+            console.info(`[CHAT][OFFER_JOB] userId=${ctx.userId} status=collecting missing=${missing.length}`);
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+            return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        const result = await this.externalService.createJob({
+            jobTitle: draft.jobTitle.trim(),
+            company: draft.company.trim(),
+            description: effectiveDescription,
+            seniority: draft.seniority.trim(),
+            location: draft.location.trim(),
+            requirements: draft.requirements,
+            salary: draft.salary,
+            url: draft.url,
+        });
+
+        if (result.status === "error") {
+            console.warn(`[CHAT][OFFER_JOB] userId=${ctx.userId} status=error message=${result.message}`);
+            const reply =
+                `I tried to post "${draft.jobTitle.trim()}" at ${draft.company.trim()}, but something went wrong on our end. ` +
+                `Want me to try posting it again?`;
+            await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+            return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        console.info(`[CHAT][OFFER_JOB] userId=${ctx.userId} status=created jobId=${result.id} title="${result.jobTitle}"`);
+        const salaryLine = draft.salary ? ` (~$${draft.salary.toLocaleString("en-US")}/yr)` : "";
+        const reply =
+            `Done! I posted "${result.jobTitle}" at ${result.company}${salaryLine}. ` +
+            `It's now live for other CareerCoach users, and anyone who saved a matching wanted job will be alerted automatically. ` +
+            `Want to post another role?`;
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+        return { reply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
+    };
+
     private tryPipelineShortcutResponse = async (ctx: SendMessagePreparedContext): Promise<ChatMessageResponse | null> => {
         const awaitingPipelineDecision =
             ctx.jobContext?.jobRecommendationContext?.awaitingPipelineDecision === true
             && Boolean(ctx.jobContext.selectedJobSnapshot && ctx.jobContext.jobRecommendationContext);
         const pipelineIntent = awaitingPipelineDecision ? this.pipelineIntentService.detect(ctx.normalizedMessage) : null;
         if (pipelineIntent === "PIPELINE_ACCEPT" && ctx.jobContext) {
+            // Add the specific role the user named ("add the Intel role", "the 2nd one"), not just the top one.
+            const resolution = resolveJobSelectionFromFollowUpMessage(
+                ctx.normalizedMessage,
+                ctx.jobContext.selectedJobSnapshot,
+                ctx.jobContext.lastReturnedJobs
+            );
+            const chosenJob = resolution.status === "resolved" ? resolution.job : ctx.jobContext.selectedJobSnapshot;
+            const jobContextForAccept = chosenJob
+                ? { ...ctx.jobContext, selectedJobId: chosenJob.id, selectedJobSnapshot: chosenJob }
+                : ctx.jobContext;
             return await this.handlePipelineAccept({
                 userId: ctx.userId,
                 conversationId: ctx.conversationId,
-                jobContext: ctx.jobContext,
+                jobContext: jobContextForAccept,
                 mode: ctx.mode,
                 confidenceSummary: ctx.confidenceSummary,
             });
@@ -888,29 +1031,16 @@ export class ChatService {
         }
 
         if (jobs.length === 0) {
-            // No open roles even after broadening — save the search as a wanted job so the
-            // user gets alerted (SSE) when a matching role is added later.
+            // No open roles even after broadening — offer to save it to the wishlist (the user
+            // confirms before we store anything; on a "yes" we get alerted when one is added).
             const wantedJobInput = buildWantedJobInputFromSearch({
                 userId: ctx.userId,
                 normalizedMessage: ctx.normalizedMessage,
                 searchFilters: effectiveSearchFilters,
             });
-            let wantedSavedTitle: string | null = null;
-            if (wantedJobInput) {
-                const result = await this.wantedJobService.create(wantedJobInput);
-                if (result.status === "error") {
-                    console.warn(
-                        `[CHAT][WANTED_JOB] userId=${ctx.userId} status=error message=${result.message}`
-                    );
-                } else {
-                    wantedSavedTitle = result.jobTitle;
-                    console.info(
-                        `[CHAT][WANTED_JOB] userId=${ctx.userId} status=${result.status} title=${result.jobTitle}`
-                    );
-                }
-            }
-            const noJobsReply = wantedSavedTitle
-                ? `I do not have a matching role yet, but I have saved "${wantedSavedTitle}" to your wanted jobs and will alert you when one is added. Want me to broaden the search toward adjacent roles in the meantime?`
+            const proposedTitle = wantedJobInput?.jobTitle ?? null;
+            const noJobsReply = proposedTitle
+                ? buildWishlistSavePrompt(proposedTitle, "I do not have a matching role yet.")
                 : "I looked for matches based on what we discussed, but couldn't find open roles right now. Could you share a different title or skill area to lean into?";
             await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, noJobsReply);
             return { reply: noJobsReply, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
@@ -948,21 +1078,26 @@ export class ChatService {
         }
 
         if (jobs.length === 0) {
-            const fallback = `I searched for ${query} roles but couldn't find any open positions matching that right now. Could you share a different role or field you'd like to explore?`;
+            // Offer to save it to the wishlist (user confirms) so they get alerted when one appears.
+            const wantedJobInput = buildWantedJobInputFromSearch({
+                userId: ctx.userId,
+                normalizedMessage: ctx.normalizedMessage,
+                searchFilters,
+            });
+            const proposedTitle = wantedJobInput?.jobTitle ?? query.trim();
+            const fallback = proposedTitle.length > 0
+                ? buildWishlistSavePrompt(
+                    proposedTitle,
+                    `I searched for ${query} roles but couldn't find any open positions matching that right now.`
+                )
+                : `I searched for ${query} roles but couldn't find any open positions matching that right now. Could you share a different role or field you'd like to explore?`;
             await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, fallback);
             return { reply: fallback, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
         }
 
         const rankedJobs = this.rankingService.rankJobs(ctx.userCareerProfile, jobs, ctx.userRoleExperience);
         const topRankedJobs = rankedJobs.map((item) => item.job);
-        const focusJob = topRankedJobs[0];
-
-        const fallbackPack = applyValidatedJobsFallback(
-            topRankedJobs.slice(0, 10),
-            "",
-            focusJob
-        );
-        const sanitizedReply = withPipelineClosing(fallbackPack.sanitizedReply);
+        const focusJob = topRankedJobs[0] ?? null;
 
         await this.conversationService.setJobContextAfterSearch(
             ctx.userId,
@@ -973,16 +1108,19 @@ export class ChatService {
             "SEARCH_PLAN"
         );
 
-        const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
-        const primaryJobId = presentationJobs[0]?.id;
-        const jobMatches = rankedJobs
-            .filter((item) => item.jobId === primaryJobId)
-            .map((item) => mapRankedJobResultToChatMatchRow(item));
+        // Present all matches at once (consistent with the main search flow).
+        const presentationJobs = topRankedJobs.slice(0, 5);
+        const reply =
+            `Here are the roles I found that could fit — do any of these work for you? ` +
+            `Tell me which one to add to your pipeline ` +
+            `(e.g. "add the first one" or "add the ${presentationJobs[0]?.company ?? "first"} role"). ` +
+            `If none fit, just say "none" and I can save a role to your wishlist so you're alerted when a better match appears.`;
+        const jobMatches = rankedJobs.slice(0, 5).map((item) => mapRankedJobResultToChatMatchRow(item));
 
-        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, sanitizedReply, presentationJobs);
+        await this.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply, presentationJobs);
 
         return {
-            reply: sanitizedReply,
+            reply,
             jobs: presentationJobs,
             jobMatches,
             mode: ctx.mode,
@@ -1082,6 +1220,14 @@ export class ChatService {
             return await this.runDreamJobFlow(ctx);
         }
 
+        const wishlistResponse = await this.tryWishlistConfirmationResponse(ctx);
+        if (wishlistResponse) {
+            return wishlistResponse;
+        }
+        const offerJobResponse = await this.tryOfferJobShortcutResponse(ctx);
+        if (offerJobResponse) {
+            return offerJobResponse;
+        }
         const pipelineResponse = await this.tryPipelineShortcutResponse(ctx);
         if (pipelineResponse) {
             return pipelineResponse;
@@ -1089,6 +1235,10 @@ export class ChatService {
         const followUpResponse = await this.tryFollowUpShortcutResponse(ctx);
         if (followUpResponse) {
             return followUpResponse;
+        }
+        const refineOfferResponse = await this.tryRefineSearchOfferResponse(ctx);
+        if (refineOfferResponse) {
+            return refineOfferResponse;
         }
         return await this.runLlmStageAndSearchFlow(ctx);
     };

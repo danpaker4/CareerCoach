@@ -22,6 +22,58 @@ export class ChatExternalService {
         private readonly internalServiceApiKey?: string,
     ) { }
 
+    createJob = async (input: {
+        jobTitle: string;
+        company: string;
+        description: string;
+        seniority: string;
+        location?: string;
+        requirements?: string[];
+        salary?: number;
+        url?: string;
+    }): Promise<
+        | { status: "created"; id: string; jobTitle: string; company: string }
+        | { status: "error"; message: string }
+    > => {
+        const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
+        let response: Response;
+        try {
+            response = await fetch(`${baseUrl}/jobs`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    jobTitle: input.jobTitle,
+                    company: input.company,
+                    description: input.description,
+                    seniority: input.seniority,
+                    ...(input.url ? { url: input.url } : {}),
+                    ...(input.salary !== undefined ? { salary: input.salary } : {}),
+                    ...(input.location ? { location: input.location } : {}),
+                    ...(input.requirements && input.requirements.length > 0 ? { requirements: input.requirements } : {}),
+                }),
+            });
+        } catch (error) {
+            return { status: "error", message: error instanceof Error ? error.message : "Network error" };
+        }
+
+        if (response.status === 201) {
+            const payload: unknown = await response.json().catch(() => null);
+            const obj = (typeof payload === "object" && payload !== null ? payload : {}) as Record<string, unknown>;
+            return {
+                status: "created",
+                id: typeof obj.id === "string" ? obj.id : "",
+                jobTitle: typeof obj.jobTitle === "string" ? obj.jobTitle : input.jobTitle,
+                company: typeof obj.company === "string" ? obj.company : input.company,
+            };
+        }
+
+        const errorText = await response.text().catch(() => "");
+        return {
+            status: "error",
+            message: errorText.length > 0 ? errorText : `Job create failed with status ${response.status}`,
+        };
+    };
+
     readUserAchievements = async (userId: string): Promise<UserAchievementResponse[]> => {
         const achievementsResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/achievements`);
         if (achievementsResponse.ok) {
