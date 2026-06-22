@@ -1,6 +1,6 @@
 import type { ProfileInput } from "../conversation/conversation.types";
 import type { ConversationStageProgress, Conversation } from "../conversation/conversation.model";
-import type { ConversationMode } from "./chat-mode/conversation-mode.types";
+import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
 import type { UserCareerProfile } from "../career-profile/career-profile.types";
 import type { RoleExperienceEntry } from "../external-chat/role-experience.types";

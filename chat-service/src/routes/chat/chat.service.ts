@@ -21,8 +21,9 @@ import { buildUserAccountContext } from "./llm/chat.user-account-context.utils";
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
 import type { CareerProfileSignalUpdate, UserCareerProfile } from "../career-profile/career-profile.types";
 import type { ConfidenceSummary } from "./confidence/confidence.types";
-import type { ConversationMode } from "./chat-mode/conversation-mode.types";
-import { shouldEnterDreamJobMode, conversationHasDreamJobContext } from "./chat-mode/conversation-mode.utils";
+import type { ConversationMode } from "./conversation-mode/conversation-mode.types";
+import { ConversationModeService } from "./conversation-mode/conversation-mode.service";
+import { shouldEnterDreamJobMode, conversationHasDreamJobContext } from "./conversation-mode/conversation-mode.utils";
 import type { JobSearchResultItem } from "./chat.types";
 import type { SanitizedJob, JobRecommendationContextState } from "../../job-in-conversation.types";
 import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
@@ -58,6 +59,7 @@ export class ChatService {
         private readonly stageService: ConversationStageService,
         private readonly externalService: ChatExternalService,
         private readonly llmService: ChatLlmService,
+        private readonly conversationModeService: ConversationModeService,
         private readonly validationService: ChatValidationService,
         private readonly profileService: CareerProfileService,
         private readonly confidenceService: ConfidenceService,
@@ -727,7 +729,7 @@ export class ChatService {
         await this.updateUserRoleExperience(userId, inferredRoleExperience);
         const userRoleExperience = mergeRoleExperience(existingRoleExperience, inferredRoleExperience);
         const confidenceSummary = this.confidenceService.calculateConfidence(userCareerProfile, userRoleExperience);
-        const detectionResult = await this.llmService.detectConversationMode(
+        const detectionResult = await this.conversationModeService.detectConversationMode(
             conversationAfterUserMessage,
             normalizedMessage,
             userAchievements,

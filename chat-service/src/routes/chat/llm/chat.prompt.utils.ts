@@ -2,8 +2,8 @@ import type { AttachedJobSnapshot, UserAchievement } from "../chat.model";
 import type { Conversation } from "../../conversation/conversation.model";
 import type { ConversationStage } from "../../conversation/conversation.stage.consts";
 import type { JobSearchResultItem } from "../chat.types";
-import type { ConversationMode } from "../chat-mode/conversation-mode.types";
-import { CONVERSATION_MODE_OPTIONS } from "../chat-mode/conversation-mode.consts";
+import type { ConversationMode } from "../conversation-mode/conversation-mode.types";
+import { CONVERSATION_MODE_OPTIONS } from "../conversation-mode/conversation-mode.consts";
 
 const MAX_JOB_DESCRIPTION_CHARS = 1200;
 

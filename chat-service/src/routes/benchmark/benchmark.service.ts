@@ -6,6 +6,7 @@ import { createTextCompletionPortFromChain } from "../../ai/text-completion.util
 import { ConversationRepository } from "../conversation/conversation.repository";
 import { ChatConversationService } from "../conversation/conversation.service";
 import { ConversationStageService } from "../conversation/conversation.stage.service";
+import { ConversationModeService } from "../chat/conversation-mode/conversation-mode.service";
 import { ChatLlmService } from "../chat/llm/chat.llm.service";
 import { ChatValidationService } from "../chat/llm/chat.validation.service";
 import { ChatService } from "../chat/chat.service";
@@ -279,6 +280,7 @@ export class BenchmarkService {
         const conversationService = new ChatConversationService(conversationRepository, externalService, stageService);
         const textCompletion = createTextCompletionPortFromChain([config], tokenRecorder);
         const llmService = new ChatLlmService(textCompletion, observer);
+        const conversationModeService = new ConversationModeService(textCompletion);
         const profileRepository = new CareerProfileRepository(this.dbClient.careerProfiles);
         const profileService = new CareerProfileService(profileRepository, new BenchmarkNoopEmbeddingPort(), null);
         const knowledgeService = new BenchmarkNoopCareerKnowledgeService(this.dbClient.careerDirectionExamples);
@@ -291,6 +293,7 @@ export class BenchmarkService {
             stageService,
             externalService,
             llmService,
+            conversationModeService,
             new ChatValidationService(),
             profileService,
             new ConfidenceService(),

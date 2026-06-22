@@ -15,6 +15,7 @@ import { AchievementInferenceService } from "./inference/achievement-inference/a
 import { SeniorityInferenceService } from "./inference/seniority-inference/seniority-inference.service";
 import { JobFollowUpAnswerService } from "./job-follow-up-answer/job-follow-up-answer.service";
 import { CareerKnowledgeService } from "./knowledge/career-knowledge.service";
+import { ConversationModeService } from "./conversation-mode/conversation-mode.service";
 import { ChatLlmService } from "./llm/chat.llm.service";
 import { ChatValidationService } from "./llm/chat.validation.service";
 import { DreamJobRoadmapService } from "./dream-job/chat.dream-job-roadmap.service";
@@ -46,6 +47,7 @@ export const createChatServiceDependencies = (
     const textCompletion = createTextCompletionPortFromChain(chatConfig.llmTextCompletionChain, tokenUsageRepository);
     const embedding = createEmbeddingPort(chatConfig.llm, chatConfig.embeddingModel, chatConfig.customEmbeddingUrl);
     const llmService = new ChatLlmService(textCompletion);
+    const conversationModeService = new ConversationModeService(textCompletion);
     const validationService = new ChatValidationService();
     const profileRepository = new CareerProfileRepository(dbClient.careerProfiles);
     const profileService = new CareerProfileService(profileRepository, embedding, {
@@ -75,6 +77,7 @@ export const createChatServiceDependencies = (
             stageService,
             externalService,
             llmService,
+            conversationModeService,
             validationService,
             profileService,
             confidenceService,

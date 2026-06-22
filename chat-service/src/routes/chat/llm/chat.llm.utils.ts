@@ -1,6 +1,6 @@
 import type { JobSearchRequest, LlmDecision, StageLlmDecision } from "../chat.types";
-import { DEFAULT_CONVERSATION_MODE } from "../chat-mode/conversation-mode.consts";
-import { isConversationMode } from "../chat-mode/conversation-mode.utils";
+import { DEFAULT_CONVERSATION_MODE } from "../conversation-mode/conversation-mode.consts";
+import { isConversationMode } from "../conversation-mode/conversation-mode.utils";
 
 const parseSearchFiltersFromUnknown = (value: unknown): JobSearchRequest => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
