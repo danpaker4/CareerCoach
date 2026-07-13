@@ -46,6 +46,11 @@ curl -u "$LLM_USER:$LLM_PASS" http://llm.cs.colman.ac.il/api/tags   # LLM reacha
 
 ## Notes / gotchas
 
+- **LLM endpoint uses the IP `http://10.10.248.41`, not the hostname.** The gateway nginx has no
+  `server_name llm.cs.colman.ac.il`, so requests with that Host header get 403; only the IP vhost is
+  served (and the integration guide lists the IP as the primary HTTP URL). DNS resolves the hostname
+  fine — it's purely the gateway's Host handling. If the LLM admin adds the `server_name`, switch
+  `OLLAMA_BASE_URL` / `CUSTOM_EMBEDDING_URL` back to the hostname.
 - The college LLM allows ~10 generate-requests/min per IP shared by all services; heavy demos can
   hit 429s. Optionally set `GEMINI_API_KEY` in chat/roadmap env files as an automatic fallback.
 - The VM firewall must allow inbound 80/443 (request from the admin) for public access.
