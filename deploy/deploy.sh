@@ -31,8 +31,12 @@ docker run --rm -v "$PWD/frontend":/app -w /app node:22 \
     bash -lc "npm ci --no-audit --no-fund && npm run build"
 
 echo "==> Publishing frontend to /var/www/careercoach"
-sudo mkdir -p /var/www/careercoach
-sudo rsync -a --delete frontend/dist/ /var/www/careercoach/
+# One-time setup: sudo mkdir -p /var/www/careercoach && sudo chown $USER /var/www/careercoach
+if [ ! -w /var/www/careercoach ]; then
+    echo "ERROR: /var/www/careercoach missing or not writable (see one-time setup above)" >&2
+    exit 1
+fi
+rsync -a --delete frontend/dist/ /var/www/careercoach/
 
 echo "==> Status"
 docker compose -f docker-compose.prod.yml ps
