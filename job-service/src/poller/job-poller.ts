@@ -34,7 +34,11 @@ export const startJobPollerSchedule = (
         }, async (span) => {
             try {
                 console.info(`[LLM] Poller run provider=${provider} model=${model}`);
-                // await jobPoller(jobsCollection, tokenUsageRepository);
+                if (process.env.THEIRSTACK_API_KEY) {
+                    await jobPoller(jobsCollection, tokenUsageRepository);
+                } else {
+                    console.log("⏭️ Skipping poller: THEIRSTACK_API_KEY not set");
+                }
                 // await jobPollerMock(jobsCollection, tokenUsageRepository);
                 span.setAttribute("job.poller.status", "success");
             } catch (error) {

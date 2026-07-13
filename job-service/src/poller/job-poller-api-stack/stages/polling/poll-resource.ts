@@ -4,7 +4,10 @@ export type TheirStackSearchResponse = Record<string, unknown>;
 const THEIRSTACK_JOBS_SEARCH_URL = "https://api.theirstack.com/v1/jobs/search";
 const POSTED_AT_MAX_AGE_DAYS = 7;
 const JOB_COUNTRY_CODES = ["IL"];
-const JOB_SEARCH_LIMIT = 1;
+// Each returned job consumes TheirStack API credits — keep the batch small by default.
+const JOB_SEARCH_LIMIT = Number(process.env.THEIRSTACK_JOB_LIMIT) > 0
+  ? Number(process.env.THEIRSTACK_JOB_LIMIT)
+  : 1;
 
 const isTheirStackSearchResponse = (payload: unknown): payload is { data: unknown[] } => {
   if (typeof payload !== "object" || payload === null || !("data" in payload)) {

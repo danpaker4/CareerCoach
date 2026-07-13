@@ -41,7 +41,17 @@ const normalizeArray = (items: readonly string[]): string[] =>
 
 const shouldRetryGeminiError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("503") || message.toLowerCase().includes("service unavailable");
+  return message.includes("503")
+    || message.includes("429")
+    || message.toLowerCase().includes("service unavailable");
+};
+
+// 429 = the gateway's 10-requests/minute window is exhausted; retrying sooner is pointless.
+const RATE_LIMIT_RETRY_DELAY_MS = 61_000;
+
+const retryDelayForError = (error: unknown, attempt: number): number => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("429") ? RATE_LIMIT_RETRY_DELAY_MS : RETRY_BASE_DELAY_MS * attempt;
 };
 
 const generateWithOllama = async (
@@ -224,9 +234,9 @@ const enrichSingleJob = async (
   } catch (error) {
     const canRetry = shouldRetryGeminiError(error) && attempt < MAX_GEMINI_RETRIES;
     if (canRetry) {
-      const delay = RETRY_BASE_DELAY_MS * attempt;
+      const delay = retryDelayForError(error, attempt);
       console.warn(
-        `Gemini request failed with service unavailability for job ${job.id}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_GEMINI_RETRIES})`,
+        `LLM request failed (retryable) for job ${job.id}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_GEMINI_RETRIES})`,
       );
       await sleep(delay);
       return enrichSingleJob(model, embeddingModel, job, llmProvider, llmModel, tokenUsageRecorder, attempt + 1);
@@ -287,12 +297,18 @@ export const enrichByGemini = async (
     : null;
   const embeddingModel = createEmbeddingClientFromEnv();
 
-  return Promise.all(jobs.map((job) => enrichSingleJob(
-    model as ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
-    embeddingModel,
-    job,
-    llmProvider,
-    llmModel,
-    tokenUsageRecorder
-  )));
+  // Sequential on purpose: the college LLM gateway allows ~10 generate-requests/minute
+  // per IP. Enriching in parallel bursts the whole batch at once and everything 429s.
+  const enrichedJobs: EnrichedJob[] = [];
+  for (const job of jobs) {
+    enrichedJobs.push(await enrichSingleJob(
+      model as ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+      embeddingModel,
+      job,
+      llmProvider,
+      llmModel,
+      tokenUsageRecorder
+    ));
+  }
+  return enrichedJobs;
 };
