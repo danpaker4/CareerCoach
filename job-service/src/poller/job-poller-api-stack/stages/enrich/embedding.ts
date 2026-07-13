@@ -1,12 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { embedText as embedWithOllama, isOllamaEmbeddingProvider } from "../../../../ai/college-llm.client";
 import { withSpan } from "../../../../observability/tracing";
 
 const DEFAULT_EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"] as const;
 
-export type EmbeddingClient = {
-  genAI: GoogleGenerativeAI;
-  modelNames: string[];
-};
+export type EmbeddingClient =
+  | {
+    provider: "gemini";
+    genAI: GoogleGenerativeAI;
+    modelNames: string[];
+  }
+  | { provider: "ollama" };
 
 const normalizeList = (items: readonly string[]): string =>
   items.map((item) => item.trim()).filter(Boolean).join(", ");
@@ -44,13 +48,32 @@ export const createEmbeddingClient = (apiKey: string): EmbeddingClient => {
     ...DEFAULT_EMBEDDING_MODELS,
   ].filter((name, index, arr) => arr.indexOf(name) === index);
   const genAI = new GoogleGenerativeAI(apiKey);
-  return { genAI, modelNames };
+  return { provider: "gemini", genAI, modelNames };
+};
+
+export const createEmbeddingClientFromEnv = (): EmbeddingClient | null => {
+  if (isOllamaEmbeddingProvider()) {
+    return { provider: "ollama" };
+  }
+  const apiKey = process.env.GEMINI_API_KEY;
+  return apiKey ? createEmbeddingClient(apiKey) : null;
 };
 
 export const createEmbedding = async (
   client: EmbeddingClient,
   text: string,
 ): Promise<number[]> => {
+  if (client.provider === "ollama") {
+    return await withSpan("llm.embedding", {
+      "llm.provider": "ollama",
+      "llm.model": process.env.EMBEDDING_MODEL || "all-minilm:latest",
+      "llm.operation": "job.embedding",
+    }, async (span) => {
+      const values = await embedWithOllama(text);
+      span.setAttribute("llm.request.status", values.length > 0 ? "success" : "error");
+      return values;
+    });
+  }
   let lastError: unknown = null;
   for (const modelName of client.modelNames) {
     try {

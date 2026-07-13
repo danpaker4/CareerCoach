@@ -7,7 +7,8 @@ import type { EnrichedJob } from "./types";
 import { buildEnrichmentPrompt } from "./prompet";
 import { inferFallback } from "./fallback/fallback-logic";
 import { cleanStringArray, parseGeminiJson } from "./utils/gemini-response-utils";
-import { buildSearchableText, createEmbedding, createEmbeddingClient, type EmbeddingClient } from "./embedding";
+import { buildSearchableText, createEmbedding, createEmbeddingClientFromEnv, type EmbeddingClient } from "./embedding";
+import { buildLlmAuthHeaders } from "../../../../ai/llm-auth.utils";
 
 const MAX_GEMINI_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 1000;
@@ -55,7 +56,7 @@ const generateWithOllama = async (
   const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...buildLlmAuthHeaders() },
     body: JSON.stringify({ model: modelName, prompt, stream: false }),
   });
   const payload: unknown = await response.json().catch(() => null);
@@ -284,7 +285,7 @@ export const enrichByGemini = async (
   const model = llmProvider === "gemini" && apiKey
     ? new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: llmModel })
     : null;
-  const embeddingModel = apiKey ? createEmbeddingClient(apiKey) : null;
+  const embeddingModel = createEmbeddingClientFromEnv();
 
   return Promise.all(jobs.map((job) => enrichSingleJob(
     model as ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,

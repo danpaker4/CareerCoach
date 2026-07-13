@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText as generateWithOllama, isOllamaTextProvider } from "../../../ai/college-llm.client";
 import type { AchievementDraft, GeminiAchievementsPayload } from "./gemini.types";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.0-flash";
@@ -113,24 +114,32 @@ export const extractAchievementsWithGemini = async (input: {
   linkedInUrl?: string;
   githubUrl?: string;
 }): Promise<AchievementDraft[]> => {
-  const modelName = process.env.GEMINI_MODEL || process.env.LLM_MODEL || DEFAULT_GEMINI_MODEL;
-  console.info(`[LLM] CV achievements generator provider=gemini model=${modelName}`);
+  const useOllama = isOllamaTextProvider();
+  const modelName = useOllama
+    ? process.env.OLLAMA_MODEL || process.env.LLM_MODEL || "llama3"
+    : process.env.GEMINI_MODEL || process.env.LLM_MODEL || DEFAULT_GEMINI_MODEL;
+  console.info(`[LLM] CV achievements generator provider=${useOllama ? "ollama" : "gemini"} model=${modelName}`);
 
   try {
     const prompt = buildPrompt(input);
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is missing");
-    }
+    let responseText: string;
+    if (useOllama) {
+      responseText = await generateWithOllama(prompt);
+    } else {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is missing");
+      }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelName });
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      responseText = result.response.text();
+    }
     const parsed = parseGeminiResponse(responseText);
 
     if (!parsed || !Array.isArray(parsed.achievements)) {
-      console.warn("Gemini returned invalid achievements JSON");
+      console.warn("LLM returned invalid achievements JSON");
       return [];
     }
 

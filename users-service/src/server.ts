@@ -41,6 +41,7 @@ export class Server {
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ["Content-Type", "Authorization", "X-Internal-Service-Key", "X-Service-User-Id"],
             });
+            this.app.get("/health", async () => ({ status: "ok" }));
             await this.app.register(cookie);
             await this.app.register(multipart, {
                 limits: {

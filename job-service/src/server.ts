@@ -52,6 +52,7 @@ export class Server {
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
 
+            this.app.get("/health", async () => ({ status: "ok" }));
             await this.app.register(pipelineRouter(this.DBClient.pipelines));
             await this.app.register(pipelineJobRouter(this.DBClient.pipelineJobs));
             await this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));

@@ -49,6 +49,7 @@ export class Server {
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
                 allowedHeaders: ['Content-Type', 'Authorization']
             });
+            this.app.get("/health", async () => ({ status: "ok" }));
             await this.app.register(websocket);
 
             const rateLimitRepository = new ChatRateLimitRepository(

@@ -1,6 +1,6 @@
 import type { Collection } from "mongodb";
 import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
-import { createEmbedding, createEmbeddingClient } from "../job-poller-api-stack/stages/enrich/embedding";
+import { createEmbedding, createEmbeddingClientFromEnv } from "../job-poller-api-stack/stages/enrich/embedding";
 import type { EnrichedJob } from "../job-poller-api-stack/stages/enrich/types";
 import { saveEnrichedJobs } from "../job-poller-api-stack/stages/save/save-enriched-jobs";
 import { pollResource } from "./stages/polling/poll-resource";
@@ -16,8 +16,7 @@ export const jobPollerMock = async (
   const generatedJobs = await pollResource(tokenUsageRecorder);
   console.log(`✅ ${generatedJobs.length} mock jobs generated`);
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  const embeddingModel = apiKey ? createEmbeddingClient(apiKey) : null;
+  const embeddingModel = createEmbeddingClientFromEnv();
   const enrichedJobs: EnrichedJob[] = await Promise.all(
     generatedJobs.map(async (job) => {
       const searchEmbedding = embeddingModel

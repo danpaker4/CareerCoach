@@ -1,6 +1,7 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
 import { recordLlmTokenUsage, toLlmErrorMessage } from "../../token-usage.utils";
+import { buildLlmAuthHeaders } from "../../llm-auth.utils";
 import { withSpan } from "../../../observability/tracing";
 import { readTextFromCustomLlmPayload } from "./http-custom-text-completion.utils";
 
@@ -21,7 +22,7 @@ export class HttpCustomTextCompletionAdapter implements TextCompletionPort {
             try {
                 const response = await fetch(this.endpointUrl, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", ...buildLlmAuthHeaders() },
                     body: JSON.stringify({ prompt }),
                 });
 

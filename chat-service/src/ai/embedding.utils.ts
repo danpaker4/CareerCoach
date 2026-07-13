@@ -14,12 +14,12 @@ export const createEmbeddingPort = (llm: ResolvedLlmConfig, embeddingModel?: str
     }
     if (llm.provider === "ollama") {
         if (customEmbeddingUrl?.trim()) {
-            return new HttpCustomEmbeddingAdapter(customEmbeddingUrl.trim());
+            return new HttpCustomEmbeddingAdapter(customEmbeddingUrl.trim(), embeddingModel?.trim() || undefined);
         }
         return new FallbackEmbeddingAdapter();
     }
     if (customEmbeddingUrl?.trim()) {
-        return new HttpCustomEmbeddingAdapter(customEmbeddingUrl.trim());
+        return new HttpCustomEmbeddingAdapter(customEmbeddingUrl.trim(), embeddingModel?.trim() || undefined);
     }
     return new FallbackEmbeddingAdapter();
 };

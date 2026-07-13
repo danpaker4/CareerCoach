@@ -1,6 +1,7 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
 import { readOpenAiUsage, recordLlmTokenUsage, toLlmErrorMessage } from "../../token-usage.utils";
+import { buildLlmAuthHeaders } from "../../llm-auth.utils";
 import { withSpan } from "../../../observability/tracing";
 import { OPENAI_CHAT_COMPLETIONS_URL } from "./openai-text-completion.consts";
 import { formatOpenAiErrorMessage, isOpenAiChatResponse } from "./openai-text-completion.utils";
@@ -26,6 +27,8 @@ export class OpenAiTextCompletionAdapter implements TextCompletionPort {
                     headers: {
                         Authorization: `Bearer ${this.apiKey}`,
                         "Content-Type": "application/json",
+                        // College /v1 gateway authenticates with Basic auth instead of a Bearer key.
+                        ...buildLlmAuthHeaders(),
                     },
                     body: JSON.stringify({
                         model: this.model,

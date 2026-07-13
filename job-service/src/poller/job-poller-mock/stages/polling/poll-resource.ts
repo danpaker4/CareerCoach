@@ -1,5 +1,6 @@
 import type { LlmTokenUsageRecorder } from "../../../../llm-token-usage/llm-token-usage.types";
 import { readGeminiUsage, readOllamaUsage, recordLlmTokenUsage } from "../../../../llm-token-usage/llm-token-usage.utils";
+import { buildLlmAuthHeaders } from "../../../../ai/llm-auth.utils";
 
 const DEFAULT_MOCK_JOBS_COUNT = 8;
 const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
@@ -119,7 +120,7 @@ export const pollResource = async (tokenUsageRecorder?: LlmTokenUsageRecorder): 
       const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
       const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...buildLlmAuthHeaders() },
         body: JSON.stringify({ model: modelName, prompt, stream: false }),
       });
       const payload: unknown = await response.json().catch(() => null);

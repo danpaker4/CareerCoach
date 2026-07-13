@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Collection } from "mongodb";
+import { embedText as embedWithOllama, isOllamaEmbeddingProvider } from "../../ai/college-llm.client";
 import type { User, UserDocument } from "./user.model";
 import { toUser } from "./user.utils";
 
@@ -75,8 +76,9 @@ export const regenerateProfileEmbedding = async (
     usersCollection: Collection<UserDocument>,
     userId: string
 ): Promise<void> => {
+    const useOllama = isOllamaEmbeddingProvider();
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return;
+    if (!useOllama && !apiKey) return;
 
     const userDoc = await usersCollection.findOne({ _id: userId });
     if (!userDoc) return;
@@ -85,7 +87,9 @@ export const regenerateProfileEmbedding = async (
     const profileText = buildUserProfileText(user);
     if (!profileText.trim()) return;
 
-    const embedding = await generateProfileEmbedding(profileText, apiKey);
+    const embedding = useOllama
+        ? await embedWithOllama(profileText)
+        : await generateProfileEmbedding(profileText, apiKey as string);
     await usersCollection.updateOne(
         { _id: userId },
         { $set: { profileEmbedding: embedding, profileEmbeddingUpdatedAt: new Date() } }

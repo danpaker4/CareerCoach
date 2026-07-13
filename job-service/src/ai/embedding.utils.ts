@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { embedText as embedWithOllama, isOllamaEmbeddingProvider } from "./college-llm.client";
 import { withSpan } from "../observability/tracing";
 
 const VECTOR_MODEL = process.env.JOB_EMBEDDING_MODEL || "text-embedding-004";
@@ -30,6 +31,23 @@ const sleep = (ms: number): Promise<void> =>
 export const generateQueryVector = async (
     queryText: string
 ): Promise<number[] | null> => {
+    if (isOllamaEmbeddingProvider()) {
+        return await withSpan("llm.embedding", {
+            "llm.provider": "ollama",
+            "llm.model": process.env.EMBEDDING_MODEL || "all-minilm:latest",
+            "llm.operation": "job.search.embedding",
+        }, async (span) => {
+            try {
+                const values = await embedWithOllama(queryText);
+                span.setAttribute("llm.request.status", values.length > 0 ? "success" : "error");
+                return values.length > 0 ? values : null;
+            } catch {
+                span.setAttribute("llm.request.status", "error");
+                return null;
+            }
+        });
+    }
+
     const client = getClient();
     if (!client) return null;
 

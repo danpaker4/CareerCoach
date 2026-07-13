@@ -1,0 +1,190 @@
+﻿# Production compose for the college VM (careercoach.cs.colman.ac.il).
+# App ports bind to 127.0.0.1 only - host nginx is the sole public entrypoint.
+# MongoDB runs on the VM host (port 21771); containers reach it via host.docker.internal.
+# Usage: docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: careercoach-rabbitmq
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [careercoach]
+
+  minio:
+    image: minio/minio:latest
+    container_name: careercoach-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env next to this compose file}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env next to this compose file}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [careercoach]
+
+  minio-setup:
+    image: minio/mc:latest
+    container_name: careercoach-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-careercoach-uploads}
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      set -e
+      mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" --api S3v4
+      mc mb -p local/"$$MINIO_BUCKET" || true
+    networks: [careercoach]
+
+  users-service:
+    build: ./users-service
+    container_name: careercoach-users
+    env_file: ./deploy/env/users-service.env
+    ports:
+      - "127.0.0.1:3001:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "llm.cs.colman.ac.il:10.10.248.41"
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks: [careercoach]
+
+  chat-service:
+    build: ./chat-service
+    container_name: careercoach-chat
+    env_file: ./deploy/env/chat-service.env
+    ports:
+      - "127.0.0.1:3002:3002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "llm.cs.colman.ac.il:10.10.248.41"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks: [careercoach]
+
+  chat-worker:
+    build: ./chat-service
+    container_name: careercoach-chat-worker
+    command: ["node", "dist/chat-worker.js"]
+    env_file: ./deploy/env/chat-service.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "llm.cs.colman.ac.il:10.10.248.41"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [careercoach]
+
+  job-service:
+    build: ./job-service
+    container_name: careercoach-job
+    env_file: ./deploy/env/job-service.env
+    ports:
+      - "127.0.0.1:3003:3003"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "llm.cs.colman.ac.il:10.10.248.41"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks: [careercoach]
+
+  evaluation-service:
+    build: ./evaluation-service
+    container_name: careercoach-evaluation
+    env_file: ./deploy/env/evaluation-service.env
+    ports:
+      - "127.0.0.1:3004:3004"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "llm.cs.colman.ac.il:10.10.248.41"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks: [careercoach]
+
+  roadmap-service:
+    build: ./roadmap-service
+    container_name: careercoach-roadmap
+    env_file: ./deploy/env/roadmap-service.env
+    ports:
+      - "127.0.0.1:3005:3005"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "llm.cs.colman.ac.il:10.10.248.41"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks: [careercoach]
+
+  # Fallback if the VM's host MongoDB (port 21771) is not reachable from containers:
+  # uncomment, then point MONGO_CONNECTION_STRING at mongodb://mongo:27017/careerCoachDB.
+  # mongo:
+  #   image: mongo:7
+  #   container_name: careercoach-mongo
+  #   command: ["mongod", "--bind_ip_all"]
+  #   volumes:
+  #     - mongo_data:/data/db
+  #   ports:
+  #     - "127.0.0.1:27017:27017"
+  #   restart: unless-stopped
+  #   networks: [careercoach]
+
+networks:
+  careercoach:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:
+  minio_data:
+  # mongo_data:

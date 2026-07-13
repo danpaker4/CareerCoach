@@ -55,6 +55,8 @@ export const buildApp = async (runnerConfig: RunnerConfig) => {
         },
     });
 
+    app.get("/health", async () => ({ status: "ok" }));
+
     await app.register(evaluationCaseRoutes(runnerConfig), { prefix: "/evaluation-cases" });
 
     return app;

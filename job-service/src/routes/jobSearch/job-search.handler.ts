@@ -242,7 +242,12 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
                 return;
             }
             const mongoError = error as MongoSearchError;
-            const isSearchNotEnabled = mongoError.code === 31082 || mongoError.codeName === "SearchNotEnabled";
+            // 31082/SearchNotEnabled = Atlas without search; 40324/"Unrecognized pipeline stage" =
+            // plain mongod, which has no $vectorSearch at all. Both mean: fall back to title search.
+            const isSearchNotEnabled = mongoError.code === 31082
+                || mongoError.codeName === "SearchNotEnabled"
+                || mongoError.code === 40324
+                || (error instanceof Error && error.message.includes("Unrecognized pipeline stage"));
             if (isSearchNotEnabled) {
                 const fallbackRequest = normalizedSearches[0];
                 const fallbackResults = await searchByJobTitleFallback(fallbackRequest);

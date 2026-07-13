@@ -34,6 +34,7 @@ export class Server {
                 allowedHeaders: ["Content-Type", "Authorization"],
             });
 
+            this.app.get("/health", async () => ({ status: "ok" }));
             await this.app.register(roadmapGenerationRouter(this.DBClient, this.config.roadmapConfig));
 
             const address = await this.app.listen({
