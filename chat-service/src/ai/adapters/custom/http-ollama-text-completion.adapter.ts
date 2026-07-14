@@ -12,6 +12,12 @@ type OllamaGenerateResponse = {
 const isOllamaGenerateResponse = (value: unknown): value is OllamaGenerateResponse =>
     typeof value === "object" && value !== null && "response" in value;
 
+// Transient gateway failures (503 while the model loads, 429 rate-limit blips,
+// dropped connections) resolve within seconds — retry briefly before failing the chain.
+const OLLAMA_MAX_ATTEMPTS = 3;
+const OLLAMA_RETRY_DELAY_MS = 2000;
+const isRetryableStatus = (status: number): boolean => status === 503 || status === 429;
+
 export class HttpOllamaTextCompletionAdapter implements TextCompletionPort {
     constructor(
         private readonly baseUrl: string,
@@ -28,20 +34,35 @@ export class HttpOllamaTextCompletionAdapter implements TextCompletionPort {
         }, async (span) => {
             console.info(`[LLM] Sending request provider=ollama model=${this.model} baseUrl=${this.baseUrl}`);
             try {
-                const response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/api/generate`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", ...buildLlmAuthHeaders() },
-                    signal: AbortSignal.timeout(DEFAULT_OLLAMA_TIMEOUT_MS),
-                    body: JSON.stringify({
-                        model: this.model,
-                        prompt,
-                        stream: false,
-                    }),
-                });
+                let response: Response | null = null;
+                for (let attempt = 1; attempt <= OLLAMA_MAX_ATTEMPTS; attempt += 1) {
+                    response = await fetch(`${this.baseUrl.replace(/\/$/, "")}/api/generate`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", ...buildLlmAuthHeaders() },
+                        signal: AbortSignal.timeout(DEFAULT_OLLAMA_TIMEOUT_MS),
+                        body: JSON.stringify({
+                            model: this.model,
+                            prompt,
+                            stream: false,
+                        }),
+                    }).catch((error: unknown) => {
+                        if (attempt === OLLAMA_MAX_ATTEMPTS) {
+                            throw error;
+                        }
+                        return null;
+                    });
+                    if (response && !isRetryableStatus(response.status)) {
+                        break;
+                    }
+                    if (attempt < OLLAMA_MAX_ATTEMPTS) {
+                        console.warn(`[LLM] Ollama transient failure (${response ? response.status : "network"}), retry ${attempt + 1}/${OLLAMA_MAX_ATTEMPTS}`);
+                        await new Promise((resolve) => setTimeout(resolve, OLLAMA_RETRY_DELAY_MS * attempt));
+                    }
+                }
 
-                const payload: unknown = await response.json().catch(() => null);
-                if (!response.ok || !isOllamaGenerateResponse(payload)) {
-                    throw new Error(`Ollama completion failed with status ${response.status}`);
+                const payload: unknown = response ? await response.json().catch(() => null) : null;
+                if (!response || !response.ok || !isOllamaGenerateResponse(payload)) {
+                    throw new Error(`Ollama completion failed with status ${response ? response.status : "network-error"}`);
                 }
                 const text = payload.response?.trim();
                 if (!text) {

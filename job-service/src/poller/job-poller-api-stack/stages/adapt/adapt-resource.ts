@@ -34,7 +34,8 @@ const toAdaptedJob = (value: unknown): AdaptedJob | null => {
 
   const id = readRequiredString(record, "id");
   const jobTitle = readRequiredString(record, "job_title");
-  const url = readRequiredString(record, "final_url");
+  // TheirStack leaves final_url NULL on most listings; url is always populated.
+  const url = readRequiredString(record, "final_url") || readRequiredString(record, "url");
   const company = readRequiredString(record, "company");
   const seniority = readRequiredString(record, "seniority");
   const description = readRequiredString(record, "description");
