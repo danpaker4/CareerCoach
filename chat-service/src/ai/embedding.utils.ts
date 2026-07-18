@@ -12,7 +12,7 @@ export const createEmbeddingPort = (llm: ResolvedLlmConfig, embeddingModel?: str
     if (llm.provider === "openai") {
         return new OpenAiEmbeddingAdapter(llm.apiKey, embeddingModel?.trim() || "text-embedding-3-small");
     }
-    if (llm.provider === "ollama") {
+    if (llm.provider === "ollama" || llm.provider === "litellm" || llm.provider === "dify") {
         if (customEmbeddingUrl?.trim()) {
             return new HttpCustomEmbeddingAdapter(customEmbeddingUrl.trim());
         }

@@ -1,7 +1,26 @@
-import { DEFAULT_GEMINI_MODEL, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_MODEL } from "./llm-config.consts";
+import { DEFAULT_DIFY_API_BASE_URL, DEFAULT_GEMINI_MODEL, DEFAULT_LITELLM_BASE_URL, DEFAULT_LITELLM_MODEL, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_MODEL } from "./llm-config.consts";
 import type { LlmEnvInput, ResolvedLlmConfig } from "./llm-config.types";
 
 export const resolveLlmConfig = (env: LlmEnvInput): ResolvedLlmConfig => {
+    if (env.llmProvider === "litellm") {
+        const endpointUrl = env.litellmBaseUrl?.trim() || DEFAULT_LITELLM_BASE_URL;
+        const apiKey = env.litellmApiKey?.trim();
+        if (!apiKey) {
+            throw new Error("resolveLlmConfig: missing LITELLM_API_KEY for provider litellm");
+        }
+        const model = env.litellmModel?.trim() || env.llmModel?.trim() || DEFAULT_LITELLM_MODEL;
+        return { provider: "litellm", endpointUrl, apiKey, model };
+    }
+
+    if (env.llmProvider === "dify") {
+        const endpointUrl = env.difyApiBaseUrl?.trim() || DEFAULT_DIFY_API_BASE_URL;
+        const apiKey = env.difyApiKey?.trim();
+        if (!apiKey) {
+            throw new Error("resolveLlmConfig: missing DIFY_API_KEY for provider dify");
+        }
+        return { provider: "dify", endpointUrl, apiKey };
+    }
+
     if (env.llmProvider === "gemini") {
         const apiKey = env.geminiApiKey?.trim();
         if (!apiKey) {

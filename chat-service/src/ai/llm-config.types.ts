@@ -1,10 +1,12 @@
-type LlmProviderId = "gemini" | "openai" | "custom" | "ollama";
+type LlmProviderId = "gemini" | "openai" | "custom" | "ollama" | "litellm" | "dify";
 
 export type ResolvedLlmConfig =
     | { readonly provider: "gemini"; readonly apiKey: string; readonly model: string }
     | { readonly provider: "openai"; readonly apiKey: string; readonly model: string }
     | { readonly provider: "custom"; readonly endpointUrl: string }
-    | { readonly provider: "ollama"; readonly endpointUrl: string; readonly model: string };
+    | { readonly provider: "ollama"; readonly endpointUrl: string; readonly model: string }
+    | { readonly provider: "litellm"; readonly endpointUrl: string; readonly apiKey: string; readonly model: string }
+    | { readonly provider: "dify"; readonly endpointUrl: string; readonly apiKey: string };
 
 export type LlmEnvInput = {
     readonly llmProvider: LlmProviderId;
@@ -16,4 +18,9 @@ export type LlmEnvInput = {
     readonly customLlmUrl?: string;
     readonly ollamaBaseUrl?: string;
     readonly ollamaModel?: string;
+    readonly litellmBaseUrl?: string;
+    readonly litellmApiKey?: string;
+    readonly litellmModel?: string;
+    readonly difyApiBaseUrl?: string;
+    readonly difyApiKey?: string;
 };

@@ -5,7 +5,7 @@ import { buildTextCompletionLlmChain } from "./ai/llm-text-completion-chain.util
 
 const envString = (name: string) => z.string().min(1, `${name} is required`);
 
-const LlmProviderSchema = z.enum(["gemini", "openai", "custom", "ollama"]);
+const LlmProviderSchema = z.enum(["gemini", "openai", "custom", "ollama", "litellm", "dify"]);
 
 const EnvSchema = z
     .object({
@@ -19,7 +19,7 @@ const EnvSchema = z
         RABBITMQ_URL: envString("RABBITMQ_URL"),
         CHAT_REQUEST_QUEUE_NAME: z.string().min(1).default("chat.message.requests"),
         CHAT_EVENTS_EXCHANGE_NAME: z.string().min(1).default("chat.request.events"),
-        LLM_PROVIDER: LlmProviderSchema.default("ollama"),
+        LLM_PROVIDER: LlmProviderSchema.default("litellm"),
         GEMINI_API_KEY: z.string().optional(),
         GEMINI_MODEL: z.string().optional(),
         LLM_MODEL: z.string().optional(),
@@ -28,6 +28,11 @@ const EnvSchema = z
         CUSTOM_LLM_URL: z.string().url().optional(),
         OLLAMA_BASE_URL: z.string().url().optional(),
         OLLAMA_MODEL: z.string().optional(),
+        LITELLM_BASE_URL: z.string().url().optional(),
+        LITELLM_API_KEY: z.string().optional(),
+        LITELLM_MODEL: z.string().optional(),
+        DIFY_API_BASE_URL: z.string().url().optional(),
+        DIFY_API_KEY: z.string().optional(),
         EMBEDDING_MODEL: z.string().optional(),
         CUSTOM_EMBEDDING_URL: z.string().url().optional(),
         CAREER_PROFILE_VECTOR_INDEX_NAME: z.string().default("career_profile_vector_index"),
@@ -45,6 +50,11 @@ const EnvSchema = z
             customLlmUrl: data.CUSTOM_LLM_URL,
             ollamaBaseUrl: data.OLLAMA_BASE_URL,
             ollamaModel: data.OLLAMA_MODEL,
+            litellmBaseUrl: data.LITELLM_BASE_URL,
+            litellmApiKey: data.LITELLM_API_KEY,
+            litellmModel: data.LITELLM_MODEL,
+            difyApiBaseUrl: data.DIFY_API_BASE_URL,
+            difyApiKey: data.DIFY_API_KEY,
         });
         if (chain.length === 0) {
             ctx.addIssue({
@@ -67,6 +77,11 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
         customLlmUrl: parsed.CUSTOM_LLM_URL,
         ollamaBaseUrl: parsed.OLLAMA_BASE_URL,
         ollamaModel: parsed.OLLAMA_MODEL,
+        litellmBaseUrl: parsed.LITELLM_BASE_URL,
+        litellmApiKey: parsed.LITELLM_API_KEY,
+        litellmModel: parsed.LITELLM_MODEL,
+        difyApiBaseUrl: parsed.DIFY_API_BASE_URL,
+        difyApiKey: parsed.DIFY_API_KEY,
     });
     const llm = (() => {
         try {
@@ -80,6 +95,11 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
                 customLlmUrl: parsed.CUSTOM_LLM_URL,
                 ollamaBaseUrl: parsed.OLLAMA_BASE_URL,
                 ollamaModel: parsed.OLLAMA_MODEL,
+                litellmBaseUrl: parsed.LITELLM_BASE_URL,
+                litellmApiKey: parsed.LITELLM_API_KEY,
+                litellmModel: parsed.LITELLM_MODEL,
+                difyApiBaseUrl: parsed.DIFY_API_BASE_URL,
+                difyApiKey: parsed.DIFY_API_KEY,
             });
         } catch {
             return llmTextCompletionChain[0];

@@ -1,4 +1,4 @@
-export type LlmProvider = "gemini" | "openai" | "custom" | "ollama";
+export type LlmProvider = "gemini" | "openai" | "custom" | "ollama" | "litellm" | "dify";
 
 export type LlmTokenStatus = "known" | "unknown";
 

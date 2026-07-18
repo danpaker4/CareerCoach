@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "infra:up": "bash scripts/infra-up.sh",
+    "infra:down": "bash scripts/infra-down.sh",
     "dev:users-service": "npm --prefix users-service run dev",
     "dev:chat-service": "npm --prefix chat-service run dev",
     "dev:chat-worker": "npm --prefix chat-service run dev:worker",

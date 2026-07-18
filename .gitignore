@@ -1,1 +1,3 @@
 node_modules
+dify/docker/volumes/
+dify/docker/.env

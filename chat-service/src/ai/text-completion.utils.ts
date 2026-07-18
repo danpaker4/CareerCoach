@@ -5,22 +5,48 @@ import { GeminiTextCompletionAdapter } from "./adapters/gemini/gemini-text-compl
 import { OpenAiTextCompletionAdapter } from "./adapters/openai/openai-text-completion.adapter";
 import { HttpCustomTextCompletionAdapter } from "./adapters/custom/http-custom-text-completion.adapter";
 import { HttpOllamaTextCompletionAdapter } from "./adapters/custom/http-ollama-text-completion.adapter";
+import { HttpLiteLlmTextCompletionAdapter } from "./adapters/litellm/http-litellm-text-completion.adapter";
+import { HttpDifyTextCompletionAdapter } from "./adapters/dify/http-dify-text-completion.adapter";
 import { FallbackTextCompletionAdapter } from "./adapters/custom/fallback-text-completion.adapter";
+import { LangfuseTracedTextCompletionAdapter } from "./adapters/langfuse-traced-text-completion.adapter";
+
+const resolveModelName = (llm: ResolvedLlmConfig): string => {
+    if (llm.provider === "custom" || llm.provider === "dify") {
+        return llm.provider;
+    }
+    return llm.model;
+};
 
 const createSingleTextCompletionPort = (llm: ResolvedLlmConfig, tokenUsageRecorder?: LlmTokenUsageRecorder): TextCompletionPort => {
-    if (llm.provider === "gemini") {
-        return new GeminiTextCompletionAdapter(llm.apiKey, llm.model, tokenUsageRecorder);
-    }
+    const adapter = ((): TextCompletionPort => {
+        if (llm.provider === "litellm") {
+            return new HttpLiteLlmTextCompletionAdapter(llm.endpointUrl, llm.apiKey, llm.model, tokenUsageRecorder);
+        }
 
-    if (llm.provider === "openai") {
-        return new OpenAiTextCompletionAdapter(llm.apiKey, llm.model, tokenUsageRecorder);
-    }
+        if (llm.provider === "dify") {
+            return new HttpDifyTextCompletionAdapter(llm.endpointUrl, llm.apiKey, tokenUsageRecorder);
+        }
 
-    if (llm.provider === "ollama") {
-        return new HttpOllamaTextCompletionAdapter(llm.endpointUrl, llm.model, tokenUsageRecorder);
-    }
+        if (llm.provider === "gemini") {
+            return new GeminiTextCompletionAdapter(llm.apiKey, llm.model, tokenUsageRecorder);
+        }
 
-    return new HttpCustomTextCompletionAdapter(llm.endpointUrl, tokenUsageRecorder);
+        if (llm.provider === "openai") {
+            return new OpenAiTextCompletionAdapter(llm.apiKey, llm.model, tokenUsageRecorder);
+        }
+
+        if (llm.provider === "ollama") {
+            return new HttpOllamaTextCompletionAdapter(llm.endpointUrl, llm.model, tokenUsageRecorder);
+        }
+
+        return new HttpCustomTextCompletionAdapter(llm.endpointUrl, tokenUsageRecorder);
+    })();
+
+    return new LangfuseTracedTextCompletionAdapter({
+        inner: adapter,
+        provider: llm.provider,
+        model: resolveModelName(llm),
+    });
 };
 
 export const createTextCompletionPortFromChain = (

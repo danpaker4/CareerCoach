@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: CareerCoach chat-service prompt regression suite (via LiteLLM)
+
+prompts:
+  - file://prompts/chat.prompt.ts
+
+providers:
+  - id: openai:chat:chat-default
+    config:
+      apiBaseUrl: http://127.0.0.1:4000/v1
+      apiKey: sk-litellm-local-dev
+      temperature: 0.2
+
+tests:
+  - description: Decision prompt returns searchable career JSON
+    vars:
+      promptType: decision
+      latestUserMessage: I am interested in frontend engineering roles.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const parsed = JSON.parse(output);
+          return typeof parsed.reply === 'string'
+            && typeof parsed.shouldSearchJobs === 'boolean'
+            && Array.isArray(parsed.recommendedJobIds)
+            && parsed.searchFilters
+            && typeof parsed.searchFilters === 'object';
+
+  - description: Stage prompt returns stage advancement JSON
+    vars:
+      promptType: stage
+      latestUserMessage: I have three years of TypeScript experience building React apps.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const parsed = JSON.parse(output);
+          return typeof parsed.reply === 'string'
+            && typeof parsed.shouldAdvanceStage === 'boolean';
+
+  - description: Mode detection returns a known mode for explicit job search
+    vars:
+      promptType: mode-detection
+      latestUserMessage: Find me a job as a frontend developer
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const parsed = JSON.parse(output);
+          const allowed = ['GUIDED', 'FAST_SEARCH', 'DEEP_DISCOVERY', 'DREAMJOB'];
+          return typeof parsed.mode === 'string' && allowed.includes(parsed.mode);
+
+  - description: Dream job prompt returns confirmation-capable JSON
+    vars:
+      promptType: dream-job
+      latestUserMessage: I want to become a startup founder someday.
+    assert:
+      - type: is-json
+      - type: javascript
+        value: |
+          const parsed = JSON.parse(output);
+          return typeof parsed.reply === 'string'
+            && typeof parsed.awaitingConfirmation === 'boolean'
+            && typeof parsed.userConfirmed === 'boolean';

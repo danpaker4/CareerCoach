@@ -3,6 +3,8 @@ import { resolveLlmConfig } from "./llm-config.utils";
 
 const hasValue = (value: string | undefined): boolean => typeof value === "string" && value.trim().length > 0;
 
+const DIRECT_ESCAPE_HATCH_PROVIDERS = new Set(["ollama", "gemini", "openai", "custom"]);
+
 export const buildTextCompletionLlmChain = (env: LlmEnvInput): readonly ResolvedLlmConfig[] => {
     const chain: ResolvedLlmConfig[] = [];
     const configuredProviders = new Set<ResolvedLlmConfig["provider"]>();
@@ -14,6 +16,22 @@ export const buildTextCompletionLlmChain = (env: LlmEnvInput): readonly Resolved
         configuredProviders.add(config.provider);
         chain.push(config);
     };
+
+    // Gateway mode (default): Dify app layer + LiteLLM model gateway can both be in the chain.
+    // Order: Dify first (when keyed), then LiteLLM as shared model path / fallback.
+    if (!DIRECT_ESCAPE_HATCH_PROVIDERS.has(env.llmProvider)) {
+        if (hasValue(env.difyApiKey)) {
+            addProvider(resolveLlmConfig({ ...env, llmProvider: "dify" }));
+        }
+
+        if (hasValue(env.litellmApiKey)) {
+            addProvider(resolveLlmConfig({ ...env, llmProvider: "litellm" }));
+        }
+
+        if (chain.length > 0) {
+            return chain;
+        }
+    }
 
     if (env.llmProvider === "ollama" || hasValue(env.ollamaBaseUrl) || hasValue(env.ollamaModel)) {
         addProvider(resolveLlmConfig({ ...env, llmProvider: "ollama" }));
