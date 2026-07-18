@@ -1,3 +1,4 @@
+import "./observability/register";
 import dotenv from "dotenv";
 import { buildApp } from "./app";
 import { connectMongo, disconnectMongo } from "./models/evaluation-case.model";
