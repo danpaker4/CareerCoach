@@ -1,10 +1,10 @@
 import type { Collection } from "mongodb";
 import { ObjectId } from "mongodb";
-import type { ChatMessage } from "../chat/chat.model";
+import type { ChatMessage } from "../../chat-flow/api/shared/chat.model";
 import type { Conversation, ConversationStageProgress, DreamJobFlow } from "./conversation.model";
 import type { ConversationListRow } from "./conversation.types";
 import { conversationFilter } from "./conversation.utils";
-import type { ConversationJobContext } from "../../job-in-conversation.types";
+import type { ConversationJobContext } from "./job-in-conversation.types";
 
 export class ConversationRepository {
     constructor(private readonly conversationsCollection: Collection<Conversation>) {}

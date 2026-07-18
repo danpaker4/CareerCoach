@@ -1,7 +1,36 @@
 import type { ObjectId } from "mongodb";
-import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
+import type { AttachedJobSnapshot, ChatMessage, UserAchievement } from "../../chat-flow/api/shared/chat-message.types";
+import type { ConversationJobContext } from "./job-in-conversation.types";
 
-export type { UserAchievement };
+export type ConversationStage = {
+    id: string;
+    objective: string;
+};
+
+export type DreamJobFlow = {
+    proposedTitle?: string;
+    awaitingConfirmation: boolean;
+};
+
+export type ConversationStageProgress = {
+    currentStageIndex: number;
+    currentStageId?: string;
+    completedStageIds?: string[];
+    awaitingConfirmation: boolean;
+    stageNotes: Record<string, string[]>;
+    surfacedAchievementIds?: string[];
+};
+
+export type Conversation = {
+    _id?: ObjectId;
+    userId: string;
+    messages: ChatMessage[];
+    jobContext?: ConversationJobContext;
+    dreamJobFlow?: DreamJobFlow;
+    stageProgress: ConversationStageProgress;
+    createdAt: Date;
+    updatedAt: Date;
+};
 
 export type EnsureConversationExistsResult = {
     conversationId: string;

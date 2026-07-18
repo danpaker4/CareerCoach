@@ -28,7 +28,9 @@ const EnvSchema = z.object({
 });
 
 const resolveDefaultServiceName = (): string =>
-    process.argv.some((item) => item.includes("chat-worker")) ? CHAT_WORKER_SERVICE_NAME : CHAT_API_SERVICE_NAME;
+    process.argv.some((item) => item.includes("chat.worker") || item.includes("chat-worker"))
+        ? CHAT_WORKER_SERVICE_NAME
+        : CHAT_API_SERVICE_NAME;
 
 const env = EnvSchema.parse(process.env);
 

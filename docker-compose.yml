@@ -71,6 +71,21 @@ services:
       - ./otel-collector-config.yml:/etc/otelcol/config.yml:ro
     restart: unless-stopped
 
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm-careercoach
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: sk-litellm-local-dev
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   rabbitmq_data:
   minio_data:

@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
-import type { AttachedJobSnapshot, UserAchievement } from "../chat/chat.model";
-import type { JobSearchResultItem } from "../chat/chat.types";
+import type { AttachedJobSnapshot, UserAchievement } from "../../chat-flow/api/shared/chat.model";
+import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
 import type { Conversation, ConversationStageProgress } from "./conversation.model";
 import { CONVERSATION_STAGES } from "./conversation.stage.consts";
 import type { ConversationResponse } from "./conversation.types";

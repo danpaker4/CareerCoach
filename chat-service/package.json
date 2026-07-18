@@ -4,10 +4,10 @@
     "main": "index.js",
     "scripts": {
         "dev": "tsx watch src/index.ts",
-        "dev:worker": "tsx watch src/chat-worker.ts",
+        "dev:worker": "tsx watch src/chat-flow/api/worker/chat.worker.ts",
         "build": "tsc",
         "start": "node dist/index.js",
-        "start:worker": "node dist/chat-worker.js",
+        "start:worker": "node dist/chat-flow/api/worker/chat.worker.js",
         "test": "tsx --test src/**/_tests/**/*.test.ts",
         "test:run": "tsx --test src/**/_tests/**/*.test.ts"
     },
@@ -21,9 +21,7 @@
     "dependencies": {
         "@fastify/cors": "^11.2.0",
         "@fastify/websocket": "^11.2.0",
-        "@google/generative-ai": "^0.24.1",
         "@opentelemetry/api": "^1.9.1",
-        "@types/amqplib": "^0.10.8",
         "amqplib": "^2.0.1",
         "dotenv": "^17.2.3",
         "fastify": "^5.6.2",
@@ -34,6 +32,7 @@
         "zod": "^4.0.0"
     },
     "devDependencies": {
+        "@types/amqplib": "^0.10.8",
         "@types/node": "^25.0.10",
         "tsx": "^4.21.0",
         "typescript": "^5.8.3"

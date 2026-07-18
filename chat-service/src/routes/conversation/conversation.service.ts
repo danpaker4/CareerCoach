@@ -3,7 +3,7 @@ import type {
     ConversationSummaryResponse,
     EnsureConversationExistsResult,
 } from "./conversation.types";
-import { ChatExternalService } from "../external-chat/chat.external.service";
+import { ChatExternalService } from "../external-chat-tools/chat.external.service";
 import { ConversationRepository } from "./conversation.repository";
 import {
     ConversationNotFoundError,
@@ -14,16 +14,15 @@ import {
     parseConversationObjectIdOrThrow,
     tryParseConversationObjectId,
 } from "./conversation.utils";
-import { ConversationStageService } from "./conversation.stage.service";
+import { getCurrentStage, getInitialAssistantMessage } from "./conversation.stage.utils";
 import type { Conversation, ConversationStageProgress, DreamJobFlow } from "./conversation.model";
-import type { JobSearchResultItem } from "../chat/chat.types";
-import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "../../job-in-conversation.types";
+import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
+import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "./job-in-conversation.types";
 
 export class ChatConversationService {
     constructor(
         private readonly repository: ConversationRepository,
-        private readonly chatExternalService: ChatExternalService,
-        private readonly stageService: ConversationStageService
+        private readonly chatExternalService: ChatExternalService
     ) {}
 
     listConversationSummaries = async (userId: string): Promise<ConversationSummaryResponse[]> => {
@@ -36,10 +35,10 @@ export class ChatConversationService {
     };
 
     createAdditionalConversation = async (userId: string): Promise<ConversationResponse> => {
-        const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
+        const firstAssistantMessage = getInitialAssistantMessage();
         const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
         const achievements = await this.chatExternalService.readUserAchievements(userId);
-        const currentStage = this.stageService.getCurrentStage(created);
+        const currentStage = getCurrentStage(created);
         return toConversationResponse(created, achievements, currentStage?.id ?? null);
     };
 
@@ -64,7 +63,7 @@ export class ChatConversationService {
             return { conversationId: existingConversation._id.toHexString() };
         }
 
-        const firstAssistantMessage = this.stageService.getInitialAssistantMessage();
+        const firstAssistantMessage = getInitialAssistantMessage();
         const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
         return { conversationId: created._id!.toHexString() };
     };
@@ -82,7 +81,7 @@ export class ChatConversationService {
         const conversation = await this.getConversationOrThrow(userId, conversationId);
         const achievements = await this.chatExternalService.readUserAchievements(userId);
         const lastUserMessage = [...conversation.messages].reverse().find((message) => message.role === "user")?.content;
-        const currentStage = this.stageService.getCurrentStage(conversation, lastUserMessage);
+        const currentStage = getCurrentStage(conversation, lastUserMessage);
         return toConversationResponse(conversation, achievements, currentStage?.id ?? null);
     };
 
