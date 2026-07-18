@@ -1,14 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ServerConfig } from "../../server.types";
 import type { MongoClient } from "../../mongo/mongo";
-import { ChatAuthService } from "../chat/chat-auth.service";
-import { createValidateAuthenticatedChatParams } from "../chat/chat-auth.middleware";
-import { ChatExternalService } from "../external-chat/chat.external.service";
-import { validateUserIdAndConversationIdParams, validateUserIdParam } from "../chat/chat.middleware";
+import { ChatAuthService } from "../../chat-flow/api/middlewares/authentication/chat-auth.service";
+import { createValidateAuthenticatedChatParams } from "../../chat-flow/api/middlewares/authentication/chat-auth.middleware";
+import { ChatExternalService } from "../external-chat-tools/chat.external.service";
+import { validateUserIdAndConversationIdParams, validateUserIdParam } from "../../chat-flow/api/middlewares/chat-validation.middleware";
 import { ConversationController } from "./conversation.controller";
 import { ConversationRepository } from "./conversation.repository";
 import { ChatConversationService } from "./conversation.service";
-import { ConversationStageService } from "./conversation.stage.service";
 
 export const conversationRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
     const repository = new ConversationRepository(dbClient.conversations);
@@ -19,8 +18,7 @@ export const conversationRouter = (dbClient: MongoClient, chatConfig: ServerConf
     );
     const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
     const validateAuthenticatedUser = createValidateAuthenticatedChatParams(authService, chatConfig.internalServiceApiKey);
-    const stageService = new ConversationStageService();
-    const conversationService = new ChatConversationService(repository, externalService, stageService);
+    const conversationService = new ChatConversationService(repository, externalService);
     const controller = new ConversationController(conversationService);
 
     app.get(

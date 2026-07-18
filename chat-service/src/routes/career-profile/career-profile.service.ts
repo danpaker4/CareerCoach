@@ -5,7 +5,7 @@ import type { CareerProfileSignalUpdate, CareerSignal, CoachProfileAccountLink, 
 import { CareerProfileRepository } from "./career-profile.repository";
 import { EXPLICIT_USER_SIGNAL_CONFIDENCE } from "./career-profile.consts";
 import type { ProfileInput } from "../conversation/conversation.types";
-import { EmbeddingPort } from "../../ai/ports/embedding.types";
+import { EmbeddingPort } from "../../ai/embedding/embedding.types";
 
 const buildDefaultProfile = (userId: string): UserCareerProfile => {
     const now = new Date();

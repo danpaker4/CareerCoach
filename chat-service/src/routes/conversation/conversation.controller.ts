@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
-import { readOptionalConversationIdQuery } from "../chat/chat.utils";
+import { readOptionalConversationIdQuery } from "../../chat-flow/api/shared/chat.utils";
 import { ConversationNotFoundError, InvalidConversationIdError } from "./conversation.utils";
 import type { ChatConversationService } from "./conversation.service";
 
