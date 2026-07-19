@@ -12,7 +12,7 @@ import {
 } from "../middlewares/authentication/chat-auth.middleware";
 import { validateChatMessageBody } from "../middlewares/chat-validation.middleware";
 import { ChatRequestRealtimeService } from "../async-jobs/chat-request-realtime.service";
-import { ChatRequestRepository } from "../async-jobs/chat-request.repository";
+import { ChatRequestDal } from "../async-jobs/chat-request.dal";
 import { ChatRequestService } from "../async-jobs/chat-request.service";
 
 export const chatRouter = (
@@ -24,8 +24,8 @@ export const chatRouter = (
 ) => async (app: FastifyInstance) => {
     const { conversationService } = createChatServiceDependencies(dbClient, chatConfig);
     const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
-    const requestRepository = new ChatRequestRepository(dbClient.chatRequests, dbClient.chatSocketTickets);
-    const requestService = new ChatRequestService(requestRepository, conversationService, rateLimitService, queueClient);
+    const requestDal = new ChatRequestDal(dbClient.chatRequests, dbClient.chatSocketTickets);
+    const requestService = new ChatRequestService(requestDal, conversationService, rateLimitService, queueClient);
     const handler = new ChatRequestHandler(requestService);
 
     app.post(

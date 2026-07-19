@@ -1,6 +1,6 @@
 import type { SendMessage } from "../../chat-flow.types";
 import { withSpan } from "../../../observability/tracing";
-import { ChatRequestRepository } from "../../api/async-jobs/chat-request.repository";
+import { ChatRequestDal } from "../../api/async-jobs/chat-request.dal";
 import { readErrorMessage } from "../../api/async-jobs/chat-request.utils";
 import { ChatRateLimitService } from "../rate-limit/chat-rate-limit.service";
 import { ChatQueueClient } from "./chat-queue.client";
@@ -20,7 +20,7 @@ export class ChatQueueWorker {
 
     constructor(
         private readonly queueClient: ChatQueueClient,
-        private readonly requestRepository: ChatRequestRepository,
+        private readonly requestDal: ChatRequestDal,
         private readonly rateLimitService: ChatRateLimitService,
         private readonly sendMessage: SendMessage
     ) {}
@@ -84,14 +84,14 @@ export class ChatQueueWorker {
         });
 
     private processJob = async (job: ChatQueueJob): Promise<void> => {
-        const existingRequest = await this.requestRepository.findByRequestId(job.requestId);
+        const existingRequest = await this.requestDal.findByRequestId(job.requestId);
         if (!existingRequest || existingRequest.status === "completed") {
             return;
         }
 
         const activeRequest = await this.acquireActiveRequestWithRetry(job.userId);
         if (!activeRequest) {
-            const failedRequest = await this.requestRepository.markFailed(
+            const failedRequest = await this.requestDal.markFailed(
                 job.requestId,
                 "A chat response is already being generated for this user."
             );
@@ -107,7 +107,7 @@ export class ChatQueueWorker {
         }
 
         try {
-            await this.requestRepository.markStarted(job.requestId);
+            await this.requestDal.markStarted(job.requestId);
             await this.publishEvent({
                 type: "started",
                 requestId: job.requestId,
@@ -116,7 +116,7 @@ export class ChatQueueWorker {
                 status: "started",
             });
             const response = await this.sendMessage(job.userId, job.message, job.userProfile, job.conversationId);
-            await this.requestRepository.markCompleted(job.requestId, response);
+            await this.requestDal.markCompleted(job.requestId, response);
             await this.publishEvent({
                 type: "completed",
                 requestId: job.requestId,
@@ -127,7 +127,7 @@ export class ChatQueueWorker {
             });
         } catch (error) {
             const errorMessage = readErrorMessage(error);
-            await this.requestRepository.markFailed(job.requestId, errorMessage);
+            await this.requestDal.markFailed(job.requestId, errorMessage);
             await this.publishEvent({
                 type: "failed",
                 requestId: job.requestId,

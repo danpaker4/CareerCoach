@@ -4,9 +4,9 @@ import { createConfigFromEnv } from "../../../config";
 import { MongoClient } from "../../../mongo/mongo";
 import { ChatQueueClient } from "../../stage-0-gateway/queue/chat-queue.client";
 import { ChatQueueWorker } from "../../stage-0-gateway/queue/chat-queue.worker";
-import { ChatRateLimitRepository } from "../../stage-0-gateway/rate-limit/chat-rate-limit.repository";
+import { ChatRateLimitDal } from "../../stage-0-gateway/rate-limit/chat-rate-limit.dal";
 import { ChatRateLimitService } from "../../stage-0-gateway/rate-limit/chat-rate-limit.service";
-import { ChatRequestRepository } from "../async-jobs/chat-request.repository";
+import { ChatRequestDal } from "../async-jobs/chat-request.dal";
 import { createChatServiceDependencies } from "../factory/chat-service.factory";
 
 dotenv.config();
@@ -17,17 +17,17 @@ const queueClient = new ChatQueueClient(config.queueConfig);
 
 const startWorker = async (): Promise<void> => {
     await dbClient.start();
-    const rateLimitRepository = new ChatRateLimitRepository(
+    const rateLimitDal = new ChatRateLimitDal(
         dbClient.chatRateLimitConfig,
         dbClient.chatRateLimitConfigHistory,
         dbClient.chatRateLimitCounters,
         dbClient.chatActiveRequests,
         dbClient.llmTokenUsage
     );
-    const rateLimitService = new ChatRateLimitService(rateLimitRepository);
-    const requestRepository = new ChatRequestRepository(dbClient.chatRequests, dbClient.chatSocketTickets);
+    const rateLimitService = new ChatRateLimitService(rateLimitDal);
+    const requestDal = new ChatRequestDal(dbClient.chatRequests, dbClient.chatSocketTickets);
     const { chatFlow } = createChatServiceDependencies(dbClient, config.chatConfig);
-    const worker = new ChatQueueWorker(queueClient, requestRepository, rateLimitService, chatFlow.sendMessage);
+    const worker = new ChatQueueWorker(queueClient, requestDal, rateLimitService, chatFlow.sendMessage);
 
     await worker.start();
     console.log("Chat queue worker started");

@@ -1,10 +1,10 @@
 import type {
     ConversationResponse,
     ConversationSummaryResponse,
-    EnsureConversationExistsResult,
+    ResolvedConversation,
 } from "./conversation.types";
 import { ChatExternalService } from "../external-chat-tools/chat.external.service";
-import { ConversationRepository } from "./conversation.repository";
+import { ConversationDal } from "./conversation.dal";
 import {
     ConversationNotFoundError,
     defaultStageProgress,
@@ -21,12 +21,12 @@ import type { ConversationJobContext, JobRecommendationContextState, SanitizedJo
 
 export class ChatConversationService {
     constructor(
-        private readonly repository: ConversationRepository,
+        private readonly dal: ConversationDal,
         private readonly chatExternalService: ChatExternalService
     ) {}
 
     listConversationSummaries = async (userId: string): Promise<ConversationSummaryResponse[]> => {
-        const rows = await this.repository.listSummariesByUserId(userId);
+        const rows = await this.dal.listSummariesByUserId(userId);
         return rows.map((row) => ({
             conversationId: row._id.toHexString(),
             updatedAt: row.updatedAt.toISOString(),
@@ -36,40 +36,57 @@ export class ChatConversationService {
 
     createAdditionalConversation = async (userId: string): Promise<ConversationResponse> => {
         const firstAssistantMessage = getInitialAssistantMessage();
-        const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
+        const created = await this.dal.createConversation(userId, firstAssistantMessage, defaultStageProgress());
         const achievements = await this.chatExternalService.readUserAchievements(userId);
         const currentStage = getCurrentStage(created);
         return toConversationResponse(created, achievements, currentStage?.id ?? null);
     };
 
-    ensureConversationExists = async (
+    getConversation = async (
         userId: string,
         requestedConversationId: string | undefined
-    ): Promise<EnsureConversationExistsResult> => {
+    ): Promise<ResolvedConversation> => {
         if (requestedConversationId) {
             const objectId = tryParseConversationObjectId(requestedConversationId);
             if (!objectId) {
                 throw new InvalidConversationIdError();
             }
-            const existingConversation = await this.repository.findByIdAndUserId(objectId, userId);
+            const existingConversation = await this.dal.findByIdAndUserId(objectId, userId);
             if (!existingConversation) {
                 throw new ConversationNotFoundError();
             }
-            return { conversationId: requestedConversationId };
+            return {
+                conversationId: requestedConversationId,
+                conversation: existingConversation,
+            };
         }
 
-        const existingConversation = await this.repository.findMostRecentlyUpdatedByUserId(userId);
+        const existingConversation = await this.dal.findMostRecentlyUpdatedByUserId(userId);
         if (existingConversation?._id) {
-            return { conversationId: existingConversation._id.toHexString() };
+            return {
+                conversationId: existingConversation._id.toHexString(),
+                conversation: existingConversation,
+            };
         }
 
         const firstAssistantMessage = getInitialAssistantMessage();
-        const created = await this.repository.createConversation(userId, firstAssistantMessage, defaultStageProgress());
-        return { conversationId: created._id!.toHexString() };
+        const created = await this.dal.createConversation(userId, firstAssistantMessage, defaultStageProgress());
+        return {
+            conversationId: created._id!.toHexString(),
+            conversation: created,
+        };
     };
 
-    getConversationOrThrow = async (userId: string, conversationId: string): Promise<Conversation> => {
-        const conversation = await this.repository.findByIdAndUserId(parseConversationObjectIdOrThrow(conversationId), userId);
+    getConversationId = async (
+        userId: string,
+        requestedConversationId: string | undefined
+    ): Promise<string> => {
+        const { conversationId } = await this.getConversation(userId, requestedConversationId);
+        return conversationId;
+    };
+
+    getConversationByConversationIdAndUserId = async (userId: string, conversationId: string): Promise<Conversation> => {
+        const conversation = await this.dal.findByIdAndUserId(parseConversationObjectIdOrThrow(conversationId), userId);
         if (!conversation) {
             throw new ConversationNotFoundError();
         }
@@ -77,8 +94,7 @@ export class ChatConversationService {
     };
 
     getConversationResponse = async (userId: string, requestedConversationId?: string): Promise<ConversationResponse> => {
-        const { conversationId } = await this.ensureConversationExists(userId, requestedConversationId);
-        const conversation = await this.getConversationOrThrow(userId, conversationId);
+        const { conversation } = await this.getConversation(userId, requestedConversationId);
         const achievements = await this.chatExternalService.readUserAchievements(userId);
         const lastUserMessage = [...conversation.messages].reverse().find((message) => message.role === "user")?.content;
         const currentStage = getCurrentStage(conversation, lastUserMessage);
@@ -90,15 +106,29 @@ export class ChatConversationService {
         if (!objectId) {
             throw new InvalidConversationIdError();
         }
-        await this.repository.deleteByIdAndUserId(objectId, userId);
+        await this.dal.deleteByIdAndUserId(objectId, userId);
     };
 
-    appendUserMessage = async (userId: string, conversationId: string, content: string): Promise<void> => {
-        await this.repository.appendMessage(userId, parseConversationObjectIdOrThrow(conversationId), {
-            role: "user",
+    saveUserMessage = async (
+        userId: string,
+        conversation: Conversation,
+        content: string
+    ): Promise<Conversation> => {
+        const conversationId = conversation._id;
+        if (!conversationId) {
+            throw new ConversationNotFoundError();
+        }
+        const message = {
+            role: "user" as const,
             content,
             timestamp: new Date(),
-        });
+        };
+        await this.dal.appendMessage(userId, conversationId, message);
+        return {
+            ...conversation,
+            messages: [...conversation.messages, message],
+            updatedAt: message.timestamp,
+        };
     };
 
     appendAssistantMessage = async (
@@ -108,7 +138,7 @@ export class ChatConversationService {
         attachedJobs?: readonly JobSearchResultItem[]
     ): Promise<void> => {
         const snapshots = attachedJobs && attachedJobs.length > 0 ? toAttachedJobSnapshots(attachedJobs) : undefined;
-        await this.repository.appendMessage(userId, parseConversationObjectIdOrThrow(conversationId), {
+        await this.dal.appendMessage(userId, parseConversationObjectIdOrThrow(conversationId), {
             role: "assistant",
             content,
             timestamp: new Date(),
@@ -117,15 +147,15 @@ export class ChatConversationService {
     };
 
     updateStageProgress = async (userId: string, conversationId: string, stageProgress: ConversationStageProgress): Promise<void> => {
-        await this.repository.updateStageProgress(userId, parseConversationObjectIdOrThrow(conversationId), stageProgress);
+        await this.dal.updateStageProgress(userId, parseConversationObjectIdOrThrow(conversationId), stageProgress);
     };
 
     saveJobContext = async (userId: string, conversationId: string, jobContext: ConversationJobContext): Promise<void> => {
-        await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
+        await this.dal.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
     };
 
     updateDreamJobFlow = async (userId: string, conversationId: string, dreamJobFlow: DreamJobFlow | undefined): Promise<void> => {
-        await this.repository.updateDreamJobFlow(userId, parseConversationObjectIdOrThrow(conversationId), dreamJobFlow);
+        await this.dal.updateDreamJobFlow(userId, parseConversationObjectIdOrThrow(conversationId), dreamJobFlow);
     };
 
     setJobContextAfterSearch = async (
@@ -137,7 +167,7 @@ export class ChatConversationService {
         lastSearchIntent: string | null
     ): Promise<void> => {
         const now = new Date();
-        const conversation = await this.getConversationOrThrow(userId, conversationId);
+        const conversation = await this.getConversationByConversationIdAndUserId(userId, conversationId);
         const prevRec = conversation.jobContext?.jobRecommendationContext;
         const mergedRejected = [...new Set([...(prevRec?.rejectedJobIds ?? [])])];
         const mergedAccepted = [...new Set([...(prevRec?.acceptedJobIds ?? [])])];
@@ -178,11 +208,11 @@ export class ChatConversationService {
             updatedAt: now,
             jobRecommendationContext,
         };
-        await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
+        await this.dal.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), jobContext);
     };
 
     setSelectedJob = async (userId: string, conversationId: string, selectedJob: SanitizedJob): Promise<void> => {
-        const conversation = await this.getConversationOrThrow(userId, conversationId);
+        const conversation = await this.getConversationByConversationIdAndUserId(userId, conversationId);
         const existingJobContext = conversation.jobContext;
         if (!existingJobContext) {
             return;
@@ -204,6 +234,6 @@ export class ChatConversationService {
                   }
                 : {}),
         };
-        await this.repository.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), updatedContext);
+        await this.dal.updateJobContext(userId, parseConversationObjectIdOrThrow(conversationId), updatedContext);
     };
 }

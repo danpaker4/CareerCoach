@@ -5,7 +5,7 @@ import {
     CHAT_RATE_LIMIT_DAY_MS,
     CHAT_RATE_LIMIT_MINUTE_MS,
 } from "./chat-rate-limit.consts";
-import { ChatRateLimitRepository } from "./chat-rate-limit.repository";
+import { ChatRateLimitDal } from "./chat-rate-limit.dal";
 import type {
     ChatRateLimitBlockedDecision,
     ChatRateLimitConfigDocument,
@@ -78,7 +78,7 @@ export class ChatRateLimitValidationError extends Error {
 export class ChatRateLimitService {
     private cachedConfig: CachedRateLimitConfig | null = null;
 
-    constructor(private readonly repository: ChatRateLimitRepository) { }
+    constructor(private readonly dal: ChatRateLimitDal) { }
 
     private readConfig = async (forceRefresh = false): Promise<ChatRateLimitConfigDocument> => {
         const nowMs = Date.now();
@@ -86,7 +86,7 @@ export class ChatRateLimitService {
             return this.cachedConfig.config;
         }
 
-        const config = await this.repository.getConfig();
+        const config = await this.dal.getConfig();
         this.cachedConfig = {
             config,
             expiresAtMs: nowMs + CHAT_RATE_LIMIT_CONFIG_CACHE_MS,
@@ -101,7 +101,7 @@ export class ChatRateLimitService {
         }
 
         const windowEnd = endOfFixedWindow(windowStart, windowMs);
-        const count = await this.repository.incrementCounter({
+        const count = await this.dal.incrementCounter({
             rule,
             identity,
             windowStart,
@@ -117,7 +117,7 @@ export class ChatRateLimitService {
         const dayStart = startOfUtcDay(now);
         const dayEnd = endOfUtcDay(now);
         if (rules.dailyTokensPerUser.enabled) {
-            const userTokens = await this.repository.sumUserDailyTokens(userId, dayStart, dayEnd);
+            const userTokens = await this.dal.sumUserDailyTokens(userId, dayStart, dayEnd);
             if (userTokens >= rules.dailyTokensPerUser.limit) {
                 return createBlockedDecision(
                     "CHAT_TOKEN_BUDGET_EXCEEDED",
@@ -128,7 +128,7 @@ export class ChatRateLimitService {
         }
 
         if (rules.dailyTokensGlobal.enabled) {
-            const globalTokens = await this.repository.sumGlobalDailyTokens(dayStart, dayEnd);
+            const globalTokens = await this.dal.sumGlobalDailyTokens(dayStart, dayEnd);
             if (globalTokens >= rules.dailyTokensGlobal.limit) {
                 return createBlockedDecision(
                     "CHAT_TOKEN_BUDGET_EXCEEDED",
@@ -248,7 +248,7 @@ export class ChatRateLimitService {
                 throw error;
             }
         })();
-        const config = await this.repository.updateConfig(parsed.rules, updatedByAdmin);
+        const config = await this.dal.updateConfig(parsed.rules, updatedByAdmin);
         this.cachedConfig = {
             config,
             expiresAtMs: Date.now() + CHAT_RATE_LIMIT_CONFIG_CACHE_MS,
@@ -267,7 +267,7 @@ export class ChatRateLimitService {
         }
 
         const acquiredActiveRequest = rules.activeRequestsPerUser.enabled
-            ? await this.repository.acquireActiveRequest(params.userId, rules.activeRequestsPerUser.limit)
+            ? await this.dal.acquireActiveRequest(params.userId, rules.activeRequestsPerUser.limit)
             : true;
         if (!acquiredActiveRequest) {
             return createBlockedDecision(
@@ -278,7 +278,7 @@ export class ChatRateLimitService {
 
         const release = rules.activeRequestsPerUser.enabled
             ? async (): Promise<void> => {
-                await this.repository.releaseActiveRequest(params.userId);
+                await this.dal.releaseActiveRequest(params.userId);
             }
             : noopRelease;
 
@@ -301,7 +301,7 @@ export class ChatRateLimitService {
         }
 
         const activeRequestCount = rules.activeRequestsPerUser.enabled
-            ? await this.repository.countActiveRequests(params.userId)
+            ? await this.dal.countActiveRequests(params.userId)
             : 0;
         if (rules.activeRequestsPerUser.enabled && activeRequestCount >= rules.activeRequestsPerUser.limit) {
             return createBlockedDecision(
@@ -329,7 +329,7 @@ export class ChatRateLimitService {
             return { status: "allowed", release: noopRelease };
         }
 
-        const acquiredActiveRequest = await this.repository.acquireActiveRequest(userId, rules.activeRequestsPerUser.limit);
+        const acquiredActiveRequest = await this.dal.acquireActiveRequest(userId, rules.activeRequestsPerUser.limit);
         if (!acquiredActiveRequest) {
             return createBlockedDecision(
                 "CHAT_REQUEST_IN_PROGRESS",
@@ -340,7 +340,7 @@ export class ChatRateLimitService {
         return {
             status: "allowed",
             release: async (): Promise<void> => {
-                await this.repository.releaseActiveRequest(userId);
+                await this.dal.releaseActiveRequest(userId);
             },
         };
     };

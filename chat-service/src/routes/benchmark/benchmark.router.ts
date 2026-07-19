@@ -4,12 +4,12 @@ import type { MongoClient } from "../../mongo/mongo";
 import { AdminAuthService } from "../admin/admin-auth.service";
 import { BenchmarkController } from "./benchmark.controller";
 import { BENCHMARK_ROUTE_PREFIX } from "./benchmark.consts";
-import { BenchmarkRunRepository } from "./benchmark.repository";
+import { BenchmarkRunDal } from "./benchmark.dal";
 import { BenchmarkService } from "./benchmark.service";
 
 export const benchmarkRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
-    const repository = new BenchmarkRunRepository(dbClient.benchmarkRuns);
-    const service = new BenchmarkService(dbClient, chatConfig, repository);
+    const dal = new BenchmarkRunDal(dbClient.benchmarkRuns);
+    const service = new BenchmarkService(dbClient, chatConfig, dal);
     const authService = new AdminAuthService(chatConfig.usersServiceBaseUrl);
     const controller = new BenchmarkController(service, authService);
 

@@ -5,7 +5,7 @@ import type { ChatRequestDocument, ChatSocketTicketDocument } from "./chat-reque
 
 const QUEUED_CHAT_REQUEST_STATUS = "queued";
 
-export class ChatRequestRepository {
+export class ChatRequestDal {
     constructor(
         private readonly requestsCollection: Collection<ChatRequestDocument>,
         private readonly socketTicketsCollection: Collection<ChatSocketTicketDocument>

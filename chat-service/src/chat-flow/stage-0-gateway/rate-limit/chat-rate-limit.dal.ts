@@ -27,7 +27,7 @@ const buildActiveRequestKey = (userId: string): string => `user:${userId}`;
 const readTokenTotal = (documents: readonly { readonly totalTokens: number }[]): number =>
     documents[0]?.totalTokens ?? 0;
 
-export class ChatRateLimitRepository {
+export class ChatRateLimitDal {
     constructor(
         private readonly configCollection: Collection<ChatRateLimitConfigDocument>,
         private readonly configHistoryCollection: Collection<ChatRateLimitConfigHistoryDocument>,

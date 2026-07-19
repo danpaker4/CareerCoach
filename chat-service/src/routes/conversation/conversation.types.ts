@@ -36,6 +36,11 @@ export type EnsureConversationExistsResult = {
     conversationId: string;
 };
 
+export type ResolvedConversation = {
+    readonly conversationId: string;
+    readonly conversation: Conversation;
+};
+
 export type ConversationResponse = {
     conversationId: string;
     userId: string;

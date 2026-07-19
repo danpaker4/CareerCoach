@@ -7,7 +7,7 @@ import { chatRouter } from "./chat-flow/api/routers/chat.router";
 import { conversationRouter } from "./routes/conversation/conversation.router";
 import { benchmarkRouter } from "./routes/benchmark/benchmark.router";
 import { internalRouter } from "./routes/internal-api/internal.router";
-import { ChatRateLimitRepository } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.repository";
+import { ChatRateLimitDal } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.dal";
 import { ChatRateLimitService } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.service";
 import { chatRateLimitRouter } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.router";
 import type { ServerConfig } from "./server.types";
@@ -48,14 +48,14 @@ export class Server {
             });
             await this.app.register(websocket);
 
-            const rateLimitRepository = new ChatRateLimitRepository(
+            const rateLimitDal = new ChatRateLimitDal(
                 this.DBClient.chatRateLimitConfig,
                 this.DBClient.chatRateLimitConfigHistory,
                 this.DBClient.chatRateLimitCounters,
                 this.DBClient.chatActiveRequests,
                 this.DBClient.llmTokenUsage
             );
-            const rateLimitService = new ChatRateLimitService(rateLimitRepository);
+            const rateLimitService = new ChatRateLimitService(rateLimitDal);
             const realtimeService = new ChatRequestRealtimeService();
             await queueClient.consumeEvents(async (event) => {
                 realtimeService.broadcast(event);

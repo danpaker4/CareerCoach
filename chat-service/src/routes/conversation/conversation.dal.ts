@@ -6,7 +6,7 @@ import type { ConversationListRow } from "./conversation.types";
 import { conversationFilter } from "./conversation.utils";
 import type { ConversationJobContext } from "./job-in-conversation.types";
 
-export class ConversationRepository {
+export class ConversationDal {
     constructor(private readonly conversationsCollection: Collection<Conversation>) {}
 
     findByIdAndUserId = async (conversationId: ObjectId, userId: string): Promise<Conversation | null> =>

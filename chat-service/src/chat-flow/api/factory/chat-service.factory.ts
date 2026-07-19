@@ -1,16 +1,16 @@
 import type { ServerConfig } from "../../../server.types";
 import { createEmbeddingPort } from "../../../ai/embedding/embedding.utils";
-import { LlmTokenUsageRepository } from "../../../ai/token-usage/repository/token-usage.repository";
+import { LlmTokenUsageDal } from "../../../ai/token-usage/dal/token-usage.dal";
 import { createTextCompletionPort } from "../../../litellm/text-completion/text-completion.utils";
 import type { MongoClient } from "../../../mongo/mongo";
 import { createChatFlow } from "../../chat-flow.factory";
 import { createDreamJobRoadmapHttpGenerator } from "../../stage-2-shortcuts/dream-job/chat.dream-job-roadmap-http.service";
 import { createDreamJobRoadmapCreator } from "../../stage-2-shortcuts/dream-job/chat.dream-job-roadmap.service";
 import { createSuggestDirections } from "../../stage-6-present-jobs/knowledge/career-knowledge.service";
-import { CareerProfileRepository } from "../../../routes/career-profile/career-profile.repository";
+import { CareerProfileDal } from "../../../routes/career-profile/dal/career-profile.dal";
 import { CareerProfileService } from "../../../routes/career-profile/career-profile.service";
 import { ChatConversationService } from "../../../routes/conversation/conversation.service";
-import { ConversationRepository } from "../../../routes/conversation/conversation.repository";
+import { ConversationDal } from "../../../routes/conversation/conversation.dal";
 import { ChatExternalService } from "../../../routes/external-chat-tools/chat.external.service";
 import type { ChatServiceDependencies } from "./chat-service.types";
 
@@ -18,18 +18,18 @@ export const createChatServiceDependencies = (
     dbClient: MongoClient,
     chatConfig: ServerConfig["chatConfig"]
 ): ChatServiceDependencies => {
-    const repository = new ConversationRepository(dbClient.conversations);
-    const tokenUsageRepository = new LlmTokenUsageRepository(dbClient.llmTokenUsage);
+    const dal = new ConversationDal(dbClient.conversations);
+    const tokenUsageDal = new LlmTokenUsageDal(dbClient.llmTokenUsage);
     const externalService = new ChatExternalService(
         chatConfig.usersServiceBaseUrl,
         chatConfig.jobServiceBaseUrl,
         chatConfig.internalServiceApiKey,
     );
-    const conversationService = new ChatConversationService(repository, externalService);
-    const textCompletion = createTextCompletionPort(chatConfig.llm, tokenUsageRepository);
+    const conversationService = new ChatConversationService(dal, externalService);
+    const textCompletion = createTextCompletionPort(chatConfig.llm, tokenUsageDal);
     const embedding = createEmbeddingPort(chatConfig.customEmbeddingUrl);
-    const profileRepository = new CareerProfileRepository(dbClient.careerProfiles);
-    const profileService = new CareerProfileService(profileRepository, embedding, {
+    const profileDal = new CareerProfileDal(dbClient.careerProfiles);
+    const profileService = new CareerProfileService(profileDal, embedding, textCompletion, {
         notifyProfileMaterialized: (userId) => externalService.notifyCoachProfileMaterialized(userId),
     });
     const roadmapGenerator = createDreamJobRoadmapHttpGenerator(chatConfig.roadmapServiceBaseUrl);

@@ -6,6 +6,7 @@
         "dev": "tsx watch src/index.ts",
         "dev:worker": "tsx watch src/chat-flow/api/worker/chat.worker.ts",
         "build": "tsc",
+        "build:worker": "tsc",
         "start": "node dist/index.js",
         "start:worker": "node dist/chat-flow/api/worker/chat.worker.js",
         "test": "tsx --test src/**/_tests/**/*.test.ts",

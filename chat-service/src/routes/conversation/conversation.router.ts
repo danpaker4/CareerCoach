@@ -6,11 +6,11 @@ import { createValidateAuthenticatedChatParams } from "../../chat-flow/api/middl
 import { ChatExternalService } from "../external-chat-tools/chat.external.service";
 import { validateUserIdAndConversationIdParams, validateUserIdParam } from "../../chat-flow/api/middlewares/chat-validation.middleware";
 import { ConversationController } from "./conversation.controller";
-import { ConversationRepository } from "./conversation.repository";
+import { ConversationDal } from "./conversation.dal";
 import { ChatConversationService } from "./conversation.service";
 
 export const conversationRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) => async (app: FastifyInstance) => {
-    const repository = new ConversationRepository(dbClient.conversations);
+    const dal = new ConversationDal(dbClient.conversations);
     const externalService = new ChatExternalService(
         chatConfig.usersServiceBaseUrl,
         chatConfig.jobServiceBaseUrl,
@@ -18,7 +18,7 @@ export const conversationRouter = (dbClient: MongoClient, chatConfig: ServerConf
     );
     const authService = new ChatAuthService(chatConfig.usersServiceBaseUrl);
     const validateAuthenticatedUser = createValidateAuthenticatedChatParams(authService, chatConfig.internalServiceApiKey);
-    const conversationService = new ChatConversationService(repository, externalService);
+    const conversationService = new ChatConversationService(dal, externalService);
     const controller = new ConversationController(conversationService);
 
     app.get(

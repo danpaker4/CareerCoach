@@ -6,7 +6,7 @@ import type { ChatQueueJob } from "../../stage-0-gateway/queue/chat-queue.types"
 import type { ChatRateLimitService } from "../../stage-0-gateway/rate-limit/chat-rate-limit.service";
 import { withSpan } from "../../../observability/tracing";
 import { CHAT_SOCKET_TICKET_TTL_MS } from "./chat-request.consts";
-import { ChatRequestRepository } from "./chat-request.repository";
+import { ChatRequestDal } from "./chat-request.dal";
 import type {
     ChatRequestResponse,
     ChatRequestSubmissionResult,
@@ -16,7 +16,7 @@ import { readErrorMessage, toChatRequestResponse, toChatSocketTicketResponse } f
 
 export class ChatRequestService {
     constructor(
-        private readonly repository: ChatRequestRepository,
+        private readonly dal: ChatRequestDal,
         private readonly conversationService: ChatConversationService,
         private readonly rateLimitService: ChatRateLimitService,
         private readonly queueClient: ChatQueueClient
@@ -24,8 +24,8 @@ export class ChatRequestService {
 
     submitMessage = async (body: ChatMessageRequestBody, ipAddress: string): Promise<ChatRequestSubmissionResult> => {
         const queueState = {
-            queuedRequestsForUser: await this.repository.countQueuedByUserId(body.userId),
-            queuedRequestsGlobal: await this.repository.countQueuedGlobal(),
+            queuedRequestsForUser: await this.dal.countQueuedByUserId(body.userId),
+            queuedRequestsGlobal: await this.dal.countQueuedGlobal(),
         };
         const rateLimitDecision = await this.rateLimitService.checkBeforeEnqueue({
             userId: body.userId,
@@ -37,9 +37,9 @@ export class ChatRequestService {
             return { status: "blocked", decision: rateLimitDecision };
         }
 
-        const { conversationId } = await this.conversationService.ensureConversationExists(body.userId, body.conversationId);
+        const conversationId = await this.conversationService.getConversationId(body.userId, body.conversationId);
         const requestId = randomUUID();
-        const request = await this.repository.createQueuedRequest({
+        const request = await this.dal.createQueuedRequest({
             requestId,
             userId: body.userId,
             conversationId,
@@ -71,7 +71,7 @@ export class ChatRequestService {
                 });
             });
         } catch (error) {
-            await this.repository.markFailed(requestId, readErrorMessage(error));
+            await this.dal.markFailed(requestId, readErrorMessage(error));
             throw error;
         }
 
@@ -86,12 +86,12 @@ export class ChatRequestService {
     };
 
     getRequestForUser = async (requestId: string, userId: string): Promise<ChatRequestResponse | null> => {
-        const request = await this.repository.findByRequestIdAndUserId(requestId, userId);
+        const request = await this.dal.findByRequestIdAndUserId(requestId, userId);
         return request ? toChatRequestResponse(request) : null;
     };
 
     createSocketTicket = async (userId: string): Promise<ChatSocketTicketResponse> => {
-        const ticket = await this.repository.createSocketTicket(
+        const ticket = await this.dal.createSocketTicket(
             randomUUID(),
             userId,
             new Date(Date.now() + CHAT_SOCKET_TICKET_TTL_MS)
@@ -100,7 +100,7 @@ export class ChatRequestService {
     };
 
     consumeSocketTicket = async (ticketId: string): Promise<string | null> => {
-        const ticket = await this.repository.consumeSocketTicket(ticketId);
+        const ticket = await this.dal.consumeSocketTicket(ticketId);
         return ticket?.userId ?? null;
     };
 }

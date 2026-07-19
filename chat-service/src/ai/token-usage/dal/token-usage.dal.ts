@@ -1,7 +1,7 @@
 import type { Collection } from "mongodb";
 import type { LlmTokenUsageDocument, LlmTokenUsageRecorder, LlmTokenUsageRecordInput } from "../token-usage.types";
 
-export class LlmTokenUsageRepository implements LlmTokenUsageRecorder {
+export class LlmTokenUsageDal implements LlmTokenUsageRecorder {
     constructor(private readonly collection: Collection<LlmTokenUsageDocument>) { }
 
     readonly record = async (input: LlmTokenUsageRecordInput): Promise<void> => {

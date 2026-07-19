@@ -1,7 +1,7 @@
 import { ObjectId, type Collection } from "mongodb";
 import type { BenchmarkRunDocument } from "./benchmark.types";
 
-export class BenchmarkRunRepository {
+export class BenchmarkRunDal {
     constructor(private readonly collection: Collection<BenchmarkRunDocument>) { }
 
     create = async (run: BenchmarkRunDocument): Promise<BenchmarkRunDocument> => {

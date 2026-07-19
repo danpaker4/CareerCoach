@@ -1,5 +1,5 @@
-import type { CareerProfileSignalBucketKey, CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "./career-profile.types";
-import { CAREER_PROFILE_SIGNAL_BUCKETS, SIGNAL_CONFIDENCE_WEAK_OVERRIDE_GAP } from "./career-profile.consts";
+import type { CareerProfileSignalBucketKey, CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "../career-profile.types";
+import { CAREER_PROFILE_SIGNAL_BUCKETS, SIGNAL_CONFIDENCE_WEAK_OVERRIDE_GAP } from "../career-profile.consts";
 
 const normalizeSignalValue = (value: string): string => value.trim().toLowerCase();
 

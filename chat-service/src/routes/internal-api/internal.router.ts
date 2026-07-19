@@ -2,12 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { ServerConfig } from "../../server.types";
 import type { MongoClient } from "../../mongo/mongo";
-import { CareerProfileRepository } from "../career-profile/career-profile.repository";
+import { CareerProfileDal } from "../career-profile/dal/career-profile.dal";
 import { createValidateInternalServiceKey } from "./internal-auth.middleware";
 
 export const internalRouter = (dbClient: MongoClient, chatConfig: ServerConfig["chatConfig"]) =>
     async (app: FastifyInstance) => {
-        const repository = new CareerProfileRepository(dbClient.careerProfiles);
+        const dal = new CareerProfileDal(dbClient.careerProfiles);
         const validateInternal = createValidateInternalServiceKey(chatConfig.internalServiceApiKey ?? "");
 
         app.get(
@@ -20,7 +20,7 @@ export const internalRouter = (dbClient: MongoClient, chatConfig: ServerConfig["
                     return;
                 }
 
-                const profile = await repository.findByUserId(userId);
+                const profile = await dal.findByUserId(userId);
                 if (!profile) {
                     reply.status(StatusCodes.NOT_FOUND).send({ error: "Career profile not found" });
                     return;

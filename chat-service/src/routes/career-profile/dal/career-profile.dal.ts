@@ -1,7 +1,7 @@
 import type { Collection } from "mongodb";
-import type { UserCareerProfileDocument } from "./career-profile.model";
+import type { UserCareerProfileDocument } from "../career-profile.model";
 
-export class CareerProfileRepository {
+export class CareerProfileDal {
     constructor(private readonly collection: Collection<UserCareerProfileDocument>) { }
 
     findByUserId = async (userId: string): Promise<UserCareerProfileDocument | null> =>

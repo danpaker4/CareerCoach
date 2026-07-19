@@ -3,16 +3,16 @@ import type { ServerConfig } from "../../server.types";
 import type { MongoClient } from "../../mongo/mongo";
 import type { ResolvedLlmConfig } from "../../litellm/config/litellm-config.types";
 import { createTextCompletionPort } from "../../litellm/text-completion/text-completion.utils";
-import { ConversationRepository } from "../conversation/conversation.repository";
+import { ConversationDal } from "../conversation/conversation.dal";
 import { ChatConversationService } from "../conversation/conversation.service";
 import { createChatFlow } from "../../chat-flow/chat-flow.factory";
 import type { ChatFlow } from "../../chat-flow/chat-flow.types";
-import { CareerProfileRepository } from "../career-profile/career-profile.repository";
+import { CareerProfileDal } from "../career-profile/dal/career-profile.dal";
 import { CareerProfileService } from "../career-profile/career-profile.service";
 import type { DreamJobRoadmapCreator } from "../../chat-flow/stage-2-shortcuts/dream-job/chat.dream-job-roadmap.types";
 import { BenchmarkFixtureExternalService } from "./benchmark-fixture.external-service";
 import { BenchmarkNoopEmbeddingPort, createBenchmarkNoopSuggestDirections } from "./benchmark-noop.services";
-import { BenchmarkRunRepository } from "./benchmark.repository";
+import { BenchmarkRunDal } from "./benchmark.dal";
 import {
     BENCHMARK_CASES,
     BENCHMARK_DEFAULT_MODEL,
@@ -120,7 +120,7 @@ export class BenchmarkService {
     constructor(
         private readonly dbClient: MongoClient,
         private readonly chatConfig: ServerConfig["chatConfig"],
-        private readonly repository: BenchmarkRunRepository
+        private readonly dal: BenchmarkRunDal
     ) { }
 
     getConfig = (): BenchmarkConfigResponse => ({
@@ -134,10 +134,10 @@ export class BenchmarkService {
     });
 
     listRuns = async (limit: number): Promise<BenchmarkRunSummary[]> =>
-        (await this.repository.list(limit)).map(toBenchmarkRunSummary);
+        (await this.dal.list(limit)).map(toBenchmarkRunSummary);
 
     getRun = async (runId: string): Promise<BenchmarkRunSummary | null> => {
-        const run = await this.repository.findById(runId);
+        const run = await this.dal.findById(runId);
         return run ? toBenchmarkRunSummary(run) : null;
     };
 
@@ -159,7 +159,7 @@ export class BenchmarkService {
             selectedCandidateIds: candidateIds,
             candidateResults: normalizedCandidateResults,
         };
-        return toBenchmarkRunSummary(await this.repository.create(run));
+        return toBenchmarkRunSummary(await this.dal.create(run));
     };
 
     private runCandidate = async (
@@ -250,12 +250,12 @@ export class BenchmarkService {
         tokenRecorder: BenchmarkTokenUsageRecorder,
         observer: BenchmarkLlmObserver
     ): ChatFlow => {
-        const conversationRepository = new ConversationRepository(this.dbClient.conversations);
+        const conversationDal = new ConversationDal(this.dbClient.conversations);
         const externalService = new BenchmarkFixtureExternalService(benchmarkCase);
-        const conversationService = new ChatConversationService(conversationRepository, externalService);
+        const conversationService = new ChatConversationService(conversationDal, externalService);
         const textCompletion = createTextCompletionPort(config, tokenRecorder);
-        const profileRepository = new CareerProfileRepository(this.dbClient.careerProfiles);
-        const profileService = new CareerProfileService(profileRepository, new BenchmarkNoopEmbeddingPort(), null);
+        const profileDal = new CareerProfileDal(this.dbClient.careerProfiles);
+        const profileService = new CareerProfileService(profileDal, new BenchmarkNoopEmbeddingPort(), textCompletion, null);
         const suggestDirections = createBenchmarkNoopSuggestDirections(this.dbClient.careerDirectionExamples);
         const dreamJobRoadmapCreator: DreamJobRoadmapCreator = {
             create: async () => ({ created: true }),
