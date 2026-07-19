@@ -4,7 +4,12 @@ import { inferAchievementsFromMessage } from "./inference/achievement-inference/
 import { inferSeniorityFromMessage } from "./inference/seniority-inference/seniority-inference.service";
 import { calculateConfidence } from "./confidence/confidence.service";
 import { detectConversationMode } from "./mode-detection/conversation-mode.service";
-import { shouldEnterDreamJobMode, conversationHasDreamJobContext } from "./mode-detection/conversation-mode.utils";
+import {
+    conversationHasDreamJobContext,
+    hasExplicitFastSearchIntent,
+    resolveConversationModeOverride,
+    shouldPreferGuidedOverDreamJob,
+} from "./mode-detection/conversation-mode.utils";
 import { buildUserAccountContext } from "./user-context/chat.user-account-context.utils";
 import { detectFollowUpIntent } from "../stage-2-shortcuts/follow-up/job-follow-up-answer.service";
 import type { ChatFlowDeps, PrepareSendMessageContextParams, SendMessagePreparedContext } from "../chat-flow.types";
@@ -24,11 +29,20 @@ export const runStage1PrepareContext = async (
         requestedConversationId
     );
     const baseCareerProfile = await deps.profileService.updateProfileFromInput(userId, profile);
-    const conversationAfterUserMessage = await deps.conversationService.saveUserMessage(
+    const conversationWithUserMessage = await deps.conversationService.saveUserMessage(
         userId,
         conversation,
         normalizedMessage
     );
+    const shouldClearDreamJobFlow =
+        (hasExplicitFastSearchIntent(normalizedMessage) || shouldPreferGuidedOverDreamJob(normalizedMessage)) &&
+        conversationWithUserMessage.dreamJobFlow !== undefined;
+    if (shouldClearDreamJobFlow) {
+        await deps.conversationService.updateDreamJobFlow(userId, conversationId, undefined);
+    }
+    const conversationAfterUserMessage = shouldClearDreamJobFlow
+        ? { ...conversationWithUserMessage, dreamJobFlow: undefined }
+        : conversationWithUserMessage;
 
     const serverUser = await deps.externalService.readUserPublicProfile(userId).catch(() => null);
     const userAccountContext = buildUserAccountContext({ serverUser, profile });
@@ -57,10 +71,14 @@ export const runStage1PrepareContext = async (
     );
     const serverDreamJob = typeof serverUser?.dreamJob === "string" ? serverUser.dreamJob : null;
     const existingDreamJob = conversationAfterUserMessage.dreamJobFlow?.proposedTitle ?? serverDreamJob;
-    const isDreamJobRule = shouldEnterDreamJobMode(normalizedMessage, existingDreamJob) ||
-        conversationAfterUserMessage.dreamJobFlow !== undefined ||
-        (conversationHasDreamJobContext(conversationAfterUserMessage.messages) && serverDreamJob === null);
-    const mode = isDreamJobRule ? "DREAMJOB" : detectionResult.mode;
+    const mode = resolveConversationModeOverride({
+        message: normalizedMessage,
+        existingDreamJob,
+        hasActiveDreamJobFlow: conversationAfterUserMessage.dreamJobFlow !== undefined,
+        stickyDreamJobFromHistory:
+            conversationHasDreamJobContext(conversationAfterUserMessage.messages) && serverDreamJob === null,
+        detectedMode: detectionResult.mode,
+    });
 
     const followUpIntent = detectFollowUpIntent(normalizedMessage);
     const jobContext = conversationAfterUserMessage.jobContext;

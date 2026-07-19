@@ -8,11 +8,13 @@ export const CONVERSATION_MODE_OPTIONS: readonly {
 }[] = [
     {
         mode: "GUIDED",
-        description: "Default career-coach guidance when the user is still sharing background, skills, preferences, or goals.",
+        description:
+            "Default coaching mode for background, skills, preferences, and timeline. Use when the user has not decided short-term vs long-term yet, or needs clarifying questions before searching or setting a dream role.",
     },
     {
         mode: "FAST_SEARCH",
-        description: "Immediate job-search mode when the user asks to find, show, or search jobs now, or gives a concrete role/domain to search.",
+        description:
+            "Immediate job-search mode only when the user explicitly asks to find, show, or search jobs right now.",
     },
     {
         mode: "DEEP_DISCOVERY",
@@ -20,7 +22,8 @@ export const CONVERSATION_MODE_OPTIONS: readonly {
     },
     {
         mode: "DREAMJOB",
-        description: "Long-term aspiration mode when the user describes, changes, or confirms their dream job, dream role, or future career identity.",
+        description:
+            "Long-term aspiration mode only when the user clearly wants a future dream job / dream role, not when timeline is still unclear.",
     },
 ] as const;
 
@@ -54,4 +57,37 @@ export const DREAMJOB_CHANGE_SIGNALS = [
     "new dream role",
     "update my dream job",
     "different dream job",
+] as const;
+
+/** Explicit search commands that should enter FAST_SEARCH. */
+export const EXPLICIT_FAST_SEARCH_SIGNALS = [
+    "find me a job",
+    "find a job now",
+    "find a job asap",
+    "looking for a job now",
+    "need a job now",
+    "need a job asap",
+    "want a job now",
+    "job right now",
+    "search for jobs",
+    "search jobs",
+    "show me jobs",
+    "show me roles",
+] as const;
+
+/** Phrases that mean the user has not decided short-term vs long-term yet. */
+export const TIMELINE_UNCERTAINTY_SIGNALS = [
+    "not sure",
+    "not sure if",
+    "dont know if",
+    "don't know if",
+    "do not know if",
+    "unsure",
+    "haven't decided",
+    "have not decided",
+    "still deciding",
+    "figuring out",
+    "either short or long",
+    "short or long term",
+    "short-term or long-term",
 ] as const;

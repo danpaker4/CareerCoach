@@ -59,11 +59,11 @@ Respond ONLY with valid JSON in this exact structure:
 Rules:
 - Set mode to exactly one value from the available modes JSON below.
 - FAST_SEARCH is an INSTANT bypass mode. Use FAST_SEARCH **ONLY** when the user's LATEST message explicitly commands a job search right now (e.g., "Find me a job as a frontend developer", "Show me backend roles", "Search for data analyst").
-- NEVER use FAST_SEARCH if the user is answering a question the assistant asked them.
+- NEVER use FAST_SEARCH if the user is answering a question the assistant asked them, unless they clearly command a job search now.
 - NEVER use FAST_SEARCH to "continue" an existing search or add details to a previous conversation.
-- Use GUIDED for almost all conversations, including answering questions about background, interests, or education. GUIDED is perfectly capable of naturally searching for jobs when the time is right.
-- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what fits them.
-- Use DREAMJOB only for long-term aspiration, dream-role, or future-career identity discussion.
+- Use GUIDED when the user has not decided short-term vs long-term yet, or needs clarifying questions about timeline, background, interests, or education. GUIDED can naturally search for jobs when the time is right.
+- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what career direction fits them.
+- Use DREAMJOB only for clear long-term aspiration / dream-role discussion. If timeline is unclear or they want near-term work without commanding a search, prefer GUIDED over DREAMJOB.
 
 User achievements:
 ${achievementsText(userAchievements)}

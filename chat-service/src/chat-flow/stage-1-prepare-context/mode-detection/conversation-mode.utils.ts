@@ -1,4 +1,10 @@
-import { CONVERSATION_MODE_VALUES, DREAMJOB_CHANGE_SIGNALS, DREAMJOB_SIGNALS } from "./conversation-mode.consts";
+import {
+    CONVERSATION_MODE_VALUES,
+    DREAMJOB_CHANGE_SIGNALS,
+    DREAMJOB_SIGNALS,
+    EXPLICIT_FAST_SEARCH_SIGNALS,
+    TIMELINE_UNCERTAINTY_SIGNALS,
+} from "./conversation-mode.consts";
 import type { ConversationMode, DreamJobContextMessage } from "./conversation-mode.types";
 
 export const isConversationMode = (value: unknown): value is ConversationMode =>
@@ -20,6 +26,11 @@ const DREAMJOB_ASPIRATION_PATTERNS: readonly RegExp[] = [
     /\bmy own (?:company|startup|business)\b/i,
 ];
 
+const NEAR_TERM_HORIZON_PATTERN =
+    /\b(?:short[\s-]?term|near[\s-]?term|asap|immediately|right away|right now|soon)\b/i;
+const JOB_SEEKING_PATTERN =
+    /\b(?:job|jobs|role|roles|position|positions|hire|hiring|employ|find|looking for|search|apply)\b/i;
+
 export const hasDreamJobChangeIntent = (message: string): boolean => {
     const normalized = message.toLowerCase();
     return DREAMJOB_CHANGE_SIGNALS.some((signal) => normalized.includes(signal));
@@ -35,7 +46,32 @@ export const hasDreamJobIntent = (message: string): boolean => {
     );
 };
 
+export const hasExplicitFastSearchIntent = (message: string): boolean => {
+    const normalized = message.toLowerCase();
+    return EXPLICIT_FAST_SEARCH_SIGNALS.some((signal) => normalized.includes(signal));
+};
+
+export const hasNearTermJobSearchIntent = (message: string): boolean => {
+    if (hasExplicitFastSearchIntent(message)) {
+        return true;
+    }
+    return NEAR_TERM_HORIZON_PATTERN.test(message) && JOB_SEEKING_PATTERN.test(message);
+};
+
+export const hasTimelineUncertaintyIntent = (message: string): boolean => {
+    const normalized = message.toLowerCase();
+    return TIMELINE_UNCERTAINTY_SIGNALS.some((signal) => normalized.includes(signal));
+};
+
+/** Exit sticky DREAMJOB and coach via GUIDED (timeline / clarifying questions). */
+export const shouldPreferGuidedOverDreamJob = (message: string): boolean =>
+    hasTimelineUncertaintyIntent(message) ||
+    (hasNearTermJobSearchIntent(message) && !hasExplicitFastSearchIntent(message));
+
 export const shouldEnterDreamJobMode = (message: string, existingDreamJob: string | null): boolean => {
+    if (hasExplicitFastSearchIntent(message) || shouldPreferGuidedOverDreamJob(message)) {
+        return false;
+    }
     if (hasDreamJobChangeIntent(message)) {
         return true;
     }
@@ -44,7 +80,6 @@ export const shouldEnterDreamJobMode = (message: string, existingDreamJob: strin
     }
     return hasDreamJobIntent(message);
 };
-
 
 export const conversationHasDreamJobContext = (
     messages: readonly DreamJobContextMessage[],
@@ -63,4 +98,29 @@ export const conversationHasDreamJobContext = (
     return recent
         .filter((message) => message.role === "assistant")
         .some((message) => assistantDreamJobDiscussion.test(message.content));
+};
+
+export const resolveConversationModeOverride = (params: {
+    message: string;
+    existingDreamJob: string | null;
+    hasActiveDreamJobFlow: boolean;
+    stickyDreamJobFromHistory: boolean;
+    detectedMode: ConversationMode;
+}): ConversationMode => {
+    const { message, existingDreamJob, hasActiveDreamJobFlow, stickyDreamJobFromHistory, detectedMode } = params;
+
+    if (hasExplicitFastSearchIntent(message)) {
+        return "FAST_SEARCH";
+    }
+    if (shouldPreferGuidedOverDreamJob(message)) {
+        return "GUIDED";
+    }
+
+    const isDreamJobRule =
+        shouldEnterDreamJobMode(message, existingDreamJob) || hasActiveDreamJobFlow || stickyDreamJobFromHistory;
+
+    if (isDreamJobRule) {
+        return "DREAMJOB";
+    }
+    return detectedMode;
 };
