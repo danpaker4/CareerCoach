@@ -10,7 +10,7 @@ import type { RoleExperienceEntry } from "../routes/external-chat-tools/role-exp
 import type { ChatExternalService } from "../routes/external-chat-tools/chat.external.service";
 import type { ChatMessageResponse } from "./api/shared/chat.types";
 import type { UserAchievement } from "./api/shared/chat.model";
-import type { ConversationMode } from "./stage-1-prepare-context/mode-detection/conversation-mode.types";
+import type { ConversationMode, ConversationModeDetectionResult } from "./stage-1-prepare-context/mode-detection/conversation-mode.types";
 import type { ConfidenceSummary } from "./stage-1-prepare-context/confidence/confidence.types";
 import type { JobFollowUpIntentResult } from "./stage-2-shortcuts/follow-up/job-follow-up-answer.types";
 import type { DreamJobRoadmapCreator } from "./stage-2-shortcuts/dream-job/chat.dream-job-roadmap.types";
@@ -37,7 +37,7 @@ export type SendMessagePreparedContext = {
     userRoleExperience: RoleExperienceEntry[];
     confidenceSummary: ConfidenceSummary;
     mode: ConversationMode;
-    fastSearchQuery?: string;
+    modeDetection: ConversationModeDetectionResult;
     followUpIntent: JobFollowUpIntentResult;
     jobContext: Conversation["jobContext"];
     authorization?: string;

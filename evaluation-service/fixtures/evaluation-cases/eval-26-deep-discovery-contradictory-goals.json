@@ -1,21 +1,36 @@
 {
-  "id": "eval-26-deep-discovery-contradictory-goals",
-  "messages": [
-    { "role": "user", "content": "help me pick a path. i want high salary, no pressure, no coding, remote only, hired in 2 weeks" },
-    { "role": "assistant", "content": "Thanks for sharing. Which one is the top priority if trade-offs are needed?" },
-    { "role": "user", "content": "all of them. and please no follow-up questions" },
-    { "role": "assistant", "content": "I hear you. Would you be open to two tracks: quick-entry roles now plus a longer-term upgrade path?" },
-    { "role": "user", "content": "maybe, but keep it short and dont force one option" }
-  ],
-  "expected": {
-    "mode": "DEEP_DISCOVERY",
-    "maxLines": 11,
-    "mustAskQuestion": true,
-    "forbiddenWords": [
-      "this is impossible for you",
-      "you have to choose only one",
-      "there are no options",
-      "just lower your expectations"
-    ]
-  }
+    "id": "eval-26-deep-discovery-contradictory-goals",
+    "messages": [
+        {
+            "role": "user",
+            "content": "help me pick a path. i want high salary, no pressure, no coding, remote only, hired in 2 weeks"
+        },
+        {
+            "role": "assistant",
+            "content": "Thanks for sharing. Which one is the top priority if trade-offs are needed?"
+        },
+        {
+            "role": "user",
+            "content": "all of them. and please no follow-up questions"
+        },
+        {
+            "role": "assistant",
+            "content": "I hear you. Would you be open to two tracks: quick-entry roles now plus a longer-term upgrade path?"
+        },
+        {
+            "role": "user",
+            "content": "maybe, but keep it short and dont force one option"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 11,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "this is impossible for you",
+            "you have to choose only one",
+            "there are no options",
+            "just lower your expectations"
+        ]
+    }
 }

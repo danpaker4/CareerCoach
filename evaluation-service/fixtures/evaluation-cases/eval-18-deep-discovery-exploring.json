@@ -1,12 +1,17 @@
 {
-  "id": "eval-18-deep-discovery-exploring",
-  "messages": [
-    { "role": "user", "content": "im exploring careers after army, unsure what direction to take" }
-  ],
-  "expected": {
-    "mode": "DEEP_DISCOVERY",
-    "maxLines": 12,
-    "mustAskQuestion": true,
-    "forbiddenWords": ["you should only"]
-  }
+    "id": "eval-18-deep-discovery-exploring",
+    "messages": [
+        {
+            "role": "user",
+            "content": "im exploring careers after army, unsure what direction to take"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 12,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "you should only"
+        ]
+    }
 }

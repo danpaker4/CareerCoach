@@ -1,6 +1,7 @@
 import type { Conversation } from "../../routes/conversation/conversation.model";
 import type { ConfidenceSummary } from "../stage-1-prepare-context/confidence/confidence.types";
 import type { ConversationMode } from "../stage-1-prepare-context/mode-detection/conversation-mode.types";
+import { CONVERSATION_MODE } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import type { ChatFlowDeps, SendMessagePreparedContext, StageFlowSendMessageResult } from "../chat-flow.types";
 import {
     applyStageAdvance,
@@ -33,7 +34,7 @@ export const resolveStageFlowForSendMessage = async (params: {
         ? completeAllStages(stageProgressWithNote)
         : stageProgressWithNote;
 
-    if (!currentStage || shouldSkipStages || mode === "FAST_SEARCH" || mode === "DREAMJOB") {
+    if (!currentStage || shouldSkipStages || mode === CONVERSATION_MODE.DREAMJOB) {
         return { kind: "continue_main_flow", progress: initialProgress };
     }
 

@@ -1,6 +1,7 @@
 import type { ChatMessageResponse, LlmDecision } from "../api/shared/chat.types";
 import type { Conversation } from "../../routes/conversation/conversation.model";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../chat-flow.types";
+import { CONVERSATION_MODE } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { decideNextStep } from "../shared/llm/chat.llm.service";
 import { sanitizeReply } from "../stage-6-present-jobs/presentation/chat.validation.service";
 import { buildWorkDirectionFilters } from "../stage-5-job-search/direction-filters/chat.direction.utils";
@@ -16,14 +17,15 @@ import { rankJobs } from "../stage-6-present-jobs/ranking/job-ranking.service";
 import { getCurrentStage, recordStageMessage, resolveStageFlowForSendMessage } from "../stage-4-guided-stages/resolve-stage-flow";
 import { runDreamJobFlow } from "../stage-2-shortcuts/dream-job/dream-job-flow";
 
-export const runFastSearchFlow = async (
+export const runNearTermSearchFlow = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse> => {
-    const query = ctx.fastSearchQuery && ctx.fastSearchQuery.trim() !== "" ? ctx.fastSearchQuery : ctx.normalizedMessage;
+    const detectedQuery = ctx.modeDetection.searchQuery;
+    const query = detectedQuery !== undefined && detectedQuery.trim() !== "" ? detectedQuery : ctx.normalizedMessage;
     const searchFilters = buildWorkDirectionFilters(query);
     console.info(
-        `[CHAT][SEARCH] userId=${ctx.userId} trigger=FAST_SEARCH query="${query}" filters=${JSON.stringify(searchFilters)}`
+        `[CHAT][SEARCH] userId=${ctx.userId} trigger=NEAR_TERM query="${query}" filters=${JSON.stringify(searchFilters)}`
     );
     const jobs = await searchJobsWithBroaderFallback({
         externalService: deps.externalService,
@@ -31,7 +33,7 @@ export const runFastSearchFlow = async (
         userRoleExperience: ctx.userRoleExperience,
         searchFilters,
         userId: ctx.userId,
-        trigger: "FAST_SEARCH",
+        trigger: CONVERSATION_MODE.NEAR_TERM,
     });
 
     if (jobs.length === 0) {
@@ -129,14 +131,14 @@ export const runStage3LlmDecision = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse> => {
-    if (ctx.mode === "DREAMJOB") {
-        console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow from LLM mode`);
-        return await runDreamJobFlow(deps, { ...ctx, mode: "DREAMJOB" });
+    if (ctx.mode === CONVERSATION_MODE.DREAMJOB) {
+        console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow from mode detection`);
+        return await runDreamJobFlow(deps, ctx);
     }
 
-    if (ctx.mode === "FAST_SEARCH") {
-        console.info(`[CHAT][FAST_SEARCH] userId=${ctx.userId} routing to fast search flow`);
-        return await runFastSearchFlow(deps, ctx);
+    if (ctx.mode === CONVERSATION_MODE.NEAR_TERM && ctx.modeDetection.shouldSearchJobs) {
+        console.info(`[CHAT][NEAR_TERM] userId=${ctx.userId} mode is ready, routing to near-term job search`);
+        return await runNearTermSearchFlow(deps, ctx);
     }
 
     const llmDecision = await decideNextStep(
