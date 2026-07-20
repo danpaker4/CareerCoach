@@ -1,52 +1,136 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
-import type { SkillMatcher } from "../skillMatcher/skill-matcher.model";
+import type { AdaptedJob } from "../../poller/job-poller-api-stack/stages/adapt/adapt-resource.types";
+import type { LlmTokenUsageRecorder } from "../../llm-token-usage/llm-token-usage.types";
+import { generateQueryVector } from "../../ai/embedding.utils";
+import type { UserEmbeddingCache } from "../../cache/user-embedding.cache";
+import { computeVectorMatchScore } from "../jobScores/vector-score.service";
+import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/enrich-by-gemini";
+import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
+import { fetchUserProfileEmbedding } from "./user-profile.client";
+import type { CreateJobBody } from "./jobs.schema";
+import { MIN_MATCH_FIT_PCT } from "./jobs.consts";
+
+const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
+const NUM_CANDIDATES = 150;
+const SEARCH_LIMIT = 50;
 
 type GetJobsQuery = { search?: string; userId?: string };
 
-const computeMatchPct = (
-  requirements: string[] | undefined,
-  userSkills: string[]
-): number => {
-  if (!requirements || requirements.length === 0) return 0;
-  const lower = userSkills.map((s) => s.toLowerCase());
-  const matched = requirements.filter((req) =>
-    lower.some((skill) => req.toLowerCase().includes(skill) || skill.includes(req.toLowerCase()))
-  ).length;
-  return Math.round((matched / requirements.length) * 100);
+interface JobsHandlerDeps {
+  jobsCollection: Collection<EnrichedJob>;
+  tokenUsageRecorder?: LlmTokenUsageRecorder;
+  usersServiceBaseUrl?: string;
+  embeddingCache?: UserEmbeddingCache;
+}
+
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const regexSearch = async (
+  collection: Collection<EnrichedJob>,
+  term: string
+): Promise<EnrichedJob[]> => {
+  const escaped = escapeRegex(term);
+  return collection
+    .find({
+      $or: [
+        { jobTitle: { $regex: escaped, $options: "i" } },
+        { company: { $regex: escaped, $options: "i" } },
+        { description: { $regex: escaped, $options: "i" } },
+      ],
+    })
+    .limit(SEARCH_LIMIT)
+    .toArray();
 };
 
-export const JobsHandler = (
-  jobsCollection: Collection<EnrichedJob>,
-  skillMatchersCollection: Collection<SkillMatcher>
-) => ({
+const vectorSearch = async (
+  collection: Collection<EnrichedJob>,
+  queryVector: number[]
+): Promise<EnrichedJob[]> =>
+  collection
+    .aggregate<EnrichedJob>([
+      {
+        $vectorSearch: {
+          index: VECTOR_INDEX_NAME,
+          path: "searchEmbedding",
+          queryVector,
+          numCandidates: NUM_CANDIDATES,
+          limit: SEARCH_LIMIT,
+        },
+      },
+    ])
+    .toArray();
+
+const vectorSearchWithFallback = async (
+  collection: Collection<EnrichedJob>,
+  term: string
+): Promise<EnrichedJob[]> => {
+  try {
+    const queryVector = await generateQueryVector(term);
+
+    if (queryVector) {
+      const results = await vectorSearch(collection, queryVector);
+      if (results.length > 0) return results;
+    }
+  } catch {
+    // Fall through to regex search when vector search cannot be used.
+  }
+
+  return regexSearch(collection, term);
+};
+
+const getUserEmbedding = async (
+  userId: string | undefined,
+  embeddingCache: UserEmbeddingCache | undefined,
+  usersServiceBaseUrl: string | undefined
+): Promise<number[] | null> => {
+  if (!userId || !embeddingCache) {
+    return null;
+  }
+
+  const cachedEmbedding = embeddingCache.get(userId);
+  if (cachedEmbedding) {
+    return cachedEmbedding;
+  }
+
+  if (!usersServiceBaseUrl) {
+    return null;
+  }
+
+  const fetchedEmbedding = await fetchUserProfileEmbedding(usersServiceBaseUrl, userId);
+  if (fetchedEmbedding) {
+    embeddingCache.set(userId, fetchedEmbedding);
+  }
+
+  return fetchedEmbedding;
+};
+
+const getMatchPct = (userEmbedding: number[] | null, jobEmbedding: number[]): number | undefined =>
+  userEmbedding && jobEmbedding.length > 0
+    ? computeVectorMatchScore(userEmbedding, jobEmbedding)
+    : undefined;
+
+export const JobsHandler = ({
+  jobsCollection,
+  tokenUsageRecorder,
+  usersServiceBaseUrl,
+  embeddingCache,
+}: JobsHandlerDeps) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: GetJobsQuery }>,
     reply: FastifyReply
   ) => {
     try {
       const { search, userId } = request.query;
-
-      const filter: Record<string, unknown> = {};
-      if (search && search.trim()) {
-        const term = search.trim();
-        filter.$or = [
-          { jobTitle: { $regex: term, $options: "i" } },
-          { company: { $regex: term, $options: "i" } },
-          { description: { $regex: term, $options: "i" } },
-        ];
-      }
-
-      const jobs = await jobsCollection.find(filter).limit(50).toArray();
-
-      let userSkills: string[] = [];
-      if (userId) {
-        const matchers = await skillMatchersCollection.find({ userId }).toArray();
-        userSkills = matchers.flatMap((m) => m.skillToImprove.map((s) => s.skill));
-      }
-
+      const term = search?.trim();
+      const jobs = term
+        ? await vectorSearchWithFallback(jobsCollection, term)
+        : await jobsCollection.find({}).limit(SEARCH_LIMIT).toArray();
+      const userEmbedding = await getUserEmbedding(userId, embeddingCache, usersServiceBaseUrl);
       const result = jobs.map((job) => ({
         id: job.id,
         jobTitle: job.jobTitle,
@@ -57,17 +141,67 @@ export const JobsHandler = (
         salary: job.salary,
         requirements: job.requirements,
         benefits: job.benefits,
-        matchPct: userId ? computeMatchPct(job.requirements, userSkills) : undefined,
+        matchPct: getMatchPct(userEmbedding, job.searchEmbedding),
       }));
+      const sortedResult = userEmbedding
+        ? [...result].sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0))
+        : result;
+      const filteredResult = userEmbedding
+        ? sortedResult.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
+        : sortedResult;
 
-      // Sort by match % descending when userId provided
-      if (userId) {
-        result.sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0));
-      }
-
-      reply.code(StatusCodes.OK).send(result);
+      reply.code(StatusCodes.OK).send(filteredResult);
     } catch (error) {
-      reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({ message: "Internal server error" });
+      request.log.error({ err: error }, "Failed to fetch jobs");
+      reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
+
+  createJobHandler: async (
+    request: FastifyRequest<{ Body: CreateJobBody }>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const { jobTitle, company, url, description, seniority, salary } = request.body;
+
+      const adapted: AdaptedJob = {
+        id: randomUUID(),
+        jobTitle: jobTitle.trim(),
+        company: company.trim(),
+        url: url ? url.trim() : "",
+        seniority: seniority.trim(),
+        description: description.trim(),
+        lon: null,
+        lat: null,
+      };
+
+      const [enriched] = await enrichByGemini([adapted], tokenUsageRecorder);
+      const finalJob: EnrichedJob = salary !== undefined && salary > 0
+        ? { ...enriched, salary }
+        : enriched;
+
+      await saveEnrichedJobs(jobsCollection, [finalJob]);
+
+      reply.code(StatusCodes.CREATED).send({
+        id: finalJob.id,
+        jobTitle: finalJob.jobTitle,
+        company: finalJob.company,
+        seniority: finalJob.seniority,
+        description: finalJob.description,
+        url: finalJob.url,
+        salary: finalJob.salary,
+        requirements: finalJob.requirements,
+        benefits: finalJob.benefits,
+      });
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to create job");
+      reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+        message: "Failed to create job",
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   },
 });

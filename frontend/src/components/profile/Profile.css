@@ -5,7 +5,7 @@
 }
 
 .profile-container {
-  max-width: 1000px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 36px 24px;
 }
@@ -19,7 +19,8 @@
 }
 
 .profile-logout-button {
-  padding: 10px 18px;
+  min-height: 46px;
+  padding: 12px 24px;
   border: 1.5px solid var(--clr-slate-300);
   border-radius: var(--r-full);
   background: var(--surface-base);
@@ -53,9 +54,9 @@
 /* Layout */
 .profile-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 320px minmax(0, 1fr);
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 768px) {
@@ -75,6 +76,11 @@
 }
 
 /* Sidebar */
+.profile-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
 .avatar-card {
   padding: 32px 24px;
   text-align: center;
@@ -183,6 +189,9 @@
 /* Form section */
 .profile-form-section {
   padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .form-section-header {
@@ -241,7 +250,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
-  margin-top: 24px;
+  margin-top: auto;
   padding-top: 20px;
   border-top: 1px solid var(--border-soft);
 }
@@ -262,23 +271,83 @@
   filter: invert(37%) sepia(76%) saturate(500%) hue-rotate(100deg) brightness(85%);
 }
 
-/* CV Upload Card */
+/* Skill import cards */
 .cv-card {
   margin-top: 16px;
+}
+
+.profile-import-card {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  border-color: var(--border-strong);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.profile-import-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profile-import-card-title {
+  font-size: var(--fz-lg);
+  font-weight: 800;
+  color: var(--clr-slate-900);
+  letter-spacing: 0;
+}
+
+.profile-import-card-subtitle {
+  color: var(--clr-slate-500);
+  font-size: var(--fz-xs);
+  line-height: 1.45;
+}
+
+.profile-import-source {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-import-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(116px, 1fr);
+  gap: 10px;
+}
+
+.profile-import-divider {
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.profile-source-header {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.cv-card-header {
-  display: flex;
+.profile-source-icon-shell {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
-.cv-card-icon {
-  width: 18px;
-  height: 18px;
+.profile-source-icon-shell--cv {
+  background: var(--clr-primary-50);
+}
+
+.profile-source-icon-shell--github {
+  background: var(--surface-subtle);
+}
+
+.profile-source-icon {
+  width: 17px;
+  height: 17px;
   filter: invert(32%) sepia(96%) saturate(1250%) hue-rotate(210deg) brightness(90%);
 }
 
@@ -286,26 +355,47 @@
   filter: none;
 }
 
+.profile-source-heading {
+  min-width: 0;
+}
+
 .cv-card-title {
   font-size: var(--fz-base);
-  font-weight: 700;
+  font-weight: 800;
   color: var(--clr-slate-900);
+  letter-spacing: 0;
+}
+
+.profile-source-kicker {
+  margin-top: 2px;
+  color: var(--clr-slate-500);
+  font-size: var(--fz-xs);
+  font-weight: 600;
 }
 
 .cv-card-sub {
   font-size: var(--fz-xs);
-  color: var(--clr-slate-500);
-  line-height: 1.5;
+  color: var(--clr-slate-600);
+  line-height: 1.55;
 }
 
 .cv-card-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: var(--fz-xs);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--clr-success);
   background: var(--clr-success-bg);
-  padding: 4px 10px;
+  padding: 7px 12px;
   border-radius: var(--r-full);
   align-self: flex-start;
+}
+
+.cv-card-current img {
+  width: 13px;
+  height: 13px;
+  filter: invert(37%) sepia(76%) saturate(500%) hue-rotate(100deg) brightness(85%);
 }
 
 .cv-file-input {
@@ -313,15 +403,31 @@
 }
 
 .cv-file-label {
-  display: block;
-  padding: 10px 14px;
-  border: 2px dashed var(--clr-slate-300);
-  border-radius: var(--r-md);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1.5px dashed var(--clr-slate-300);
+  border-radius: var(--r-lg);
+  background: var(--clr-slate-50);
   font-size: var(--fz-sm);
-  color: var(--clr-slate-500);
+  color: var(--clr-slate-700);
   cursor: pointer;
   text-align: center;
-  transition: border-color var(--t-fast), color var(--t-fast);
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+
+.cv-file-label-kind {
+  color: var(--clr-primary);
+  font-size: var(--fz-xs);
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.cv-file-label-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -330,11 +436,15 @@
 .cv-file-label:hover {
   border-color: var(--clr-primary);
   color: var(--clr-primary);
+  background: var(--clr-primary-50);
 }
 
 .cv-extract-btn {
   width: 100%;
   justify-content: center;
+  min-height: 44px;
+  padding-inline: 12px;
+  white-space: nowrap;
 }
 
 .cv-error {
@@ -359,6 +469,40 @@
 }
 
 .profile-github-pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px;
+  border-radius: var(--r-md);
+  background: var(--clr-warning-bg);
   font-size: var(--fz-xs);
-  color: var(--clr-slate-500);
+  color: var(--clr-warning);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.profile-github-pending-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--clr-warning);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+  .profile-import-card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 380px) {
+  .profile-source-header {
+    align-items: flex-start;
+  }
+
+  .cv-card-title {
+    font-size: var(--fz-base);
+  }
 }

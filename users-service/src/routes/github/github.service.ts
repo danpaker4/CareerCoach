@@ -7,6 +7,7 @@ import {
     REPOSITORY_LIST_PER_PAGE,
 } from "./github.consts";
 import type {
+    GithubLinkResult,
     GithubContentFileResponse,
     GithubRepository,
     GithubRepositoryLanguages,
@@ -17,7 +18,7 @@ import type {
     GithubUserProfile,
 } from "./github.types";
 import type { User, UserDocument } from "../users/user.model";
-import { toUserDocument } from "../users/user.utils";
+import { toUser, toUserDocument } from "../users/user.utils";
 import { buildAuthenticatedSession } from "../auth/auth.service";
 import type { AuthenticatedUserSession } from "../auth/auth.types";
 import { toSafeUser } from "../auth/auth.utils";
@@ -275,10 +276,13 @@ export const loginOrCreateGithubUser = async (
                 firstName,
                 lastName,
                 email: emailLower,
+                role: "user",
+                profileEmbedding: [],
                 achievements: [],
                 technologies: [],
                 interests: [],
                 knownSkills: [],
+                roleExperience: [],
                 githubSkills: extractedSkills,
                 githubId: githubProfile.id,
                 githubUrl: githubProfile.html_url,
@@ -294,4 +298,38 @@ export const loginOrCreateGithubUser = async (
         })();
 
     return buildAuthenticatedSession(toSafeUser(finalUser));
+};
+
+export const linkGithubSkillsToUser = async (
+    usersCollection: Collection<UserDocument>,
+    userId: string,
+    accessToken: string,
+    githubProfile: GithubUserProfile,
+): Promise<GithubLinkResult> => {
+    const user = await usersCollection.findOne({ _id: userId });
+    if (!user) {
+        return { status: "not_found" };
+    }
+
+    const existingGithubUser = await usersCollection.findOne({
+        _id: { $ne: userId },
+        githubId: githubProfile.id,
+    });
+    if (existingGithubUser) {
+        return { status: "github_in_use" };
+    }
+
+    const extractedSkills = await extractGithubSkills(accessToken);
+    const updates: Partial<Omit<UserDocument, "_id">> = {
+        githubId: githubProfile.id,
+        githubUrl: githubProfile.html_url,
+        githubSkills: extractedSkills,
+    };
+
+    await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+
+    return {
+        status: "updated",
+        user: toUser({ ...user, ...updates }),
+    };
 };

@@ -6,32 +6,28 @@ import iconKanban from '../../assets/icon-kanban.svg';
 import iconTarget from '../../assets/icon-target.svg';
 import iconSparkle from '../../assets/icon-sparkle.svg';
 import iconMessage from '../../assets/icon-message.svg';
+import iconUser from '../../assets/icon-user.svg';
 import iconMenu from '../../assets/icon-menu.svg';
 import iconX from '../../assets/icon-x.svg';
 import iconSun from '../../assets/icon-sun.svg';
 import iconMoon from '../../assets/icon-moon.svg';
 import './Header.css';
-import type { ThemeMode } from '../../lib/theme';
+import type { HeaderProps } from './header.types';
+import { getInitials } from './header.utils';
 
-interface HeaderProps {
-  userName?: string;
-  theme: ThemeMode;
-  onToggleTheme: () => void;
-}
-
-const getInitials = (name: string): string => {
-  const parts = name.trim().split(' ');
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-};
-
-export const Header = ({ userName, theme, onToggleTheme }: HeaderProps) => {
+export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: HeaderProps) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const homePath = userName ? '/dashboard' : '/';
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string): boolean => {
+    if (path === '/management') {
+      return location.pathname === path || location.pathname.startsWith('/management/');
+    }
+
+    return location.pathname === path;
+  };
 
   useEffect(() => {
     setMenuOpen(false);
@@ -75,6 +71,12 @@ export const Header = ({ userName, theme, onToggleTheme }: HeaderProps) => {
             <img src={iconSparkle} alt="" aria-hidden="true" className="nav-icon" />
             Jobs
           </Link>
+          {isAdmin && (
+            <Link to="/management" className={`nav-link${isActive('/management') ? ' nav-link--active' : ''}`}>
+              <img src={iconUser} alt="" aria-hidden="true" className="nav-icon" />
+              Management
+            </Link>
+          )}
         </>
       )}
     </>

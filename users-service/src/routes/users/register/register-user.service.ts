@@ -110,6 +110,8 @@ export const registerUser = async (
     firstName,
     lastName,
     email,
+    role: "user",
+    profileEmbedding: [],
     password: hashedPassword,
     birthDate: new Date(birthDate),
     currentJob: currentJob || undefined,
@@ -125,6 +127,7 @@ export const registerUser = async (
     technologies,
     interests,
     knownSkills: technologies,
+    roleExperience: [],
   };
 
   await usersCollection.insertOne(toUserDocument(newUser));

@@ -1,4 +1,4 @@
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import iconTarget from '../../assets/icon-target.svg';
 import iconZap from '../../assets/icon-zap.svg';
 import iconBriefcase from '../../assets/icon-briefcase.svg';
@@ -115,19 +115,6 @@ export const Home = () => {
         </div>
       </section>
 
-      <footer className="site-footer">
-        <div className="section-inner footer-inner">
-          <span className="footer-brand">CareerCoach</span>
-          <nav className="footer-nav">
-            <Link to="/" className="footer-link">Home</Link>
-            <Link to="/login" className="footer-link">Log In</Link>
-            <Link to="/roadmap" className="footer-link">Roadmap</Link>
-            <Link to="/skill-matcher" className="footer-link">Skill Tracker</Link>
-            <Link to="/pipeline" className="footer-link">Pipeline</Link>
-          </nav>
-          <span className="footer-copy">© {new Date().getFullYear()} CareerCoach. Final Project.</span>
-        </div>
-      </footer>
     </div>
   );
 };

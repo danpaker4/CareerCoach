@@ -1,0 +1,20 @@
+model_list:
+  - model_name: chat-default
+    litellm_params:
+      model: ollama/llama3
+      api_base: http://host.docker.internal:9009
+  - model_name: chat-fallback
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+router_settings:
+  fallbacks:
+    - chat-default:
+        - chat-fallback
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

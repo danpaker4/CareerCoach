@@ -1,3 +1,6 @@
+import type { LlmTokenUsageRecorder } from "../../../../llm-token-usage/llm-token-usage.types";
+import { readGeminiUsage, readOllamaUsage, recordLlmTokenUsage } from "../../../../llm-token-usage/llm-token-usage.utils";
+
 const DEFAULT_MOCK_JOBS_COUNT = 8;
 const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 const DEFAULT_MODEL = "llama3";
@@ -104,7 +107,7 @@ Rules:
 - Do not add extra fields.
 `;
 
-export const pollResource = async (): Promise<MockGeneratedJob[]> => {
+export const pollResource = async (tokenUsageRecorder?: LlmTokenUsageRecorder): Promise<MockGeneratedJob[]> => {
   const llmProvider = (process.env.LLM_PROVIDER || "ollama").toLowerCase();
   const modelName = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || DEFAULT_MODEL;
   const requestedCount = Number(process.env.MOCK_JOBS_COUNT || DEFAULT_MOCK_JOBS_COUNT);
@@ -124,7 +127,17 @@ export const pollResource = async (): Promise<MockGeneratedJob[]> => {
         throw new Error(`Mock poller ollama generation failed with status ${response.status}`);
       }
       const text = (payload as { response?: unknown }).response;
-      return typeof text === "string" ? text : "";
+      if (typeof text !== "string") {
+        return "";
+      }
+      await recordLlmTokenUsage(tokenUsageRecorder, {
+        sourceService: "job-service",
+        operation: "job.mock_generation",
+        provider: "ollama",
+        model: modelName,
+        usage: readOllamaUsage(payload),
+      });
+      return text;
     })()
     : await (async (): Promise<string> => {
       const { GoogleGenerativeAI } = await import("@google/generative-ai");
@@ -134,7 +147,15 @@ export const pollResource = async (): Promise<MockGeneratedJob[]> => {
       }
       const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
-      return result.response.text();
+      const text = result.response.text();
+      await recordLlmTokenUsage(tokenUsageRecorder, {
+        sourceService: "job-service",
+        operation: "job.mock_generation",
+        provider: "gemini",
+        model: modelName,
+        usage: readGeminiUsage(result.response),
+      });
+      return text;
     })();
   const parsed = parseMockPollResponse(rawText);
 

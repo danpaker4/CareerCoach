@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { LlmTokenUsageRecorder } from "../../../../llm-token-usage/llm-token-usage.types";
+import { readGeminiUsage, readOllamaUsage, recordLlmTokenUsage } from "../../../../llm-token-usage/llm-token-usage.utils";
+import { withSpan } from "../../../../observability/tracing";
 import type { AdaptedJob } from "../adapt/adapt-resource.types";
 import type { EnrichedJob } from "./types";
 import { buildEnrichmentPrompt } from "./prompet";
@@ -40,7 +43,15 @@ const shouldRetryGeminiError = (error: unknown): boolean => {
   return message.includes("503") || message.toLowerCase().includes("service unavailable");
 };
 
-const generateWithOllama = async (prompt: string, modelName: string): Promise<string> => {
+const generateWithOllama = async (
+  prompt: string,
+  modelName: string,
+  tokenUsageRecorder?: LlmTokenUsageRecorder,
+): Promise<string> => withSpan("llm.complete", {
+  "llm.provider": "ollama",
+  "llm.model": modelName,
+  "llm.operation": "job.enrichment",
+}, async (span) => {
   const baseUrl = process.env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL;
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/generate`, {
     method: "POST",
@@ -48,15 +59,33 @@ const generateWithOllama = async (prompt: string, modelName: string): Promise<st
     body: JSON.stringify({ model: modelName, prompt, stream: false }),
   });
   const payload: unknown = await response.json().catch(() => null);
+  span.setAttribute("http.response.status_code", response.status);
+
   if (!response.ok || typeof payload !== "object" || payload === null || !("response" in payload)) {
+    span.setAttribute("llm.request.status", "error");
     throw new Error(`Ollama enrichment failed with status ${response.status}`);
   }
   const text = (payload as { response?: unknown }).response;
   if (typeof text !== "string") {
+    span.setAttribute("llm.request.status", "error");
     throw new Error("Ollama enrichment returned invalid response");
   }
+  const usage = readOllamaUsage(payload);
+  if (usage) {
+    span.setAttribute("llm.usage.prompt_tokens", usage.promptTokens);
+    span.setAttribute("llm.usage.completion_tokens", usage.completionTokens);
+    span.setAttribute("llm.usage.total_tokens", usage.totalTokens);
+  }
+  await recordLlmTokenUsage(tokenUsageRecorder, {
+    sourceService: "job-service",
+    operation: "job.enrichment",
+    provider: "ollama",
+    model: modelName,
+    usage,
+  });
+  span.setAttribute("llm.request.status", "success");
   return text;
-};
+});
 
 const enrichSingleJob = async (
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
@@ -64,6 +93,7 @@ const enrichSingleJob = async (
   job: AdaptedJob,
   llmProvider: "gemini" | "ollama",
   llmModel: string,
+  tokenUsageRecorder?: LlmTokenUsageRecorder,
   attempt = 1,
 ): Promise<EnrichedJob> => {
   if (!job.description.trim()) {
@@ -91,10 +121,31 @@ const enrichSingleJob = async (
 
   try {
     const text = llmProvider === "ollama"
-      ? await generateWithOllama(prompt, llmModel)
+      ? await generateWithOllama(prompt, llmModel, tokenUsageRecorder)
       : await (async (): Promise<string> => {
-        const result = await model.generateContent(prompt);
-        return result.response.text();
+        return await withSpan("llm.complete", {
+          "llm.provider": "gemini",
+          "llm.model": llmModel,
+          "llm.operation": "job.enrichment",
+        }, async (span) => {
+          const result = await model.generateContent(prompt);
+          const usage = readGeminiUsage(result.response);
+          if (usage) {
+            span.setAttribute("llm.usage.prompt_tokens", usage.promptTokens);
+            span.setAttribute("llm.usage.completion_tokens", usage.completionTokens);
+            span.setAttribute("llm.usage.total_tokens", usage.totalTokens);
+          }
+          const generatedText = result.response.text();
+          await recordLlmTokenUsage(tokenUsageRecorder, {
+            sourceService: "job-service",
+            operation: "job.enrichment",
+            provider: "gemini",
+            model: llmModel,
+            usage,
+          });
+          span.setAttribute("llm.request.status", "success");
+          return generatedText;
+        });
       })();
     const parsed = parseGeminiJson(text);
     const fallback = inferFallback(job);
@@ -177,7 +228,7 @@ const enrichSingleJob = async (
         `Gemini request failed with service unavailability for job ${job.id}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_GEMINI_RETRIES})`,
       );
       await sleep(delay);
-      return enrichSingleJob(model, embeddingModel, job, llmProvider, llmModel, attempt + 1);
+      return enrichSingleJob(model, embeddingModel, job, llmProvider, llmModel, tokenUsageRecorder, attempt + 1);
     }
 
     console.warn(`Gemini enrichment failed for job ${job.id}. Using fallback values.`);
@@ -202,7 +253,10 @@ const enrichSingleJob = async (
   }
 };
 
-export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]> => {
+export const enrichByGemini = async (
+  jobs: AdaptedJob[],
+  tokenUsageRecorder?: LlmTokenUsageRecorder,
+): Promise<EnrichedJob[]> => {
   const llmProvider = (process.env.LLM_PROVIDER || "ollama").toLowerCase() === "gemini" ? "gemini" : "ollama";
   const llmModel = process.env.LLM_MODEL || process.env.OLLAMA_MODEL || DEFAULT_LLM_MODEL;
   console.info(`[LLM] Job enrichment generator provider=${llmProvider} model=${llmModel}`);
@@ -237,6 +291,7 @@ export const enrichByGemini = async (jobs: AdaptedJob[]): Promise<EnrichedJob[]>
     embeddingModel,
     job,
     llmProvider,
-    llmModel
+    llmModel,
+    tokenUsageRecorder
   )));
 };

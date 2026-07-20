@@ -1,7 +1,7 @@
 import type { FastifySchema } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { UserSchema } from "./user.model";
+import { RoleExperienceEntrySchema, UserSchema } from "./user.model";
 
 export const getUserSchema = {
     response: {
@@ -41,6 +41,7 @@ export const createUserSchema = {
         technologies: z.array(z.string()).optional(),
         interests: z.array(z.string()).optional(),
         knownSkills: z.array(z.string()).optional(),
+        roleExperience: z.array(RoleExperienceEntrySchema).optional(),
     }),
 } satisfies FastifySchema;
 
@@ -77,6 +78,25 @@ export const updateUserSchema = {
         interests: z.array(z.string()).optional(),
         knownSkills: z.array(z.string()).optional(),
         coachProfileMaterializedAt: z.coerce.date().optional(),
+        roleExperience: z.array(RoleExperienceEntrySchema).optional(),
+    }),
+} satisfies FastifySchema;
+
+export const updateDreamJobSchema = {
+    response: {
+        [StatusCodes.OK]: z.object({
+            message: z.string(),
+            status: z.string(),
+        }),
+        [StatusCodes.NOT_FOUND]: z.object({
+            error: z.string(),
+        }),
+    },
+    params: z.object({
+        userId: z.string().min(1, "userId cannot be empty"),
+    }),
+    body: z.object({
+        dreamJob: z.string().min(1, "dreamJob cannot be empty"),
     }),
 } satisfies FastifySchema;
 

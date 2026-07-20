@@ -10,10 +10,12 @@ export const toUserDocument = (user: User): UserDocument => {
 };
 
 export const toUser = (userDocument: UserDocument): User => {
-    const { _id, ...rest } = userDocument;
+    const { _id, role, ...rest } = userDocument;
 
     return {
         id: _id,
         ...rest,
+        profileEmbedding: rest.profileEmbedding ?? [],
+        role: role ?? "user",
     };
 };

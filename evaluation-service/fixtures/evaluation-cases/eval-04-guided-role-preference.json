@@ -1,0 +1,12 @@
+{
+  "id": "eval-04-guided-role-preference",
+  "messages": [
+    { "role": "user", "content": "i like javascript and react, did 4 years frontend" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 12,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["you should only do backend"]
+  }
+}

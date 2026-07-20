@@ -1,7 +1,7 @@
 import type { FastifySchema } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { CareerRoadMapSchema, StageToDreamJobSchema } from "./career-roadmap.model";
+import { CareerProgressionMetaSchema, CareerRoadMapSchema, StageToDreamJobSchema } from "./career-roadmap.model";
 
 export const getCareerRoadMapByUserIdSchema = {
     response: {
@@ -36,6 +36,8 @@ export const createCareerRoadMapSchema = {
         userId: z.string().uuid("userId must be a valid UUID"),
         dreamJob: z.string().min(1, "dreamJob cannot be empty"),
         stagesToDreamJob: z.array(StageToDreamJobSchema),
+        generatedAt: z.coerce.date().optional(),
+        progressionMeta: CareerProgressionMetaSchema.optional(),
     }),
 } satisfies FastifySchema;
 
@@ -52,5 +54,25 @@ export const editStagesSchema = {
     body: z.object({
         stagesToDreamJob: z.array(StageToDreamJobSchema),
     }),
+} satisfies FastifySchema;
+
+export const discoverOpportunitiesSchema = {
+    body: z.object({
+        roleCategories: z.array(z.string().min(1)).min(1),
+        userSkills: z.array(z.string()).optional(),
+        limit: z.number().int().positive().max(20).optional(),
+    }),
+    response: {
+        [StatusCodes.OK]: z.object({
+            opportunities: z.array(z.object({
+                jobId: z.string(),
+                title: z.string(),
+                company: z.string(),
+                seniority: z.string(),
+                url: z.string(),
+                relevanceReason: z.string(),
+            })),
+        }),
+    },
 } satisfies FastifySchema;
 

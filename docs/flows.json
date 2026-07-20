@@ -1,0 +1,373 @@
+{
+  "app": {
+    "name": "CareerCoach",
+    "tagline": "AI-powered career coaching, job search, and skill development platform",
+    "description": "A microservices monorepo that helps users build their career profile from CV / GitHub / LinkedIn, chat with an AI coach (with persistent career profile + multi-mode conversations), match skills against jobs, manage a job application pipeline, and plan a long-term career roadmap. Includes an admin management console with token-usage analytics and a multi-provider LLM stack with automatic fallback.",
+    "repository": "/Users/Rony/Documents/CareerCoach",
+    "lastUpdated": "2026-05-19 (post-merge of 62 commits from main)"
+  },
+  "techStack": {
+    "frontend": ["React 18.3.1", "React Router v6.26", "TypeScript 5.5", "Vite"],
+    "backend": ["Node.js 22+", "Fastify 5.6", "TypeScript", "MongoDB 7"],
+    "auth": ["JWT access token (60s)", "Refresh cookie (7d, HTTP-only)", "GitHub OAuth", "LinkedIn OAuth (OpenID Connect)", "Role-based (admin/user) routes"],
+    "ai": ["Google Gemini", "OpenAI", "Ollama (local)", "Custom HTTP LLM", "FallbackTextCompletionAdapter chain"],
+    "storage": ["AWS S3 (CVs, avatars)", "MinIO (local S3 dev)"],
+    "architecture": "Microservices: 4 services + 1 SPA, all Fastify + Mongo where applicable"
+  },
+  "services": [
+    { "name": "frontend", "port": 5173, "purpose": "React SPA (Vite dev server)" },
+    { "name": "users-service", "port": 3001, "purpose": "Auth, profile, CV, OAuth callbacks, admin (users + LLM token usage)" },
+    { "name": "chat-service", "port": 3002, "purpose": "AI coach: conversation modes, career-profile materialization, chat→pipeline" },
+    { "name": "job-service", "port": 3003, "purpose": "Jobs catalog, pipeline, skill matcher, career roadmap, job poller" }
+  ],
+  "routes": [
+    { "path": "/", "auth": false, "page": "Home (redirects to /dashboard if logged in)" },
+    { "path": "/login", "auth": false, "page": "Sign in / Sign up + GitHub & LinkedIn OAuth" },
+    { "path": "/auth/github/callback", "auth": false, "page": "GitHub OAuth popup handler" },
+    { "path": "/auth/linkedin/callback", "auth": false, "page": "LinkedIn OAuth popup handler" },
+    { "path": "/dashboard", "auth": true, "page": "User overview" },
+    { "path": "/chat", "auth": true, "page": "AI Career Coach (multi-tab conversations)" },
+    { "path": "/roadmap", "auth": true, "page": "Career roadmap (dream job + milestones)" },
+    { "path": "/skill-matcher", "auth": true, "page": "Skill-gap analysis vs target role" },
+    { "path": "/pipeline", "auth": true, "page": "Kanban job application board" },
+    { "path": "/my-skills", "auth": true, "page": "Skills from CV + GitHub + skill gaps" },
+    { "path": "/job-suggestions", "auth": true, "page": "Job search & AI recommendations" },
+    { "path": "/profile", "auth": true, "page": "User profile + CV (re-)upload" },
+    { "path": "/management", "auth": true, "page": "Admin hub (admin role required)" },
+    { "path": "/management/users", "auth": true, "page": "Admin: paginated user search, promote/demote/delete" },
+    { "path": "/management/usage", "auth": true, "page": "Admin: LLM token-usage analytics (30/90/365 days)" },
+    { "path": "*", "auth": false, "page": "NotFound" }
+  ],
+  "flows": [
+    {
+      "id": "signup-cv",
+      "name": "User Registration with CV Upload",
+      "category": "Auth",
+      "purpose": "New users create an account; CV is parsed and enriched with achievements.",
+      "frontend": { "route": "/login", "trigger": "Sign Up form submit" },
+      "endpoints": [
+        { "method": "POST", "service": "users-service", "path": "/api/auth/register", "notes": "Multipart: firstName, lastName, email, password, cvFile (PDF)" }
+      ],
+      "external": ["Gemini (via LLM fallback chain)", "AWS S3 / MinIO"],
+      "dataFlow": [
+        "User submits form with PDF",
+        "Server parses PDF text",
+        "LLM chain (Gemini → fallback) extracts achievements",
+        "CV uploaded to S3 (URL stored on user)",
+        "User doc persisted to MongoDB",
+        "JWT issued + refresh cookie set",
+        "Token usage recorded in llmTokenUsage"
+      ]
+    },
+    {
+      "id": "login",
+      "name": "Email/Password Sign In & Token Refresh",
+      "category": "Auth",
+      "purpose": "Authenticate returning users and keep sessions alive transparently.",
+      "frontend": { "route": "/login", "trigger": "Sign In form" },
+      "endpoints": [
+        { "method": "POST", "service": "users-service", "path": "/api/auth/login", "notes": "Email + password" },
+        { "method": "GET", "service": "users-service", "path": "/api/auth/refresh", "notes": "Reads HTTP-only refresh cookie" },
+        { "method": "POST", "service": "users-service", "path": "/api/auth/logout", "notes": "Clears refresh cookie" }
+      ],
+      "dataFlow": [
+        "Validate credentials",
+        "Issue 60s access JWT (localStorage) + 7d refresh cookie",
+        "Frontend apiFetch() silently refreshes JWT on 401 and retries"
+      ]
+    },
+    {
+      "id": "github-oauth",
+      "name": "GitHub OAuth & Skill Import",
+      "category": "Auth",
+      "purpose": "Sign in / link GitHub; import public repos' languages as skills.",
+      "frontend": { "route": "/login → popup → /auth/github/callback → /my-skills", "trigger": "GitHub button (popup window)" },
+      "endpoints": [
+        { "method": "GET", "service": "users-service", "path": "/api/auth/github/callback", "notes": "Exchanges code; popup posts GITHUB_CODE via postMessage" }
+      ],
+      "external": ["GitHub OAuth", "GitHub REST API (user, repos, languages)"],
+      "dataFlow": [
+        "Open popup → GitHub consent",
+        "Popup posts {type:'GITHUB_CODE', code} to parent",
+        "Parent calls backend callback, exchanges code → user",
+        "Frontend fetches repos, aggregates languages → githubSkills on user"
+      ]
+    },
+    {
+      "id": "linkedin-oauth",
+      "name": "LinkedIn OAuth (OpenID Connect)",
+      "category": "Auth",
+      "purpose": "Sign in with LinkedIn; pulls name + email only (skills require Partner access).",
+      "frontend": { "route": "/login → popup → /auth/linkedin/callback", "trigger": "LinkedIn button (popup window)" },
+      "endpoints": [
+        { "method": "GET", "service": "users-service", "path": "/api/auth/linkedin/callback", "notes": "Exchanges code; calls LinkedIn /v2/userinfo" }
+      ],
+      "external": ["LinkedIn OAuth", "LinkedIn /v2/userinfo"],
+      "dataFlow": [
+        "Open popup → LinkedIn consent",
+        "Popup posts {type:'LINKEDIN_CODE', code} to parent",
+        "Backend exchanges code for ID token + userinfo",
+        "User record created/linked in MongoDB"
+      ]
+    },
+    {
+      "id": "profile",
+      "name": "Profile Management & CV Re-upload",
+      "category": "Profile",
+      "purpose": "View / edit profile; replace CV → re-extract skills via Gemini chain.",
+      "frontend": { "route": "/profile", "trigger": "Edit form / Upload CV" },
+      "endpoints": [
+        { "method": "GET", "service": "users-service", "path": "/api/users/:userId" },
+        { "method": "PATCH", "service": "users-service", "path": "/api/users/:userId", "notes": "Partial updates: bio, location, achievements, etc." },
+        { "method": "POST", "service": "users-service", "path": "/api/users/:userId/cv", "notes": "PDF → parse + Gemini Files API → achievements" }
+      ],
+      "external": ["Gemini Files API (CV upload)", "Gemini generateContent"],
+      "dataFlow": [
+        "User uploads PDF",
+        "PDF parsed + sent to LLM chain with extraction prompt",
+        "LLM returns array of {name, grade}",
+        "PATCH /api/users/:userId saves achievements",
+        "Token usage recorded"
+      ]
+    },
+    {
+      "id": "ai-chat",
+      "name": "AI Career Coach Chat",
+      "category": "AI",
+      "purpose": "Multi-conversation chat where the LLM selects intent mode (GUIDED / FAST_SEARCH / DEEP_DISCOVERY / DREAMJOB) and grounds replies in the user's persistent career profile.",
+      "frontend": { "route": "/chat", "trigger": "Send message / switch conversation tab" },
+      "endpoints": [
+        { "method": "GET", "service": "chat-service", "path": "/chat/users/:userId/conversations", "notes": "List all conversations" },
+        { "method": "POST", "service": "chat-service", "path": "/chat/users/:userId/conversations", "notes": "Create new conversation (accepts userProfile)" },
+        { "method": "DELETE", "service": "chat-service", "path": "/chat/users/:userId/conversations/:conversationId" },
+        { "method": "GET", "service": "chat-service", "path": "/chat/:userId", "notes": "Ensure a conversation exists (creates if none)" },
+        { "method": "POST", "service": "chat-service", "path": "/chat/message", "notes": "Send message; returns reply + detected mode + confidence + attachedJobs[]" }
+      ],
+      "external": ["LLM chain (Ollama → Gemini → Custom)", "job-service (for FAST_SEARCH job lookup)"],
+      "dataFlow": [
+        "The chat decision prompt sends available modes and the LLM returns the selected mode in JSON",
+        "Career profile loaded / materialized for context",
+        "Prompt built (mode + profile + history) and sent to LLM chain",
+        "On failure: fallback adapter switches to next provider",
+        "Token usage logged",
+        "Reply persisted; attachedJobs (if any) returned for UI",
+        "SeniorityInferenceService updates seniority signal on profile"
+      ]
+    },
+    {
+      "id": "chat-add-to-pipeline",
+      "name": "Chat → Add Job to Pipeline",
+      "category": "AI",
+      "purpose": "User accepts a chat-suggested job → it lands on their pipeline board.",
+      "frontend": { "route": "/chat", "trigger": "Click 'Add to pipeline' on a suggested job card" },
+      "endpoints": [
+        { "method": "POST", "service": "chat-service", "path": "/chat/message", "notes": "User confirms via chat message" },
+        { "method": "POST", "service": "job-service", "path": "/jobs-in-pipeline", "notes": "Called by chat-service PipelineService" }
+      ],
+      "dataFlow": [
+        "Chat recommends job (attachedJobs[] in assistant reply)",
+        "User confirms",
+        "chat-service.PipelineService.addJobToPipeline calls job-service",
+        "On success: 'Done — I added the {title} role to your pipeline'",
+        "On failure: fallback message instructs user to add it manually"
+      ]
+    },
+    {
+      "id": "career-profile",
+      "name": "Career Profile Materialization",
+      "category": "AI",
+      "purpose": "Persistent, embedding-indexed profile that grows from CV + chat interactions; replaces the old conversation-memory feature.",
+      "frontend": { "route": "/chat (implicit)", "trigger": "First chat / new strong signals" },
+      "endpoints": [
+        { "method": "POST", "service": "chat-service", "path": "/chat/message", "notes": "Updates careerProfiles on inference" }
+      ],
+      "external": ["LLM chain (embeddings + completion)", "users-service (notifyProfileMaterialized)"],
+      "dataFlow": [
+        "On first conversation, careerProfiles doc created for userId",
+        "LLM infers signals: strengths, preferredRoles, domains, technologies, goals, seniority…",
+        "Each signal carries {value, confidence, evidence[], source}",
+        "profileSummaryText + profileSummaryEmbedding recomputed",
+        "First materialization notifies users-service",
+        "All subsequent chats hydrate prompts from this profile"
+      ]
+    },
+    {
+      "id": "skill-matcher",
+      "name": "Skill Matcher for Jobs",
+      "category": "Jobs",
+      "purpose": "Score user skills against the requirements of a specific job.",
+      "frontend": { "route": "/skill-matcher", "trigger": "Select job → rate skills" },
+      "endpoints": [
+        { "method": "GET", "service": "job-service", "path": "/skill-matcher/:userId" },
+        { "method": "POST", "service": "job-service", "path": "/skill-matcher/:id/skill" },
+        { "method": "PATCH", "service": "job-service", "path": "/skill-matcher/:userId/:jobId/:skill" }
+      ],
+      "dataFlow": [
+        "Load user assessments",
+        "Add / update per-skill rating",
+        "Aggregate match score back to UI"
+      ]
+    },
+    {
+      "id": "job-search",
+      "name": "Job Search & Suggestions",
+      "category": "Jobs",
+      "purpose": "Browse and filter aggregated jobs; results re-ranked using seniority compatibility.",
+      "frontend": { "route": "/job-suggestions", "trigger": "Filters / search bar" },
+      "endpoints": [
+        { "method": "GET", "service": "job-service", "path": "/jobs", "notes": "List all jobs" },
+        { "method": "POST", "service": "job-service", "path": "/jobs/search", "notes": "Filters: location, stack, seniority" }
+      ],
+      "dataFlow": [
+        "Background poller ingests jobs into MongoDB",
+        "Search applies filters",
+        "JobRankingService checks isJobSeniorityCompatibleWithRoleExperience",
+        "Results rendered with save / add-to-pipeline actions"
+      ]
+    },
+    {
+      "id": "job-upload",
+      "name": "Upload Job Posting",
+      "category": "Jobs",
+      "purpose": "Users add a job that the poller hasn't picked up; the description is enriched (skills, requirements, salary) via the LLM chain and indexed for search.",
+      "frontend": { "route": "/job-suggestions", "trigger": "'Upload Job' button → modal form" },
+      "endpoints": [
+        { "method": "POST", "service": "job-service", "path": "/jobs", "notes": "Body: { jobTitle, company, url, description, seniority, salary? } → 201 EnrichedJob. LinkedIn direct-import skipped: requires Talent Solutions Partner access. Users paste the LinkedIn job URL + description text instead." }
+      ],
+      "external": ["LLM chain (Gemini/Ollama) for enrichment + embeddings"],
+      "dataFlow": [
+        "User fills modal: title, company, url, seniority, salary?, description",
+        "Frontend POSTs to /jobs",
+        "Server builds AdaptedJob with a uuid id",
+        "enrichByGemini extracts requirements/benefits/skills + builds searchEmbedding (falls back to inferFallback on LLM error)",
+        "saveEnrichedJobs upserts the job (createdAt/updatedAt set)",
+        "Token usage recorded in llmTokenUsage",
+        "Job list refreshes; the new job appears in search and skill-matching"
+      ]
+    },
+    {
+      "id": "pipeline",
+      "name": "Job Application Pipeline",
+      "category": "Jobs",
+      "purpose": "Kanban board tracking jobs through user-defined stages (wishlist → applied → interview → offer / rejected).",
+      "frontend": { "route": "/pipeline", "trigger": "Drag-drop / edit cards" },
+      "endpoints": [
+        { "method": "GET", "service": "job-service", "path": "/pipelines/:userId" },
+        { "method": "POST", "service": "job-service", "path": "/pipelines/:userId/stages" },
+        { "method": "DELETE", "service": "job-service", "path": "/pipelines/:userId/stages/:stage" },
+        { "method": "GET", "service": "job-service", "path": "/jobs-in-pipeline/:userId" },
+        { "method": "POST", "service": "job-service", "path": "/jobs-in-pipeline" },
+        { "method": "PATCH", "service": "job-service", "path": "/jobs-in-pipeline/:id/stage" },
+        { "method": "PATCH", "service": "job-service", "path": "/jobs-in-pipeline/:id/description" },
+        { "method": "DELETE", "service": "job-service", "path": "/jobs-in-pipeline/:id" }
+      ],
+      "dataFlow": [
+        "Load user pipeline + jobs",
+        "Drag updates stage via PATCH",
+        "Notes/description edited inline",
+        "Stages can be added/removed"
+      ]
+    },
+    {
+      "id": "roadmap",
+      "name": "Career Roadmap",
+      "category": "Planning",
+      "purpose": "Plan multi-stage progression toward a dream role with milestones.",
+      "frontend": { "route": "/roadmap", "trigger": "Create roadmap / edit stages" },
+      "endpoints": [
+        { "method": "GET", "service": "job-service", "path": "/career-roadmap/:userId" },
+        { "method": "POST", "service": "job-service", "path": "/career-roadmap" },
+        { "method": "PATCH", "service": "job-service", "path": "/career-roadmap/:id/stages" },
+        { "method": "DELETE", "service": "job-service", "path": "/career-roadmap/:id" }
+      ],
+      "dataFlow": [
+        "Load existing roadmap or create new",
+        "Add dream job + ordered milestones",
+        "Edit / remove stages as plan evolves"
+      ]
+    },
+    {
+      "id": "admin-users",
+      "name": "Admin: User Management",
+      "category": "Admin",
+      "purpose": "Search, paginate, promote, demote, and delete users (admin role only).",
+      "frontend": { "route": "/management/users", "trigger": "Search box / row actions" },
+      "endpoints": [
+        { "method": "GET", "service": "users-service", "path": "/api/admin/users?search=&page=", "notes": "Paginated (25/page, max 100)" },
+        { "method": "POST", "service": "users-service", "path": "/api/admin/admins", "notes": "Promote user to admin (by email)" },
+        { "method": "DELETE", "service": "users-service", "path": "/api/admin/admins/:userId", "notes": "Demote admin to user" },
+        { "method": "DELETE", "service": "users-service", "path": "/api/admin/users/:userId", "notes": "Delete user (confirm dialog)" }
+      ],
+      "dataFlow": [
+        "Admin token verified server-side",
+        "List users with search + page params",
+        "Promote/demote/delete actions update users collection",
+        "UI refreshes paginated list"
+      ]
+    },
+    {
+      "id": "admin-token-usage",
+      "name": "Admin: LLM Token Usage Analytics",
+      "category": "Admin",
+      "purpose": "Visualize per-day token consumption by provider, model, operation, and per-user average.",
+      "frontend": { "route": "/management/usage", "trigger": "Switch 30 / 90 / 365 day window" },
+      "endpoints": [
+        { "method": "GET", "service": "users-service", "path": "/api/admin/llm-token-usage?days=", "notes": "Aggregates llmTokenUsage; days ∈ {30,90,365}" }
+      ],
+      "dataFlow": [
+        "Frontend picks window",
+        "Service aggregates llmTokenUsage by day/model/operation",
+        "Chart renders prompt/completion/total token series",
+        "Per-user average computed"
+      ]
+    },
+    {
+      "id": "llm-fallback",
+      "name": "LLM Fallback Chain (system)",
+      "category": "System",
+      "purpose": "Resilient LLM calls: try primary provider, fall back through alternates on error / rate-limit.",
+      "frontend": { "route": "(transparent)", "trigger": "Any LLM call (chat, CV extract, embeddings)" },
+      "endpoints": [],
+      "external": ["Ollama (local)", "Google Gemini", "OpenAI", "Custom HTTP LLM"],
+      "dataFlow": [
+        "buildTextCompletionLlmChain() composes adapter list per env",
+        "FallbackTextCompletionAdapter tries first adapter",
+        "On error: warn + try next adapter",
+        "All failures → aggregated error thrown",
+        "Every attempt logged to llmTokenUsage (with requestStatus / errorMessage)"
+      ]
+    },
+    {
+      "id": "token-usage-tracking",
+      "name": "Token Usage Tracking (system)",
+      "category": "System",
+      "purpose": "Record every LLM call with provider, model, operation, user, and token counts.",
+      "frontend": { "route": "(invisible)", "trigger": "Any text-completion call" },
+      "endpoints": [],
+      "dataFlow": [
+        "Token-usage repository middleware wraps LLM adapter calls",
+        "Per-call doc inserted: {createdAt, sourceService, operation, userId, provider, model, promptTokens, completionTokens, totalTokens, tokenStatus, requestStatus}",
+        "Errors record errorCount + errorMessage",
+        "Surfaced in /management/usage admin view"
+      ]
+    }
+  ],
+  "dataModels": [
+    { "name": "User", "fields": ["id", "email", "passwordHash", "firstName", "lastName", "role (admin|user)", "cv (S3 URL)", "currentJob", "achievements[]", "technologies[]", "interests[]", "githubSkills[]", "knownSkills[]", "linkedinSub?", "githubUsername?", "createdAt"] },
+    { "name": "Conversation", "fields": ["userId", "messages[] (role, content, mode?, attachedJobs?[])", "jobContext?", "stageProgress", "createdAt", "updatedAt"] },
+    { "name": "CareerProfile", "fields": ["userId", "strengths[]", "weakSignals[]", "preferredRoles[]", "dislikedRoles[]", "domains[]", "technologies[]", "softSkills[]", "motivations[]", "interests[]", "goals[]", "senioritySignal", "salaryExpectation", "locationPreference", "remotePreference", "uncertaintyLevel", "profileSummaryText", "profileSummaryEmbedding[]", "updatedAt"] },
+    { "name": "LlmTokenUsage", "fields": ["createdAt", "sourceService", "operation", "userId?", "provider", "model", "promptTokens", "completionTokens", "totalTokens", "tokenStatus", "requestStatus?", "errorCount?", "errorMessage?", "requestCount"] },
+    { "name": "SkillMatcher", "fields": ["userId", "jobId", "requiredSkills[] (name, level, match)"] },
+    { "name": "Pipeline", "fields": ["userId", "stages[] (custom names: wishlist, applied, …)", "createdAt"] },
+    { "name": "PipelineJob", "fields": ["userId", "jobId", "title", "company", "stage", "description", "createdAt"] },
+    { "name": "CareerRoadMap", "fields": ["userId", "dreamJob", "stagesToDreamJob[]", "createdAt", "updatedAt"] },
+    { "name": "Job", "fields": ["id", "title", "company", "location", "salary", "url", "seniority", "description", "skillsRequired[]"] },
+    { "name": "CareerDirectionExamples", "fields": ["examples[]", "embeddings[] (vector index)"] }
+  ],
+  "absentFeatures": [
+    { "name": "Notifications system", "status": "not implemented", "trackedBy": "Task #2" },
+    { "name": "SSE / EventSource for live updates", "status": "not implemented", "trackedBy": "Task #4" },
+    { "name": "Wanted-jobs collection (chat 'job not yet in DB')", "status": "not implemented", "trackedBy": "Task #3" },
+    { "name": "Direct LinkedIn job-posting API import", "status": "not feasible without LinkedIn Talent Solutions Partner access", "trackedBy": "Task #1 — closed as 'paste URL + description' instead" }
+  ]
+}

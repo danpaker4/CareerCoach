@@ -1,0 +1,14 @@
+{
+  "id": "eval-01-guided-qa-intro",
+  "messages": [
+    { "role": "user", "content": "hi my name is gal and im qa" },
+    { "role": "assistant", "content": "Nice to meet you. What kind of QA work did you do?" },
+    { "role": "user", "content": "i worked 2 years with cypress on web apps" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 10,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["I recommend backend developer", "you must become a"]
+  }
+}

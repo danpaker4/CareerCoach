@@ -118,6 +118,20 @@ export const refreshAccessToken = (usersCollection: Collection<UserDocument>): A
     }
   };
 
+export const getAuthSession = (): AuthRouteHandler =>
+  async (request, reply) => {
+    const user = request.authUser;
+    if (!user) {
+      reply.status(StatusCodes.UNAUTHORIZED).send({ error: "Unauthorized", errorCode: "UNAUTHORIZED" });
+      return;
+    }
+
+    reply.status(StatusCodes.OK).send({
+      userId: user.userId,
+      email: user.email,
+    });
+  };
+
 export const logoutUser = (): AuthRouteHandler =>
   async (_request, reply) => {
     clearAuthCookies(reply);

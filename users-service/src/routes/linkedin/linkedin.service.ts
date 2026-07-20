@@ -57,32 +57,36 @@ export const loginOrCreateLinkedInUser = async (
 
     const user = await usersCollection.findOne({ email: emailLower });
 
-    let finalUser: UserDocument;
-
-    if (user) {
-        const updates: Partial<Omit<UserDocument, "_id">> = {
-            linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
-            avatarUrl: user.avatarUrl ?? profile.picture,
-        };
-        await usersCollection.updateOne({ _id: user._id }, { $set: updates });
-        finalUser = { ...user, ...updates };
-    } else {
-        const newUser: User = {
-            id: randomUUID(),
-            firstName: profile.given_name,
-            lastName: profile.family_name,
-            email: emailLower,
-            achievements: [],
-            technologies: [],
-            interests: [],
-            knownSkills: [],
-            linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
-            avatarUrl: profile.picture,
-            githubSkills: [],
-        };
-        finalUser = toUserDocument(newUser);
-        await usersCollection.insertOne(finalUser);
-    }
+    const finalUser = user
+        ? await (async (): Promise<UserDocument> => {
+            const updates: Partial<Omit<UserDocument, "_id">> = {
+                linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
+                avatarUrl: user.avatarUrl ?? profile.picture,
+            };
+            await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+            return { ...user, ...updates };
+        })()
+        : await (async (): Promise<UserDocument> => {
+            const newUser: User = {
+                id: randomUUID(),
+                firstName: profile.given_name,
+                lastName: profile.family_name,
+                email: emailLower,
+                role: "user",
+                profileEmbedding: [],
+                achievements: [],
+                technologies: [],
+                interests: [],
+                knownSkills: [],
+                roleExperience: [],
+                linkedInUrl: `https://www.linkedin.com/in/${profile.sub}`,
+                avatarUrl: profile.picture,
+                githubSkills: [],
+            };
+            const userDocument = toUserDocument(newUser);
+            await usersCollection.insertOne(userDocument);
+            return userDocument;
+        })();
 
     return buildAuthenticatedSession(toSafeUser(toUser(finalUser)));
 };

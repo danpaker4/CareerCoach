@@ -4,35 +4,13 @@ import { ENV } from '../../config';
 import './LinkedInCallback.css';
 import type { User } from '../../types/user';
 import { setStoredAccessToken } from '../../lib/authSession';
+import { normalizeUser } from '../../lib/authResponse';
 
 interface LinkedInCallbackProps {
   onLoginSuccess: (user: User) => void;
 }
 
 type CallbackState = 'loading' | 'error';
-
-const parseUser = (data: unknown): User | null => {
-  if (typeof data !== 'object' || data === null) return null;
-  const obj = data as Record<string, unknown>;
-  if (
-    typeof obj.id !== 'string' ||
-    typeof obj.firstName !== 'string' ||
-    typeof obj.lastName !== 'string' ||
-    typeof obj.email !== 'string'
-  ) return null;
-  return {
-    id: obj.id,
-    firstName: obj.firstName,
-    lastName: obj.lastName,
-    email: obj.email,
-    ...(typeof obj.currentJob === 'string' ? { currentJob: obj.currentJob } : {}),
-    ...(typeof obj.birthDate === 'string' ? { birthDate: obj.birthDate } : {}),
-    ...(typeof obj.linkedInUrl === 'string' ? { linkedInUrl: obj.linkedInUrl } : {}),
-    ...(typeof obj.githubUrl === 'string' ? { githubUrl: obj.githubUrl } : {}),
-    ...(typeof obj.cv === 'string' ? { cv: obj.cv } : {}),
-    ...(Array.isArray(obj.achievements) ? { achievements: obj.achievements as User['achievements'] } : {}),
-  };
-};
 
 export const LinkedInCallback = ({ onLoginSuccess }: LinkedInCallbackProps) => {
   const [searchParams] = useSearchParams();
@@ -72,7 +50,7 @@ export const LinkedInCallback = ({ onLoginSuccess }: LinkedInCallbackProps) => {
           throw new Error(msg);
         }
         const data = await res.json() as Record<string, unknown>;
-        const user = parseUser(data.user ?? data);
+        const user = normalizeUser(data.user ?? data);
         if (!user) throw new Error('Invalid user data received');
         if (typeof data.accessToken === 'string') {
           setStoredAccessToken(data.accessToken);

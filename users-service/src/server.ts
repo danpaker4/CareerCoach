@@ -6,6 +6,8 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 import { MongoClient } from "./mongo/mongo"; 
 import { AUTH_ROUTE_PREFIX } from "./routes/auth/auth.consts";
 import { authRouter } from "./routes/auth/auth.router";
+import { ADMIN_ROUTE_PREFIX } from "./routes/admin/admin.consts";
+import { adminRouter } from "./routes/admin/admin.router";
 import { usersRouter } from "./routes/users/users.router";
 import { githubRouter } from "./routes/github/github.router";
 import { linkedInRouter } from "./routes/linkedin/linkedin.router";
@@ -37,7 +39,7 @@ export class Server {
                 origin: true,
                 credentials: true,
                 methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-                allowedHeaders: ['Content-Type', 'Authorization']
+                allowedHeaders: ["Content-Type", "Authorization", "X-Internal-Service-Key", "X-Service-User-Id"],
             });
             await this.app.register(cookie);
             await this.app.register(multipart, {
@@ -51,6 +53,9 @@ export class Server {
                 prefix: AUTH_ROUTE_PREFIX,
             });
             await this.app.register(usersRouter(this.DBClient.users));
+            await this.app.register(adminRouter(this.DBClient.users, this.DBClient.llmTokenUsage), {
+                prefix: ADMIN_ROUTE_PREFIX,
+            });
             await this.app.register(githubRouter(this.DBClient.users), {
                 prefix: AUTH_ROUTE_PREFIX,
             });
