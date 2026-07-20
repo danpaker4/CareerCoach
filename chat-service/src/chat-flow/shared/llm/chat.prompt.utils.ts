@@ -3,7 +3,7 @@ import type { Conversation } from "../../../routes/conversation/conversation.mod
 import type { ConversationStage } from "../../../routes/conversation/conversation.types";
 import type { JobSearchResultItem } from "../../api/shared/chat.types";
 import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
-import { CONVERSATION_MODE_OPTIONS } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
+import { DEFAULT_CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 
 const MAX_JOB_DESCRIPTION_CHARS = 1200;
 
@@ -42,44 +42,6 @@ const achievementsText = (userAchievements: readonly UserAchievement[]): string 
 
 const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
-
-export const buildModeDetectionPrompt = (
-    conversation: Conversation,
-    latestUserMessage: string,
-    userAchievements: readonly UserAchievement[],
-    userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
-): string => `
-You are CareerCoach AI.
-Respond ONLY with valid JSON in this exact structure:
-{
-  "mode": "FAST_SEARCH",
-  "fastSearchQuery": "string (optional, only if mode is FAST_SEARCH, extract the core job title, skill, or domain)"
-}
-
-Rules:
-- Set mode to exactly one value from the available modes JSON below.
-- FAST_SEARCH is an INSTANT bypass mode. Use FAST_SEARCH **ONLY** when the user's LATEST message explicitly commands a job search right now (e.g., "Find me a job as a frontend developer", "Show me backend roles", "Search for data analyst").
-- NEVER use FAST_SEARCH if the user is answering a question the assistant asked them, unless they clearly command a job search now.
-- NEVER use FAST_SEARCH to "continue" an existing search or add details to a previous conversation.
-- Use GUIDED when the user has not decided short-term vs long-term yet, or needs clarifying questions about timeline, background, interests, or education. GUIDED can naturally search for jobs when the time is right.
-- Use DEEP_DISCOVERY only when the user is genuinely unsure or exploring what career direction fits them.
-- Use DREAMJOB only for clear long-term aspiration / dream-role discussion. If timeline is unclear or they want near-term work without commanding a search, prefer GUIDED over DREAMJOB.
-
-User achievements:
-${achievementsText(userAchievements)}
-
-Available conversation modes JSON:
-${JSON.stringify(CONVERSATION_MODE_OPTIONS, null, 2)}
-
-Known account context (registration profile, CV excerpt, GitHub skills):
-${userAccountContext}
-
-Conversation so far:
-${buildHistory(conversation)}
-
-Latest user message:
-${latestUserMessage}
-`;
 
 export const buildDecisionPrompt = (
     conversation: Conversation,
@@ -196,7 +158,7 @@ export const buildStagePrompt = (
     latestUserMessage: string,
     stage: ConversationStage,
     userAchievements: readonly UserAchievement[],
-    mode: ConversationMode = "GUIDED",
+    mode: ConversationMode = DEFAULT_CONVERSATION_MODE,
     userAccountContext: string = DEFAULT_USER_ACCOUNT_CONTEXT
 ): string => `
 You are a career data extractor and guide.

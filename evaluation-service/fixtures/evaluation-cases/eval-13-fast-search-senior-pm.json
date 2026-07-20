@@ -1,12 +1,17 @@
 {
-  "id": "eval-13-fast-search-senior-pm",
-  "messages": [
-    { "role": "user", "content": "find jobs now for senior product manager b2b" }
-  ],
-  "expected": {
-    "mode": "FAST_SEARCH",
-    "maxLines": 15,
-    "mustAskQuestion": false,
-    "forbiddenWords": ["you should definitely"]
-  }
+    "id": "eval-13-fast-search-senior-pm",
+    "messages": [
+        {
+            "role": "user",
+            "content": "find jobs now for senior product manager b2b"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15,
+        "mustAskQuestion": false,
+        "forbiddenWords": [
+            "you should definitely"
+        ]
+    }
 }

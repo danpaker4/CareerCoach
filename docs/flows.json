@@ -134,7 +134,7 @@
       "id": "ai-chat",
       "name": "AI Career Coach Chat",
       "category": "AI",
-      "purpose": "Multi-conversation chat where the LLM selects intent mode (GUIDED / FAST_SEARCH / DEEP_DISCOVERY / DREAMJOB) and grounds replies in the user's persistent career profile.",
+      "purpose": "Multi-conversation chat where the LLM selects intent mode (DREAMJOB / NEAR_TERM / GUIDED) with a readiness score and grounds replies in the user's persistent career profile.",
       "frontend": { "route": "/chat", "trigger": "Send message / switch conversation tab" },
       "endpoints": [
         { "method": "GET", "service": "chat-service", "path": "/chat/users/:userId/conversations", "notes": "List all conversations" },
@@ -143,7 +143,7 @@
         { "method": "GET", "service": "chat-service", "path": "/chat/:userId", "notes": "Ensure a conversation exists (creates if none)" },
         { "method": "POST", "service": "chat-service", "path": "/chat/message", "notes": "Send message; returns reply + detected mode + confidence + attachedJobs[]" }
       ],
-      "external": ["LLM chain (Ollama → Gemini → Custom)", "job-service (for FAST_SEARCH job lookup)"],
+      "external": ["LLM chain (Ollama → Gemini → Custom)", "job-service (for NEAR_TERM job lookup)"],
       "dataFlow": [
         "The chat decision prompt sends available modes and the LLM returns the selected mode in JSON",
         "Career profile loaded / materialized for context",

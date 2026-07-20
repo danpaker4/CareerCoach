@@ -4,6 +4,7 @@ import type { Conversation, DreamJobFlow } from "../../../routes/conversation/co
 import type { ConversationStage } from "../../../routes/conversation/conversation.types";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../../api/shared/chat.types";
 import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
+import { DEFAULT_CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,
@@ -115,7 +116,7 @@ export const generateStageReply = async (
     latestUserMessage: string,
     stage: ConversationStage,
     userAchievements: readonly UserAchievement[],
-    mode: ConversationMode = "GUIDED",
+    mode: ConversationMode = DEFAULT_CONVERSATION_MODE,
     userAccountContext?: string,
     observer?: ChatLlmObserver
 ): Promise<StageLlmDecision> => {

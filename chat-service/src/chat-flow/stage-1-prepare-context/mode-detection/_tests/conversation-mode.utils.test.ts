@@ -1,99 +1,87 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-    conversationHasDreamJobContext,
-    hasDreamJobIntent,
-    hasExplicitFastSearchIntent,
-    hasNearTermJobSearchIntent,
-    hasTimelineUncertaintyIntent,
-    resolveConversationModeOverride,
-    shouldEnterDreamJobMode,
-    shouldPreferGuidedOverDreamJob,
-} from "../conversation-mode.utils";
+import { isConversationMode, parseConversationModeDetectionResult } from "../conversation-mode.utils";
 
-describe("hasDreamJobIntent", () => {
-    it("detects founder startup messages", () => {
-        assert.equal(
-            hasDreamJobIntent("i want to be a founder of startup that will find a solution to object detection with drones"),
-            true,
-        );
+describe("isConversationMode", () => {
+    it("accepts the three supported modes", () => {
+        assert.equal(isConversationMode("DREAMJOB"), true);
+        assert.equal(isConversationMode("NEAR_TERM"), true);
+        assert.equal(isConversationMode("GUIDED"), true);
     });
 
-    it("detects looking for something in the future", () => {
-        assert.equal(hasDreamJobIntent("im looking for something in the future"), true);
+    it("rejects removed and unknown modes", () => {
+        assert.equal(isConversationMode("FAST_SEARCH"), false);
+        assert.equal(isConversationMode("DEEP_DISCOVERY"), false);
+        assert.equal(isConversationMode(42), false);
     });
 });
 
-describe("hasNearTermJobSearchIntent", () => {
-    it("detects short-term job seeking", () => {
-        assert.equal(
-            hasNearTermJobSearchIntent("i want to find a job in a short term as data engineering"),
-            true,
+describe("parseConversationModeDetectionResult", () => {
+    it("parses a ready dream-job detection with a title", () => {
+        const result = parseConversationModeDetectionResult(
+            JSON.stringify({
+                mode: "DREAMJOB",
+                readinessScore: 90,
+                isReady: true,
+                missingInformation: [],
+                dreamJobTitle: "Data Engineer",
+                searchQuery: null,
+            })
         );
+        assert.deepEqual(result, {
+            mode: "DREAMJOB",
+            readinessScore: 90,
+            isReady: true,
+            missingInformation: [],
+            dreamJobTitle: "Data Engineer",
+            shouldSearchJobs: false,
+            searchQuery: undefined,
+        });
     });
 
-    it("detects explicit find-me-a-job phrasing", () => {
-        assert.equal(hasNearTermJobSearchIntent("find me a job as backend developer"), true);
-    });
-
-    it("does not treat bare yes as near-term search", () => {
-        assert.equal(hasNearTermJobSearchIntent("yes"), false);
-    });
-});
-
-describe("timeline and mode overrides", () => {
-    it("prefers guided when timeline is unclear", () => {
-        assert.equal(hasTimelineUncertaintyIntent("im not sure if i want short or long term"), true);
-        assert.equal(shouldPreferGuidedOverDreamJob("im not sure if i want short or long term"), true);
-    });
-
-    it("routes short-term job seeking to guided, not fast search", () => {
-        const message = "i want to find a job in a short term as data engineering";
-        assert.equal(hasExplicitFastSearchIntent(message), false);
-        assert.equal(shouldPreferGuidedOverDreamJob(message), true);
-        assert.equal(
-            resolveConversationModeOverride({
-                message,
-                existingDreamJob: null,
-                hasActiveDreamJobFlow: true,
-                stickyDreamJobFromHistory: true,
-                detectedMode: "DREAMJOB",
-            }),
-            "GUIDED",
+    it("marks near-term ready detections as should search jobs", () => {
+        const result = parseConversationModeDetectionResult(
+            JSON.stringify({
+                mode: "NEAR_TERM",
+                readinessScore: 85,
+                isReady: true,
+                missingInformation: [],
+                dreamJobTitle: null,
+                searchQuery: "data engineer",
+            })
         );
+        assert.equal(result?.shouldSearchJobs, true);
+        assert.equal(result?.searchQuery, "data engineer");
+        assert.equal(result?.dreamJobTitle, undefined);
     });
 
-    it("routes explicit search commands to fast search", () => {
-        const message = "find me a job as backend developer";
-        assert.equal(hasExplicitFastSearchIntent(message), true);
-        assert.equal(
-            resolveConversationModeOverride({
-                message,
-                existingDreamJob: null,
-                hasActiveDreamJobFlow: true,
-                stickyDreamJobFromHistory: true,
-                detectedMode: "GUIDED",
-            }),
-            "FAST_SEARCH",
+    it("keeps near-term not-ready detections from searching and returns missing information", () => {
+        const result = parseConversationModeDetectionResult(
+            JSON.stringify({
+                mode: "NEAR_TERM",
+                readinessScore: 40,
+                isReady: false,
+                missingInformation: ["target role for the near time"],
+                dreamJobTitle: null,
+                searchQuery: null,
+            })
         );
+        assert.equal(result?.shouldSearchJobs, false);
+        assert.deepEqual(result?.missingInformation, ["target role for the near time"]);
     });
 
-    it("does not enter dream-job mode for short-term job intent", () => {
-        assert.equal(
-            shouldEnterDreamJobMode("i want to find a job in a short term as data engineering", null),
-            false,
+    it("clamps readiness score into the 0-100 range", () => {
+        const result = parseConversationModeDetectionResult(
+            JSON.stringify({ mode: "GUIDED", readinessScore: 250, isReady: false, missingInformation: [] })
         );
+        assert.equal(result?.readinessScore, 100);
     });
-});
 
-describe("conversationHasDreamJobContext", () => {
-    it("returns true when a recent user message stated future intent", () => {
-        const hasContext = conversationHasDreamJobContext([
-            { role: "assistant", content: "What excites you?" },
-            { role: "user", content: "im looking for something in the future" },
-            { role: "assistant", content: "Let's explore long-term career aspirations!" },
-            { role: "user", content: "yes" },
-        ]);
-        assert.equal(hasContext, true);
+    it("returns null for invalid JSON or unknown mode", () => {
+        assert.equal(parseConversationModeDetectionResult("not json"), null);
+        assert.equal(
+            parseConversationModeDetectionResult(JSON.stringify({ mode: "FAST_SEARCH", isReady: true })),
+            null
+        );
     });
 });

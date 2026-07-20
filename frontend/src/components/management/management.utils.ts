@@ -601,7 +601,7 @@ const isEvaluationMessageRole = (value: unknown): value is EvaluationMessageRole
   value === 'user' || value === 'assistant' || value === 'system';
 
 const isEvaluationMode = (value: unknown): value is EvaluationExpected['mode'] =>
-  value === 'FAST_SEARCH' || value === 'GUIDED' || value === 'DEEP_DISCOVERY' || value === 'DREAMJOB';
+  value === 'DREAMJOB' || value === 'NEAR_TERM' || value === 'GUIDED';
 
 const isEvaluationMessage = (value: unknown): value is EvaluationMessage => {
   if (typeof value !== 'object' || value === null) {

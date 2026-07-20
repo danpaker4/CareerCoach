@@ -1,5 +1,6 @@
 import type { ChatMessageResponse } from "../../api/shared/chat.types";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../../chat-flow.types";
+import { CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { decideDreamJobStep } from "../../shared/llm/chat.llm.service";
 import { sanitizeReply } from "../../stage-6-present-jobs/presentation/chat.validation.service";
 import {
@@ -22,7 +23,11 @@ export const runDreamJobFlow = async (
         dreamJobFlow
     );
 
-    const inferredTitle = inferDreamJobTitleFromMessage(ctx.normalizedMessage);
+    const detectedTitle =
+        ctx.modeDetection.dreamJobTitle !== undefined && ctx.modeDetection.dreamJobTitle.length > 0
+            ? normalizeDreamJobTitle(ctx.modeDetection.dreamJobTitle)
+            : undefined;
+    const inferredTitle = inferDreamJobTitleFromMessage(ctx.normalizedMessage) ?? detectedTitle;
     const pendingTitle =
         decision.proposedDreamJobTitle !== undefined && decision.proposedDreamJobTitle.length > 0
             ? normalizeDreamJobTitle(decision.proposedDreamJobTitle)
@@ -48,7 +53,7 @@ export const runDreamJobFlow = async (
             const failureReply =
                 "I couldn't save your dream job right now. Please try again from your profile, or confirm once more.";
             await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, failureReply);
-            return { reply: failureReply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
+            return { reply: failureReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
         }
 
         await deps.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, undefined);
@@ -59,7 +64,7 @@ export const runDreamJobFlow = async (
             ? `Saved ${pendingTitle} as your dream job and created a 4-stage roadmap toward it. You can review it on My Roadmap.`
             : `Saved ${pendingTitle} as your dream job, but I couldn't create the roadmap right now. You can create it from My Roadmap.`;
         await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, successReply);
-        return { reply: successReply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
+        return { reply: successReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
     }
 
     if (isNegativeConfirmation(ctx.normalizedMessage) && dreamJobFlow?.awaitingConfirmation === true) {
@@ -81,5 +86,5 @@ export const runDreamJobFlow = async (
             ? `It sounds like your long-term dream role is ${pendingTitle}. Should I save "${pendingTitle}" as your dream job?`
             : sanitized;
     await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
-    return { reply, mode: "DREAMJOB", confidenceSummary: ctx.confidenceSummary };
+    return { reply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
 };
