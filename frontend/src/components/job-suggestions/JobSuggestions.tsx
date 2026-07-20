@@ -6,7 +6,7 @@ import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
 import { UploadJobModal } from './UploadJobModal';
-import { AiAnalysisLoader } from './AiAnalysisLoader';
+import { JobSuggestionsSkeleton } from './JobSuggestionsSkeleton';
 import './JobSuggestions.css';
 import type { User } from '../../types/user';
 
@@ -84,7 +84,6 @@ const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
 export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [fetchState, setFetchState] = useState<FetchState>('idle');
   const [jobs, setJobs] = useState<JobResult[]>([]);
-  const [pendingJobs, setPendingJobs] = useState<JobResult[] | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
@@ -112,7 +111,6 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const fetchJobs = useCallback((query: string) => {
     if (!user?.id) return;
-    setPendingJobs(null);
     setFetchState('loading');
     const params = new URLSearchParams({ userId: user.id });
     const trimmedQuery = query.trim();
@@ -122,25 +120,23 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     const url = `${ENV.JOB_SERVICE_BASE_URL}/jobs?${params.toString()}`;
     apiFetch(url, { credentials: 'include' })
       .then(async (res) => {
-        if (res.status === 404) { setPendingJobs([]); return; }
+        if (res.status === 404) {
+          setJobs([]);
+          setFetchState('success');
+          return;
+        }
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
-        setPendingJobs(parseJobs(data));
+        const parsedJobs = parseJobs(data);
+        const isSearching = query.trim().length > 0;
+        setJobs(isSearching ? parsedJobs : filterByMatchFit(parsedJobs));
+        setFetchState('success');
       })
       .catch((err: unknown) => {
         setErrorMessage(err instanceof Error ? err.message : 'Failed to load jobs');
         setFetchState('error');
       });
   }, [user?.id]);
-
-  const handleAnalysisComplete = useCallback(() => {
-    if (pendingJobs !== null) {
-      const isSearching = searchQuery.trim().length > 0;
-      setJobs(isSearching ? pendingJobs : filterByMatchFit(pendingJobs));
-      setPendingJobs(null);
-      setFetchState('success');
-    }
-  }, [pendingJobs, searchQuery]);
 
   useEffect(() => {
     void loadPipelineJobHashes();
@@ -238,19 +234,14 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
           <input
             type="search"
             className="jobs-search-input"
-            placeholder="Search by role, skill, or keyword... (AI-powered)"
+            placeholder="Search by role, skill, or keyword"
             value={searchQuery}
             onChange={handleSearchChange}
             aria-label="Search jobs"
           />
         </div>
 
-        {fetchState === 'loading' && (
-          <AiAnalysisLoader
-            isDataReady={pendingJobs !== null}
-            onComplete={handleAnalysisComplete}
-          />
-        )}
+        {fetchState === 'loading' && <JobSuggestionsSkeleton />}
 
         {fetchState === 'error' && (
           <div className="page-error">
