@@ -217,7 +217,7 @@ export interface EvaluationMessage {
   content: string;
 }
 
-export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY' | 'DREAMJOB';
+export type EvaluationMode = 'DREAMJOB' | 'NEAR_TERM' | 'GUIDED';
 
 export interface EvaluationExpected {
   mode?: EvaluationMode;

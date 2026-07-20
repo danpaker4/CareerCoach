@@ -1,13 +1,11 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { StatusCodes } from "http-status-codes";
+import { AdminAuthService } from "../admin/admin-auth.service";
+import type { AdminAuthResult } from "../admin/admin-auth.types";
 import { BENCHMARK_DEFAULT_RUN_LIMIT, BENCHMARK_MAX_RUN_LIMIT } from "./benchmark.consts";
-import { BenchmarkAdminAuthService } from "./benchmark-admin-auth.service";
 import { BenchmarkService } from "./benchmark.service";
 import type { BenchmarkCandidateId, BenchmarkRunRequest } from "./benchmark.types";
-import type { BenchmarkAdminAuthResult } from "./benchmark-admin-auth.service";
-
-const isBenchmarkCandidateId = (value: unknown): value is BenchmarkCandidateId =>
-    value === "ollama-llama" || value === "gemini";
+import { isBenchmarkCandidateId } from "./benchmark.utils";
 
 const readAuthorizationHeader = (request: FastifyRequest): string | undefined => {
     const header = request.headers.authorization;
@@ -50,7 +48,7 @@ const parseRunRequest = (body: unknown): BenchmarkRunRequest => {
     };
 };
 
-const sendAuthFailure = (authResult: BenchmarkAdminAuthResult, reply: FastifyReply): boolean => {
+const sendAuthFailure = (authResult: AdminAuthResult, reply: FastifyReply): boolean => {
     if (authResult.status === "success") {
         return false;
     }
@@ -65,7 +63,7 @@ const sendAuthFailure = (authResult: BenchmarkAdminAuthResult, reply: FastifyRep
 export class BenchmarkController {
     constructor(
         private readonly benchmarkService: BenchmarkService,
-        private readonly authService: BenchmarkAdminAuthService
+        private readonly authService: AdminAuthService
     ) { }
 
     getConfig = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {

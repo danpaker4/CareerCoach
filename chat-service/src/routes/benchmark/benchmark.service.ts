@@ -1,34 +1,22 @@
 import { randomUUID } from "crypto";
 import type { ServerConfig } from "../../server.types";
 import type { MongoClient } from "../../mongo/mongo";
-import type { ResolvedLlmConfig } from "../../ai/llm-config.types";
-import { createTextCompletionPortFromChain } from "../../ai/text-completion.utils";
-import { ConversationRepository } from "../conversation/conversation.repository";
+import type { ResolvedLlmConfig } from "../../litellm/config/litellm-config.types";
+import { createTextCompletionPort } from "../../litellm/text-completion/text-completion.utils";
+import { ConversationDal } from "../conversation/conversation.dal";
 import { ChatConversationService } from "../conversation/conversation.service";
-import { ConversationStageService } from "../conversation/conversation.stage.service";
-import { ChatLlmService } from "../chat/llm/chat.llm.service";
-import { ChatValidationService } from "../chat/llm/chat.validation.service";
-import { ChatService } from "../chat/chat.service";
-import { CareerProfileRepository } from "../career-profile/career-profile.repository";
+import { createChatFlow } from "../../chat-flow/chat-flow.factory";
+import type { ChatFlow } from "../../chat-flow/chat-flow.types";
+import { CareerProfileDal } from "../career-profile/dal/career-profile.dal";
 import { CareerProfileService } from "../career-profile/career-profile.service";
-import { ConfidenceService } from "../chat/confidence/confidence.service";
-
-import { AchievementInferenceService } from "../chat/inference/achievement-inference/achievement-inference.service";
-import { SeniorityInferenceService } from "../chat/inference/seniority-inference/seniority-inference.service";
-import { JobSearchPlanService } from "../chat/search/job-search-plan.service";
-import { JobRankingService } from "../chat/ranking/job-ranking.service";
-import { JobFollowUpAnswerService } from "../chat/job-follow-up-answer/job-follow-up-answer.service";
-import { PipelineIntentService } from "../chat/pipeline/pipeline-intent.service";
-import { PipelineService } from "../chat/pipeline/pipeline.service";
-import type { DreamJobRoadmapCreator } from "../chat/dream-job/chat.dream-job-roadmap.types";
+import type { DreamJobRoadmapCreator } from "../../chat-flow/stage-2-shortcuts/dream-job/chat.dream-job-roadmap.types";
 import { BenchmarkFixtureExternalService } from "./benchmark-fixture.external-service";
-import { BenchmarkNoopCareerKnowledgeService, BenchmarkNoopEmbeddingPort } from "./benchmark-noop.services";
-import { BenchmarkRunRepository } from "./benchmark.repository";
+import { BenchmarkNoopEmbeddingPort, createBenchmarkNoopSuggestDirections } from "./benchmark-noop.services";
+import { BenchmarkRunDal } from "./benchmark.dal";
 import {
     BENCHMARK_CASES,
-    BENCHMARK_GEMINI_MODEL_FALLBACK,
-    BENCHMARK_OLLAMA_BASE_URL_FALLBACK,
-    BENCHMARK_OLLAMA_MODEL_FALLBACK,
+    BENCHMARK_DEFAULT_MODEL,
+    BENCHMARK_FALLBACK_MODEL,
     BENCHMARK_RANDOM_CASE_COUNT,
     BENCHMARK_RUBRIC,
     BENCHMARK_USER_ID_PREFIX,
@@ -48,33 +36,24 @@ import {
     BenchmarkLlmObserver,
     BenchmarkTokenUsageRecorder,
     calculateCaseResult,
+    isBenchmarkCandidateId,
     normalizeCandidateScores,
     toBenchmarkRunSummary,
 } from "./benchmark.utils";
-
-const isBenchmarkCandidateId = (value: string): value is BenchmarkCandidateId =>
-    value === "ollama-llama" || value === "gemini";
 
 const average = (values: readonly number[]): number =>
     values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
 
 const toErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
-const resolveCandidateConfig = (candidateId: BenchmarkCandidateId, chatConfig: ServerConfig["chatConfig"]): ResolvedLlmConfig | null => {
-    if (candidateId === "ollama-llama") {
-        const configured = chatConfig.llmTextCompletionChain.find((item) => item.provider === "ollama");
-        if (configured?.provider === "ollama") {
-            return configured;
-        }
-        return {
-            provider: "ollama",
-            endpointUrl: BENCHMARK_OLLAMA_BASE_URL_FALLBACK,
-            model: BENCHMARK_OLLAMA_MODEL_FALLBACK,
-        };
-    }
-
-    const configured = chatConfig.llmTextCompletionChain.find((item) => item.provider === "gemini");
-    return configured?.provider === "gemini" ? configured : null;
+const resolveCandidateConfig = (candidateId: BenchmarkCandidateId, chatConfig: ServerConfig["chatConfig"]): ResolvedLlmConfig => {
+    const model = candidateId === "ollama-llama" ? BENCHMARK_DEFAULT_MODEL : BENCHMARK_FALLBACK_MODEL;
+    return {
+        provider: "litellm",
+        endpointUrl: chatConfig.llm.endpointUrl,
+        model,
+        ...(chatConfig.llm.apiKey ? { apiKey: chatConfig.llm.apiKey } : {}),
+    };
 };
 
 const toCandidate = (candidateId: BenchmarkCandidateId, chatConfig: ServerConfig["chatConfig"]): BenchmarkCandidate => {
@@ -82,21 +61,19 @@ const toCandidate = (candidateId: BenchmarkCandidateId, chatConfig: ServerConfig
     if (candidateId === "ollama-llama") {
         return {
             id: candidateId,
-            label: "Llama via Ollama",
-            provider: "ollama",
-            model: config?.provider === "ollama" ? config.model : BENCHMARK_OLLAMA_MODEL_FALLBACK,
-            available: Boolean(config),
-            ...(config ? {} : { unavailableReason: "Ollama configuration is unavailable." }),
+            label: "Llama via LiteLLM",
+            provider: "litellm",
+            model: config.model,
+            available: true,
         };
     }
 
     return {
         id: candidateId,
-        label: "Gemini",
-        provider: "gemini",
-        model: config?.provider === "gemini" ? config.model : BENCHMARK_GEMINI_MODEL_FALLBACK,
-        available: Boolean(config),
-        ...(config ? {} : { unavailableReason: "GEMINI_API_KEY is not configured for chat-service." }),
+        label: "Gemini via LiteLLM",
+        provider: "litellm",
+        model: config.model,
+        available: true,
     };
 };
 
@@ -143,7 +120,7 @@ export class BenchmarkService {
     constructor(
         private readonly dbClient: MongoClient,
         private readonly chatConfig: ServerConfig["chatConfig"],
-        private readonly repository: BenchmarkRunRepository
+        private readonly dal: BenchmarkRunDal
     ) { }
 
     getConfig = (): BenchmarkConfigResponse => ({
@@ -157,10 +134,10 @@ export class BenchmarkService {
     });
 
     listRuns = async (limit: number): Promise<BenchmarkRunSummary[]> =>
-        (await this.repository.list(limit)).map(toBenchmarkRunSummary);
+        (await this.dal.list(limit)).map(toBenchmarkRunSummary);
 
     getRun = async (runId: string): Promise<BenchmarkRunSummary | null> => {
-        const run = await this.repository.findById(runId);
+        const run = await this.dal.findById(runId);
         return run ? toBenchmarkRunSummary(run) : null;
     };
 
@@ -182,7 +159,7 @@ export class BenchmarkService {
             selectedCandidateIds: candidateIds,
             candidateResults: normalizedCandidateResults,
         };
-        return toBenchmarkRunSummary(await this.repository.create(run));
+        return toBenchmarkRunSummary(await this.dal.create(run));
     };
 
     private runCandidate = async (
@@ -236,14 +213,14 @@ export class BenchmarkService {
         const userId = `${BENCHMARK_USER_ID_PREFIX}-${candidateId}-${benchmarkCase.id}-${randomUUID()}`;
         const tokenRecorder = new BenchmarkTokenUsageRecorder();
         const observer = new BenchmarkLlmObserver();
-        const service = this.createChatService(config, benchmarkCase, tokenRecorder, observer);
+        const chatFlow = this.createChatFlow(config, benchmarkCase, tokenRecorder, observer);
         const startTime = Date.now();
         const replies: string[] = [];
 
         try {
             await this.cleanupBenchmarkUser(userId);
             for (const message of benchmarkCase.messages) {
-                const response = await service.sendMessage(userId, message, benchmarkCase.profile);
+                const response = await chatFlow.sendMessage(userId, message, benchmarkCase.profile);
                 replies.push(response.reply);
             }
             return calculateCaseResult({
@@ -267,43 +244,33 @@ export class BenchmarkService {
         }
     };
 
-    private createChatService = (
+    private createChatFlow = (
         config: ResolvedLlmConfig,
         benchmarkCase: BenchmarkCase,
         tokenRecorder: BenchmarkTokenUsageRecorder,
         observer: BenchmarkLlmObserver
-    ): ChatService => {
-        const conversationRepository = new ConversationRepository(this.dbClient.conversations);
+    ): ChatFlow => {
+        const conversationDal = new ConversationDal(this.dbClient.conversations);
         const externalService = new BenchmarkFixtureExternalService(benchmarkCase);
-        const stageService = new ConversationStageService();
-        const conversationService = new ChatConversationService(conversationRepository, externalService, stageService);
-        const textCompletion = createTextCompletionPortFromChain([config], tokenRecorder);
-        const llmService = new ChatLlmService(textCompletion, observer);
-        const profileRepository = new CareerProfileRepository(this.dbClient.careerProfiles);
-        const profileService = new CareerProfileService(profileRepository, new BenchmarkNoopEmbeddingPort(), null);
-        const knowledgeService = new BenchmarkNoopCareerKnowledgeService(this.dbClient.careerDirectionExamples);
+        const conversationService = new ChatConversationService(conversationDal, externalService);
+        const textCompletion = createTextCompletionPort(config, tokenRecorder);
+        const profileDal = new CareerProfileDal(this.dbClient.careerProfiles);
+        const profileService = new CareerProfileService(profileDal, new BenchmarkNoopEmbeddingPort(), textCompletion, null);
+        const suggestDirections = createBenchmarkNoopSuggestDirections(this.dbClient.careerDirectionExamples);
         const dreamJobRoadmapCreator: DreamJobRoadmapCreator = {
             create: async () => ({ created: true }),
         };
 
-        return new ChatService(
+        return createChatFlow({
             conversationService,
-            stageService,
             externalService,
-            llmService,
-            new ChatValidationService(),
             profileService,
-            new ConfidenceService(),
-            new AchievementInferenceService(),
-            new SeniorityInferenceService(),
-            new JobSearchPlanService(),
-            new JobRankingService(),
-            knowledgeService,
-            new JobFollowUpAnswerService(),
-            new PipelineIntentService(),
-            new PipelineService(this.chatConfig.jobServiceBaseUrl),
-            dreamJobRoadmapCreator
-        );
+            textCompletion,
+            jobServiceBaseUrl: this.chatConfig.jobServiceBaseUrl,
+            dreamJobRoadmapCreator,
+            suggestDirections,
+            llmObserver: observer,
+        });
     };
 
     private cleanupBenchmarkUser = async (userId: string): Promise<void> => {

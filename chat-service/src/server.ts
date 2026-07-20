@@ -2,20 +2,17 @@ import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod"; 
-
 import { MongoClient } from "./mongo/mongo"; 
-import { chatRouter } from "./routes/chat/chat.router";
+import { chatRouter } from "./chat-flow/api/routers/chat.router";
 import { conversationRouter } from "./routes/conversation/conversation.router";
 import { benchmarkRouter } from "./routes/benchmark/benchmark.router";
-import { internalRouter } from "./routes/internal/internal.router";
-import { ChatRateLimitRepository } from "./routes/chat/rate-limit/chat-rate-limit.repository";
-import { ChatRateLimitService } from "./routes/chat/rate-limit/chat-rate-limit.service";
-import { chatRateLimitRouter } from "./routes/chat/rate-limit/chat-rate-limit.router";
+import { internalRouter } from "./routes/internal-api/internal.router";
+import { ChatRateLimitDal } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.dal";
+import { ChatRateLimitService } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.service";
+import { chatRateLimitRouter } from "./chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.router";
 import type { ServerConfig } from "./server.types";
-import { ChatQueueClient } from "./routes/chat/queue/chat-queue.client";
-import { ChatRequestRealtimeService } from "./routes/chat/request/chat-request-realtime.service";
-
-export type { ServerConfig } from "./server.types";
+import { ChatQueueClient } from "./chat-flow/stage-0-gateway/queue/chat-queue.client";
+import { ChatRequestRealtimeService } from "./chat-flow/api/async-jobs/chat-request-realtime.service";
 
 export class Server {
     readonly app: FastifyInstance;
@@ -51,14 +48,14 @@ export class Server {
             });
             await this.app.register(websocket);
 
-            const rateLimitRepository = new ChatRateLimitRepository(
+            const rateLimitDal = new ChatRateLimitDal(
                 this.DBClient.chatRateLimitConfig,
                 this.DBClient.chatRateLimitConfigHistory,
                 this.DBClient.chatRateLimitCounters,
                 this.DBClient.chatActiveRequests,
                 this.DBClient.llmTokenUsage
             );
-            const rateLimitService = new ChatRateLimitService(rateLimitRepository);
+            const rateLimitService = new ChatRateLimitService(rateLimitDal);
             const realtimeService = new ChatRequestRealtimeService();
             await queueClient.consumeEvents(async (event) => {
                 realtimeService.broadcast(event);

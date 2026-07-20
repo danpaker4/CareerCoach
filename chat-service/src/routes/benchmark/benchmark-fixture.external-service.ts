@@ -1,11 +1,11 @@
-import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse } from "../chat/chat.types";
-import { ChatExternalService } from "../external-chat/chat.external.service";
+import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse } from "../../chat-flow/api/shared/chat.types";
+import { ChatExternalService } from "../external-chat-tools/chat.external.service";
 import type {
     ApplyInferredAchievementSignalsParams,
     ApplyInferredRoleExperienceParams,
     CreateCareerRoadmapParams,
-} from "../external-chat/chat.external.types";
-import type { RoleExperienceEntry } from "../external-chat/role-experience.types";
+} from "../external-chat-tools/chat.external.types";
+import type { RoleExperienceEntry } from "../external-chat-tools/role-experience.types";
 import type { BenchmarkCase } from "./benchmark.types";
 
 export class BenchmarkFixtureExternalService extends ChatExternalService {

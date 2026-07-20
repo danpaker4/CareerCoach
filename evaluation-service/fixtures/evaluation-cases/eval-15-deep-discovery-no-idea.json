@@ -1,12 +1,17 @@
 {
-  "id": "eval-15-deep-discovery-no-idea",
-  "messages": [
-    { "role": "user", "content": "i have no idea which job is right for me" }
-  ],
-  "expected": {
-    "mode": "DEEP_DISCOVERY",
-    "maxLines": 12,
-    "mustAskQuestion": true,
-    "forbiddenWords": ["I recommend you become"]
-  }
+    "id": "eval-15-deep-discovery-no-idea",
+    "messages": [
+        {
+            "role": "user",
+            "content": "i have no idea which job is right for me"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 12,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "I recommend you become"
+        ]
+    }
 }

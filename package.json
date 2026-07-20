@@ -11,7 +11,15 @@
     "dev:roadmap-service": "npm --prefix roadmap-service run dev",
     "dev:evaluation-service": "npm --prefix evaluation-service run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,ROADMAP,EVAL,FRONT \"npm run dev:users-service\" \"npm run dev:chat-service\" \"npm run dev:chat-worker\" \"npm run dev:job-service\" \"npm run dev:roadmap-service\" \"npm run dev:evaluation-service\" \"npm run dev:frontend\""
+    "dev": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,ROADMAP,EVAL,FRONT \"npm run dev:users-service\" \"npm run dev:chat-service\" \"npm run dev:chat-worker\" \"npm run dev:job-service\" \"npm run dev:roadmap-service\" \"npm run dev:evaluation-service\" \"npm run dev:frontend\"",
+  "build": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,ROADMAP,EVAL,FRONT \"npm run build:users-service\" \"npm run build:chat-service\" \"npm run build:chat-worker\" \"npm run build:job-service\" \"npm run build:roadmap-service\" \"npm run build:evaluation-service\" \"npm run build:frontend\"",
+  "build:users-service": "npm --prefix users-service run build",
+  "build:chat-service": "npm --prefix chat-service run build",
+  "build:chat-worker": "npm --prefix chat-service run build:worker",
+  "build:job-service": "npm --prefix job-service run build",
+  "build:roadmap-service": "npm --prefix roadmap-service run build",
+  "build:evaluation-service": "npm --prefix evaluation-service run build",
+  "build:frontend": "npm --prefix frontend run build"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

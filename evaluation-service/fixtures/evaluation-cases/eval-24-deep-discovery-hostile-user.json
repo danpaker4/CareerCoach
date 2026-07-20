@@ -1,21 +1,36 @@
 {
-  "id": "eval-24-deep-discovery-hostile-user",
-  "messages": [
-    { "role": "user", "content": "nothing fits me and career advice is usually useless" },
-    { "role": "assistant", "content": "That sounds frustrating. Want to explore what drains you vs what energizes you?" },
-    { "role": "user", "content": "not really. just tell me the best paying role and done" },
-    { "role": "assistant", "content": "I can help narrow options. Is salary your top priority or do you also care about work-life balance?" },
-    { "role": "user", "content": "salary only maybe. i get bored fast and hate meetings." }
-  ],
-  "expected": {
-    "mode": "DEEP_DISCOVERY",
-    "maxLines": 12,
-    "mustAskQuestion": true,
-    "forbiddenWords": [
-      "there is one perfect role for you",
-      "you must become",
-      "your personality cannot change",
-      "stop being difficult"
-    ]
-  }
+    "id": "eval-24-deep-discovery-hostile-user",
+    "messages": [
+        {
+            "role": "user",
+            "content": "nothing fits me and career advice is usually useless"
+        },
+        {
+            "role": "assistant",
+            "content": "That sounds frustrating. Want to explore what drains you vs what energizes you?"
+        },
+        {
+            "role": "user",
+            "content": "not really. just tell me the best paying role and done"
+        },
+        {
+            "role": "assistant",
+            "content": "I can help narrow options. Is salary your top priority or do you also care about work-life balance?"
+        },
+        {
+            "role": "user",
+            "content": "salary only maybe. i get bored fast and hate meetings."
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 12,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "there is one perfect role for you",
+            "you must become",
+            "your personality cannot change",
+            "stop being difficult"
+        ]
+    }
 }
