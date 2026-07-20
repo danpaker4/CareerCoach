@@ -2,28 +2,12 @@ import type { Collection, Filter, WithId } from "mongodb";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import { cosineSimilarity } from "../jobScores/vector-score.service";
 
-// Only jobs with a non-empty embedding can take part in semantic search.
 export const EMBEDDED_JOBS_FILTER = {
   "searchEmbedding.0": { $exists: true },
 } as unknown as Filter<EnrichedJob>;
 
-// Safety backstop on how many embedded jobs we pull in to rerank.
 const MAX_RERANK_CANDIDATES = 10_000;
 
-/**
- * Rank items by cosine similarity between the query embedding and each item's
- * pre-computed `searchEmbedding`, most relevant first.
- *
- * This is real, in-app vector search (no Atlas `$vectorSearch` required): the
- * query is embedded by the LLM, then compared against the stored embeddings. It
- * infers semantic intent — e.g. "pm" surfaces "Product Manager" roles — with no
- * hand-maintained synonym list.
- *
- * Items whose embedding dimensionality differs from the query (e.g. produced by
- * a different model) are skipped, since cross-model cosine is meaningless.
- * `minSimilarity` lets callers drop weak matches; the default of 0 keeps every
- * item and relies purely on ordering.
- */
 export const rankJobsByCosine = <T extends { searchEmbedding?: number[] }>(
   queryVector: number[],
   jobs: readonly T[],
@@ -45,12 +29,6 @@ export const rankJobsByCosine = <T extends { searchEmbedding?: number[] }>(
     .map((scored) => scored.job);
 };
 
-/**
- * DB-backed semantic search shared by both search routes. Fetches only the id +
- * embedding of candidate jobs (cheap), ranks them by cosine similarity, then
- * hydrates the full documents for just the top `limit` results — preserving the
- * relevance order. Returns [] when no jobs have embeddings yet.
- */
 export const semanticSearchJobs = async (
   collection: Collection<EnrichedJob>,
   queryVector: number[],

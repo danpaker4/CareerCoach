@@ -29,8 +29,6 @@ interface JobsHandlerDeps {
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// Keyword fallback, used only when semantic search is unavailable (no embedding
-// model configured, or no jobs have embeddings yet).
 const regexSearch = async (
   collection: Collection<EnrichedJob>,
   term: string
@@ -48,9 +46,6 @@ const regexSearch = async (
     .toArray();
 };
 
-// Real, in-app vector search: embed the query, then rank embedded jobs by
-// cosine similarity. Returns null when no embedding model is configured, so the
-// caller can fall back to keyword search. No Atlas / $vectorSearch index needed.
 const semanticSearch = async (
   collection: Collection<EnrichedJob>,
   term: string
@@ -70,8 +65,6 @@ const searchJobs = async (
     const semantic = await semanticSearch(collection, term);
     if (semantic && semantic.length > 0) return semantic;
   } catch (error) {
-    // Genuine faults (bad API key, Mongo errors) shouldn't silently masquerade
-    // as keyword results — log before degrading so misconfiguration is visible.
     logger?.warn({ err: error }, "Semantic search failed; falling back to keyword search");
   }
 
@@ -139,10 +132,6 @@ export const JobsHandler = ({
         benefits: job.benefits,
         matchPct: getMatchPct(userEmbedding, job.searchEmbedding),
       }));
-      // When the user is browsing (no query), order and filter by profile fit.
-      // When they typed a query, honor the search: keep the cosine relevance
-      // order and don't hide jobs just because they aren't an 80% profile match
-      // (matchPct stays on each result as informational metadata).
       const sortedResult = userEmbedding && isBrowse
         ? [...result].sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0))
         : result;
