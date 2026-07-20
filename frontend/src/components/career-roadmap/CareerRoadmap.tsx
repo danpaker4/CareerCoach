@@ -291,7 +291,27 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
         </div>
 
         {fetchState === 'loading' && (
-          <div className="page-loading"><div className="spinner" /><p>Loading your roadmap...</p></div>
+          <div className="roadmap-skeleton">
+            <div className="skeleton-card">
+              <div className="skeleton-line skeleton-line--title" />
+              <div className="skeleton-line skeleton-line--subtitle" />
+              <div className="skeleton-progress">
+                <div className="skeleton-line skeleton-line--label" />
+                <div className="skeleton-line skeleton-line--bar" />
+              </div>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="skeleton-step">
+                  <div className="skeleton-circle" />
+                  <div className="skeleton-step-body">
+                    <div className="skeleton-line skeleton-line--step-label" />
+                    <div className="skeleton-line skeleton-line--step-heading" />
+                    <div className="skeleton-line skeleton-line--step-desc" />
+                    <div className="skeleton-line skeleton-line--step-desc-short" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {fetchState === 'error' && (
