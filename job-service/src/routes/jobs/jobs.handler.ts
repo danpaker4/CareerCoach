@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyBaseLogger, FastifyReply, FastifyRequest } from "fastify";
 import type { Collection } from "mongodb";
 import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
@@ -13,9 +13,8 @@ import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/
 import { fetchUserProfileEmbedding } from "./user-profile.client";
 import type { CreateJobBody } from "./jobs.schema";
 import { MIN_MATCH_FIT_PCT } from "./jobs.consts";
+import { semanticSearchJobs } from "./semantic-search";
 
-const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
-const NUM_CANDIDATES = 150;
 const SEARCH_LIMIT = 50;
 
 type GetJobsQuery = { search?: string; userId?: string };
@@ -47,37 +46,26 @@ const regexSearch = async (
     .toArray();
 };
 
-const vectorSearch = async (
-  collection: Collection<EnrichedJob>,
-  queryVector: number[]
-): Promise<EnrichedJob[]> =>
-  collection
-    .aggregate<EnrichedJob>([
-      {
-        $vectorSearch: {
-          index: VECTOR_INDEX_NAME,
-          path: "searchEmbedding",
-          queryVector,
-          numCandidates: NUM_CANDIDATES,
-          limit: SEARCH_LIMIT,
-        },
-      },
-    ])
-    .toArray();
-
-const vectorSearchWithFallback = async (
+const semanticSearch = async (
   collection: Collection<EnrichedJob>,
   term: string
+): Promise<EnrichedJob[] | null> => {
+  const queryVector = await generateQueryVector(term);
+  if (!queryVector) return null;
+
+  return semanticSearchJobs(collection, queryVector, SEARCH_LIMIT);
+};
+
+const searchJobs = async (
+  collection: Collection<EnrichedJob>,
+  term: string,
+  logger?: FastifyBaseLogger
 ): Promise<EnrichedJob[]> => {
   try {
-    const queryVector = await generateQueryVector(term);
-
-    if (queryVector) {
-      const results = await vectorSearch(collection, queryVector);
-      if (results.length > 0) return results;
-    }
-  } catch {
-    // Fall through to regex search when vector search cannot be used.
+    const semantic = await semanticSearch(collection, term);
+    if (semantic && semantic.length > 0) return semantic;
+  } catch (error) {
+    logger?.warn({ err: error }, "Semantic search failed; falling back to keyword search");
   }
 
   return regexSearch(collection, term);
@@ -127,8 +115,9 @@ export const JobsHandler = ({
     try {
       const { search, userId } = request.query;
       const term = search?.trim();
+      const isBrowse = !term;
       const jobs = term
-        ? await vectorSearchWithFallback(jobsCollection, term)
+        ? await searchJobs(jobsCollection, term, request.log)
         : await jobsCollection.find({}).limit(SEARCH_LIMIT).toArray();
       const userEmbedding = await getUserEmbedding(userId, embeddingCache, usersServiceBaseUrl);
       const result = jobs.map((job) => ({
@@ -143,10 +132,10 @@ export const JobsHandler = ({
         benefits: job.benefits,
         matchPct: getMatchPct(userEmbedding, job.searchEmbedding),
       }));
-      const sortedResult = userEmbedding
+      const sortedResult = userEmbedding && isBrowse
         ? [...result].sort((a, b) => (b.matchPct ?? 0) - (a.matchPct ?? 0))
         : result;
-      const filteredResult = userEmbedding
+      const filteredResult = userEmbedding && isBrowse
         ? sortedResult.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
         : sortedResult;
 

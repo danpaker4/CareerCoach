@@ -135,11 +135,12 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
 
   const handleAnalysisComplete = useCallback(() => {
     if (pendingJobs !== null) {
-      setJobs(filterByMatchFit(pendingJobs));
+      const isSearching = searchQuery.trim().length > 0;
+      setJobs(isSearching ? pendingJobs : filterByMatchFit(pendingJobs));
       setPendingJobs(null);
       setFetchState('success');
     }
-  }, [pendingJobs]);
+  }, [pendingJobs, searchQuery]);
 
   useEffect(() => {
     void loadPipelineJobHashes();
