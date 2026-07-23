@@ -1,6 +1,6 @@
-import type { SanitizedJob } from "../../../routes/conversation/job-in-conversation.types";
-import { hashStringToNumber } from "./pipeline-hash.utils";
-import type { AddJobToPipelineResult } from "./pipeline.types";
+import type { SanitizedJob } from "../../../../routes/conversation/job-in-conversation.types";
+import { hashStringToNumber } from "./pipeline-accept.utils";
+import type { AddJobToPipelineResult } from "./pipeline-accept.types";
 
 export const addJobToPipeline = async (
     jobServiceBaseUrl: string,

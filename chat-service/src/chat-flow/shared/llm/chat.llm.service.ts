@@ -3,6 +3,7 @@ import type { UserAchievement } from "../../api/shared/chat.model";
 import type { Conversation, DreamJobFlow } from "../../../routes/conversation/conversation.model";
 import type { ConversationStage } from "../../../routes/conversation/conversation.types";
 import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../../api/shared/chat.types";
+import type { ChatFlowDeps, SendMessagePreparedContext } from "../../chat-flow.types";
 import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
 import { DEFAULT_CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import {
@@ -31,24 +32,21 @@ const recordParseEvent = (
 };
 
 export const decideNextStep = async (
-    textCompletion: TextCompletionPort,
-    conversation: Conversation,
-    latestUserMessage: string,
-    userAchievements: readonly UserAchievement[],
-    userAccountContext?: string,
-    observer?: ChatLlmObserver
+    deps: ChatFlowDeps,
+    ctx: SendMessagePreparedContext
 ): Promise<LlmDecision> => {
-    const rawText = await textCompletion.complete(
-        buildDecisionPrompt(conversation, latestUserMessage, userAchievements, userAccountContext),
+    const conversation = ctx.conversationAfterUserMessage;
+    const rawText = await deps.textCompletion.complete(
+        buildDecisionPrompt(conversation, ctx.normalizedMessage, ctx.userAchievements, ctx.userAccountContext),
         { operation: "chat.decision", userId: conversation.userId }
     );
 
     try {
         const parsed = parseLlmDecisionFromJson(rawText);
-        recordParseEvent(observer, "chat.decision", rawText, "success");
+        recordParseEvent(deps.llmObserver, "chat.decision", rawText, "success");
         return parsed;
     } catch {
-        recordParseEvent(observer, "chat.decision", rawText, "fallback");
+        recordParseEvent(deps.llmObserver, "chat.decision", rawText, "fallback");
         return {
             reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
             shouldSearchJobs: false,

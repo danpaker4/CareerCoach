@@ -36,7 +36,6 @@ export type SendMessagePreparedContext = {
     userCareerProfile: UserCareerProfile;
     userRoleExperience: RoleExperienceEntry[];
     confidenceSummary: ConfidenceSummary;
-    mode: ConversationMode;
     modeDetection: ConversationModeDetectionResult;
     followUpIntent: JobFollowUpIntentResult;
     authorization?: string;

@@ -1,26 +1,16 @@
-import type { Conversation } from "../../routes/conversation/conversation.types";
-import type { UserCareerProfile } from "../../routes/career-profile/career-profile.types";
-import type { RoleExperienceEntry } from "../../routes/external-chat-tools/role-experience.types";
+import type { Conversation } from "../../routes/conversation/conversation.model";
 import type { JobSearchResultItem } from "../api/shared/chat.types";
-import type { ConfidenceSummary } from "../stage-1-prepare-context/confidence/confidence.types";
-import type { ConversationMode } from "../stage-1-prepare-context/mode-detection/conversation-mode.types";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../chat-flow.types";
 
 export type PresentRankedJobsOptions = {
     deps: ChatFlowDeps;
-    userId: string;
-    conversationId: string;
-    normalizedMessage: string;
-    conversation: Conversation;
-    userCareerProfile: UserCareerProfile;
-    userRoleExperience: RoleExperienceEntry[];
+    ctx: SendMessagePreparedContext;
     jobs: JobSearchResultItem[];
-    userAccountContext: string;
-    userAchievements: SendMessagePreparedContext["userAchievements"];
-    mode: ConversationMode;
-    confidenceSummary: ConfidenceSummary;
-    queryLabel: string;
     searchIntent: string;
+    /** Defaults to `ctx.conversationAfterUserMessage` when omitted. */
+    conversation?: Conversation;
+    /** Defaults to `ctx.normalizedMessage` when omitted. */
+    queryLabel?: string;
     includeRecommendedDirections?: boolean;
     directionHint?: string;
 };

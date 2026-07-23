@@ -1,8 +1,5 @@
-import type { Conversation } from "../../routes/conversation/conversation.model";
-import type { ConfidenceSummary } from "../stage-1-prepare-context/confidence/confidence.types";
-import type { ConversationMode } from "../stage-1-prepare-context/mode-detection/conversation-mode.types";
+import type { StageFlowSendMessageResult } from "../chat-flow.types";
 import { CONVERSATION_MODE } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
-import type { ChatFlowDeps, SendMessagePreparedContext, StageFlowSendMessageResult } from "../chat-flow.types";
 import {
     applyStageAdvance,
     completeAllStages,
@@ -10,26 +7,26 @@ import {
     recordStageMessage,
 } from "../../routes/conversation/conversation.stage.utils";
 import { generateStageReply } from "../shared/llm/chat.llm.service";
+import type { ResolveStageFlowForSendMessageParams } from "./resolve-stage-flow.types";
 
-export const resolveStageFlowForSendMessage = async (params: {
-    deps: ChatFlowDeps;
-    normalizedMessage: string;
-    conversationAfterUserMessage: Conversation;
-    currentStage: ReturnType<typeof getCurrentStage>;
-    shouldSkipStages: boolean;
-    mode: ConversationMode;
-    userId: string;
-    conversationId: string;
-    userAccountContext: string;
-    userAchievements: SendMessagePreparedContext["userAchievements"];
-    stageProgressWithNote: Conversation["stageProgress"];
-    confidenceSummary: ConfidenceSummary;
-}): Promise<StageFlowSendMessageResult> => {
+export const resolveStageFlowForSendMessage = async (
+    params: ResolveStageFlowForSendMessageParams
+): Promise<StageFlowSendMessageResult> => {
+    const { deps, ctx, shouldSkipStages } = params;
     const {
-        deps, conversationId, userId, normalizedMessage, conversationAfterUserMessage,
-        currentStage, shouldSkipStages, mode, userAccountContext, userAchievements,
-        stageProgressWithNote, confidenceSummary,
-    } = params;
+        userId,
+        conversationId,
+        normalizedMessage,
+        conversationAfterUserMessage,
+        userAccountContext,
+        userAchievements,
+        confidenceSummary,
+    } = ctx;
+    const mode = ctx.modeDetection.mode;
+    const currentStage = getCurrentStage(conversationAfterUserMessage, normalizedMessage);
+    const stageProgressWithNote = currentStage
+        ? recordStageMessage(conversationAfterUserMessage, normalizedMessage, currentStage.id)
+        : conversationAfterUserMessage.stageProgress;
     const initialProgress = shouldSkipStages
         ? completeAllStages(stageProgressWithNote)
         : stageProgressWithNote;

@@ -51,7 +51,6 @@ export const runStage1PrepareContext = async (
         userCareerProfile,
         userRoleExperience,
         confidenceSummary,
-        mode: modeDetection.mode,
         modeDetection,
         followUpIntent,
         authorization,

@@ -25,10 +25,26 @@ const filterEligibleRankedJobs = (userCareerProfile: UserCareerProfile, jobs: Jo
 
 export const presentRankedJobs = async (options: PresentRankedJobsOptions): Promise<ChatMessageResponse> => {
     const {
-        deps, userId, conversationId, normalizedMessage, conversation, userCareerProfile,
-        userRoleExperience, jobs, userAccountContext, userAchievements, mode, confidenceSummary,
-        queryLabel, searchIntent, includeRecommendedDirections = false, directionHint,
+        deps,
+        ctx,
+        jobs,
+        searchIntent,
+        conversation = ctx.conversationAfterUserMessage,
+        queryLabel = ctx.normalizedMessage,
+        includeRecommendedDirections = false,
+        directionHint,
     } = options;
+    const {
+        userId,
+        conversationId,
+        normalizedMessage,
+        userCareerProfile,
+        userRoleExperience,
+        userAccountContext,
+        userAchievements,
+        confidenceSummary,
+    } = ctx;
+    const mode = ctx.modeDetection.mode;
 
     const { rankedJobs, orderedRankedPool } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
 
