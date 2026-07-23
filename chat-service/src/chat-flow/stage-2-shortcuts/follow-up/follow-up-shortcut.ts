@@ -10,14 +10,15 @@ export const tryFollowUpShortcutResponse = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse | null> => {
-    const hasStoredJobs = (ctx.jobContext?.lastReturnedJobs.length ?? 0) > 0;
-    if (!hasStoredJobs || !ctx.followUpIntent.isFollowUp || ctx.followUpIntent.isExplicitNewSearch || !ctx.jobContext) {
+    const jobContext = ctx.conversationAfterUserMessage.jobContext;
+    const hasStoredJobs = (jobContext?.lastReturnedJobs.length ?? 0) > 0;
+    if (!hasStoredJobs || !ctx.followUpIntent.isFollowUp || ctx.followUpIntent.isExplicitNewSearch || !jobContext) {
         return null;
     }
     const resolution = resolveJobSelectionFromFollowUpMessage(
         ctx.normalizedMessage,
-        ctx.jobContext.selectedJobSnapshot,
-        ctx.jobContext.lastReturnedJobs
+        jobContext.selectedJobSnapshot,
+        jobContext.lastReturnedJobs
     );
     if (resolution.status === "missing") {
         const missingMessage = "I do not have stored jobs in context yet. Ask me for jobs first, and I will keep them for follow-up questions.";

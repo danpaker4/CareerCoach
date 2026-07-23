@@ -1,6 +1,5 @@
 import type { Conversation } from "../../routes/conversation/conversation.model";
 import type { UserCareerProfile } from "../../routes/career-profile/career-profile.types";
-import type { RoleExperienceEntry } from "../../routes/external-chat-tools/role-experience.types";
 import type { ChatMessageResponse, JobSearchResultItem } from "../api/shared/chat.types";
 import { rankJobs } from "./ranking/job-ranking.service";
 import {
@@ -14,15 +13,10 @@ import { generateJobAwareReply } from "../shared/llm/chat.llm.service";
 import { EXHAUSTED_JOBS_REPLY } from "./present-jobs.consts";
 import type { PresentRankedJobsOptions } from "./present-jobs.types";
 
-const filterEligibleRankedJobs = (
-    userCareerProfile: UserCareerProfile,
-    jobs: JobSearchResultItem[],
-    userRoleExperience: RoleExperienceEntry[],
-    conversation: Conversation
-) => {
+const filterEligibleRankedJobs = (userCareerProfile: UserCareerProfile, jobs: JobSearchResultItem[], conversation: Conversation) => {
     const rejectedIds = new Set(conversation.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
     const acceptedIds = new Set(conversation.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
-    const rankedJobs = rankJobs(userCareerProfile, jobs, userRoleExperience);
+    const rankedJobs = rankJobs(userCareerProfile, jobs);
     const eligibleRanked = rankedJobs.filter(
         (item) => !rejectedIds.has(item.job.id) && !acceptedIds.has(item.job.id)
     );
@@ -36,12 +30,7 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
         queryLabel, searchIntent, includeRecommendedDirections = false, directionHint,
     } = options;
 
-    const { rankedJobs, orderedRankedPool } = filterEligibleRankedJobs(
-        userCareerProfile,
-        jobs,
-        userRoleExperience,
-        conversation
-    );
+    const { rankedJobs, orderedRankedPool } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
 
     if (orderedRankedPool.length === 0) {
         await deps.conversationService.appendAssistantMessage(userId, conversationId, EXHAUSTED_JOBS_REPLY);

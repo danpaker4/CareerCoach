@@ -1,10 +1,5 @@
 import type { UserAchievementResponse } from "../../chat-flow/api/shared/chat.types";
 import type { GeneratedStageContent } from "../../chat-flow/stage-2-shortcuts/dream-job/chat.dream-job-roadmap.types";
-import type { RoleExperienceEntry } from "./role-experience.types";
-
-export type ApplyInferredRoleExperienceParams = {
-    roleExperience: readonly RoleExperienceEntry[];
-};
 
 export type ApplyInferredAchievementSignalsParams = {
     technologies: readonly string[];

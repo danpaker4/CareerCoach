@@ -1,24 +1,15 @@
 import type { UserCareerProfile } from "../../../routes/career-profile/career-profile.types";
-import type { RoleExperienceEntry } from "../../../routes/external-chat-tools/role-experience.types";
-import { isJobSeniorityCompatibleWithRoleExperience } from "../../stage-1-prepare-context/inference/seniority-inference/seniority-inference.utils";
 import type { JobSearchResultItem } from "../../api/shared/chat.types";
 import type { RankedJobResult } from "./job-ranking.types";
 
 const toLowerSet = (items: readonly string[]): Set<string> => new Set(items.map((item) => item.toLowerCase()));
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
 
-export const rankJobs = (
-    profile: UserCareerProfile,
-    jobs: readonly JobSearchResultItem[],
-    roleExperience: readonly RoleExperienceEntry[] = []
-): RankedJobResult[] => {
+export const rankJobs = (profile: UserCareerProfile, jobs: readonly JobSearchResultItem[]): RankedJobResult[] => {
     const skills = toLowerSet(profile.technologies.map((item) => item.value));
     const preferences = toLowerSet(profile.interests.map((item) => item.value));
-    const seniorityEligibleJobs = jobs.filter((job) =>
-        isJobSeniorityCompatibleWithRoleExperience(roleExperience, job)
-    );
 
-    const scored = seniorityEligibleJobs.map((job) => {
+    const scored = jobs.map((job) => {
         const corpus = `${job.title} ${job.description}`.toLowerCase();
         const skillHits = [...skills].filter((skill) => corpus.includes(skill)).length;
         const prefHits = [...preferences].filter((pref) => corpus.includes(pref)).length;
@@ -26,17 +17,13 @@ export const rankJobs = (
         const semanticSimilarityScore = clamp((prefHits * 18) + (skillHits * 8));
         const preferenceFitScore = clamp(prefHits * 22);
         const growthPotentialScore = clamp(job.seniority.toLowerCase().includes("junior") ? 65 : 55);
-        const seniorityFitScore = clamp(
-            isJobSeniorityCompatibleWithRoleExperience(roleExperience, job) ? 80 : 40
-        );
         const locationOrConstraintFitScore = 50;
         const finalScore = clamp(
-            (skillMatchScore * 0.30)
+            (skillMatchScore * 0.35)
             + (semanticSimilarityScore * 0.25)
             + (preferenceFitScore * 0.15)
             + (growthPotentialScore * 0.15)
-            + (seniorityFitScore * 0.10)
-            + (locationOrConstraintFitScore * 0.05)
+            + (locationOrConstraintFitScore * 0.10)
         );
         const missingSkills = [...skills].filter((skill) => !corpus.includes(skill)).slice(0, 4);
         const reasons = [
@@ -53,7 +40,6 @@ export const rankJobs = (
                 semanticSimilarityScore,
                 preferenceFitScore,
                 growthPotentialScore,
-                seniorityFitScore,
                 locationOrConstraintFitScore,
             },
             reasons,

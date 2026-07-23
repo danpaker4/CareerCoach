@@ -4,7 +4,6 @@ export type ConfidenceSummary = {
     preferencesConfidence: number;
     roleExperienceConfidence: number;
     domainConfidence: number;
-    seniorityConfidence: number;
     searchReadinessConfidence: number;
     discoveryConfidence: number;
 };

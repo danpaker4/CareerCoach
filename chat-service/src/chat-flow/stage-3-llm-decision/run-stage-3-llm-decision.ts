@@ -42,7 +42,7 @@ export const runNearTermSearchFlow = async (
         return { reply: fallback, mode: ctx.mode, confidenceSummary: ctx.confidenceSummary };
     }
 
-    const rankedJobs = rankJobs(ctx.userCareerProfile, jobs, ctx.userRoleExperience);
+    const rankedJobs = rankJobs(ctx.userCareerProfile, jobs);
     const topRankedJobs = rankedJobs.map((item) => item.job);
     const focusJob = topRankedJobs[0];
 

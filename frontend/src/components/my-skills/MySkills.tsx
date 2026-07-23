@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { normalizeUser } from '../../lib/authResponse';
 import { connectGithubAccount } from '../../lib/githubAuth';
 import iconCheck from '../../assets/icon-check.svg';
 import iconZap from '../../assets/icon-zap.svg';
@@ -23,10 +24,12 @@ interface SkillDataset {
 
 interface MySkillsProps {
   user: User;
+  onUserUpdated?: (updated: User) => void;
 }
 
 type FetchState = 'idle' | 'loading' | 'success' | 'error';
 const GITHUB_PROJECT_COUNT_SKILL_SUFFIX = ' github projects';
+const USERS_URL = (userId: string) => `${ENV.USERS_SERVICE_BASE_URL}/users/${userId}`;
 
 const parseSkillDatasets = (data: unknown): SkillDataset[] => {
   if (!Array.isArray(data)) return [];
@@ -42,22 +45,31 @@ const parseSkillDatasets = (data: unknown): SkillDataset[] => {
   });
 };
 
-export const MySkills = ({ user }: MySkillsProps) => {
+const uniqueTrimmedStrings = (items: readonly string[]): string[] =>
+  [...new Set(items.map((item) => item.trim()).filter((item) => item.length > 0))];
+
+export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
+  const [profileUser, setProfileUser] = useState<User>(user);
   const [skillState, setSkillState] = useState<FetchState>('idle');
   const [datasets, setDatasets] = useState<SkillDataset[]>([]);
   const [skillError, setSkillError] = useState('');
+  const onUserUpdatedRef = useRef(onUserUpdated);
+  onUserUpdatedRef.current = onUserUpdated;
 
-  const achievements = user.achievements ?? [];
+  const achievements = profileUser.achievements ?? [];
   const cvSkills = achievements.map((achievement) => achievement.name);
-  const githubSkills = [...new Set((user.githubSkills ?? []).filter((skill) => {
+  const chatTechnologies = uniqueTrimmedStrings(profileUser.technologies ?? []);
+  const chatKnownSkills = uniqueTrimmedStrings(profileUser.knownSkills ?? []);
+  const chatSkills = uniqueTrimmedStrings([...chatTechnologies, ...chatKnownSkills]);
+  const githubSkills = [...new Set((profileUser.githubSkills ?? []).filter((skill) => {
     const normalizedSkill = skill.trim();
     return normalizedSkill.length > 0 && !normalizedSkill.toLowerCase().endsWith(GITHUB_PROJECT_COUNT_SKILL_SUFFIX);
   }))];
-  const hasGithubProfile = Boolean(user.githubUrl) || githubSkills.length > 0;
+  const hasGithubProfile = Boolean(profileUser.githubUrl) || githubSkills.length > 0;
   const githubOauthConfigured = Boolean(ENV.GITHUB_CLIENT_ID);
 
   const loadSkills = useCallback(() => {
-    if (!user?.id) return;
+    if (!user.id) return;
     setSkillState('loading');
     apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, { credentials: 'include' })
       .then(async (res) => {
@@ -70,11 +82,24 @@ export const MySkills = ({ user }: MySkillsProps) => {
         setSkillError(err instanceof Error ? err.message : 'Failed to load skills');
         setSkillState('error');
       });
-  }, [user?.id]);
+  }, [user.id]);
 
   useEffect(() => {
+    if (!user.id) return;
+
+    apiFetch(USERS_URL(user.id), { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const payload: unknown = await res.json();
+        const refreshed = normalizeUser(payload);
+        if (!refreshed) return;
+        setProfileUser(refreshed);
+        onUserUpdatedRef.current?.(refreshed);
+      })
+      .catch(() => undefined);
+
     loadSkills();
-  }, [loadSkills]);
+  }, [user.id, loadSkills]);
 
   const allSkills = datasets.flatMap((dataset) => dataset.skillToImprove);
   const skillsCompleted = allSkills.filter((skill) => skill.isDone).length;
@@ -84,7 +109,7 @@ export const MySkills = ({ user }: MySkillsProps) => {
       <div className="myskills-container">
         <div className="myskills-header">
           <h1 className="myskills-title">My Skills</h1>
-          <p className="myskills-subtitle">Skills from your CV, GitHub and assigned tracker</p>
+          <p className="myskills-subtitle">Skills from your CV, chat, GitHub and assigned tracker</p>
         </div>
 
         <section className="myskills-section">
@@ -98,7 +123,7 @@ export const MySkills = ({ user }: MySkillsProps) => {
             <div className="surface-card myskills-empty">
               <img src={iconZap} alt="" className="myskills-empty-icon" aria-hidden="true" />
               <p>
-                {user.cv
+                {profileUser.cv
                   ? 'No skills extracted yet - make sure the AI service is configured.'
                   : 'Upload your CV on the Profile page to extract skills automatically.'}
               </p>
@@ -107,6 +132,30 @@ export const MySkills = ({ user }: MySkillsProps) => {
             <div className="skill-chips-wrap surface-card">
               {cvSkills.map((skill) => (
                 <span key={skill} className="skill-chip skill-chip--blue">{skill}</span>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="myskills-section">
+          <div className="myskills-section-header">
+            <img src={iconTarget} alt="" aria-hidden="true" className="section-icon section-icon--green" />
+            <h2 className="myskills-section-title">Skills from chat</h2>
+            {chatSkills.length > 0 && <span className="myskills-section-count">{chatSkills.length}</span>}
+          </div>
+
+          {chatSkills.length === 0 ? (
+            <div className="surface-card myskills-empty">
+              <img src={iconTarget} alt="" className="myskills-empty-icon" aria-hidden="true" />
+              <p>Chat with the coach about tools and experience to extract skills here.</p>
+            </div>
+          ) : (
+            <div className="skill-chips-wrap surface-card">
+              {chatTechnologies.map((skill) => (
+                <span key={`tech-${skill}`} className="skill-chip skill-chip--green">{skill}</span>
+              ))}
+              {chatKnownSkills.map((skill) => (
+                <span key={`known-${skill}`} className="skill-chip skill-chip--orange">{skill}</span>
               ))}
             </div>
           )}

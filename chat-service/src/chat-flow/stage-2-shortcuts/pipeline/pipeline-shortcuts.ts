@@ -73,15 +73,14 @@ const pipelineRejectPresentNextSanitizedJob = async (params: {
     rejectedIds: string[];
     rec: JobRecommendationContextState;
     userCareerProfile: UserCareerProfile;
-    userRoleExperience: RoleExperienceEntry[];
     mode: ConversationMode;
     confidenceSummary: ConfidenceSummary;
 }): Promise<ChatMessageResponse> => {
     const {
         deps, userId, conversationId, jobContext, nextSanitized, rejectedIds, rec,
-        userCareerProfile, userRoleExperience, mode, confidenceSummary,
+        userCareerProfile, mode, confidenceSummary,
     } = params;
-    const ranked = rankJobs(userCareerProfile, [nextSanitized], userRoleExperience);
+    const ranked = rankJobs(userCareerProfile, [nextSanitized]);
     const top = ranked[0];
     const reasonsText = top.reasons.join(" ");
     const reply = withPipelineClosing(
@@ -116,7 +115,6 @@ const pipelineRejectFinalizeBroaderRefill = async (params: {
     conversation: Conversation;
     jobContext: NonNullable<Conversation["jobContext"]>;
     userCareerProfile: UserCareerProfile;
-    userRoleExperience: RoleExperienceEntry[];
     rejectedIds: string[];
     rec: JobRecommendationContextState;
     userAccountContext: string;
@@ -128,7 +126,7 @@ const pipelineRejectFinalizeBroaderRefill = async (params: {
 }): Promise<ChatMessageResponse> => {
     const {
         deps, conversationId, userId, conversation, jobContext, userCareerProfile,
-        userRoleExperience, rejectedIds, rec, userAccountContext, mode, confidenceSummary,
+        rejectedIds, rec, userAccountContext, mode, confidenceSummary,
         filteredJobs, orderedPool, focusJob,
     } = params;
     const userAchievements = await deps.externalService.readUserAchievements(userId);
@@ -166,7 +164,7 @@ const pipelineRejectFinalizeBroaderRefill = async (params: {
         "BROADER_PIPELINE_REFILL"
     );
     const presentationJobs = [selectedJob];
-    const rankedForMatches = rankJobs(userCareerProfile, presentationJobs, userRoleExperience);
+    const rankedForMatches = rankJobs(userCareerProfile, presentationJobs);
     const jobMatches = rankedForMatches.map((item) => mapRankedJobResultToChatMatchRow(item));
     const reply = withPipelineClosing(validatedAfterFallback.sanitizedReply);
     await deps.conversationService.appendAssistantMessage(userId, conversationId, reply, presentationJobs);
@@ -221,7 +219,7 @@ const pipelineRejectRunBroaderRefill = async (params: {
         await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
         return { reply, mode, confidenceSummary };
     }
-    const rankedJobs = rankJobs(userCareerProfile, filteredJobs, userRoleExperience);
+    const rankedJobs = rankJobs(userCareerProfile, filteredJobs);
     const orderedPool = rankedJobs.slice(0, 15).map((item) => item.job);
     const focusJob = orderedPool[0] ?? null;
     if (!focusJob) {
@@ -237,7 +235,6 @@ const pipelineRejectRunBroaderRefill = async (params: {
         conversation,
         jobContext,
         userCareerProfile,
-        userRoleExperience,
         rejectedIds,
         rec,
         userAccountContext,
@@ -288,7 +285,6 @@ const handlePipelineReject = async (params: {
             rejectedIds,
             rec,
             userCareerProfile,
-            userRoleExperience,
             mode,
             confidenceSummary,
         });
@@ -316,28 +312,29 @@ export const tryPipelineShortcutResponse = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse | null> => {
+    const jobContext = ctx.conversationAfterUserMessage.jobContext;
     const awaitingPipelineDecision =
-        ctx.jobContext?.jobRecommendationContext?.awaitingPipelineDecision === true
-        && Boolean(ctx.jobContext.selectedJobSnapshot && ctx.jobContext.jobRecommendationContext);
+        jobContext?.jobRecommendationContext?.awaitingPipelineDecision === true
+        && Boolean(jobContext.selectedJobSnapshot && jobContext.jobRecommendationContext);
     const pipelineIntent = awaitingPipelineDecision ? detectPipelineIntent(ctx.normalizedMessage) : null;
-    if (pipelineIntent === "PIPELINE_ACCEPT" && ctx.jobContext) {
+    if (pipelineIntent === "PIPELINE_ACCEPT" && jobContext) {
         return await handlePipelineAccept({
             deps,
             userId: ctx.userId,
             conversationId: ctx.conversationId,
-            jobContext: ctx.jobContext,
+            jobContext,
             mode: ctx.mode,
             confidenceSummary: ctx.confidenceSummary,
         });
     }
-    if (pipelineIntent === "PIPELINE_REJECT" && ctx.jobContext) {
+    if (pipelineIntent === "PIPELINE_REJECT" && jobContext) {
         return await handlePipelineReject({
             deps,
             userId: ctx.userId,
             conversationId: ctx.conversationId,
             normalizedMessage: ctx.normalizedMessage,
             conversation: ctx.conversationAfterUserMessage,
-            jobContext: ctx.jobContext,
+            jobContext,
             userCareerProfile: ctx.userCareerProfile,
             userRoleExperience: ctx.userRoleExperience,
             mode: ctx.mode,

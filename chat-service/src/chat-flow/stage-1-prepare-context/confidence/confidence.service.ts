@@ -6,7 +6,6 @@ import {
     GOALS_CONFIDENCE_POINTS,
     PREFERENCES_CONFIDENCE_POINTS,
     SEARCH_READINESS_BLEND_PERCENT,
-    SENIORITY_CONFIDENCE_POINTS,
     SKILLS_CONFIDENCE_POINTS,
     ROLE_EXPERIENCE_CONFIDENCE_POINTS,
 } from "./confidence.consts";
@@ -38,11 +37,6 @@ export const calculateConfidence = (
         profile.preferredDomains.length * DOMAIN_CONFIDENCE_POINTS.preferredDomainPerItem
             + profile.dislikedDomains.length * DOMAIN_CONFIDENCE_POINTS.dislikedDomainPerItem
     );
-    const seniorityConfidence = toPercent(
-        roleExperience.length > 0 || profile.senioritySignal
-            ? SENIORITY_CONFIDENCE_POINTS.whenKnown
-            : SENIORITY_CONFIDENCE_POINTS.whenUnknown
-    );
     const searchReadinessConfidence = blendPercentScores([
         { score: skillsConfidence, weightPercent: SEARCH_READINESS_BLEND_PERCENT.skills },
         { score: goalsConfidence, weightPercent: SEARCH_READINESS_BLEND_PERCENT.goals },
@@ -61,7 +55,6 @@ export const calculateConfidence = (
         preferencesConfidence,
         roleExperienceConfidence,
         domainConfidence,
-        seniorityConfidence,
         searchReadinessConfidence,
         discoveryConfidence,
     };

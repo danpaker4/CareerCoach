@@ -39,7 +39,6 @@ export type SendMessagePreparedContext = {
     mode: ConversationMode;
     modeDetection: ConversationModeDetectionResult;
     followUpIntent: JobFollowUpIntentResult;
-    jobContext: Conversation["jobContext"];
     authorization?: string;
 };
 

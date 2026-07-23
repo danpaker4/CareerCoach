@@ -1,10 +1,6 @@
 import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResultItem, UserAchievementResponse } from "../../chat-flow/api/shared/chat.types";
 import { ChatExternalService } from "../external-chat-tools/chat.external.service";
-import type {
-    ApplyInferredAchievementSignalsParams,
-    ApplyInferredRoleExperienceParams,
-    CreateCareerRoadmapParams,
-} from "../external-chat-tools/chat.external.types";
+import type { ApplyInferredAchievementSignalsParams, CreateCareerRoadmapParams } from "../external-chat-tools/chat.external.types";
 import type { RoleExperienceEntry } from "../external-chat-tools/role-experience.types";
 import type { BenchmarkCase } from "./benchmark.types";
 
@@ -47,8 +43,5 @@ export class BenchmarkFixtureExternalService extends ChatExternalService {
     override createCareerRoadmap = async (_params: CreateCareerRoadmapParams): Promise<boolean> => true;
 
     override applyInferredAchievementSignals = async (_userId: string, _params: ApplyInferredAchievementSignalsParams): Promise<void> =>
-        undefined;
-
-    override applyInferredRoleExperience = async (_userId: string, _params: ApplyInferredRoleExperienceParams): Promise<void> =>
         undefined;
 }

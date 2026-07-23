@@ -223,7 +223,15 @@ export const App = () => {
               path="/my-skills"
               element={
                 <ProtectedRoute user={currentUser}>
-                  {currentUser ? <MySkills user={currentUser} /> : null}
+                  {currentUser
+                    ? <MySkills
+                        user={currentUser}
+                        onUserUpdated={(u) => {
+                          persistUser(u);
+                          setCurrentUser(u);
+                        }}
+                      />
+                    : null}
                 </ProtectedRoute>
               }
             />

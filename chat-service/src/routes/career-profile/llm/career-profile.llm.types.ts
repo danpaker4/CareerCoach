@@ -8,7 +8,6 @@ export type ProfileInputLlmExtraction = {
     readonly shortTermGoals: readonly string[];
     readonly longTermGoals: readonly string[];
     readonly extractedKeywords: readonly string[];
-    readonly senioritySignal: string | null;
     readonly locationPreference: string | null;
     readonly uncertaintyLevel: number | null;
 };
