@@ -1,0 +1,28 @@
+{
+  "name": "@careercoach/promptfoo-evals",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional Promptfoo runner for CareerCoach evaluation cases",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "eval": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.ts",
+    "eval:compare": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.compare.ts",
+    "view": "tsx scripts/run-promptfoo.ts view",
+    "update": "tsx scripts/generate-promptfoo-tests.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "yaml": "^2.7.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.10",
+    "promptfoo": "^0.118.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.3"
+  }
+}

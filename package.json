@@ -19,7 +19,11 @@
     "build:job-service": "npm --prefix job-service run build",
     "build:roadmap-service": "npm --prefix roadmap-service run build",
     "build:evaluation-service": "npm --prefix evaluation-service run build",
-    "build:frontend": "npm --prefix frontend run build"
+    "build:frontend": "npm --prefix frontend run build",
+    "eval:promptfoo": "npm --prefix evals/promptfoo run eval",
+    "eval:promptfoo:view": "npm --prefix evals/promptfoo run view",
+    "eval:promptfoo:update": "npm --prefix evals/promptfoo run update",
+    "eval:promptfoo:compare": "npm --prefix evals/promptfoo run eval:compare"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

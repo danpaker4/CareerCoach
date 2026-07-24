@@ -138,6 +138,13 @@ export const EvaluationRunMetadataSchema = z.object({
     ranAt: z.string(),
 });
 
+export const EvaluationTokenUsageSchema = z.object({
+    prompt: z.number().int().nonnegative(),
+    completion: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+    requestCount: z.number().int().nonnegative(),
+});
+
 export const EvaluationRunResultSchema = z.object({
     caseId: z.string(),
     runId: z.string(),
@@ -148,6 +155,8 @@ export const EvaluationRunResultSchema = z.object({
     expected: EvaluationExpectedResponseSchema,
     metadata: EvaluationRunMetadataSchema,
     mode: z.string().optional(),
+    jobCount: z.number().int().nonnegative().optional(),
+    tokenUsage: EvaluationTokenUsageSchema.optional(),
 });
 
 export type EvaluationRunResult = z.infer<typeof EvaluationRunResultSchema>;

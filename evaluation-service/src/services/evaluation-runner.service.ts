@@ -11,6 +11,7 @@ import {
     extractUserMessages,
     hasCheckableExpected,
 } from "./evaluation-runner.utils";
+import { sumChatTokenUsageForUser } from "./evaluation-token-usage.utils";
 import type { ChatMessageResponse, EvaluationRunMessage, EvaluationRunResult } from "./evaluation-runner.types";
 
 type ChatRequestStatus = "queued" | "started" | "completed" | "failed";
@@ -263,6 +264,15 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
         expected: expectedForRun,
         actualMode: finalChatResponse.mode,
     });
+    const jobCount =
+        (Array.isArray(finalChatResponse.jobs) ? finalChatResponse.jobs.length : 0) +
+        (Array.isArray(finalChatResponse.jobMatches) ? finalChatResponse.jobMatches.length : 0);
+    const endedAt = new Date();
+    const tokenUsage = await sumChatTokenUsageForUser({
+        userId: config.evaluationUserId,
+        from: new Date(startedAt),
+        to: endedAt,
+    });
 
     return {
         caseId: evaluationCase.id,
@@ -273,12 +283,14 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
         checks,
         expected: expectedForRun,
         mode: finalChatResponse.mode,
+        jobCount,
+        tokenUsage,
         metadata: {
             userId: config.evaluationUserId,
             conversationId,
             userTurnCount: userMessages.length,
-            durationMs: Date.now() - startedAt,
-            ranAt: new Date().toISOString(),
+            durationMs: endedAt.getTime() - startedAt,
+            ranAt: endedAt.toISOString(),
         },
     };
 };
