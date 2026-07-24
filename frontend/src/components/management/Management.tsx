@@ -47,6 +47,13 @@ export const Management = () => (
           <p>Review model responses, compare runs, and track evaluation metrics over time.</p>
           <span className="management-home-card-action">Open LLM evaluation</span>
         </Link>
+
+        <Link to="/management/promptfoo" className="management-home-card">
+          <span className="management-eyebrow">Quality</span>
+          <h2>Promptfoo tests</h2>
+          <p>View Promptfoo eval results in the embedded local viewer (port 15500).</p>
+          <span className="management-home-card-action">Open Promptfoo</span>
+        </Link>
       </div>
     </section>
   </main>
