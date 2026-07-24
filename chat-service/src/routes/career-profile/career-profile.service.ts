@@ -1,4 +1,3 @@
-import type { Conversation } from "../conversation/conversation.model";
 import type { ProfileInput } from "../conversation/conversation.types";
 import type { EmbeddingPort } from "../../ai/embedding/embedding.types";
 import type { TextCompletionPort } from "../../litellm/text-completion/text-completion.types";
@@ -7,7 +6,6 @@ import {
     hasUsableProfileInput,
     inferProfileUpdateFromProfileInputWithLlm,
 } from "./llm/career-profile.llm.utils";
-import { inferProfileUpdateFromMessage } from "./message-inference/career-profile.message-inference.utils";
 import { CareerProfileDal } from "./dal/career-profile.dal";
 import {
     createEmptyProfileSignals,
@@ -70,16 +68,6 @@ export class CareerProfileService {
         };
         await this.dal.upsertByUserId(nextProfile);
         return nextProfile;
-    };
-
-    updateProfileFromConversation = async (
-        userId: string,
-        message: string,
-        _conversationContext: Conversation
-    ): Promise<UserCareerProfile> => {
-        const existing = await this.getProfile(userId);
-        const updates = inferProfileUpdateFromMessage(message);
-        return this.mergeProfileSignals(existing, updates);
     };
 
     updateProfileFromInput = async (userId: string, profile?: ProfileInput): Promise<UserCareerProfile> => {

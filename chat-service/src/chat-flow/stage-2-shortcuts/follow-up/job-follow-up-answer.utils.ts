@@ -105,7 +105,7 @@ export const resolveJobSelectionFromFollowUpMessage = (
 };
 
 /** Lowercase tokens scanned in job descriptions when structured skills are empty. */
-export const JOB_FOLLOW_UP_DESCRIPTION_TECH_KEYWORDS = [
+const JOB_FOLLOW_UP_DESCRIPTION_TECH_KEYWORDS = [
     "react",
     "node",
     "typescript",
@@ -125,7 +125,7 @@ export const JOB_FOLLOW_UP_DISAMBIGUATION_MAX_JOBS = 5;
 export const formatFollowUpList = (items: readonly string[]): string =>
     items.length > 0 ? items.map((item) => `- ${item}`).join("\n") : "- Not available";
 
-export const extractTechKeywordsFromJobDescription = (description: string): string[] => {
+const extractTechKeywordsFromJobDescription = (description: string): string[] => {
     const loweredDescription = description.toLowerCase();
     return JOB_FOLLOW_UP_DESCRIPTION_TECH_KEYWORDS
         .filter((keyword) => loweredDescription.includes(keyword))

@@ -68,5 +68,3 @@ export const resolveStageFlowForSendMessage = async (
     }
     return { kind: "continue_main_flow", progress: nextStageProgress };
 };
-
-export { getCurrentStage, recordStageMessage };

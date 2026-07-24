@@ -1,4 +1,4 @@
-import type { ChatMessageResponse, JobSearchResultItem } from "../../../api/shared/chat.types";
+import type { JobSearchResultItem } from "../../../api/shared/chat.types";
 import type { Conversation } from "../../../../routes/conversation/conversation.model";
 import type { UserCareerProfile } from "../../../../routes/career-profile/career-profile.types";
 import type { RoleExperienceEntry } from "../../../../routes/external-chat-tools/role-experience.types";
