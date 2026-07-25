@@ -1,5 +1,5 @@
 import type { Conversation } from "../../../routes/conversation/conversation.model";
-import { CONVERSATION_MODE_OPTIONS } from "./conversation-mode.consts";
+import { DETECTABLE_CONVERSATION_MODE_OPTIONS } from "./conversation-mode.consts";
 
 const DEFAULT_USER_ACCOUNT_CONTEXT =
     "No structured account context is available yet (no CV excerpt, GitHub skills, or profile lists were provided for this turn).";
@@ -26,7 +26,7 @@ Respond ONLY with valid JSON in this exact structure:
 }
 
 Available modes:
-${JSON.stringify(CONVERSATION_MODE_OPTIONS, null, 2)}
+${JSON.stringify(DETECTABLE_CONVERSATION_MODE_OPTIONS, null, 2)}
 
 Mode rules:
 - DREAMJOB: the user talks about their dreams, working in the future, or long-term goals (not the near time).

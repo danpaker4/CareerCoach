@@ -1,12 +1,12 @@
 # Evaluation case fixtures
 
-28 cases covering **GUIDED**, **NEAR_TERM**, and **DREAMJOB**, with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
+36 cases covering **GUIDED**, **NEAR_TERM**, **DREAMJOB**, and quick-help modes (**SKILLS_GAP**, **CV_IMPROVE**, **INTERVIEW_PREP**), with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
 
 ## Upload one file (UI)
 
 Management → LLM evaluation → **Add Conversation** → pick a `.json` file.
 
-## Seed all 28 into MongoDB
+## Seed all 36 into MongoDB
 
 With evaluation-service running on port 3004:
 
@@ -49,3 +49,11 @@ Skips cases that already exist (409). To replace, delete the case in the UI firs
 | eval-26-deep-discovery-contradictory-goals | GUIDED | Conflicting constraints with low patience |
 | eval-27-dreamjob-founder-aspiration | DREAMJOB | Long-term founder aspiration |
 | eval-28-dreamjob-future-role | DREAMJOB | 10-year future role vision |
+| eval-29-quick-help-skills-gap-ask-role | SKILLS_GAP | Skills-gap shortcut asks for target role |
+| eval-30-quick-help-skills-gap-with-role | GUIDED | Skills-gap advice after role is given |
+| eval-31-quick-help-cv-improve-ask-upload | CV_IMPROVE | CV improve asks for upload when profile is thin |
+| eval-32-quick-help-cv-improve-resume-phrase | CV_IMPROVE | Alternate "review my resume" trigger |
+| eval-33-quick-help-interview-prep-ask-topic | INTERVIEW_PREP | Interview prep asks for topic |
+| eval-34-quick-help-interview-prep-with-topic | INTERVIEW_PREP | Theoretical practice questions after topic |
+| eval-35-quick-help-profile-job-match | NEAR_TERM | Profile job match one-shot search |
+| eval-36-quick-help-skills-gap-exit | GUIDED | Exit sticky skills-gap with "stop" |

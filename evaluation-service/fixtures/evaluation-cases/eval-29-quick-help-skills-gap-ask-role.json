@@ -1,0 +1,20 @@
+{
+    "id": "eval-29-quick-help-skills-gap-ask-role",
+    "messages": [
+        {
+            "role": "user",
+            "content": "What skills should I learn for my next role?"
+        }
+    ],
+    "expected": {
+        "mode": "SKILLS_GAP",
+        "maxLines": 8,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs",
+            "apply now",
+            "job listings"
+        ]
+    }
+}

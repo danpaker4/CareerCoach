@@ -12,6 +12,26 @@ export type DreamJobFlow = {
     awaitingConfirmation: boolean;
 };
 
+export type SkillsGapQuickHelpFlow = {
+    kind: "skills_gap";
+    step: "awaiting_role";
+};
+
+export type CvImproveQuickHelpFlow = {
+    kind: "cv_improve";
+    step: "awaiting_cv_or_proceed" | "coaching";
+};
+
+export type InterviewPrepQuickHelpFlow = {
+    kind: "interview_prep";
+    step: "awaiting_topic" | "awaiting_answer" | "awaiting_ack";
+    topic?: string;
+    questions?: string[];
+    index?: number;
+};
+
+export type QuickHelpFlow = SkillsGapQuickHelpFlow | CvImproveQuickHelpFlow | InterviewPrepQuickHelpFlow;
+
 export type ConversationStageProgress = {
     currentStageIndex: number;
     currentStageId?: string;
@@ -27,6 +47,7 @@ export type Conversation = {
     messages: ChatMessage[];
     jobContext?: ConversationJobContext;
     dreamJobFlow?: DreamJobFlow;
+    quickHelpFlow?: QuickHelpFlow;
     stageProgress: ConversationStageProgress;
     createdAt: Date;
     updatedAt: Date;

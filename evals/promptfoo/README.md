@@ -65,7 +65,7 @@ This writes `generated/tests.yaml` with:
 - `expected` mode / structured fields
 - rubric summary derived from expected checks
 - test `description` (= case id)
-- tags (guided, near-term, dreamjob, safety, …)
+- tags (guided, near-term, dreamjob, quick-help, skills-gap, cv-improve, interview-prep, profile-job-match, safety, …)
 - deterministic `file://` assertions
 - optional `llm-rubric` assertions when `PROMPTFOO_ENABLE_JUDGE=true`
 

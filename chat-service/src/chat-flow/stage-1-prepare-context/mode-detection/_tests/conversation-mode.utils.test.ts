@@ -3,10 +3,13 @@ import { describe, it } from "node:test";
 import { isConversationMode, parseConversationModeDetectionResult } from "../conversation-mode.utils";
 
 describe("isConversationMode", () => {
-    it("accepts the three supported modes", () => {
+    it("accepts the supported modes including sticky quick-help modes", () => {
         assert.equal(isConversationMode("DREAMJOB"), true);
         assert.equal(isConversationMode("NEAR_TERM"), true);
         assert.equal(isConversationMode("GUIDED"), true);
+        assert.equal(isConversationMode("SKILLS_GAP"), true);
+        assert.equal(isConversationMode("CV_IMPROVE"), true);
+        assert.equal(isConversationMode("INTERVIEW_PREP"), true);
     });
 
     it("rejects removed and unknown modes", () => {

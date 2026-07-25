@@ -1,0 +1,20 @@
+{
+    "id": "eval-33-quick-help-interview-prep-ask-topic",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Help me prepare for interviews"
+        }
+    ],
+    "expected": {
+        "mode": "INTERVIEW_PREP",
+        "maxLines": 8,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs",
+            "apply now",
+            "job listings"
+        ]
+    }
+}
