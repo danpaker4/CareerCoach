@@ -15,7 +15,7 @@ import {
     tryParseConversationObjectId,
 } from "./conversation.utils";
 import { getCurrentStage, getInitialAssistantMessage } from "./conversation.stage.utils";
-import type { Conversation, ConversationStageProgress, DreamJobFlow } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, DreamJobFlow, QuickHelpFlow } from "./conversation.model";
 import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
 import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "./job-in-conversation.types";
 
@@ -156,6 +156,10 @@ export class ChatConversationService {
 
     updateDreamJobFlow = async (userId: string, conversationId: string, dreamJobFlow: DreamJobFlow | undefined): Promise<void> => {
         await this.dal.updateDreamJobFlow(userId, parseConversationObjectIdOrThrow(conversationId), dreamJobFlow);
+    };
+
+    updateQuickHelpFlow = async (userId: string, conversationId: string, quickHelpFlow: QuickHelpFlow | undefined): Promise<void> => {
+        await this.dal.updateQuickHelpFlow(userId, parseConversationObjectIdOrThrow(conversationId), quickHelpFlow);
     };
 
     setJobContextAfterSearch = async (

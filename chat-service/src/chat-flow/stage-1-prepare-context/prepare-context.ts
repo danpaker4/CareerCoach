@@ -36,7 +36,7 @@ export const runStage1PrepareContext = async (
         updateUserAchievements(deps, userId, achievementInference),
     ]);
     const confidenceSummary = calculateConfidence(userCareerProfile, userRoleExperience);
-    
+
     const followUpIntent = detectFollowUpIntent(normalizedMessage);
     return {
         userId,

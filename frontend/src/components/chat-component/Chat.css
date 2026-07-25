@@ -153,3 +153,36 @@
   20%  { opacity: 1; }
   100% { opacity: 0.2; }
 }
+
+.chat-cv-file-input {
+  display: none;
+}
+
+.chat-cv-upload-button {
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 42px;
+  border-radius: var(--r-2xl);
+  border: 1.5px solid var(--clr-slate-200);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: var(--fz-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-cv-upload-button:hover:not(:disabled) {
+  border-color: var(--clr-primary);
+}
+
+.chat-cv-upload-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.chat-cv-upload-status {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: var(--fz-xs);
+  color: color-mix(in srgb, var(--text-primary) 72%, transparent);
+}

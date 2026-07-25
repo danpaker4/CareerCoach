@@ -127,6 +127,21 @@ const deriveTags = (caseId: string): string[] => {
     if (caseId.includes("dreamjob")) {
         tags.push("dreamjob");
     }
+    if (caseId.includes("quick-help")) {
+        tags.push("quick-help");
+    }
+    if (caseId.includes("skills-gap")) {
+        tags.push("skills-gap");
+    }
+    if (caseId.includes("cv-improve")) {
+        tags.push("cv-improve");
+    }
+    if (caseId.includes("interview-prep")) {
+        tags.push("interview-prep");
+    }
+    if (caseId.includes("profile-job-match")) {
+        tags.push("near-term", "profile-job-match");
+    }
     if (caseId.includes("check")) {
         tags.push("checks");
     }

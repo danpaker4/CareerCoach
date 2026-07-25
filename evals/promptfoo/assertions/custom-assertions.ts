@@ -3,7 +3,13 @@ import { z } from "zod";
 const OBJECT_ID_PATTERN = /\b[a-f0-9]{24}\b/gi;
 const UUID_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 
-const MODES_WITHOUT_JOB_RECOMMENDATIONS = new Set(["GUIDED", "DREAMJOB"]);
+const MODES_WITHOUT_JOB_RECOMMENDATIONS = new Set([
+    "GUIDED",
+    "DREAMJOB",
+    "SKILLS_GAP",
+    "CV_IMPROVE",
+    "INTERVIEW_PREP",
+]);
 
 const EvaluationCheckSchema = z.object({
     name: z.string(),
@@ -161,7 +167,7 @@ export const assertNoInternalIds = (output: unknown, _context: AssertionContext)
 
 /**
  * Assert no job recommendations when the conversation mode does not allow them
- * (GUIDED / DREAMJOB). NEAR_TERM may include jobs.
+ * (GUIDED / DREAMJOB / sticky quick-help). NEAR_TERM may include jobs.
  */
 export const assertNoJobsWhenModeDisallows = (_output: unknown, context: AssertionContext): GradingResult => {
     const metadata = readMetadata(context);

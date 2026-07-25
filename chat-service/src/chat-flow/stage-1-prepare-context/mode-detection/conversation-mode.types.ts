@@ -1,4 +1,10 @@
-export type ConversationMode = "DREAMJOB" | "NEAR_TERM" | "GUIDED";
+export type ConversationMode =
+    | "DREAMJOB"
+    | "NEAR_TERM"
+    | "GUIDED"
+    | "SKILLS_GAP"
+    | "CV_IMPROVE"
+    | "INTERVIEW_PREP";
 
 export type ConversationModeDetectionResult = {
     mode: ConversationMode;

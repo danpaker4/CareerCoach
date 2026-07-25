@@ -5,11 +5,18 @@ import { runDreamJobFlow } from "./dream-job/dream-job-flow";
 import { tryFollowUpShortcutResponse } from "./follow-up/follow-up-shortcut";
 import { runNearTermSearchFlow } from "./near-term/near-term-search-flow";
 import { checkIfNeededAddToPipeline } from "./pipeline/pipeline-shortcuts";
+import { tryQuickHelpShortcutResponse } from "./quick-help/run-quick-help";
 
 export const runStage2Shortcuts = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse | null> => {
+    // Sticky / new quick-help first so multi-turn flows are not stolen by mode reclassification.
+    const quickHelpResponse = await tryQuickHelpShortcutResponse(deps, ctx);
+    if (quickHelpResponse) {
+        return quickHelpResponse;
+    }
+
     if (ctx.modeDetection.mode === CONVERSATION_MODE.DREAMJOB) {
         console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow`);
         return await runDreamJobFlow(deps, ctx);

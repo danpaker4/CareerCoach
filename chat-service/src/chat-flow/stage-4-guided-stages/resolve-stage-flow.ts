@@ -1,5 +1,5 @@
 import type { StageFlowSendMessageResult } from "../chat-flow.types";
-import { CONVERSATION_MODE } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
+import { CONVERSATION_MODE, STICKY_QUICK_HELP_MODES } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import {
     applyStageAdvance,
     completeAllStages,
@@ -18,8 +18,9 @@ export const resolveStageFlowForSendMessage = async (
         normalizedMessage,
         conversationAfterUserMessage,
         confidenceSummary,
+        modeDetection
     } = ctx;
-    const mode = ctx.modeDetection.mode;
+    const mode = modeDetection.mode;
     const currentStage = getCurrentStage(conversationAfterUserMessage, normalizedMessage);
     const stageProgressWithNote = currentStage
         ? recordStageMessage(conversationAfterUserMessage, normalizedMessage, currentStage.id)
@@ -28,7 +29,8 @@ export const resolveStageFlowForSendMessage = async (
         ? completeAllStages(stageProgressWithNote)
         : stageProgressWithNote;
 
-    if (!currentStage || shouldSkipStages || mode === CONVERSATION_MODE.DREAMJOB) {
+    const isStickyQuickHelp = (STICKY_QUICK_HELP_MODES as readonly string[]).includes(mode);
+    if (!currentStage || shouldSkipStages || mode === CONVERSATION_MODE.DREAMJOB || isStickyQuickHelp) {
         return { kind: "continue_main_flow", progress: initialProgress };
     }
 

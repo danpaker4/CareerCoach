@@ -1,0 +1,18 @@
+{
+    "id": "eval-32-quick-help-cv-improve-resume-phrase",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Can you review my resume?"
+        }
+    ],
+    "expected": {
+        "mode": "CV_IMPROVE",
+        "maxLines": 8,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs",
+            "apply now"
+        ]
+    }
+}

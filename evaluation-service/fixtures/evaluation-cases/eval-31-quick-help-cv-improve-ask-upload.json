@@ -1,0 +1,19 @@
+{
+    "id": "eval-31-quick-help-cv-improve-ask-upload",
+    "messages": [
+        {
+            "role": "user",
+            "content": "How can I improve my CV?"
+        }
+    ],
+    "expected": {
+        "mode": "CV_IMPROVE",
+        "maxLines": 8,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs",
+            "apply now",
+            "job listings"
+        ]
+    }
+}
