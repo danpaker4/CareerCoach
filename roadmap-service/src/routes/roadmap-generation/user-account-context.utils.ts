@@ -35,8 +35,15 @@ const mergeUniqueStrings = (...groups: readonly (readonly string[])[]): string[]
 };
 
 const pickCvExcerpt = (serverUser: Record<string, unknown>): string | null => {
+    const fromText = readString(serverUser.cvText);
+    if (fromText !== null && fromText.length >= 40 && !/^s3:\/\//i.test(fromText) && !/^uploads\/cv\//i.test(fromText)) {
+        return fromText.length > MAX_CV_CONTEXT_CHARS ? `${fromText.slice(0, MAX_CV_CONTEXT_CHARS)}…` : fromText;
+    }
     const fromServer = readString(serverUser.cv);
     if (fromServer === null) {
+        return null;
+    }
+    if (/^s3:\/\//i.test(fromServer) || /^uploads\/cv\//i.test(fromServer)) {
         return null;
     }
     return fromServer.length > MAX_CV_CONTEXT_CHARS ? `${fromServer.slice(0, MAX_CV_CONTEXT_CHARS)}…` : fromServer;

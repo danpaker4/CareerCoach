@@ -715,10 +715,17 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               interests: user?.interests,
               githubSkills: user?.githubSkills,
               knownSkills: user?.knownSkills,
-              cvExcerpt:
-                user?.cv && typeof user.cv === 'string' && user.cv.trim().length > 0
-                  ? user.cv.trim().slice(0, 4000)
-                  : undefined,
+              cvExcerpt: (() => {
+                const fromText = typeof user?.cvText === 'string' ? user.cvText.trim() : '';
+                if (fromText.length > 0) {
+                  return fromText.slice(0, 4000);
+                }
+                const fromCv = typeof user?.cv === 'string' ? user.cv.trim() : '';
+                if (fromCv.length === 0 || /^s3:\/\//i.test(fromCv) || /^uploads\/cv\//i.test(fromCv)) {
+                  return undefined;
+                }
+                return fromCv.slice(0, 4000);
+              })(),
             }}
           />
           ) : (

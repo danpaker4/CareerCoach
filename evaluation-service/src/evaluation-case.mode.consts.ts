@@ -1,5 +1,12 @@
 /** Must stay in sync with chat-service `ConversationMode`. */
-export const CONVERSATION_MODES = ["DREAMJOB", "NEAR_TERM", "GUIDED"] as const;
+export const CONVERSATION_MODES = [
+    "DREAMJOB",
+    "NEAR_TERM",
+    "GUIDED",
+    "SKILLS_GAP",
+    "CV_IMPROVE",
+    "INTERVIEW_PREP",
+] as const;
 
 export type ConversationMode = (typeof CONVERSATION_MODES)[number];
 

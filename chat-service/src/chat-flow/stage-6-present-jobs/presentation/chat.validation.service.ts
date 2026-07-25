@@ -12,5 +12,6 @@ export const sanitizeReply = (reply: string): string =>
     reply
         .replace(JOB_ID_LEAK_REGEX, "")
         .replace(STRIP_LINE_REGEX, "")
-        .replace(/\s{2,}/g, " ")
+        .replace(/[^\S\n]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();

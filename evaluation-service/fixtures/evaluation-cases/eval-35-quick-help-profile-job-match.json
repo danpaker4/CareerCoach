@@ -1,0 +1,17 @@
+{
+    "id": "eval-35-quick-help-profile-job-match",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Suggest jobs that match my profile"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 20,
+        "forbiddenWords": [
+            "I recommend backend developer",
+            "you must become a"
+        ]
+    }
+}

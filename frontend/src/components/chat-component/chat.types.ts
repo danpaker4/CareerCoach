@@ -1,13 +1,20 @@
+import type { User } from '../../types/user';
+
 export type ConversationSummary = {
     conversationId: string;
     updatedAt: string;
     previewText: string;
 };
 
+export type ChatInterfaceHandle = {
+    sendPrompt: (text: string) => void;
+};
+
 export interface ChatProps {
     userId: string;
     conversationId: string;
     onExportSnapshotChange?: (snapshot: ChatExportSnapshot) => void;
+    onUserUpdated?: (user: User) => void;
     userProfile?: {
         firstName?: string;
         lastName?: string;

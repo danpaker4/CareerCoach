@@ -38,7 +38,10 @@ export const UserSchema = z.object({
     linkedInUrl: z.string().nullish(),
     githubUrl: z.string().nullish(),
     githubSkills: z.array(z.string()).default([]),
+    /** S3 URI (or path) for the uploaded CV PDF. */
     cv: z.string().nullish(),
+    /** Extracted plain text from the CV PDF for coaching / context. */
+    cvText: z.string().nullish(),
     githubId: z.number().nullish(),
     avatarUrl: z.string().nullish(),
     bio: z.string().nullish(),

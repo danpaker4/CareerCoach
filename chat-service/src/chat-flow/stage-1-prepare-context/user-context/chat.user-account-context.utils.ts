@@ -24,6 +24,19 @@ export const buildUserAccountContext = (params: {
 
     const { technologies, interests, knownSkills, githubSkills } = resolveProfileLists(server, profile);
     const cvExcerpt = pickCvExcerpt(server, profile);
+    const achievementsRaw = server.achievements;
+    const achievementNames = Array.isArray(achievementsRaw)
+        ? achievementsRaw
+              .filter(
+                  (item): item is { name: string } =>
+                      typeof item === "object" &&
+                      item !== null &&
+                      "name" in item &&
+                      typeof (item as { name: unknown }).name === "string"
+              )
+              .map((item) => item.name.trim())
+              .filter((name) => name.length > 0)
+        : [];
 
     const lines: string[] = [];
     if (displayName.length > 0) {
@@ -55,6 +68,9 @@ export const buildUserAccountContext = (params: {
     }
     if (githubSkills.length > 0) {
         lines.push(`GitHub-derived skills: ${githubSkills.join(", ")}`);
+    }
+    if (achievementNames.length > 0) {
+        lines.push(`Achievements: ${achievementNames.slice(0, 15).join(", ")}`);
     }
     if (linkedInUrl !== null) {
         lines.push(`LinkedIn: ${linkedInUrl}`);

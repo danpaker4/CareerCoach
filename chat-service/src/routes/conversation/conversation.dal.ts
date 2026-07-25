@@ -1,7 +1,7 @@
 import type { Collection } from "mongodb";
 import { ObjectId } from "mongodb";
 import type { ChatMessage } from "../../chat-flow/api/shared/chat.model";
-import type { Conversation, ConversationStageProgress, DreamJobFlow } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, DreamJobFlow, QuickHelpFlow } from "./conversation.model";
 import type { ConversationListRow } from "./conversation.types";
 import { conversationFilter } from "./conversation.utils";
 import type { ConversationJobContext } from "./job-in-conversation.types";
@@ -89,6 +89,23 @@ export class ConversationDal {
         await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
             $set: {
                 dreamJobFlow,
+                updatedAt: new Date(),
+            },
+        });
+    };
+
+    updateQuickHelpFlow = async (userId: string, conversationId: ObjectId, quickHelpFlow: QuickHelpFlow | undefined): Promise<void> => {
+        if (quickHelpFlow === undefined) {
+            await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+                $unset: { quickHelpFlow: "" },
+                $set: { updatedAt: new Date() },
+            });
+            return;
+        }
+
+        await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+            $set: {
+                quickHelpFlow,
                 updatedAt: new Date(),
             },
         });
