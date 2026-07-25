@@ -77,5 +77,36 @@ describe("Users Router - GET /users/:userId", () => {
             expect(responseUser.lastName).toBe(dbUser?.lastName);
         });
     });
+
+    describe("GET /users/:userId/job-matching-context", () => {
+        it("returns only the embedding context needed by the job service", async () => {
+            const updatedAt = new Date("2026-01-01T00:00:00.000Z");
+            await server.DBClient.users.updateOne(
+                { _id: testUserId },
+                {
+                    $set: {
+                        profileEmbedding: [1, 0],
+                        profileEmbeddingUpdatedAt: updatedAt,
+                        profileEmbeddingModel: "test-model",
+                        profileEmbeddingStatus: "ready",
+                    },
+                },
+            );
+
+            const response = await server.app.inject({
+                method: "GET",
+                url: `/users/${testUserId}/job-matching-context`,
+                headers: authHeadersForUser(mockUser),
+            });
+
+            expect(response.statusCode).toBe(StatusCodes.OK);
+            expect(response.json()).toEqual({
+                profileEmbedding: [1, 0],
+                profileEmbeddingUpdatedAt: updatedAt.toISOString(),
+                profileEmbeddingModel: "test-model",
+                profileEmbeddingStatus: "ready",
+            });
+        });
+    });
 });
 

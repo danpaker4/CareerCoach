@@ -1,0 +1,2 @@
+export const DEFAULT_PROFILE_EMBEDDING_MODEL = "gemini-embedding-001";
+export const DEFAULT_PROFILE_EMBEDDING_DIMENSIONS = 3_072;

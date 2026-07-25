@@ -5,6 +5,7 @@ export const UserRoleSchema = z.enum(["user", "admin"]);
 export const RoleSeniorityLevelSchema = z.enum(["junior", "mid", "senior", "lead"]);
 
 export const RoleExperienceSourceSchema = z.enum(["cv", "chat", "job_interaction", "llm_inference"]);
+export const EmbeddingStatusSchema = z.enum(["pending", "ready", "failed"]);
 
 export const RoleExperienceEntrySchema = z.object({
     roleKey: z.string().min(1),
@@ -46,6 +47,8 @@ export const UserSchema = z.object({
     company: z.string().nullish(),
     profileEmbedding: z.array(z.number()).default([]),
     profileEmbeddingUpdatedAt: z.coerce.date().optional(),
+    profileEmbeddingModel: z.string().optional(),
+    profileEmbeddingStatus: EmbeddingStatusSchema.optional(),
     /** Set when chat-service first creates the linked `userCareerProfiles` document for this `id`. */
     coachProfileMaterializedAt: z.coerce.date().optional(),
 });
@@ -53,4 +56,8 @@ export const UserSchema = z.object({
 export type UserRole = z.infer<typeof UserRoleSchema>;
 export type RoleExperienceEntry = z.infer<typeof RoleExperienceEntrySchema>;
 export type User = z.infer<typeof UserSchema>;
-export type UserDocument = Omit<User, "id" | "role"> & { _id: string; role?: UserRole };
+export type UserDocument = Omit<User, "id" | "role"> & {
+    _id: string;
+    role?: UserRole;
+    profileEmbeddingSourceHash?: string;
+};

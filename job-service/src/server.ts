@@ -14,6 +14,8 @@ import { CareerKnowledgeService } from "./routes/careerKnowledge/career-knowledg
 import { jobSearchRouter } from "./routes/jobSearch/job-search.router";
 import { startJobPollerSchedule } from "./poller/job-poller";
 import { jobsRouter } from "./routes/jobs/jobs.router";
+import { startJobEmbeddingRepairSchedule } from "./routes/jobs/job-embedding-repair.service";
+import { getJobEmbeddingConfig } from "./ai/job-embedding.config";
 import type { ServerConfig } from "./server.types";
 
 export type { ServerConfig } from "./server.types";
@@ -75,6 +77,9 @@ export class Server {
                 host: process.env.HOST || "127.0.0.1"
             });
             startJobPollerSchedule(this.DBClient.jobs, this.DBClient.llmTokenUsage);
+            if (getJobEmbeddingConfig().JOBS_VECTOR_SEARCH_ENABLED && process.env.NODE_ENV !== "test") {
+                startJobEmbeddingRepairSchedule(this.DBClient.jobs);
+            }
             void this.refreshCareerKnowledgeOnStartup();
             console.log(`🚀 Server running on ${address}`);
 

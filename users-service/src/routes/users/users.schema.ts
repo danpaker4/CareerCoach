@@ -15,6 +15,23 @@ export const getUserSchema = {
     }),
 } satisfies FastifySchema;
 
+export const getUserMatchingContextSchema = {
+    response: {
+        [StatusCodes.OK]: z.object({
+            profileEmbedding: z.array(z.number()),
+            profileEmbeddingUpdatedAt: z.coerce.date().optional(),
+            profileEmbeddingModel: z.string().optional(),
+            profileEmbeddingStatus: z.enum(["pending", "ready", "failed"]).optional(),
+        }),
+        [StatusCodes.NOT_FOUND]: z.object({
+            error: z.string(),
+        }),
+    },
+    params: z.object({
+        userId: z.string().min(1, "userId cannot be empty"),
+    }),
+} satisfies FastifySchema;
+
 export const createUserSchema = {
     response: {
         [StatusCodes.CREATED]: UserSchema,

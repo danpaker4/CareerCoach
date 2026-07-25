@@ -1,5 +1,12 @@
-interface CacheEntry {
+export interface UserMatchingContext {
     readonly embedding: number[];
+    readonly updatedAt: Date | null;
+    readonly model: string | null;
+    readonly status: "pending" | "ready" | "failed" | null;
+}
+
+interface CacheEntry {
+    readonly context: UserMatchingContext;
     readonly expiresAt: number;
 }
 
@@ -13,19 +20,19 @@ export class UserEmbeddingCache {
         this.ttlMs = ttlMs;
     }
 
-    get(userId: string): number[] | null {
+    get(userId: string): UserMatchingContext | null {
         const entry = this.store.get(userId);
         if (!entry) return null;
         if (Date.now() > entry.expiresAt) {
             this.store.delete(userId);
             return null;
         }
-        return entry.embedding;
+        return entry.context;
     }
 
-    set(userId: string, embedding: number[]): void {
+    set(userId: string, context: UserMatchingContext): void {
         this.store.set(userId, {
-            embedding,
+            context,
             expiresAt: Date.now() + this.ttlMs,
         });
     }

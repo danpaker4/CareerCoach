@@ -3,7 +3,10 @@ import { z } from "zod";
 export const ServerEnvSchema = z.object({
     PORT: z.coerce.number().int().nonnegative().default(3001),
     HOST: z.string().min(1).default("127.0.0.1"),
-    MONGO_CONNECTION_STRING: z.string().min(1).default("mongodb://127.0.0.1:27017/careerCoachDB"),
+    MONGO_CONNECTION_STRING: z
+        .string()
+        .min(1)
+        .default("mongodb://127.0.0.1:27018/careerCoachDB?directConnection=true"),
     MONGO_KEY_PATH: z.string().optional(),
 });
 

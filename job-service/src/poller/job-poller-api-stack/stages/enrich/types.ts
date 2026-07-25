@@ -13,6 +13,11 @@ export type EnrichedJob = AdaptedJob & {
   niceToHaveSkills: string[];
   searchableText: string;
   searchEmbedding: number[];
+  searchEmbeddingModel?: string;
+  searchEmbeddingUpdatedAt?: Date;
+  searchEmbeddingStatus?: "pending" | "ready" | "failed";
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 export type GeminiExtract = {
