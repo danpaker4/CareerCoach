@@ -1,6 +1,7 @@
 import type { ProfileInput } from "../routes/conversation/conversation.types";
 import type { ChatMessageResponse } from "./api/shared/chat.types";
 import type { ChatFlow, ChatFlowDeps } from "./chat-flow.types";
+import { decideNextStep } from "./shared/llm/chat.llm.service";
 import { runStage1PrepareContext } from "./stage-1-prepare-context/prepare-context";
 import { runStage2Shortcuts } from "./stage-2-shortcuts/run-stage-2-shortcuts";
 import { runStage3LlmDecision } from "./stage-3-llm-decision/run-stage-3-llm-decision";
@@ -19,20 +20,25 @@ export const sendMessage = async (
     }
     console.info(`[CHAT][INTENT] userId=${userId} incoming="${normalizedMessage}"`);
 
-    const ctx = await runStage1PrepareContext(deps, {
+    const baseContext = await runStage1PrepareContext(deps, {
         userId,
         normalizedMessage,
         profile,
         requestedConversationId: conversationId,
         authorization,
     });
+    const turnDecision = await decideNextStep(deps, baseContext);
+    const ctx = {
+        ...baseContext,
+        modeDetection: turnDecision.modeDetection,
+    };
 
     const shortcutResponse = await runStage2Shortcuts(deps, ctx);
     if (shortcutResponse) {
         return shortcutResponse;
     }
 
-    return await runStage3LlmDecision(deps, ctx);
+    return await runStage3LlmDecision(deps, ctx, turnDecision);
 };
 
 export const createChatFlow = (deps: ChatFlowDeps): ChatFlow => ({

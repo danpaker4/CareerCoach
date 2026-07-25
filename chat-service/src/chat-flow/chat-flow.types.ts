@@ -25,7 +25,7 @@ export type PrepareSendMessageContextParams = {
     authorization?: string;
 };
 
-export type SendMessagePreparedContext = {
+export type SendMessageBaseContext = {
     userId: string;
     conversationId: string;
     normalizedMessage: string;
@@ -36,9 +36,12 @@ export type SendMessagePreparedContext = {
     userCareerProfile: UserCareerProfile;
     userRoleExperience: RoleExperienceEntry[];
     confidenceSummary: ConfidenceSummary;
-    modeDetection: ConversationModeDetectionResult;
     followUpIntent: JobFollowUpIntentResult;
     authorization?: string;
+};
+
+export type SendMessagePreparedContext = SendMessageBaseContext & {
+    modeDetection: ConversationModeDetectionResult;
 };
 
 export type StageFlowSendMessageResult =

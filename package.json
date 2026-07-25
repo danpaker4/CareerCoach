@@ -23,7 +23,10 @@
     "eval:promptfoo": "npm --prefix evals/promptfoo run eval",
     "eval:promptfoo:view": "npm --prefix evals/promptfoo run view",
     "eval:promptfoo:update": "npm --prefix evals/promptfoo run update",
-    "eval:promptfoo:compare": "npm --prefix evals/promptfoo run eval:compare"
+    "eval:promptfoo:compare": "npm --prefix evals/promptfoo run eval:compare",
+    "langfuse:config": "docker compose --env-file .env.langfuse -f docker-compose.yml -f docker-compose.langfuse-cloud.yml config --no-interpolate",
+    "langfuse:up": "docker compose --env-file .env.langfuse -f docker-compose.yml -f docker-compose.langfuse-cloud.yml up -d --force-recreate otel-collector",
+    "langfuse:stop": "docker compose --env-file .env.langfuse -f docker-compose.yml -f docker-compose.langfuse-cloud.yml stop otel-collector"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

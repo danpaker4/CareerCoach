@@ -1,8 +1,8 @@
 model_list:
   - model_name: chat-default
     litellm_params:
-      model: ollama/llama3
-      api_base: http://host.docker.internal:9009
+      model: ollama/careercoach-chat
+      api_base: http://host.docker.internal:11434
   - model_name: chat-fallback
     litellm_params:
       model: gemini/gemini-2.5-flash

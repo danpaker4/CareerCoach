@@ -1,5 +1,8 @@
 import type { ProfileInput } from "../../../routes/conversation/conversation.types";
-import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
+import type {
+    ConversationMode,
+    ConversationModeDetectionResult,
+} from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
 import type { ConfidenceSummary } from "../../stage-1-prepare-context/confidence/confidence.types";
 import type { SanitizedJob } from "../../../routes/conversation/job-in-conversation.types";
 import type { JobSearchPlanItem } from "../../stage-5-job-search/search-plan/job-search-plan.types";
@@ -84,7 +87,12 @@ export type LlmDecision = {
     searchFilters: JobSearchRequest;
 };
 
-export type StageLlmDecision = {
+export type ChatTurnDecision = LlmDecision & {
+    modeDetection: ConversationModeDetectionResult;
+    shouldAdvanceStage: boolean;
+};
+
+export type StageDecision = {
     reply: string;
     shouldAdvanceStage: boolean;
 };

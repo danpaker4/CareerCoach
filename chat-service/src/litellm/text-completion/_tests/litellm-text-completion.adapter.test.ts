@@ -61,6 +61,7 @@ describe("LiteLlmTextCompletionAdapter", () => {
             model: "openai/gpt-4o-mini",
             messages: [{ role: "user", content: "ping" }],
             temperature: 0.3,
+            max_tokens: 300,
         });
         assert.equal(records.length, 1);
         assert.equal(records[0]?.provider, "litellm");

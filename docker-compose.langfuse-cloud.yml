@@ -1,0 +1,9 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.153.0
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Set LANGFUSE_PUBLIC_KEY in .env.langfuse}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Set LANGFUSE_SECRET_KEY in .env.langfuse}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
+    volumes:
+      - ./otel-collector-langfuse-config.yml:/etc/otelcol/config.yml:ro

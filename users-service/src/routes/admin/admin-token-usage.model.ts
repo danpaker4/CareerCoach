@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const LlmProviderSchema = z.enum(["gemini", "openai", "custom", "ollama"]);
+export const LlmProviderSchema = z.enum(["gemini", "openai", "custom", "ollama", "litellm"]);
 export const LlmTokenStatusSchema = z.enum(["known", "unknown"]);
 export const LlmRequestStatusSchema = z.enum(["success", "error"]);
 

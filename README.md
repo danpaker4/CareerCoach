@@ -96,3 +96,27 @@ Change `LITELLM_MODEL` to a `model_name` from `litellm-config.yaml` (for example
 ### Change the selected model
 
 Edit `LITELLM_MODEL` in `chat-service/.env`, or change the upstream mapping in `litellm-config.yaml`, then restart the affected process.
+
+## Langfuse Cloud AI tracing
+
+CareerCoach can send only its explicitly marked AI observations to Langfuse Cloud while keeping the existing complete OpenTelemetry trace stream in Jaeger. Langfuse runs in the cloud; no PostgreSQL, ClickHouse, Redis, or Langfuse container is required on the VM.
+
+1. Copy [`.env.langfuse.example`](.env.langfuse.example) to `.env.langfuse` and add the Langfuse project public and secret keys. Keep this file private and out of Git.
+2. Start the existing telemetry stack with the Cloud override:
+
+```bash
+npm run langfuse:up
+```
+
+The Langfuse credentials are available only to the OpenTelemetry Collector. Application services still export to the local collector, and the collector host ports bind to `127.0.0.1`. The command starts or replaces only the collector, so it does not restart unrelated Compose services. The VM only needs outbound HTTPS access to `cloud.langfuse.com:443`.
+
+By default, content capture is disabled. Each service supports these safe settings in its local `.env`:
+
+```env
+LANGFUSE_CAPTURE_CONTENT=false
+LANGFUSE_CONTENT_MAX_CHARS=8000
+```
+
+Set `VITE_LANGFUSE_DASHBOARD_URL=https://cloud.langfuse.com` in `frontend/.env` to show the optional external Langfuse card in Management. Never place Langfuse keys in a Vite environment variable.
+
+To return to Jaeger-only telemetry, start Compose normally. To stop the Cloud collector override, run `npm run langfuse:stop`.

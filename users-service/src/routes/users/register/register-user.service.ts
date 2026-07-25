@@ -89,6 +89,7 @@ export const registerUser = async (
       const uploadedCvS3Path = await uploadCvToS3(userId, cvBuffer);
       const cvText = await extractTextFromCv(cvBuffer);
       const extractedAchievements = await extractAchievementsWithGemini({
+        userId,
         cvText,
         currentJob,
         linkedInUrl,

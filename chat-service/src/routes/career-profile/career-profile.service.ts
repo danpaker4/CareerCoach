@@ -1,11 +1,7 @@
 import type { ProfileInput } from "../conversation/conversation.types";
 import type { EmbeddingPort } from "../../ai/embedding/embedding.types";
-import type { TextCompletionPort } from "../../litellm/text-completion/text-completion.types";
 import type { CareerProfileSignalUpdate, CoachProfileAccountLink, UserCareerProfile } from "./career-profile.types";
-import {
-    hasUsableProfileInput,
-    inferProfileUpdateFromProfileInputWithLlm,
-} from "./llm/career-profile.llm.utils";
+import { hasUsableProfileInput, toCareerProfileSignalUpdateFromProfileInput } from "./career-profile.utils";
 import { CareerProfileDal } from "./dal/career-profile.dal";
 import {
     createEmptyProfileSignals,
@@ -34,7 +30,6 @@ export class CareerProfileService {
     constructor(
         private readonly dal: CareerProfileDal,
         private readonly embedding: EmbeddingPort,
-        private readonly textCompletion: TextCompletionPort,
         private readonly accountLink: CoachProfileAccountLink | null = null
     ) { }
 
@@ -75,7 +70,7 @@ export class CareerProfileService {
         if (!hasUsableProfileInput(profile)) {
             return existing;
         }
-        const updates = await inferProfileUpdateFromProfileInputWithLlm(this.textCompletion, userId, profile);
+        const updates = toCareerProfileSignalUpdateFromProfileInput(profile);
         return this.mergeProfileSignals(existing, updates);
     };
 }

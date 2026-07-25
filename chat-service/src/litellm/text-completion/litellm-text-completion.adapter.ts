@@ -1,9 +1,14 @@
 import type { TextCompletionPort } from "./text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../ai/token-usage/token-usage.types";
 import { readOpenAiUsage, recordLlmTokenUsage, toLlmErrorMessage } from "../../ai/token-usage/utils/token-usage.utils";
-import { withSpan } from "../../observability/tracing";
+import {
+    createLangfuseContentAttributes,
+    createLangfuseObservationAttributes,
+    createLangfuseUsageAttributes,
+    withSpan,
+} from "../../observability/tracing";
 import { formatLiteLlmErrorMessage, isLiteLlmChatResponse } from "./litellm-response.utils";
-import { LITELLM_CHAT_COMPLETIONS_PATH } from "./litellm-text-completion.consts";
+import { LITELLM_CHAT_COMPLETIONS_PATH, MAX_CHAT_COMPLETION_TOKENS } from "./litellm-text-completion.consts";
 
 const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, "");
 
@@ -43,6 +48,15 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
             "llm.model": this.model,
             "llm.operation": context?.operation ?? "chat.text_completion",
             ...(context?.userId ? { "enduser.id": context.userId } : {}),
+            ...createLangfuseObservationAttributes({
+                operation: context?.operation ?? "chat.text_completion",
+                type: "generation",
+                feature: context?.feature ?? "chat",
+                provider: "litellm",
+                model: this.model,
+                userId: context?.userId,
+                sessionId: context?.sessionId,
+            }),
         }, async (span) => {
             console.info(`[LLM] Sending request provider=litellm model=${this.model} baseUrl=${this.baseUrl}`);
             try {
@@ -60,6 +74,7 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
                         model: this.model,
                         messages: [{ role: "user", content: prompt }],
                         temperature: 0.3,
+                        max_tokens: MAX_CHAT_COMPLETION_TOKENS,
                     }),
                 });
 
@@ -85,6 +100,8 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
                     "llm.usage.prompt_tokens": usage?.promptTokens ?? 0,
                     "llm.usage.completion_tokens": usage?.completionTokens ?? 0,
                     "llm.usage.total_tokens": usage?.totalTokens ?? 0,
+                    ...createLangfuseUsageAttributes(usage),
+                    ...createLangfuseContentAttributes(prompt, text),
                 });
                 await recordLlmTokenUsage(this.tokenUsageRecorder, {
                     sourceService: "chat-service",
@@ -102,6 +119,7 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
                     : error;
 
                 span.setAttribute("llm.request.status", "error");
+                span.setAttribute("langfuse.observation.status_message", toLlmErrorMessage(wrappedError).slice(0, 500));
                 await recordLlmTokenUsage(this.tokenUsageRecorder, {
                     sourceService: "chat-service",
                     operation: context?.operation ?? "chat.text_completion",

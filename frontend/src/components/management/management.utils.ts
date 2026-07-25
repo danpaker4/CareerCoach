@@ -176,7 +176,7 @@ export const getAdminUserDisplayName = (user: AdminUserSummary): string =>
   `${user.firstName} ${user.lastName}`.trim();
 
 const isLlmProvider = (value: unknown): value is LlmProvider =>
-  value === 'gemini' || value === 'openai' || value === 'custom' || value === 'ollama';
+  value === 'gemini' || value === 'openai' || value === 'custom' || value === 'ollama' || value === 'litellm';
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 

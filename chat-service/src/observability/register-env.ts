@@ -25,6 +25,8 @@ const EnvSchema = z.object({
     OTEL_EXPORTER_OTLP_ENDPOINT: z.preprocess(optionalEmptyString, z.string().url().default(DEFAULT_OTLP_ENDPOINT)),
     OTEL_EXPORTER_OTLP_PROTOCOL: z.preprocess(optionalEmptyString, z.string().min(1).default(DEFAULT_OTLP_PROTOCOL)),
     OTEL_DEPLOYMENT_ENVIRONMENT: z.preprocess(optionalEmptyString, z.string().min(1).default(DEFAULT_DEPLOYMENT_ENVIRONMENT)),
+    LANGFUSE_CAPTURE_CONTENT: booleanStringSchema.default(false),
+    LANGFUSE_CONTENT_MAX_CHARS: z.coerce.number().int().min(1).max(8000).default(8000),
 });
 
 const resolveDefaultServiceName = (): string =>
@@ -36,6 +38,12 @@ const env = EnvSchema.parse(process.env);
 
 export const isOtelEnabled = env.OTEL_ENABLED;
 export const serviceName = env.OTEL_SERVICE_NAME ?? resolveDefaultServiceName();
+export const langfuseObservabilityConfig = {
+    captureContent: env.LANGFUSE_CAPTURE_CONTENT,
+    contentMaxChars: env.LANGFUSE_CONTENT_MAX_CHARS,
+};
+process.env.LANGFUSE_CAPTURE_CONTENT = String(env.LANGFUSE_CAPTURE_CONTENT);
+process.env.LANGFUSE_CONTENT_MAX_CHARS = String(env.LANGFUSE_CONTENT_MAX_CHARS);
 
 // gal-observability reads these env vars when initOpenTelemetry() runs, and it
 // picks the OTLP exporter protocol at module load time, so the defaults must be

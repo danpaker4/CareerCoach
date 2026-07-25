@@ -1,7 +1,7 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
 import { recordLlmTokenUsage, toLlmErrorMessage } from "../../token-usage.utils";
-import { withSpan } from "../../../observability/tracing";
+import { setLangfuseGenerationResult, withSpan } from "../../../observability/tracing";
 import { readTextFromCustomLlmPayload } from "./http-custom-text-completion.utils";
 
 export class HttpCustomTextCompletionAdapter implements TextCompletionPort {
@@ -36,6 +36,7 @@ export class HttpCustomTextCompletionAdapter implements TextCompletionPort {
                 }
 
                 span.setAttribute("llm.request.status", "success");
+                setLangfuseGenerationResult(span, prompt, text, null);
                 await recordLlmTokenUsage(this.tokenUsageRecorder, {
                     sourceService: "roadmap-service",
                     operation: context?.operation ?? "chat.text_completion",

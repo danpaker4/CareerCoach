@@ -1,7 +1,6 @@
-import type { ChatMessageResponse, LlmDecision } from "../api/shared/chat.types";
+import type { ChatMessageResponse, ChatTurnDecision, LlmDecision } from "../api/shared/chat.types";
 import type { Conversation } from "../../routes/conversation/conversation.model";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../chat-flow.types";
-import { decideNextStep } from "../shared/llm/chat.llm.service";
 import { sanitizeReply } from "../stage-6-present-jobs/presentation/chat.validation.service";
 import { searchJobsWithBroaderFallback } from "../stage-5-job-search/search-jobs";
 import { presentRankedJobs } from "../stage-6-present-jobs/present-jobs";
@@ -53,13 +52,17 @@ const finalizeSendMessageFromLlmDecision = async (params: {
 
 export const runStage3LlmDecision = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
+    ctx: SendMessagePreparedContext,
+    llmDecision: ChatTurnDecision
 ): Promise<ChatMessageResponse> => {
-    const llmDecision = await decideNextStep(deps, ctx);
     const stageFlow = await resolveStageFlowForSendMessage({
         deps,
         ctx,
         shouldSkipStages: llmDecision.shouldSearchJobs,
+        stageDecision: {
+            reply: llmDecision.reply,
+            shouldAdvanceStage: llmDecision.shouldAdvanceStage,
+        },
     });
 
     if (stageFlow.kind === "stage_reply_only") {

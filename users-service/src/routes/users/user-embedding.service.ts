@@ -4,6 +4,7 @@ import type { Collection } from "mongodb";
 import type { User, UserDocument } from "./user.model";
 import { getProfileEmbeddingConfig } from "./user-embedding.config";
 import { toUser } from "./user.utils";
+import { withLangfuseAiObservation } from "../../observability/langfuse-observability";
 
 export const buildUserProfileText = (user: User): string => {
     const sections: string[] = [];
@@ -45,10 +46,24 @@ export const generateProfileEmbedding = async (
     profileText: string,
     apiKey: string,
     modelName: string,
+    userId?: string,
 ): Promise<number[]> => {
     const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName });
-    const result = await model.embedContent(profileText);
-    const values = result.embedding?.values;
+    const values = await withLangfuseAiObservation("profile.embed", {
+        operation: "profile.embed",
+        type: "embedding",
+        provider: "gemini",
+        model: modelName,
+        userId,
+        input: profileText,
+    }, async (span) => {
+        const result = await model.embedContent(profileText);
+        const embeddingValues = result.embedding?.values;
+        if (Array.isArray(embeddingValues)) {
+            span.setAttribute("langfuse.observation.metadata.embedding_dimensions", String(embeddingValues.length));
+        }
+        return embeddingValues;
+    });
     if (!Array.isArray(values) || values.length === 0) {
         throw new Error(`Embedding model ${modelName} returned an empty vector`);
     }
@@ -93,6 +108,7 @@ export const regenerateProfileEmbedding = async (
             profileText,
             config.GEMINI_API_KEY,
             config.PROFILE_EMBEDDING_MODEL,
+            userId,
         );
         if (embedding.length !== config.PROFILE_EMBEDDING_DIMENSIONS) {
             throw new Error(

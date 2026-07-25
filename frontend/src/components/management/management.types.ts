@@ -54,7 +54,7 @@ export interface ChatRateLimitConfig {
 
 export type ManagementUserAction = 'promote' | 'demote' | 'delete';
 
-export type LlmProvider = 'gemini' | 'openai' | 'custom' | 'ollama';
+export type LlmProvider = 'gemini' | 'openai' | 'custom' | 'ollama' | 'litellm';
 
 export type BenchmarkCandidateId = 'ollama-llama' | 'gemini';
 
