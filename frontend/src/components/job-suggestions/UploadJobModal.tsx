@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import iconX from '../../assets/icon-x.svg';
@@ -34,6 +35,17 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const jobTitleInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    jobTitleInputRef.current?.focus({ preventScroll: true });
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
 
   const updateField = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -98,12 +110,18 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
     }
   };
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card upload-job-modal" onClick={(e) => e.stopPropagation()}>
+  return createPortal(
+    <div className="modal-overlay upload-job-overlay" onClick={onClose}>
+      <div
+        className="modal-card upload-job-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upload-job-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <div>
-            <h2 className="modal-title">Upload a job</h2>
+            <h2 id="upload-job-modal-title" className="modal-title">Upload a job</h2>
             <p className="upload-job-subtitle">Paste the description and we'll extract the skills.</p>
           </div>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
@@ -116,6 +134,7 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
             <div className="modal-field">
               <label className="modal-label" htmlFor="upload-job-title">Job title *</label>
               <input
+                ref={jobTitleInputRef}
                 id="upload-job-title"
                 type="text"
                 className="modal-input"
@@ -123,7 +142,6 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
                 value={form.jobTitle}
                 onChange={updateField('jobTitle')}
                 maxLength={200}
-                autoFocus
               />
             </div>
             <div className="modal-field">
@@ -214,6 +232,7 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

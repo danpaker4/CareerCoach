@@ -212,16 +212,17 @@
       "id": "job-search",
       "name": "Job Search & Suggestions",
       "category": "Jobs",
-      "purpose": "Browse and filter aggregated jobs; results re-ranked using seniority compatibility.",
+      "purpose": "Browse personalized jobs in vector-ranked cursor pages and run profile-aware semantic searches.",
       "frontend": { "route": "/job-suggestions", "trigger": "Filters / search bar" },
       "endpoints": [
-        { "method": "GET", "service": "job-service", "path": "/jobs", "notes": "List all jobs" },
+        { "method": "GET", "service": "job-service", "path": "/jobs", "notes": "50-job page ranked by profile or profile + search; accepts an opaque continuation cursor" },
         { "method": "POST", "service": "job-service", "path": "/jobs/search", "notes": "Filters: location, stack, seniority" }
       ],
       "dataFlow": [
         "Background poller ingests jobs into MongoDB",
-        "Search applies filters",
-        "JobRankingService checks isJobSeniorityCompatibleWithRoleExperience",
+        "User and job embeddings are generated with the same configured model",
+        "Self-managed MongoDB Vector Search ranks the indexed catalog",
+        "IntersectionObserver requests the next cursor page",
         "Results rendered with save / add-to-pipeline actions"
       ]
     },

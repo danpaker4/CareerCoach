@@ -1,0 +1,1 @@
+export const MONGODB_COPY_BATCH_SIZE = 500;

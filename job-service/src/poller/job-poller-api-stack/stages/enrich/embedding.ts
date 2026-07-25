@@ -1,11 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getJobEmbeddingConfig } from "../../../../ai/job-embedding.config";
+import { runEmbeddingRequestWithRetry } from "../../../../ai/embedding-retry.utils";
 import { withSpan } from "../../../../observability/tracing";
-
-const DEFAULT_EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"] as const;
 
 export type EmbeddingClient = {
   genAI: GoogleGenerativeAI;
-  modelNames: string[];
+  modelName: string;
+  dimensions: number;
 };
 
 const normalizeList = (items: readonly string[]): string =>
@@ -38,40 +39,39 @@ export const buildSearchableText = (input: {
 ].join("\n");
 
 export const createEmbeddingClient = (apiKey: string): EmbeddingClient => {
-  const preferredModel = process.env.JOB_EMBEDDING_MODEL;
-  const modelNames = [
-    ...(preferredModel ? [preferredModel] : []),
-    ...DEFAULT_EMBEDDING_MODELS,
-  ].filter((name, index, arr) => arr.indexOf(name) === index);
+  const config = getJobEmbeddingConfig();
   const genAI = new GoogleGenerativeAI(apiKey);
-  return { genAI, modelNames };
+  return {
+    genAI,
+    modelName: config.JOB_EMBEDDING_MODEL,
+    dimensions: config.JOB_EMBEDDING_DIMENSIONS,
+  };
 };
 
 export const createEmbedding = async (
   client: EmbeddingClient,
   text: string,
 ): Promise<number[]> => {
-  let lastError: unknown = null;
-  for (const modelName of client.modelNames) {
-    try {
-      const values = await withSpan("llm.embedding", {
-        "llm.provider": "gemini",
-        "llm.model": modelName,
-        "llm.operation": "job.embedding",
-      }, async (span) => {
-        const model = client.genAI.getGenerativeModel({ model: modelName });
-        const result = await model.embedContent(text);
-        const embeddingValues = result.embedding?.values;
-        span.setAttribute("llm.request.status", Array.isArray(embeddingValues) ? "success" : "error");
-        return embeddingValues;
-      });
-      if (Array.isArray(values)) {
-        return values;
-      }
-      lastError = new Error(`Embedding model ${modelName} returned invalid vector`);
-    } catch (error) {
-      lastError = error;
-    }
+  const values = await runEmbeddingRequestWithRetry(
+    () => withSpan("llm.embedding", {
+      "llm.provider": "gemini",
+      "llm.model": client.modelName,
+      "llm.operation": "job.embedding",
+    }, async (span) => {
+      const model = client.genAI.getGenerativeModel({ model: client.modelName });
+      const result = await model.embedContent(text);
+      const embeddingValues = result.embedding?.values;
+      span.setAttribute("llm.request.status", Array.isArray(embeddingValues) ? "success" : "error");
+      return embeddingValues;
+    }),
+  );
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`Embedding model ${client.modelName} returned an empty vector`);
   }
-  throw lastError ?? new Error("All embedding models failed");
+  if (values.length !== client.dimensions) {
+    throw new Error(
+      `Job embedding dimension ${values.length} does not match configured dimension ${client.dimensions}`,
+    );
+  }
+  return values;
 };

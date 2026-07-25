@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Collection } from "mongodb";
-import { rankJobsByCosine, semanticSearchJobs } from "../semantic-search";
+import { rankJobsByCosine, semanticSearchJobs, vectorSearchJobsPage } from "../semantic-search";
 import type { EnrichedJob } from "../../../poller/job-poller-api-stack/stages/enrich/types";
 
 const makeJob = (id: string, searchEmbedding: number[]): EnrichedJob =>
@@ -110,5 +110,31 @@ describe("semanticSearchJobs", () => {
 
     expect(await semanticSearchJobs(collection, [1, 0], 10)).toEqual([]);
     expect(find).toHaveBeenCalledTimes(1); // no hydrate query when there are no candidates
+  });
+});
+
+describe("vectorSearchJobsPage", () => {
+  it("asks MongoDB Vector Search for the ranked window plus one lookahead result", async () => {
+    const toArray = vi.fn().mockResolvedValue([]);
+    const aggregate = vi.fn().mockReturnValue({ toArray });
+    const collection = { aggregate } as unknown as Collection<EnrichedJob>;
+    const asOf = new Date("2026-01-01T00:00:00.000Z");
+
+    await vectorSearchJobsPage(collection, [1, 0], 50, asOf, "jobs-vector-index");
+
+    expect(aggregate).toHaveBeenCalledTimes(1);
+    const pipeline = aggregate.mock.calls[0][0] as Array<Record<string, unknown>>;
+    expect(pipeline[0]).toEqual({
+      $vectorSearch: {
+        index: "jobs-vector-index",
+        path: "searchEmbedding",
+        queryVector: [1, 0],
+        numCandidates: 2020,
+        limit: 101,
+        filter: { createdAt: { $lte: asOf } },
+      },
+    });
+    expect(pipeline[1]).toEqual({ $skip: 50 });
+    expect(pipeline[2]).toEqual({ $limit: 51 });
   });
 });

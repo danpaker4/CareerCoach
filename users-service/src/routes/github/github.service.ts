@@ -22,6 +22,7 @@ import { toUser, toUserDocument } from "../users/user.utils";
 import { buildAuthenticatedSession } from "../auth/auth.service";
 import type { AuthenticatedUserSession } from "../auth/auth.types";
 import { toSafeUser } from "../auth/auth.utils";
+import { regenerateProfileEmbedding } from "../users/user-embedding.service";
 import {
     buildGithubRequestInit,
     buildGithubSkillList,
@@ -264,6 +265,9 @@ export const loginOrCreateGithubUser = async (
             };
 
             await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+            regenerateProfileEmbedding(usersCollection, user._id).catch((error: unknown) => {
+                console.error("Profile embedding update failed after GitHub sign-in", error);
+            });
             return { ...user, ...updates };
         })()
         : await (async (): Promise<UserDocument> => {
@@ -294,6 +298,9 @@ export const loginOrCreateGithubUser = async (
 
             const userDocument = toUserDocument(newUser);
             await usersCollection.insertOne(userDocument);
+            regenerateProfileEmbedding(usersCollection, userId).catch((error: unknown) => {
+                console.error("Profile embedding creation failed after GitHub sign-in", error);
+            });
             return userDocument;
         })();
 
@@ -327,6 +334,9 @@ export const linkGithubSkillsToUser = async (
     };
 
     await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+    regenerateProfileEmbedding(usersCollection, user._id).catch((error: unknown) => {
+        console.error("Profile embedding update failed after GitHub linking", error);
+    });
 
     return {
         status: "updated",
