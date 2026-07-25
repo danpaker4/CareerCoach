@@ -7,8 +7,13 @@ const MAX_HISTORY_MESSAGES = 6;
 const MAX_HISTORY_MESSAGE_CHARS = 500;
 const MAX_ACHIEVEMENTS = 5;
 
-const buildRecentHistory = (conversation: Conversation): string =>
-    conversation.messages
+const buildRecentHistory = (conversation: Conversation, latestUserMessage: string): string => {
+    const lastMessage = conversation.messages.at(-1);
+    const historyMessages = lastMessage?.role === "user" && lastMessage.content === latestUserMessage
+        ? conversation.messages.slice(0, -1)
+        : conversation.messages;
+
+    return historyMessages
         .slice(-MAX_HISTORY_MESSAGES)
         .map((message) => {
             const content = message.content.slice(0, MAX_HISTORY_MESSAGE_CHARS);
@@ -24,6 +29,7 @@ const buildRecentHistory = (conversation: Conversation): string =>
             return `${message.role.toUpperCase()}: ${content}${jobContext}`;
         })
         .join("\n");
+};
 
 const buildAchievements = (achievements: readonly UserAchievement[]): string =>
     achievements.length === 0
@@ -53,6 +59,6 @@ Achievements: ${buildAchievements(userAchievements)}
 Account:
 ${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}
 Recent conversation:
-${buildRecentHistory(conversation)}
+${buildRecentHistory(conversation, latestUserMessage)}
 Latest: ${latestUserMessage}
 `;
