@@ -1,0 +1,2 @@
+export const JOB_SEARCH_DEBOUNCE_MS = 600;
+export const JOBS_PREFETCH_ROOT_MARGIN = '400px';

@@ -6,7 +6,8 @@ import type { LlmTokenUsageDocument } from "../../llm-token-usage/llm-token-usag
 import type { UserEmbeddingCache } from "../../cache/user-embedding.cache";
 import { LlmTokenUsageRepository } from "../../llm-token-usage/llm-token-usage.repository";
 import { JobsHandler } from "./jobs.handler";
-import { createJobSchema } from "./jobs.schema";
+import { createJobSchema, getJobsSchema } from "./jobs.schema";
+import { getJobEmbeddingConfig } from "../../ai/job-embedding.config";
 
 export const jobsRouter = (
   jobsCollection: Collection<EnrichedJob>,
@@ -14,13 +15,15 @@ export const jobsRouter = (
   embeddingCache: UserEmbeddingCache
 ) => async (fastify: FastifyInstance) => {
   const tokenUsageRecorder = new LlmTokenUsageRepository(tokenUsageCollection);
+  const matchingConfig = getJobEmbeddingConfig();
   const handler = JobsHandler({
     jobsCollection,
     tokenUsageRecorder,
-    usersServiceBaseUrl: process.env.USERS_SERVICE_BASE_URL,
+    usersServiceBaseUrl: matchingConfig.USERS_SERVICE_BASE_URL,
+    internalServiceApiKey: matchingConfig.INTERNAL_SERVICE_API_KEY,
     embeddingCache,
   });
 
-  fastify.get("/jobs", handler.getJobsHandler);
+  fastify.withTypeProvider<ZodTypeProvider>().get("/jobs", { schema: getJobsSchema }, handler.getJobsHandler);
   fastify.withTypeProvider<ZodTypeProvider>().post("/jobs", { schema: createJobSchema }, handler.createJobHandler);
 };

@@ -8,7 +8,14 @@ import type { User, UserDocument } from "./user.model";
 import { updateUserCv } from "./users-cv.service";
 import { regenerateProfileEmbedding } from "./user-embedding.service";
 import { toUser, toUserDocument } from "./user.utils";
-import { createUserSchema, getUserSchema, updateDreamJobSchema, updateUserSchema, uploadUserCvSchema } from "./users.schema";
+import {
+    createUserSchema,
+    getUserMatchingContextSchema,
+    getUserSchema,
+    updateDreamJobSchema,
+    updateUserSchema,
+    uploadUserCvSchema,
+} from "./users.schema";
 import type { UsersHandlerType } from "./users.types";
 import { serializeRouteError } from "./users.utils";
 
@@ -36,6 +43,41 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
             }
         },
 
+        getUserMatchingContextHandler: async (
+            request: SchematicRequest<typeof getUserMatchingContextSchema>,
+            reply: FastifyReply,
+        ) => {
+            const { userId } = request.params;
+
+            try {
+                const user = await usersCollection.findOne(
+                    { _id: userId },
+                    {
+                        projection: {
+                            _id: 0,
+                            profileEmbedding: 1,
+                            profileEmbeddingUpdatedAt: 1,
+                            profileEmbeddingModel: 1,
+                            profileEmbeddingStatus: 1,
+                        },
+                    },
+                );
+                if (!user) {
+                    reply.code(StatusCodes.NOT_FOUND).send({ error: "User not found" });
+                    return;
+                }
+
+                reply.code(StatusCodes.OK).send({
+                    profileEmbedding: user.profileEmbedding ?? [],
+                    profileEmbeddingUpdatedAt: user.profileEmbeddingUpdatedAt,
+                    profileEmbeddingModel: user.profileEmbeddingModel,
+                    profileEmbeddingStatus: user.profileEmbeddingStatus,
+                });
+            } catch (error) {
+                reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
+            }
+        },
+
         createUserHandler: async (request: SchematicRequest<typeof createUserSchema>, reply: FastifyReply) => {
             try {
                 const userData = request.body;
@@ -54,6 +96,9 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                 };
 
                 await usersCollection.insertOne(toUserDocument(newUser));
+                regenerateProfileEmbedding(usersCollection, newUser.id).catch(
+                    (err) => request.log.error({ err }, "Profile embedding creation failed"),
+                );
                 reply.code(StatusCodes.CREATED).send(newUser);
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send(serializeRouteError(error));
@@ -110,6 +155,10 @@ export const UsersHandler = (usersCollection: Collection<UserDocument>): UsersHa
                     reply.code(StatusCodes.NOT_FOUND).send({ error: "User not found" });
                     return;
                 }
+
+                regenerateProfileEmbedding(usersCollection, userId).catch(
+                    (err) => request.log.error({ err }, "Profile embedding update failed"),
+                );
 
                 reply.code(StatusCodes.OK).send({ message: `Dream job updated for user ${userId}`, status: "OK" });
             } catch (error) {

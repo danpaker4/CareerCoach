@@ -1,18 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createHash } from "node:crypto";
 import type { Collection } from "mongodb";
 import type { User, UserDocument } from "./user.model";
+import { getProfileEmbeddingConfig } from "./user-embedding.config";
 import { toUser } from "./user.utils";
-
-const EMBEDDING_MODELS = ["text-embedding-004", "gemini-embedding-001", "embedding-001"] as const;
-
-let genAIInstance: GoogleGenerativeAI | null = null;
-
-const getGenAI = (apiKey: string): GoogleGenerativeAI => {
-    if (!genAIInstance) {
-        genAIInstance = new GoogleGenerativeAI(apiKey);
-    }
-    return genAIInstance;
-};
 
 export const buildUserProfileText = (user: User): string => {
     const sections: string[] = [];
@@ -52,31 +43,24 @@ export const buildUserProfileText = (user: User): string => {
 
 export const generateProfileEmbedding = async (
     profileText: string,
-    apiKey: string
+    apiKey: string,
+    modelName: string,
 ): Promise<number[]> => {
-    const genAI = getGenAI(apiKey);
-
-    for (const modelName of EMBEDDING_MODELS) {
-        try {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await model.embedContent(profileText);
-            const values = result.embedding?.values;
-            if (Array.isArray(values) && values.length > 0) return values;
-        } catch (error) {
-            const status = (error as { status?: number }).status;
-            if (status === 404) continue;
-            throw error;
-        }
+    const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: modelName });
+    const result = await model.embedContent(profileText);
+    const values = result.embedding?.values;
+    if (!Array.isArray(values) || values.length === 0) {
+        throw new Error(`Embedding model ${modelName} returned an empty vector`);
     }
-    throw new Error("All embedding models failed");
+    return values;
 };
 
 export const regenerateProfileEmbedding = async (
     usersCollection: Collection<UserDocument>,
     userId: string
 ): Promise<void> => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) return;
+    if (process.env.NODE_ENV === "test") return;
+    const config = getProfileEmbeddingConfig();
 
     const userDoc = await usersCollection.findOne({ _id: userId });
     if (!userDoc) return;
@@ -85,9 +69,62 @@ export const regenerateProfileEmbedding = async (
     const profileText = buildUserProfileText(user);
     if (!profileText.trim()) return;
 
-    const embedding = await generateProfileEmbedding(profileText, apiKey);
+    if (!config.GEMINI_API_KEY) {
+        await usersCollection.updateOne(
+            { _id: userId },
+            { $set: { profileEmbeddingStatus: "failed" } },
+        );
+        return;
+    }
+
+    const sourceHash = createHash("sha256").update(profileText).digest("hex");
     await usersCollection.updateOne(
         { _id: userId },
-        { $set: { profileEmbedding: embedding, profileEmbeddingUpdatedAt: new Date() } }
+        {
+            $set: {
+                profileEmbeddingStatus: "pending",
+                profileEmbeddingSourceHash: sourceHash,
+            },
+        },
     );
+
+    try {
+        const embedding = await generateProfileEmbedding(
+            profileText,
+            config.GEMINI_API_KEY,
+            config.PROFILE_EMBEDDING_MODEL,
+        );
+        if (embedding.length !== config.PROFILE_EMBEDDING_DIMENSIONS) {
+            throw new Error(
+                `Profile embedding dimension ${embedding.length} does not match configured dimension ${config.PROFILE_EMBEDDING_DIMENSIONS}`,
+            );
+        }
+
+        const latestUserDoc = await usersCollection.findOne({ _id: userId });
+        if (!latestUserDoc) return;
+        const latestProfileText = buildUserProfileText(toUser(latestUserDoc));
+        const latestSourceHash = createHash("sha256").update(latestProfileText).digest("hex");
+        if (latestSourceHash !== sourceHash) {
+            await regenerateProfileEmbedding(usersCollection, userId);
+            return;
+        }
+
+        await usersCollection.updateOne(
+            { _id: userId, profileEmbeddingSourceHash: sourceHash },
+            {
+                $set: {
+                    profileEmbedding: embedding,
+                    profileEmbeddingUpdatedAt: new Date(),
+                    profileEmbeddingModel: config.PROFILE_EMBEDDING_MODEL,
+                    profileEmbeddingStatus: "ready",
+                },
+            },
+        );
+    } catch (error) {
+        await usersCollection.updateOne(
+            { _id: userId, profileEmbeddingSourceHash: sourceHash },
+            { $set: { profileEmbeddingStatus: "failed" } },
+        );
+        throw error;
+    }
 };

@@ -8,6 +8,7 @@ import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemin
 import { uploadCvToS3 } from "../../cv/s3-upload/s3-upload.service";
 import type { RegisterUserInput } from "./register-user.types";
 import { truncateCvTextForStorage } from "../users-cv.consts";
+import { regenerateProfileEmbedding } from "../user-embedding.service";
 import {
   throwIfUserAlreadyExists,
   validatePdfFile,
@@ -135,6 +136,9 @@ export const registerUser = async (
   };
 
   await usersCollection.insertOne(toUserDocument(newUser));
+  regenerateProfileEmbedding(usersCollection, newUser.id).catch((error: unknown) => {
+    console.error("Profile embedding creation failed after registration", error);
+  });
 
   const { password: _password, ...safeUser } = newUser;
   return safeUser;

@@ -12,6 +12,8 @@ import type {
     CareerSkillProfile,
 } from "../routes/careerKnowledge/career-knowledge.types";
 import type { LlmTokenUsageDocument } from "../llm-token-usage/llm-token-usage.types";
+import { getJobEmbeddingConfig } from "../ai/job-embedding.config";
+import { ensureJobVectorSearchIndex } from "./job-vector-index.service";
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
@@ -51,12 +53,26 @@ export class MongoClient implements Service {
             this.careerDirectionExamplesCollection = this.db.collection<CareerDirectionExample>("careerDirectionExamples");
             this.llmTokenUsageCollection = this.db.collection<LlmTokenUsageDocument>("llmTokenUsage");
             await this.llmTokenUsageCollection.createIndex({ createdAt: -1, provider: 1, model: 1 });
+            await this.jobsCollection.createIndex({ createdAt: -1, id: 1 });
+            if (
+                process.env.NODE_ENV !== "test" &&
+                getJobEmbeddingConfig().JOBS_VECTOR_SEARCH_ENABLED
+            ) {
+                await this.ensureJobsVectorSearchIndex();
+            }
 
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
             console.error('Failed To Connect MongoDb', err);
             throw err;
         }
+    };
+
+    private ensureJobsVectorSearchIndex = async (): Promise<void> => {
+        if (!this.jobsCollection) return;
+        const config = getJobEmbeddingConfig();
+        await ensureJobVectorSearchIndex(this.jobsCollection, config);
+        console.log(`[VectorSearch] Jobs index ${config.JOB_VECTOR_INDEX_NAME} is queryable`);
     };
 
     stop = async (): Promise<void> => {

@@ -1,8 +1,6 @@
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 
-const MIN_MATCH_FIT_PCT = 80;
-
 export type DestinationJobResult = {
   id: string;
   jobTitle: string;
@@ -13,8 +11,8 @@ export type DestinationJobResult = {
 };
 
 const parseJobs = (data: unknown): DestinationJobResult[] => {
-  if (!Array.isArray(data)) return [];
-  return data.filter((item): item is DestinationJobResult => {
+  if (typeof data !== 'object' || data === null || !('jobs' in data) || !Array.isArray(data.jobs)) return [];
+  return data.jobs.filter((item): item is DestinationJobResult => {
     if (typeof item !== 'object' || item === null) return false;
     const obj = item as Record<string, unknown>;
     return (
@@ -25,13 +23,6 @@ const parseJobs = (data: unknown): DestinationJobResult[] => {
       typeof obj.url === 'string'
     );
   });
-};
-
-const filterByMatchFit = (jobs: DestinationJobResult[]): DestinationJobResult[] => {
-  const hasMatchScores = jobs.some((job) => job.matchPct !== undefined);
-  return hasMatchScores
-    ? jobs.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
-    : jobs;
 };
 
 export const fetchJobsByTitle = async (userId: string, search: string): Promise<DestinationJobResult[]> => {
@@ -45,5 +36,5 @@ export const fetchJobsByTitle = async (userId: string, search: string): Promise<
 
   if (!res.ok) return [];
   const data: unknown = await res.json().catch(() => []);
-  return filterByMatchFit(parseJobs(data));
+  return parseJobs(data);
 };

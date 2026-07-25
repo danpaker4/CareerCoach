@@ -7,89 +7,45 @@ import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
 import { UploadJobModal } from './UploadJobModal';
 import { JobSuggestionsSkeleton } from './JobSuggestionsSkeleton';
+import { JOB_SEARCH_DEBOUNCE_MS, JOBS_PREFETCH_ROOT_MARGIN } from './job-suggestions.consts';
+import type {
+  FetchState,
+  JobResult,
+  JobsRankingMode,
+  LoadMoreState,
+} from './job-suggestions.types';
+import {
+  buildJobsPageUrl,
+  hashStringToNumber,
+  mergeUniqueJobs,
+  parseJobsPage,
+  parsePipelineJobIdToEntryId,
+} from './job-suggestions.utils';
 import './JobSuggestions.css';
 import type { User } from '../../types/user';
-
-const MIN_MATCH_FIT_PCT = 80;
-
-interface JobResult {
-  id: string;
-  jobTitle: string;
-  company: string;
-  seniority: string;
-  description: string;
-  url: string;
-  salary?: number;
-  requirements?: string[];
-  benefits?: string[];
-  matchPct?: number;
-}
 
 interface JobSuggestionsProps {
   user: User;
 }
 
-type FetchState = 'idle' | 'loading' | 'success' | 'error';
-
-const hashStringToNumber = (str: string): number => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-};
-
-const parseJobs = (data: unknown): JobResult[] => {
-  if (!Array.isArray(data)) return [];
-  return data.filter((item): item is JobResult => {
-    if (typeof item !== 'object' || item === null) return false;
-    const obj = item as Record<string, unknown>;
-    return (
-      typeof obj.id === 'string' &&
-      typeof obj.jobTitle === 'string' &&
-      typeof obj.company === 'string' &&
-      typeof obj.seniority === 'string' &&
-      typeof obj.description === 'string' &&
-      typeof obj.url === 'string'
-    );
-  });
-};
-
-const filterByMatchFit = (jobs: JobResult[]): JobResult[] => {
-  const hasMatchScores = jobs.some((job) => job.matchPct !== undefined);
-  return hasMatchScores
-    ? jobs.filter((job) => (job.matchPct ?? 0) >= MIN_MATCH_FIT_PCT)
-    : jobs;
-};
-
-const parsePipelineJobIdToEntryId = (data: unknown): Map<number, string> => {
-  if (!Array.isArray(data)) {
-    return new Map();
-  }
-  const map = new Map<number, string>();
-  data.forEach((item) => {
-    if (typeof item !== 'object' || item === null) {
-      return;
-    }
-    const obj = item as Record<string, unknown>;
-    const jobId = obj.jobId;
-    const entryId = obj.id;
-    if (typeof jobId === 'number' && typeof entryId === 'string') {
-      map.set(jobId, entryId);
-    }
-  });
-  return map;
-};
 
 export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [fetchState, setFetchState] = useState<FetchState>('idle');
+  const [loadMoreState, setLoadMoreState] = useState<LoadMoreState>('idle');
   const [jobs, setJobs] = useState<JobResult[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
   const [pipelineJobIdToEntryId, setPipelineJobIdToEntryId] = useState(() => new Map<number, string>());
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [rankingMode, setRankingMode] = useState<JobsRankingMode>('recent');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
+  const requestAbortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
+  const loadMoreInFlightRef = useRef(false);
 
   const loadPipelineJobHashes = useCallback(async () => {
     if (!user?.id) {
@@ -109,33 +65,65 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     setPipelineJobIdToEntryId(parsePipelineJobIdToEntryId(data));
   }, [user?.id]);
 
-  const fetchJobs = useCallback((query: string) => {
+  const fetchJobs = useCallback(async (query: string, cursor: string | null = null): Promise<void> => {
     if (!user?.id) return;
-    setFetchState('loading');
-    const params = new URLSearchParams({ userId: user.id });
-    const trimmedQuery = query.trim();
-    if (trimmedQuery) {
-      params.set('search', trimmedQuery);
+    const isAppending = cursor !== null;
+    if (isAppending && loadMoreInFlightRef.current) return;
+    loadMoreInFlightRef.current = isAppending;
+    requestAbortRef.current?.abort();
+    const abortController = new AbortController();
+    requestAbortRef.current = abortController;
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+
+    if (isAppending) {
+      setLoadMoreState('loading');
+    } else {
+      loadMoreInFlightRef.current = false;
+      setFetchState('loading');
+      setLoadMoreState('idle');
+      setJobs([]);
+      setNextCursor(null);
+      setHasMore(false);
     }
-    const url = `${ENV.JOB_SERVICE_BASE_URL}/jobs?${params.toString()}`;
-    apiFetch(url, { credentials: 'include' })
-      .then(async (res) => {
-        if (res.status === 404) {
-          setJobs([]);
-          setFetchState('success');
-          return;
-        }
-        if (!res.ok) throw new Error(`Server returned ${res.status}`);
-        const data: unknown = await res.json();
-        const parsedJobs = parseJobs(data);
-        const isSearching = query.trim().length > 0;
-        setJobs(isSearching ? parsedJobs : filterByMatchFit(parsedJobs));
-        setFetchState('success');
-      })
-      .catch((err: unknown) => {
-        setErrorMessage(err instanceof Error ? err.message : 'Failed to load jobs');
-        setFetchState('error');
+    setErrorMessage('');
+
+    try {
+      const response = await apiFetch(buildJobsPageUrl(user.id, query, cursor), {
+        credentials: 'include',
+        signal: abortController.signal,
       });
+      if (response.status === 409 && isAppending) {
+        loadMoreInFlightRef.current = false;
+        await fetchJobs(query);
+        return;
+      }
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      const data: unknown = await response.json();
+      const parsedPage = parseJobsPage(data);
+      if (!parsedPage) throw new Error('Server returned an invalid jobs response');
+      if (requestId !== requestIdRef.current) return;
+
+      setJobs((currentJobs) => isAppending ? mergeUniqueJobs(currentJobs, parsedPage.jobs) : parsedPage.jobs);
+      setNextCursor(parsedPage.pagination.nextCursor);
+      setHasMore(parsedPage.pagination.hasMore);
+      setRankingMode(parsedPage.rankingMode);
+      setFetchState('success');
+      setLoadMoreState('idle');
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (requestId !== requestIdRef.current) return;
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load jobs');
+      if (isAppending) {
+        setLoadMoreState('error');
+        return;
+      }
+      setFetchState('error');
+    } finally {
+      if (isAppending && requestId === requestIdRef.current) {
+        loadMoreInFlightRef.current = false;
+      }
+    }
   }, [user?.id]);
 
   useEffect(() => {
@@ -143,16 +131,36 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   }, [loadPipelineJobHashes]);
 
   useEffect(() => {
-    fetchJobs('');
+    void fetchJobs('');
+    return () => {
+      requestAbortRef.current?.abort();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [fetchJobs]);
+
+  useEffect(() => {
+    const trigger = loadMoreTriggerRef.current;
+    if (!trigger || !hasMore || !nextCursor || loadMoreState !== 'idle' || fetchState !== 'success') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void fetchJobs(searchQuery, nextCursor);
+        }
+      },
+      { rootMargin: JOBS_PREFETCH_ROOT_MARGIN },
+    );
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [fetchJobs, fetchState, hasMore, loadMoreState, nextCursor, searchQuery]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetchJobs(value);
-    }, 600);
+      void fetchJobs(value);
+    }, JOB_SEARCH_DEBOUNCE_MS);
   };
 
   const togglePipeline = async (job: JobResult) => {
@@ -246,7 +254,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         {fetchState === 'error' && (
           <div className="page-error">
             <p>Could not load jobs: {errorMessage}</p>
-            <button type="button" className="btn-outline" style={{ marginTop: 16 }} onClick={() => fetchJobs(searchQuery)}>
+            <button type="button" className="btn-outline" style={{ marginTop: 16 }} onClick={() => void fetchJobs(searchQuery)}>
               Try Again
             </button>
           </div>
@@ -255,8 +263,18 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         {fetchState === 'success' && (
           <>
             <p className="jobs-count">
-              <strong>{jobs.length}</strong> {jobs.length === 1 ? 'job' : 'jobs'} found
+              <strong>{jobs.length}</strong> {jobs.length === 1 ? 'job' : 'jobs'} loaded
             </p>
+
+            {rankingMode === 'recent' && (
+              <p className="jobs-ranking-notice">Personalized recommendations are being prepared. Showing recent jobs for now.</p>
+            )}
+            {rankingMode === 'query' && (
+              <p className="jobs-ranking-notice">Your profile match is being prepared. Results are ranked by your search for now.</p>
+            )}
+            {rankingMode === 'keyword' && (
+              <p className="jobs-ranking-notice">Semantic search is temporarily unavailable. Showing keyword matches.</p>
+            )}
 
             {jobs.length === 0 && (
               <div className="jobs-empty surface-card">
@@ -267,8 +285,9 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
             )}
 
             {jobs.length > 0 && (
-              <div className="jobs-grid">
-                {jobs.map((job) => {
+              <>
+                <div className="jobs-grid">
+                  {jobs.map((job) => {
                   const reqs = job.requirements ?? [];
                   const firstTwo = reqs.slice(0, 2);
                   const isAdding = addingJob === job.id;
@@ -322,8 +341,36 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                       </div>
                     </div>
                   );
-                })}
-              </div>
+                  })}
+                </div>
+
+                {(hasMore || loadMoreState !== 'idle') && (
+                  <div ref={loadMoreTriggerRef} className="jobs-load-more" aria-live="polite">
+                    {loadMoreState === 'loading' && <p>Loading more jobs…</p>}
+                    {loadMoreState === 'error' && (
+                      <>
+                        <p>Could not load more jobs: {errorMessage}</p>
+                        <button
+                          type="button"
+                          className="btn-outline"
+                          onClick={() => nextCursor && void fetchJobs(searchQuery, nextCursor)}
+                        >
+                          Try Again
+                        </button>
+                      </>
+                    )}
+                    {loadMoreState === 'idle' && hasMore && (
+                      <button
+                        type="button"
+                        className="btn-outline jobs-load-more-button"
+                        onClick={() => nextCursor && void fetchJobs(searchQuery, nextCursor)}
+                      >
+                        Load more jobs
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -335,7 +382,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
           onClose={() => setShowUploadModal(false)}
           onCreated={() => {
             setShowUploadModal(false);
-            fetchJobs(searchQuery);
+            void fetchJobs(searchQuery);
           }}
         />
       )}
