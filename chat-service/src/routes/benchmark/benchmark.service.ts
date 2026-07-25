@@ -13,6 +13,7 @@ import type { DreamJobRoadmapCreator } from "../../chat-flow/stage-2-shortcuts/d
 import { BenchmarkFixtureExternalService } from "./benchmark-fixture.external-service";
 import { BenchmarkNoopEmbeddingPort, createBenchmarkNoopSuggestDirections } from "./benchmark-noop.services";
 import { BenchmarkRunDal } from "./benchmark.dal";
+import { createLangfuseObservationAttributes, withSpan } from "../../observability/tracing";
 import {
     BENCHMARK_CASES,
     BENCHMARK_DEFAULT_MODEL,
@@ -141,7 +142,15 @@ export class BenchmarkService {
         return run ? toBenchmarkRunSummary(run) : null;
     };
 
-    runBenchmark = async (request: BenchmarkRunRequest, adminUserId: string): Promise<BenchmarkRunSummary> => {
+    runBenchmark = async (request: BenchmarkRunRequest, adminUserId: string): Promise<BenchmarkRunSummary> => await withSpan(
+        "benchmark.run",
+        createLangfuseObservationAttributes({
+            operation: "benchmark.run",
+            type: "chain",
+            feature: "benchmark",
+            userId: adminUserId,
+        }),
+        async () => {
         const cases = sampleCases(selectCases(request.caseIds), request.sampleCount);
         const candidateIds = selectCandidateIds(request.candidateIds);
         const candidateResults = await Promise.all(candidateIds.map((candidateId) => this.runCandidate(candidateId, cases)));
@@ -160,7 +169,7 @@ export class BenchmarkService {
             candidateResults: normalizedCandidateResults,
         };
         return toBenchmarkRunSummary(await this.dal.create(run));
-    };
+    });
 
     private runCandidate = async (
         candidateId: BenchmarkCandidateId,
@@ -255,7 +264,7 @@ export class BenchmarkService {
         const conversationService = new ChatConversationService(conversationDal, externalService);
         const textCompletion = createTextCompletionPort(config, tokenRecorder);
         const profileDal = new CareerProfileDal(this.dbClient.careerProfiles);
-        const profileService = new CareerProfileService(profileDal, new BenchmarkNoopEmbeddingPort(), textCompletion, null);
+        const profileService = new CareerProfileService(profileDal, new BenchmarkNoopEmbeddingPort(), null);
         const suggestDirections = createBenchmarkNoopSuggestDirections(this.dbClient.careerDirectionExamples);
         const dreamJobRoadmapCreator: DreamJobRoadmapCreator = {
             create: async () => ({ created: true }),

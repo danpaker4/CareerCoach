@@ -29,7 +29,7 @@ export const createChatServiceDependencies = (
     const textCompletion = createTextCompletionPort(chatConfig.llm, tokenUsageDal);
     const embedding = createEmbeddingPort(chatConfig.customEmbeddingUrl);
     const profileDal = new CareerProfileDal(dbClient.careerProfiles);
-    const profileService = new CareerProfileService(profileDal, embedding, textCompletion, {
+    const profileService = new CareerProfileService(profileDal, embedding, {
         notifyProfileMaterialized: (userId) => externalService.notifyCoachProfileMaterialized(userId),
     });
     const roadmapGenerator = createDreamJobRoadmapHttpGenerator(chatConfig.roadmapServiceBaseUrl);

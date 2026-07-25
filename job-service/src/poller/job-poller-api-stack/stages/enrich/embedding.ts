@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getJobEmbeddingConfig } from "../../../../ai/job-embedding.config";
 import { runEmbeddingRequestWithRetry } from "../../../../ai/embedding-retry.utils";
+import { createLangfuseContentAttributes } from "../../../../observability/langfuse-observability.utils";
 import { withSpan } from "../../../../observability/tracing";
 
 export type EmbeddingClient = {
@@ -62,6 +63,10 @@ export const createEmbedding = async (
       const result = await model.embedContent(text);
       const embeddingValues = result.embedding?.values;
       span.setAttribute("llm.request.status", Array.isArray(embeddingValues) ? "success" : "error");
+      if (Array.isArray(embeddingValues)) {
+        span.setAttribute("langfuse.observation.metadata.embedding_dimensions", String(embeddingValues.length));
+      }
+      span.setAttributes(createLangfuseContentAttributes(text));
       return embeddingValues;
     }),
   );

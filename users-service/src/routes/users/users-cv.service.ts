@@ -33,6 +33,7 @@ export const updateUserCv = async (
     const extractedCvText = await extractTextFromCv(cvBuffer);
     const cvText = truncateCvTextForStorage(extractedCvText);
     const achievements = await extractAchievementsWithGemini({
+        userId: input.userId,
         cvText,
         currentJob: resolveProfileValue(input.currentJob, currentUser.currentJob),
         linkedInUrl: resolveProfileValue(input.linkedInUrl, currentUser.linkedInUrl),

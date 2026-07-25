@@ -659,4 +659,3 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
 });
 
 ChatInterface.displayName = 'ChatInterface';
-

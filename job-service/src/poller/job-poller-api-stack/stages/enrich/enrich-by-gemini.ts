@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { LlmTokenUsageRecorder } from "../../../../llm-token-usage/llm-token-usage.types";
 import { readGeminiUsage, readOllamaUsage, recordLlmTokenUsage } from "../../../../llm-token-usage/llm-token-usage.utils";
+import { createLangfuseContentAttributes } from "../../../../observability/langfuse-observability.utils";
 import { withSpan } from "../../../../observability/tracing";
 import type { AdaptedJob } from "../adapt/adapt-resource.types";
 import type { EnrichedJob } from "./types";
@@ -75,6 +76,11 @@ const generateWithOllama = async (
     span.setAttribute("llm.usage.prompt_tokens", usage.promptTokens);
     span.setAttribute("llm.usage.completion_tokens", usage.completionTokens);
     span.setAttribute("llm.usage.total_tokens", usage.totalTokens);
+    span.setAttributes({
+      "langfuse.observation.usage_details": JSON.stringify({ input: usage.promptTokens, output: usage.completionTokens, total: usage.totalTokens }),
+      "gen_ai.usage.input_tokens": usage.promptTokens,
+      "gen_ai.usage.output_tokens": usage.completionTokens,
+    });
   }
   await recordLlmTokenUsage(tokenUsageRecorder, {
     sourceService: "job-service",
@@ -83,6 +89,7 @@ const generateWithOllama = async (
     model: modelName,
     usage,
   });
+  span.setAttributes(createLangfuseContentAttributes(prompt, text));
   span.setAttribute("llm.request.status", "success");
   return text;
 });
@@ -134,6 +141,11 @@ const enrichSingleJob = async (
             span.setAttribute("llm.usage.prompt_tokens", usage.promptTokens);
             span.setAttribute("llm.usage.completion_tokens", usage.completionTokens);
             span.setAttribute("llm.usage.total_tokens", usage.totalTokens);
+            span.setAttributes({
+              "langfuse.observation.usage_details": JSON.stringify({ input: usage.promptTokens, output: usage.completionTokens, total: usage.totalTokens }),
+              "gen_ai.usage.input_tokens": usage.promptTokens,
+              "gen_ai.usage.output_tokens": usage.completionTokens,
+            });
           }
           const generatedText = result.response.text();
           await recordLlmTokenUsage(tokenUsageRecorder, {
@@ -143,6 +155,7 @@ const enrichSingleJob = async (
             model: llmModel,
             usage,
           });
+          span.setAttributes(createLangfuseContentAttributes(prompt, generatedText));
           span.setAttribute("llm.request.status", "success");
           return generatedText;
         });

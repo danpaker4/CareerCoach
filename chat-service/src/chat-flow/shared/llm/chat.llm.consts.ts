@@ -12,6 +12,3 @@ export const LLM_DECISION_PARSE_FALLBACK_REPLY =
 
 export const LLM_JOB_AWARE_PARSE_FALLBACK_REPLY =
     "I found relevant jobs. Tell me which one sounds closest to your goals, and I will help you refine it.";
-
-export const LLM_STAGE_PARSE_FALLBACK_REPLY =
-    "Got it. Can you share a bit more detail so I can guide you better?";

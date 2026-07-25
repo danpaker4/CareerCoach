@@ -7,6 +7,8 @@ export type LlmRequestStatus = "success" | "error";
 export type LlmTokenUsageContext = {
     readonly operation: string;
     readonly userId?: string;
+    readonly sessionId?: string;
+    readonly feature?: string;
 };
 
 export type LlmTokenUsageCounts = {

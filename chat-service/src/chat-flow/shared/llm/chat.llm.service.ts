@@ -1,26 +1,32 @@
 import type { TextCompletionPort } from "../../../litellm/text-completion/text-completion.types";
 import type { UserAchievement } from "../../api/shared/chat.model";
 import type { Conversation, DreamJobFlow } from "../../../routes/conversation/conversation.model";
-import type { ConversationStage } from "../../../routes/conversation/conversation.types";
-import type { JobSearchResultItem, LlmDecision, StageLlmDecision } from "../../api/shared/chat.types";
-import type { ChatFlowDeps, SendMessagePreparedContext } from "../../chat-flow.types";
-import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
-import { DEFAULT_CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
+import type {
+    ChatTurnDecision,
+    JobSearchResultItem,
+    LlmDecision,
+} from "../../api/shared/chat.types";
+import type { ChatFlowDeps, SendMessageBaseContext } from "../../chat-flow.types";
+import { DEFAULT_MODE_DETECTION_RESULT } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,
     LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
-    LLM_STAGE_PARSE_FALLBACK_REPLY,
 } from "./chat.llm.consts";
-import { parseLlmDecisionFromJson, parseStageLlmDecisionFromJson } from "./chat.llm.utils";
+import {
+    parseChatTurnDecisionFromJson,
+    parseLlmDecisionFromJson,
+} from "./chat.llm.utils";
 import { buildDreamJobPrompt } from "../../stage-2-shortcuts/dream-job/chat.dream-job.prompt.utils";
 import {
     DREAM_JOB_LLM_PARSE_FALLBACK_REPLY,
     parseDreamJobLlmDecisionFromJson,
 } from "../../stage-2-shortcuts/dream-job/chat.dream-job.llm.utils";
 import type { DreamJobLlmDecision } from "../../stage-2-shortcuts/dream-job/chat.dream-job.types";
-import { buildDecisionPrompt, buildRecommendationPrompt, buildStagePrompt } from "./chat.prompt.utils";
+import { buildRecommendationPrompt } from "./chat.recommendation.prompt.utils";
+import { buildTurnDecisionPrompt } from "./chat.turn.prompt.utils";
 import type { ChatLlmObservedOperation, ChatLlmObserver } from "./chat.llm.types";
+import { getCurrentStage } from "../../../routes/conversation/conversation.stage.utils";
 
 const recordParseEvent = (
     observer: ChatLlmObserver | undefined,
@@ -33,16 +39,23 @@ const recordParseEvent = (
 
 export const decideNextStep = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
-): Promise<LlmDecision> => {
+    ctx: SendMessageBaseContext
+): Promise<ChatTurnDecision> => {
     const conversation = ctx.conversationAfterUserMessage;
+    const currentStage = getCurrentStage(conversation, ctx.normalizedMessage);
     const rawText = await deps.textCompletion.complete(
-        buildDecisionPrompt(conversation, ctx.normalizedMessage, ctx.userAchievements, ctx.userAccountContext),
-        { operation: "chat.decision", userId: conversation.userId }
+        buildTurnDecisionPrompt(
+            conversation,
+            ctx.normalizedMessage,
+            ctx.userAchievements,
+            ctx.userAccountContext,
+            currentStage
+        ),
+        { operation: "chat.decision", userId: conversation.userId, sessionId: conversation._id?.toHexString(), feature: "chat" }
     );
 
     try {
-        const parsed = parseLlmDecisionFromJson(rawText);
+        const parsed = parseChatTurnDecisionFromJson(rawText);
         recordParseEvent(deps.llmObserver, "chat.decision", rawText, "success");
         return parsed;
     } catch {
@@ -52,6 +65,8 @@ export const decideNextStep = async (
             shouldSearchJobs: false,
             recommendedJobIds: [],
             searchFilters: EMPTY_LLM_SEARCH_FILTERS,
+            modeDetection: DEFAULT_MODE_DETECTION_RESULT,
+            shouldAdvanceStage: false,
         };
     }
 };
@@ -67,7 +82,7 @@ export const generateJobAwareReply = async (
 ): Promise<LlmDecision> => {
     const rawText = await textCompletion.complete(
         buildRecommendationPrompt(conversation, latestUserMessage, jobs, userAchievements, userAccountContext),
-        { operation: "chat.job_aware_reply", userId: conversation.userId }
+        { operation: "chat.job_aware_reply", userId: conversation.userId, sessionId: conversation._id?.toHexString(), feature: "chat" }
     );
 
     try {
@@ -94,7 +109,7 @@ export const decideDreamJobStep = async (
 ): Promise<DreamJobLlmDecision> => {
     const rawText = await textCompletion.complete(
         buildDreamJobPrompt({ conversation, latestUserMessage, userAccountContext, dreamJobFlow }),
-        { operation: "chat.dream_job", userId: conversation.userId }
+        { operation: "chat.dream_job", userId: conversation.userId, sessionId: conversation._id?.toHexString(), feature: "chat" }
     );
 
     try {
@@ -104,33 +119,6 @@ export const decideDreamJobStep = async (
             reply: DREAM_JOB_LLM_PARSE_FALLBACK_REPLY,
             awaitingConfirmation: false,
             userConfirmed: false,
-        };
-    }
-};
-
-export const generateStageReply = async (
-    textCompletion: TextCompletionPort,
-    conversation: Conversation,
-    latestUserMessage: string,
-    stage: ConversationStage,
-    userAchievements: readonly UserAchievement[],
-    mode: ConversationMode = DEFAULT_CONVERSATION_MODE,
-    userAccountContext?: string,
-    observer?: ChatLlmObserver
-): Promise<StageLlmDecision> => {
-    const rawText = await textCompletion.complete(
-        buildStagePrompt(conversation, latestUserMessage, stage, userAchievements, mode, userAccountContext),
-        { operation: "chat.stage_reply", userId: conversation.userId }
-    );
-    try {
-        const parsed = parseStageLlmDecisionFromJson(rawText);
-        recordParseEvent(observer, "chat.stage_reply", rawText, "success");
-        return parsed;
-    } catch {
-        recordParseEvent(observer, "chat.stage_reply", rawText, "fallback");
-        return {
-            reply: LLM_STAGE_PARSE_FALLBACK_REPLY,
-            shouldAdvanceStage: false,
         };
     }
 };

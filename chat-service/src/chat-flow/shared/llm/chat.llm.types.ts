@@ -1,4 +1,4 @@
-export type ChatLlmObservedOperation = "chat.decision" | "chat.stage_reply" | "chat.job_aware_reply";
+export type ChatLlmObservedOperation = "chat.decision" | "chat.job_aware_reply";
 
 export type ChatLlmParseEvent = {
     readonly operation: ChatLlmObservedOperation;

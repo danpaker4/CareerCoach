@@ -6,20 +6,17 @@ import {
     getCurrentStage,
     recordStageMessage,
 } from "../../routes/conversation/conversation.stage.utils";
-import { generateStageReply } from "../shared/llm/chat.llm.service";
 import type { ResolveStageFlowForSendMessageParams } from "./resolve-stage-flow.types";
 
 export const resolveStageFlowForSendMessage = async (
     params: ResolveStageFlowForSendMessageParams
 ): Promise<StageFlowSendMessageResult> => {
-    const { deps, ctx, shouldSkipStages } = params;
+    const { deps, ctx, shouldSkipStages, stageDecision } = params;
     const {
         userId,
         conversationId,
         normalizedMessage,
         conversationAfterUserMessage,
-        userAccountContext,
-        userAchievements,
         confidenceSummary,
         modeDetection
     } = ctx;
@@ -37,20 +34,10 @@ export const resolveStageFlowForSendMessage = async (
         return { kind: "continue_main_flow", progress: initialProgress };
     }
 
-    const stageReply = await generateStageReply(
-        deps.textCompletion,
-        conversationAfterUserMessage,
-        normalizedMessage,
-        currentStage,
-        userAchievements,
-        mode,
-        userAccountContext,
-        deps.llmObserver
-    );
     const nextStageProgress = applyStageAdvance(
         stageProgressWithNote,
         currentStage.id,
-        stageReply.shouldAdvanceStage
+        stageDecision.shouldAdvanceStage
     );
     const conversationAfterStageAdvance = {
         ...conversationAfterUserMessage,
@@ -59,11 +46,11 @@ export const resolveStageFlowForSendMessage = async (
     const nextStage = getCurrentStage(conversationAfterStageAdvance, normalizedMessage);
     if (nextStage) {
         await deps.conversationService.updateStageProgress(userId, conversationId, nextStageProgress);
-        await deps.conversationService.appendAssistantMessage(userId, conversationId, stageReply.reply);
+        await deps.conversationService.appendAssistantMessage(userId, conversationId, stageDecision.reply);
         return {
             kind: "stage_reply_only",
             progress: nextStageProgress,
-            reply: stageReply.reply,
+            reply: stageDecision.reply,
             mode,
             confidenceSummary,
         };

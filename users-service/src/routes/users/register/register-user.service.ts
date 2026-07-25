@@ -91,6 +91,7 @@ export const registerUser = async (
       const extractedCvText = await extractTextFromCv(cvBuffer);
       const storedCvText = truncateCvTextForStorage(extractedCvText);
       const extractedAchievements = await extractAchievementsWithGemini({
+        userId,
         cvText: storedCvText,
         currentJob,
         linkedInUrl,

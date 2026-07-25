@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AchievementDraft, GeminiAchievementsPayload } from "./gemini.types";
+import { setLangfuseOutput, withLangfuseAiObservation } from "../../../observability/langfuse-observability";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.0-flash";
 
@@ -108,6 +109,7 @@ const parseGeminiResponse = (raw: string): GeminiAchievementsPayload | null => {
 };
 
 export const extractAchievementsWithGemini = async (input: {
+  userId?: string;
   cvText: string;
   currentJob?: string;
   linkedInUrl?: string;
@@ -125,8 +127,19 @@ export const extractAchievementsWithGemini = async (input: {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: modelName });
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const responseText = await withLangfuseAiObservation("cv.extract", {
+      operation: "cv.extract",
+      type: "generation",
+      provider: "gemini",
+      model: modelName,
+      userId: input.userId,
+      input: prompt,
+    }, async (span) => {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      setLangfuseOutput(span, text);
+      return text;
+    });
     const parsed = parseGeminiResponse(responseText);
 
     if (!parsed || !Array.isArray(parsed.achievements)) {

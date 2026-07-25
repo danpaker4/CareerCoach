@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ENV } from '../../config';
 import './Management.css';
 
 export const Management = () => (
@@ -54,6 +55,20 @@ export const Management = () => (
           <p>View Promptfoo eval results in the embedded local viewer (port 15500).</p>
           <span className="management-home-card-action">Open Promptfoo</span>
         </Link>
+
+        {ENV.LANGFUSE_DASHBOARD_URL && (
+          <a
+            href={ENV.LANGFUSE_DASHBOARD_URL}
+            className="management-home-card"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="management-eyebrow">Observability</span>
+            <h2>Langfuse traces</h2>
+            <p>Inspect AI generations, latency, token usage, errors, and conversation sessions.</p>
+            <span className="management-home-card-action">Open Langfuse</span>
+          </a>
+        )}
       </div>
     </section>
   </main>

@@ -31,6 +31,7 @@ export const startJobPollerSchedule = (
         await withSpan("job.poller.run", {
             "llm.provider": provider,
             "llm.model": model,
+            "llm.operation": "job.enrich",
         }, async (span) => {
             try {
                 console.info(`[LLM] Poller run provider=${provider} model=${model}`);
@@ -62,6 +63,7 @@ export const jobPoller = async (
     return await withSpan("job.poller.run", {
         "llm.provider": provider,
         "llm.model": model,
+        "llm.operation": "job.enrich",
     }, async (span) => {
         console.log("🔄 Starting Job Poller...");
         console.info(`[LLM] Job poller enrichment provider=${provider} model=${model}`);
@@ -81,6 +83,7 @@ export const jobPoller = async (
             "job.count": adaptedJobs.length,
             "llm.provider": provider,
             "llm.model": model,
+            "llm.operation": "job.enrich",
         }, async (enrichSpan) => {
             const enriched = await enrichByGemini(adaptedJobs, tokenUsageRepository);
             enrichSpan.setAttribute("job.enriched.count", enriched.length);

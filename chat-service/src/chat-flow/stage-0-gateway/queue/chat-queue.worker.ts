@@ -1,5 +1,9 @@
 import type { SendMessage } from "../../chat-flow.types";
-import { withSpan } from "../../../observability/tracing";
+import {
+    createLangfuseContentAttributes,
+    createLangfuseObservationAttributes,
+    withSpan,
+} from "../../../observability/tracing";
 import { ChatRequestDal } from "../../api/async-jobs/chat-request.dal";
 import { readErrorMessage } from "../../api/async-jobs/chat-request.utils";
 import { ChatRateLimitService } from "../rate-limit/chat-rate-limit.service";
@@ -74,16 +78,27 @@ export class ChatQueueWorker {
     };
 
     private handleJob = async (job: ChatQueueJob): Promise<void> =>
-        await withSpan("chat.worker.handle_job", {
+        await withSpan("chat.turn", {
             "chat.request.id": job.requestId,
             "conversation.id": job.conversationId,
             "enduser.id": job.userId,
             "messaging.destination.name": "chat.message.requests",
-        }, async () => {
-            await this.processJob(job);
+            ...createLangfuseObservationAttributes({
+                operation: "chat.turn",
+                type: "chain",
+                feature: "chat",
+                userId: job.userId,
+                sessionId: job.conversationId,
+            }),
+            ...createLangfuseContentAttributes(job.message),
+        }, async (span) => {
+            const response = await this.processJob(job);
+            if (response) {
+                span.setAttributes(createLangfuseContentAttributes(job.message, response.reply));
+            }
         });
 
-    private processJob = async (job: ChatQueueJob): Promise<void> => {
+    private processJob = async (job: ChatQueueJob): Promise<{ readonly reply: string } | undefined> => {
         const existingRequest = await this.requestDal.findByRequestId(job.requestId);
         if (!existingRequest || existingRequest.status === "completed") {
             return;
@@ -125,6 +140,7 @@ export class ChatQueueWorker {
                 status: "completed",
                 response,
             });
+            return response;
         } catch (error) {
             const errorMessage = readErrorMessage(error);
             await this.requestDal.markFailed(job.requestId, errorMessage);
