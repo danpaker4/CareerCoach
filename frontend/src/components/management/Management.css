@@ -8,6 +8,7 @@
 .management-token-usage,
 .management-users,
 .management-llm-evaluation,
+.management-promptfoo,
 .management-alert {
   width: min(1120px, 100%);
   margin: 0 auto;
@@ -1396,4 +1397,89 @@
   .management-dialog-confirm {
     width: 100%;
   }
+}
+
+.management-page--promptfoo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.management-promptfoo {
+  width: min(1400px, 100%);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.management-promptfoo-iframe {
+  width: 100%;
+  min-height: calc(100dvh - 220px);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-radius: 12px;
+  background: var(--page-bg);
+}
+
+.management-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+.management-promptfoo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.management-promptfoo-controls {
+  width: min(1400px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: end;
+}
+
+.management-promptfoo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.management-promptfoo-field span {
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--text-primary) 70%, transparent);
+}
+
+.management-promptfoo-field input {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--page-bg);
+  color: var(--text-primary);
+}
+
+.management-promptfoo-status {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.management-promptfoo-log {
+  width: min(1400px, 100%);
+  margin: 0 auto;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-primary) 4%, var(--page-bg));
+}
+
+.management-promptfoo-log pre {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

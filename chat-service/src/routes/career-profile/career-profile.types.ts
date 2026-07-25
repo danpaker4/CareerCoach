@@ -52,7 +52,6 @@ export type CareerProfileSignalUpdate = Partial<CareerProfileSignals> & {
     salaryExpectation?: string | null;
     locationPreference?: string | null;
     remotePreference?: string | null;
-    senioritySignal?: string | null;
     uncertaintyLevel?: number;
 };
 

@@ -25,6 +25,13 @@ export type EvaluationRunMetadata = {
     ranAt: string;
 };
 
+export type EvaluationTokenUsage = {
+    prompt: number;
+    completion: number;
+    total: number;
+    requestCount: number;
+};
+
 export type EvaluationRunMessage = EvaluationMessage;
 
 export type EvaluationRunResult = {
@@ -37,6 +44,10 @@ export type EvaluationRunResult = {
     expected: EvaluationExpected;
     metadata: EvaluationRunMetadata;
     mode?: string;
+    /** Number of jobs / job matches returned with the final assistant reply. */
+    jobCount?: number;
+    /** LLM tokens consumed for this run (from chat-service llmTokenUsage). */
+    tokenUsage?: EvaluationTokenUsage;
 };
 
 export type RunEvaluationCaseParams = {

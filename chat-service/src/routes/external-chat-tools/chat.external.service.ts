@@ -9,11 +9,10 @@ import {
 } from "./chat.external.utils";
 import type {
     ApplyInferredAchievementSignalsParams,
-    ApplyInferredRoleExperienceParams,
     CreateCareerRoadmapParams,
 } from "./chat.external.types";
 import type { RoleExperienceEntry } from "./role-experience.types";
-import { mergeRoleExperience, readUserRoleExperienceField } from "./role-experience.utils";
+import { readUserRoleExperienceField } from "./role-experience.utils";
 
 export class ChatExternalService {
     constructor(
@@ -22,8 +21,22 @@ export class ChatExternalService {
         private readonly internalServiceApiKey?: string,
     ) { }
 
+    private buildUsersServiceHeaders = (userId: string, authorization?: string): Record<string, string> => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (authorization !== undefined && authorization.trim().length > 0) {
+            headers.Authorization = authorization;
+            return headers;
+        }
+        if (this.internalServiceApiKey !== undefined && this.internalServiceApiKey.length > 0) {
+            headers["X-Internal-Service-Key"] = this.internalServiceApiKey;
+            headers["X-Service-User-Id"] = userId;
+        }
+        return headers;
+    };
+
     readUserAchievements = async (userId: string): Promise<UserAchievementResponse[]> => {
-        const achievementsResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/achievements`);
+        const headers = this.buildUsersServiceHeaders(userId);
+        const achievementsResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/achievements`, { headers });
         if (achievementsResponse.ok) {
             const payload: unknown = await achievementsResponse.json().catch(() => []);
             if (Array.isArray(payload)) {
@@ -31,7 +44,7 @@ export class ChatExternalService {
             }
         }
 
-        const profileResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
+        const profileResponse = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, { headers });
         if (!profileResponse.ok) { return []; }
         const payload: unknown = await profileResponse.json().catch(() => null);
         const parsedProfile: UserProfileResponse | null = parseUserProfileResponse(payload);
@@ -101,7 +114,7 @@ export class ChatExternalService {
         const updatedAchievements = [...currentAchievements, nextAchievement];
         const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: this.buildUsersServiceHeaders(userId),
             body: JSON.stringify({ achievements: updatedAchievements }),
         });
 
@@ -118,7 +131,9 @@ export class ChatExternalService {
     };
 
     readUserPublicProfile = async (userId: string): Promise<Record<string, unknown> | null> => {
-        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`);
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            headers: this.buildUsersServiceHeaders(userId),
+        });
         if (!response.ok) {
             return null;
         }
@@ -135,7 +150,7 @@ export class ChatExternalService {
     notifyCoachProfileMaterialized = async (userId: string): Promise<void> => {
         await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: this.buildUsersServiceHeaders(userId),
             body: JSON.stringify({ coachProfileMaterializedAt: new Date().toISOString() }),
         }).catch(() => null);
     };
@@ -169,23 +184,15 @@ export class ChatExternalService {
 
         await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: this.buildUsersServiceHeaders(userId),
             body: JSON.stringify(patchBody),
         }).catch(() => null);
     };
 
     updateDreamJob = async (userId: string, dreamJob: string, authorization?: string): Promise<boolean> => {
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (authorization !== undefined && authorization.trim().length > 0) {
-            headers.Authorization = authorization;
-        } else if (this.internalServiceApiKey !== undefined && this.internalServiceApiKey.length > 0) {
-            headers["X-Internal-Service-Key"] = this.internalServiceApiKey;
-            headers["X-Service-User-Id"] = userId;
-        }
-
         const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}/dream-job`, {
             method: "PATCH",
-            headers,
+            headers: this.buildUsersServiceHeaders(userId, authorization),
             body: JSON.stringify({ dreamJob }),
         });
 
@@ -201,24 +208,5 @@ export class ChatExternalService {
         });
 
         return response.ok;
-    };
-
-    applyInferredRoleExperience = async (userId: string, params: ApplyInferredRoleExperienceParams): Promise<void> => {
-        const { roleExperience } = params;
-        if (roleExperience.length === 0) {
-            return;
-        }
-
-        const profile = await this.readUserPublicProfile(userId);
-        if (!profile) {
-            return;
-        }
-
-        const mergedRoleExperience = mergeRoleExperience(readUserRoleExperienceField(profile), roleExperience);
-        await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ roleExperience: mergedRoleExperience }),
-        }).catch(() => null);
     };
 }

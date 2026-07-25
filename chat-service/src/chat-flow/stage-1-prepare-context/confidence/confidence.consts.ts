@@ -26,11 +26,6 @@ export const DOMAIN_CONFIDENCE_POINTS = {
     dislikedDomainPerItem: 10,
 } as const;
 
-export const SENIORITY_CONFIDENCE_POINTS = {
-    whenKnown: 80,
-    whenUnknown: 35,
-} as const;
-
 /** Share of each dimension score in search-readiness (must total 100). */
 export const SEARCH_READINESS_BLEND_PERCENT = {
     skills: 30,

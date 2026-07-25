@@ -25,7 +25,7 @@ export const usersRouter = (usersCollection: Collection<UserDocument>): register
         handler.getUserMatchingContextHandler,
     );
     fastify.post("/users", { schema: createUserSchema, preHandler: authenticateRequest }, handler.createUserHandler);
-    fastify.patch("/users/:userId", { schema: updateUserSchema, preHandler: authenticateRequest }, handler.updateUserHandler);
+    fastify.patch("/users/:userId", { schema: updateUserSchema, preHandler: authenticateUserOrInternalService }, handler.updateUserHandler);
     fastify.patch(
         "/users/:userId/dream-job",
         { schema: updateDreamJobSchema, preHandler: authenticateUserOrInternalService },

@@ -20,7 +20,6 @@ export const ProfileInputLlmExtractionSchema = z.object({
     shortTermGoals: stringListSchema,
     longTermGoals: stringListSchema,
     extractedKeywords: stringListSchema,
-    senioritySignal: z.string().nullable().default(null),
     locationPreference: z.string().nullable().default(null),
     uncertaintyLevel: z.number().min(0).max(1).nullable().default(null),
 });
@@ -83,7 +82,6 @@ export const buildProfileInputInferencePrompt = (profile: ProfileInput): string 
             shortTermGoals: ["string"],
             longTermGoals: ["string"],
             extractedKeywords: ["string"],
-            senioritySignal: "string or null",
             locationPreference: "string or null",
             uncertaintyLevel: "number between 0 and 1, or null",
         }),
@@ -136,7 +134,6 @@ export const toCareerProfileSignalUpdateFromLlmExtraction = (
         shortTermGoals: mapSignals(extraction.shortTermGoals, PROFILE_INPUT_LLM_SIGNAL_CONFIDENCE.shortTermGoals),
         longTermGoals: mapSignals(extraction.longTermGoals, PROFILE_INPUT_LLM_SIGNAL_CONFIDENCE.longTermGoals),
         extractedKeywords: mapSignals(extraction.extractedKeywords, PROFILE_INPUT_LLM_SIGNAL_CONFIDENCE.extractedKeywords),
-        ...(extraction.senioritySignal ? { senioritySignal: extraction.senioritySignal } : {}),
         ...(extraction.locationPreference ? { locationPreference: extraction.locationPreference } : {}),
         ...(extraction.uncertaintyLevel !== null ? { uncertaintyLevel: extraction.uncertaintyLevel } : {}),
     };

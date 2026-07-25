@@ -10,7 +10,6 @@ import type {
     ChatRateLimitBlockedDecision,
     ChatRateLimitConfigDocument,
     ChatRateLimitConfigResponse,
-    ChatRateLimitConfigUpdateInput,
     ChatRateLimitDecision,
     ChatRateLimitRuleConfig,
     ChatRateLimitRuleKey,

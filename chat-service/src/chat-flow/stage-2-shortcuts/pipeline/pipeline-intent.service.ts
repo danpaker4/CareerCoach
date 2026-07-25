@@ -1,4 +1,5 @@
 import type { PipelineIntent } from "./pipeline.types";
+import { PIPELINE_INTENT } from "./pipeline.consts";
 
 const ACCEPT_PHRASES = [
     "add to pipeline",
@@ -62,19 +63,19 @@ export const detectPipelineIntent = (message: string): PipelineIntent | null => 
     }
 
     if (REJECT_PHRASES.some((phrase) => normalized.includes(phrase))) {
-        return "PIPELINE_REJECT";
+        return PIPELINE_INTENT.REJECT;
     }
 
     if (isStandaloneNo(normalized)) {
-        return "PIPELINE_REJECT";
+        return PIPELINE_INTENT.REJECT;
     }
 
     if (ACCEPT_PHRASES.some((phrase) => normalized.includes(phrase))) {
-        return "PIPELINE_ACCEPT";
+        return PIPELINE_INTENT.ACCEPT;
     }
 
     if (startsWithYes(normalized) || startsWithSure(normalized)) {
-        return "PIPELINE_ACCEPT";
+        return PIPELINE_INTENT.ACCEPT;
     }
 
     return null;

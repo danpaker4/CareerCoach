@@ -85,7 +85,6 @@ export const mergeProfileSignals = (existingProfile: UserCareerProfile, updates:
         salaryExpectation: updates.salaryExpectation ?? existingProfile.salaryExpectation,
         locationPreference: updates.locationPreference ?? existingProfile.locationPreference,
         remotePreference: updates.remotePreference ?? existingProfile.remotePreference,
-        senioritySignal: updates.senioritySignal ?? existingProfile.senioritySignal,
         uncertaintyLevel: typeof updates.uncertaintyLevel === "number" ? Math.max(0, Math.min(1, updates.uncertaintyLevel)) : existingProfile.uncertaintyLevel,
         updatedAt: new Date(),
     };
@@ -105,7 +104,6 @@ export const toProfileSummaryText = (profile: UserCareerProfile): string => {
         bucketSection("workStyle", "Work style"),
         bucketSection("shortTermGoals", "Short-term goals"),
         bucketSection("longTermGoals", "Long-term goals"),
-        `Seniority: ${profile.senioritySignal ?? "unknown"}`,
         `Location preference: ${profile.locationPreference ?? "unknown"}`,
         `Remote preference: ${profile.remotePreference ?? "unknown"}`,
     ].join("\n");

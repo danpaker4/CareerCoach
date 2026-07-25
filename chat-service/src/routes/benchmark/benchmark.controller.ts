@@ -4,7 +4,7 @@ import { AdminAuthService } from "../admin/admin-auth.service";
 import type { AdminAuthResult } from "../admin/admin-auth.types";
 import { BENCHMARK_DEFAULT_RUN_LIMIT, BENCHMARK_MAX_RUN_LIMIT } from "./benchmark.consts";
 import { BenchmarkService } from "./benchmark.service";
-import type { BenchmarkCandidateId, BenchmarkRunRequest } from "./benchmark.types";
+import type { BenchmarkRunRequest } from "./benchmark.types";
 import { isBenchmarkCandidateId } from "./benchmark.utils";
 
 const readAuthorizationHeader = (request: FastifyRequest): string | undefined => {

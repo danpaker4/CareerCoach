@@ -5,10 +5,14 @@ import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fas
 import { StatusCodes } from "http-status-codes";
 import { ZodError } from "zod";
 import { evaluationCaseRoutes } from "./routes/evaluation-case.routes";
-import type { RunnerConfig } from "./server.types";
+import { promptfooRunRoutes } from "./routes/promptfoo-run.routes";
+import type { PromptfooPackageConfig, RunnerConfig } from "./server.types";
+import { PromptfooRunService } from "./services/promptfoo-run.service";
+import { PROMPTFOO_RUN_ROUTE_PREFIX } from "./services/promptfoo-run.consts";
 
-export const buildApp = async (runnerConfig: RunnerConfig) => {
+export const buildApp = async (runnerConfig: RunnerConfig, promptfooConfig: PromptfooPackageConfig) => {
     const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
+    const promptfooRunService = new PromptfooRunService(promptfooConfig);
 
     app.setValidatorCompiler(validatorCompiler);
     app.setSerializerCompiler(serializerCompiler);
@@ -56,6 +60,7 @@ export const buildApp = async (runnerConfig: RunnerConfig) => {
     });
 
     await app.register(evaluationCaseRoutes(runnerConfig), { prefix: "/evaluation-cases" });
+    await app.register(promptfooRunRoutes(promptfooRunService), { prefix: PROMPTFOO_RUN_ROUTE_PREFIX });
 
     return app;
 };

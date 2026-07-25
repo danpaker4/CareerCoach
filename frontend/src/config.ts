@@ -32,4 +32,5 @@ export const ENV = {
   JOB_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_JOB_SERVICE_BASE_URL) || "",
   ROADMAP_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_ROADMAP_SERVICE_BASE_URL) || "",
   EVALUATION_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_EVALUATION_SERVICE_BASE_URL) || "",
+  PROMPTFOO_VIEW_URL: normalizeLocalServiceUrl(import.meta.env.VITE_PROMPTFOO_VIEW_URL) || "",
 };

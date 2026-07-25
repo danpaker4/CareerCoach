@@ -1,5 +1,11 @@
 import { EvaluationCaseModel } from "../models/evaluation-case.model";
-import type { CreateEvaluationCaseBody, EvaluationCaseResponse, EvaluationExpectedResponse } from "../schemas/evaluation-case.schema";
+import { normalizeConversationMode } from "../evaluation-case.mode.consts";
+import type {
+    CreateEvaluationCaseBody,
+    EvaluationCaseResponse,
+    EvaluationExpectedResponse,
+    EvaluationMessage,
+} from "../schemas/evaluation-case.schema";
 
 export class EvaluationCaseConflictError extends Error {
     constructor(readonly caseId: string) {
@@ -25,16 +31,33 @@ export class EvaluationCaseRequestIdMismatchError extends Error {
     }
 }
 
-const toEvaluationCaseResponse = (document: {
+type EvaluationCaseLeanDocument = {
     id: string;
-    messages: EvaluationCaseResponse["messages"];
-    expected: EvaluationExpectedResponse;
+    messages: EvaluationMessage[];
+    expected: {
+        mode?: string;
+        maxLines?: number;
+        mustAskQuestion?: boolean;
+        forbiddenWords?: string[];
+    };
     createdAt: Date;
     updatedAt: Date;
-}): EvaluationCaseResponse => ({
+};
+
+const normalizeExpected = (expected: EvaluationCaseLeanDocument["expected"]): EvaluationExpectedResponse => {
+    const mode = normalizeConversationMode(expected.mode);
+    return {
+        ...(mode !== undefined ? { mode } : {}),
+        ...(typeof expected.maxLines === "number" ? { maxLines: expected.maxLines } : {}),
+        ...(typeof expected.mustAskQuestion === "boolean" ? { mustAskQuestion: expected.mustAskQuestion } : {}),
+        ...(Array.isArray(expected.forbiddenWords) ? { forbiddenWords: expected.forbiddenWords } : {}),
+    };
+};
+
+const toEvaluationCaseResponse = (document: EvaluationCaseLeanDocument): EvaluationCaseResponse => ({
     id: document.id,
     messages: document.messages,
-    expected: document.expected,
+    expected: normalizeExpected(document.expected),
     createdAt: document.createdAt.toISOString(),
     updatedAt: document.updatedAt.toISOString(),
 });
@@ -45,13 +68,16 @@ export const createEvaluationCase = async (input: CreateEvaluationCaseBody): Pro
         throw new EvaluationCaseConflictError(input.id);
     }
 
-    const saved = await EvaluationCaseModel.create(input);
-    return toEvaluationCaseResponse(saved.toObject());
+    const saved = await EvaluationCaseModel.create({
+        ...input,
+        expected: normalizeExpected(input.expected),
+    });
+    return toEvaluationCaseResponse(saved.toObject() as EvaluationCaseLeanDocument);
 };
 
 export const listEvaluationCases = async (): Promise<EvaluationCaseResponse[]> => {
     const documents = await EvaluationCaseModel.find().sort({ createdAt: -1 }).lean();
-    return documents.map(toEvaluationCaseResponse);
+    return documents.map((document) => toEvaluationCaseResponse(document as EvaluationCaseLeanDocument));
 };
 
 export const getEvaluationCaseById = async (caseId: string): Promise<EvaluationCaseResponse> => {
@@ -59,7 +85,7 @@ export const getEvaluationCaseById = async (caseId: string): Promise<EvaluationC
     if (!document) {
         throw new EvaluationCaseNotFoundError(caseId);
     }
-    return toEvaluationCaseResponse(document);
+    return toEvaluationCaseResponse(document as EvaluationCaseLeanDocument);
 };
 
 export const replaceEvaluationCaseById = async (
@@ -70,17 +96,24 @@ export const replaceEvaluationCaseById = async (
         throw new EvaluationCaseRequestIdMismatchError(caseId, input.id);
     }
 
-    const updated = await EvaluationCaseModel.findOneAndUpdate({ id: caseId }, input, {
-        new: true,
-        runValidators: true,
-        lean: true,
-    });
+    const updated = await EvaluationCaseModel.findOneAndUpdate(
+        { id: caseId },
+        {
+            ...input,
+            expected: normalizeExpected(input.expected),
+        },
+        {
+            new: true,
+            runValidators: true,
+            lean: true,
+        },
+    );
 
     if (!updated) {
         throw new EvaluationCaseNotFoundError(caseId);
     }
 
-    return toEvaluationCaseResponse(updated);
+    return toEvaluationCaseResponse(updated as EvaluationCaseLeanDocument);
 };
 
 export const deleteEvaluationCaseById = async (caseId: string): Promise<void> => {

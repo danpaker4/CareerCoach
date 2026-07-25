@@ -1,5 +1,4 @@
 import type { CareerProfileSignalUpdate } from "../../routes/career-profile/career-profile.types";
-import type { RoleExperienceEntry } from "../../routes/external-chat-tools/role-experience.types";
 import type { ChatFlowDeps } from "../chat-flow.types";
 import { toSignal } from "../api/shared/chat.utils";
 import type { AchievementInferenceResult } from "./inference/achievement-inference/achievement-inference.types";
@@ -28,12 +27,4 @@ export const updateUserAchievements = async (
             achievements: achievementInference.achievements.map(toUserAchievementFromInferred),
         })
         .catch(() => null);
-};
-
-export const updateUserRoleExperience = async (
-    deps: ChatFlowDeps,
-    userId: string,
-    roleExperience: readonly RoleExperienceEntry[]
-): Promise<void> => {
-    await deps.externalService.applyInferredRoleExperience(userId, { roleExperience }).catch(() => null);
 };

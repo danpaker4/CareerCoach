@@ -261,3 +261,22 @@ export interface EvaluationRunResult {
   metadata: EvaluationRunMetadata;
   mode?: string;
 }
+
+export type PromptfooRunStatus = 'idle' | 'running' | 'completed' | 'failed';
+
+export interface PromptfooRunOptions {
+  filterFirstN?: number;
+  filterPattern?: string;
+  noCache?: boolean;
+}
+
+export interface PromptfooRunSnapshot {
+  runId: string | null;
+  status: PromptfooRunStatus;
+  startedAt: string | null;
+  finishedAt: string | null;
+  exitCode: number | null;
+  options: PromptfooRunOptions;
+  logTail: string[];
+  error: string | null;
+}

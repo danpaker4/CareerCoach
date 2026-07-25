@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { setTimeout as delay } from "timers/promises";
 import type { RunnerConfig } from "../server.types";
 import type { EvaluationCaseResponse, EvaluationExpected } from "../schemas/evaluation-case.schema";
-import { CONVERSATION_MODES } from "../evaluation-case.mode.consts";
+import { isConversationMode, normalizeConversationMode } from "../evaluation-case.mode.consts";
 import { CHAT_REQUEST_POLL_INTERVAL_MS, CHAT_REQUEST_POLL_TIMEOUT_MS } from "./evaluation-runner.consts";
 import { getEvaluationCaseById } from "./evaluation-case.service";
 import {
@@ -11,6 +11,7 @@ import {
     extractUserMessages,
     hasCheckableExpected,
 } from "./evaluation-runner.utils";
+import { sumChatTokenUsageForUser } from "./evaluation-token-usage.utils";
 import type { ChatMessageResponse, EvaluationRunMessage, EvaluationRunResult } from "./evaluation-runner.types";
 
 type ChatRequestStatus = "queued" | "started" | "completed" | "failed";
@@ -183,8 +184,8 @@ const replayUserTurns = async (
     return sendChatMessage(config, conversationId, lastMessage);
 };
 
-const isConversationMode = (value: string): value is NonNullable<EvaluationExpected["mode"]> =>
-    (CONVERSATION_MODES as readonly string[]).includes(value);
+const isConversationModeValue = (value: string): value is NonNullable<EvaluationExpected["mode"]> =>
+    isConversationMode(value);
 
 type ConversationMessagesResponse = {
     messages: Array<{
@@ -228,16 +229,13 @@ const fetchRunConversation = async (config: RunnerConfig, conversationId: string
 };
 
 const normalizeExpectedForRun = (expected: EvaluationCaseResponse["expected"]): EvaluationExpected => {
-    const normalizedMode =
-        expected.mode && isConversationMode(expected.mode.toUpperCase())
-            ? (expected.mode.toUpperCase() as EvaluationExpected["mode"])
-            : undefined;
+    const normalizedMode = normalizeConversationMode(expected.mode);
 
     return {
         maxLines: expected.maxLines,
         mustAskQuestion: expected.mustAskQuestion,
         forbiddenWords: expected.forbiddenWords,
-        mode: normalizedMode,
+        mode: normalizedMode !== undefined && isConversationModeValue(normalizedMode) ? normalizedMode : undefined,
     };
 };
 
@@ -266,6 +264,15 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
         expected: expectedForRun,
         actualMode: finalChatResponse.mode,
     });
+    const jobCount =
+        (Array.isArray(finalChatResponse.jobs) ? finalChatResponse.jobs.length : 0) +
+        (Array.isArray(finalChatResponse.jobMatches) ? finalChatResponse.jobMatches.length : 0);
+    const endedAt = new Date();
+    const tokenUsage = await sumChatTokenUsageForUser({
+        userId: config.evaluationUserId,
+        from: new Date(startedAt),
+        to: endedAt,
+    });
 
     return {
         caseId: evaluationCase.id,
@@ -276,12 +283,14 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
         checks,
         expected: expectedForRun,
         mode: finalChatResponse.mode,
+        jobCount,
+        tokenUsage,
         metadata: {
             userId: config.evaluationUserId,
             conversationId,
             userTurnCount: userMessages.length,
-            durationMs: Date.now() - startedAt,
-            ranAt: new Date().toISOString(),
+            durationMs: endedAt.getTime() - startedAt,
+            ranAt: endedAt.toISOString(),
         },
     };
 };
