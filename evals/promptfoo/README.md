@@ -27,7 +27,7 @@ evals/promptfoo/
 
 ## Prerequisites
 
-1. Dev stack running (`npm run dev` from repo root) — at least evaluation-service, chat-service, chat-worker, Mongo, LiteLLM.
+1. Dev stack running (`npm run dev` from repo root) — includes evaluation-service, chat-service, chat-worker, frontend, and the Promptfoo viewer on port 15500 (plus Mongo/LiteLLM as needed).
 2. Evaluation cases seeded:
 
 ```bash
@@ -79,7 +79,7 @@ npm run eval:promptfoo:update
 npm run eval:promptfoo
 ```
 
-View the Promptfoo UI:
+View the Promptfoo UI (also started automatically by `npm run dev` on port 15500):
 
 ```bash
 npm run eval:promptfoo:view
@@ -186,6 +186,7 @@ cp evals/promptfoo/.env.example evals/promptfoo/.env
 ./evaluation-service/scripts/seed-evaluation-cases.sh
 npm run eval:promptfoo:update
 npm run eval:promptfoo
+# Viewer is included in `npm run dev`; or start alone:
 npm run eval:promptfoo:view
 npm run eval:promptfoo:compare   # optional A/B
 ```

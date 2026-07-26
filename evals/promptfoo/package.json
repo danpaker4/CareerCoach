@@ -10,7 +10,7 @@
   "scripts": {
     "eval": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.ts",
     "eval:compare": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.compare.ts",
-    "view": "tsx scripts/run-promptfoo.ts view",
+    "view": "tsx scripts/run-promptfoo.ts view -n",
     "update": "tsx scripts/generate-promptfoo-tests.ts",
     "typecheck": "tsc --noEmit"
   },

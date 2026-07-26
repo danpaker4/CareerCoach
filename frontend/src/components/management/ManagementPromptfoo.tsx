@@ -142,7 +142,7 @@ export const ManagementPromptfoo = () => {
           </div>
           <p className="management-subtitle">
             Run Promptfoo evaluations and view results. Keep the viewer up with{' '}
-            <code className="management-inline-code">npm run eval:promptfoo:view</code>.
+            <code className="management-inline-code">npm run dev</code> (Promptfoo viewer on port 15500).
           </p>
         </div>
 
