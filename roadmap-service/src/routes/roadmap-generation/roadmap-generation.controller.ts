@@ -17,7 +17,7 @@ export class RoadmapGenerationController {
             return;
         }
 
-        const { userId, dreamJob, targetYears } = body;
+        const { userId, dreamJob, targetYears, availableHoursPerWeek } = body;
 
         if (
             !userId ||
@@ -33,8 +33,23 @@ export class RoadmapGenerationController {
             return;
         }
 
+        if (
+            availableHoursPerWeek !== undefined &&
+            (!Number.isFinite(availableHoursPerWeek) || availableHoursPerWeek <= 0 || availableHoursPerWeek > 80)
+        ) {
+            reply.code(StatusCodes.BAD_REQUEST).send({
+                error: "availableHoursPerWeek must be a positive number up to 80 when provided",
+            });
+            return;
+        }
+
         try {
-            const result = await this.service.generate(userId, dreamJob.trim(), targetYears);
+            const result = await this.service.generate(
+                userId,
+                dreamJob.trim(),
+                targetYears,
+                availableHoursPerWeek
+            );
             reply.code(StatusCodes.OK).send(result);
         } catch (error) {
             request.log.error({ err: error }, "Roadmap generation failed");

@@ -140,6 +140,8 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
             ? { estimatedYearsToGoal: generatedMeta.estimatedYearsToGoal }
             : { estimatedYearsToGoal: `Up to ${formatTargetYearsLabel(targetYears)}` }),
           ...(generatedMeta?.progressionReasoning ? { progressionReasoning: generatedMeta.progressionReasoning } : {}),
+          ...(generatedMeta?.generationVersion ? { generationVersion: generatedMeta.generationVersion } : {}),
+          ...(generatedMeta?.generationMode ? { generationMode: generatedMeta.generationMode } : {}),
           ...(generatedGap ? { gapAnalysis: generatedGap } : {}),
         };
       }
@@ -327,7 +329,14 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
                         </div>
                       </div>
                       {stage.whyItMatters && <p className="generation-stage-why">{stage.whyItMatters}</p>}
-                      <p className="generation-stage-desc">{stage.description}</p>
+                      {stage.howToGetThere ? (
+                        <p className="generation-stage-desc"><strong>How:</strong> {stage.howToGetThere}</p>
+                      ) : (
+                        <p className="generation-stage-desc">{stage.description}</p>
+                      )}
+                      {stage.whatYouGain && (
+                        <p className="generation-stage-desc"><strong>You gain:</strong> {stage.whatYouGain}</p>
+                      )}
                       {stage.actions.length > 0 && (
                         <ul className="generation-stage-actions">
                           {stage.actions.slice(0, 3).map((action, j) => (

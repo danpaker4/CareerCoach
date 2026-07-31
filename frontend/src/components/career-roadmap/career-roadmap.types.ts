@@ -21,12 +21,28 @@ export interface GapAnalysisSnapshot {
   experienceGapSummary: string;
 }
 
+export interface CompletionCriterion {
+  id: string;
+  description: string;
+  metric: 'actions_complete' | 'hours_logged' | 'artifact_ready' | 'self_attest';
+  targetValue: number;
+}
+
+export interface TimelineMeta {
+  effortHours: number;
+  hoursPerWeek: number;
+  estimatedWeeks: number;
+  assumedAvailability: boolean;
+}
+
 export interface CareerProgressionMeta {
   currentRoleSummary?: string;
   dreamRoleCategory: string;
   estimatedYearsToGoal?: string;
   progressionReasoning?: string;
   gapAnalysis?: GapAnalysisSnapshot;
+  generationVersion?: string;
+  generationMode?: string;
 }
 
 export interface StageContent {
@@ -36,6 +52,8 @@ export interface StageContent {
   resources?: StageResource[];
   estimatedTimeframe?: string;
   whyItMatters?: string;
+  howToGetThere?: string;
+  whatYouGain?: string;
   progressionType?: ProgressionType;
   requiredCapabilities?: string[];
   skillsToBuild?: string[];
@@ -43,6 +61,12 @@ export interface StageContent {
   experienceAccumulation?: string;
   roleCategories?: string[];
   futureOpportunities?: string[];
+  templateId?: string;
+  capabilityIds?: string[];
+  gapIds?: string[];
+  completionCriteria?: CompletionCriterion[];
+  timelineMeta?: TimelineMeta;
+  reasonCodes?: string[];
 }
 
 export interface RoadmapStage {
@@ -50,6 +74,7 @@ export interface RoadmapStage {
   isDone: boolean;
   content?: StageContent;
   completedActions?: string[];
+  completedCriterionIds?: string[];
 }
 
 export interface CareerRoadmapData {
@@ -69,6 +94,8 @@ export interface RoadmapGenerationResponse {
   stages: StageContent[];
   progressionMeta?: CareerProgressionMeta;
   gapAnalysis?: GapAnalysisSnapshot;
+  generationVersion?: string;
+  generationMode?: string;
 }
 
 export interface StageOpportunity {

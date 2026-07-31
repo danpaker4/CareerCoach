@@ -15,10 +15,44 @@ export type GeneratedStageContent = {
     actions: string[];
     resources?: GeneratedResource[];
     estimatedTimeframe?: string;
+    whyItMatters?: string;
+    progressionType?: "learning" | "experience" | "hybrid";
+    requiredCapabilities?: string[];
+    skillsToBuild?: string[];
+    responsibilitiesToGain?: string[];
+    experienceAccumulation?: string;
+    roleCategories?: string[];
+    futureOpportunities?: string[];
+    templateId?: string;
+    capabilityIds?: string[];
+    gapIds?: string[];
+    reasonCodes?: string[];
+};
+
+export type CareerProgressionMeta = {
+    currentRoleSummary?: string;
+    dreamRoleCategory: string;
+    estimatedYearsToGoal?: string;
+    progressionReasoning?: string;
+    gapAnalysis?: {
+        skillsPresent: string[];
+        skillsMissing: string[];
+        responsibilitiesMissing: string[];
+        leadershipGaps: string[];
+        architectureGaps: string[];
+        domainGaps: string[];
+        experienceGapSummary: string;
+    };
+    generationVersion?: string;
+    generationMode?: string;
 };
 
 export type RoadmapGenerationResponse = {
     stages: GeneratedStageContent[];
+    progressionMeta?: CareerProgressionMeta;
+    gapAnalysis?: CareerProgressionMeta["gapAnalysis"];
+    generationVersion?: string;
+    generationMode?: string;
 };
 
 export type DreamJobRoadmapFailureReason = "generation_failed" | "invalid_stage_count" | "persistence_failed";
@@ -28,7 +62,7 @@ export type DreamJobRoadmapCreationResult =
     | { created: false; reason: DreamJobRoadmapFailureReason };
 
 export type DreamJobRoadmapGenerator = {
-    generate: (userId: string, dreamJob: string, stageCount: number) => Promise<RoadmapGenerationResponse>;
+    generate: (userId: string, dreamJob: string, targetYears: number) => Promise<RoadmapGenerationResponse>;
 };
 
 export type DreamJobRoadmapPersistence = {

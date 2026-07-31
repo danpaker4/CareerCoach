@@ -17,5 +17,11 @@ export type ServerConfig = {
         embeddingModel?: string;
         customEmbeddingUrl?: string;
         careerDirectionVectorIndexName: string;
+        featureFlags: {
+            deterministicCoreEnabled: boolean;
+            aiPolishEnabled: boolean;
+            structuredEvidenceEnabled: boolean;
+            measurableCompletionEnabled: boolean;
+        };
     };
 };

@@ -58,13 +58,13 @@ export const generateDreamJobRoadmapHttp = async (
     roadmapServiceBaseUrl: string,
     userId: string,
     dreamJob: string,
-    stageCount: number
+    targetYears: number
 ): Promise<RoadmapGenerationResponse> => {
     const baseUrl = roadmapServiceBaseUrl.replace(/\/$/, "");
     const response = await fetch(`${baseUrl}/roadmap/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, dreamJob, stageCount }),
+        body: JSON.stringify({ userId, dreamJob, targetYears }),
     });
 
     if (!response.ok) {
@@ -80,6 +80,6 @@ export const generateDreamJobRoadmapHttp = async (
 };
 
 export const createDreamJobRoadmapHttpGenerator = (roadmapServiceBaseUrl: string): DreamJobRoadmapGenerator => ({
-    generate: (userId, dreamJob, stageCount) =>
-        generateDreamJobRoadmapHttp(roadmapServiceBaseUrl, userId, dreamJob, stageCount),
+    generate: (userId, dreamJob, targetYears) =>
+        generateDreamJobRoadmapHttp(roadmapServiceBaseUrl, userId, dreamJob, targetYears),
 });

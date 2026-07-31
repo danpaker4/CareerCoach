@@ -18,4 +18,21 @@ export type CreateCareerRoadmapParams = {
     dreamJob: string;
     stagesToDreamJob: readonly CreateCareerRoadmapStage[];
     generatedAt?: Date;
+    progressionMeta?: {
+        currentRoleSummary?: string;
+        dreamRoleCategory: string;
+        estimatedYearsToGoal?: string;
+        progressionReasoning?: string;
+        gapAnalysis?: {
+            skillsPresent: string[];
+            skillsMissing: string[];
+            responsibilitiesMissing: string[];
+            leadershipGaps: string[];
+            architectureGaps: string[];
+            domainGaps: string[];
+            experienceGapSummary: string;
+        };
+        generationVersion?: string;
+        generationMode?: string;
+    };
 };

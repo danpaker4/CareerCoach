@@ -1,20 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { CreateCareerRoadmapParams } from "../../../routes/external-chat-tools/chat.external.types";
-import {
-    DREAM_JOB_ROADMAP_STAGE_COUNT,
-    createDreamJobRoadmapCreator,
-} from "./chat.dream-job-roadmap.service";
+import type { CreateCareerRoadmapParams } from "../../../../routes/external-chat-tools/chat.external.types";
+import { DREAM_JOB_ROADMAP_DEFAULT_TARGET_YEARS } from "../chat.dream-job-roadmap.consts";
+import { createDreamJobRoadmapCreator } from "../chat.dream-job-roadmap.service";
 import type {
     DreamJobRoadmapGenerator,
     DreamJobRoadmapPersistence,
     GeneratedStageContent,
-} from "./chat.dream-job-roadmap.types";
+} from "../chat.dream-job-roadmap.types";
 
 type GeneratorCall = {
     userId: string;
     dreamJob: string;
-    stageCount: number;
+    targetYears: number;
 };
 
 type CreateServiceParams = {
@@ -41,12 +39,19 @@ const createCreator = (params: CreateServiceParams = {}) => {
     const generatedAt = params.generatedAt ?? new Date("2026-01-02T03:04:05.000Z");
 
     const generator: DreamJobRoadmapGenerator = {
-        generate: async (userId, dreamJob, stageCount) => {
-            generatorCalls.push({ userId, dreamJob, stageCount });
+        generate: async (userId, dreamJob, targetYears) => {
+            generatorCalls.push({ userId, dreamJob, targetYears });
             if (params.generateError === true) {
                 throw new Error("Generation failed");
             }
-            return { stages: params.stages ?? buildStages(DREAM_JOB_ROADMAP_STAGE_COUNT) };
+            return {
+                stages: params.stages ?? buildStages(4),
+                progressionMeta: {
+                    dreamRoleCategory: dreamJob,
+                    generationVersion: "2.0.0",
+                    generationMode: "legacy-llm",
+                },
+            };
         },
     };
 
@@ -66,14 +71,16 @@ const createCreator = (params: CreateServiceParams = {}) => {
 };
 
 describe("createDreamJobRoadmapCreator", () => {
-    it("generates and persists exactly four mapped stages", async () => {
-        const stages = buildStages(DREAM_JOB_ROADMAP_STAGE_COUNT);
+    it("generates with targetYears and persists stages plus progressionMeta", async () => {
+        const stages = buildStages(4);
         const { creator, generatorCalls, persistedRoadmaps, generatedAt } = createCreator({ stages });
 
         const result = await creator.create("user-1", "Founder");
 
         assert.deepEqual(result, { created: true });
-        assert.deepEqual(generatorCalls, [{ userId: "user-1", dreamJob: "Founder", stageCount: 4 }]);
+        assert.deepEqual(generatorCalls, [
+            { userId: "user-1", dreamJob: "Founder", targetYears: DREAM_JOB_ROADMAP_DEFAULT_TARGET_YEARS },
+        ]);
         assert.equal(persistedRoadmaps.length, 1);
 
         const persistedRoadmap = persistedRoadmaps[0];
@@ -84,6 +91,7 @@ describe("createDreamJobRoadmapCreator", () => {
         assert.equal(persistedRoadmap.userId, "user-1");
         assert.equal(persistedRoadmap.dreamJob, "Founder");
         assert.equal(persistedRoadmap.generatedAt, generatedAt);
+        assert.equal(persistedRoadmap.progressionMeta?.dreamRoleCategory, "Founder");
         assert.deepEqual(
             persistedRoadmap.stagesToDreamJob,
             stages.map((content, index) => ({ jobId: index + 1, isDone: false, content }))
@@ -99,8 +107,8 @@ describe("createDreamJobRoadmapCreator", () => {
         assert.equal(persistedRoadmaps.length, 0);
     });
 
-    it("does not persist when generation returns fewer than four stages", async () => {
-        const { creator, persistedRoadmaps } = createCreator({ stages: buildStages(3) });
+    it("does not persist when generation returns fewer than two stages", async () => {
+        const { creator, persistedRoadmaps } = createCreator({ stages: buildStages(1) });
 
         const result = await creator.create("user-1", "Founder");
 
