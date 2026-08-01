@@ -48,6 +48,29 @@ const computeRoadmapProgress = (data: unknown): number | null => {
   return Math.round((progressSum / totalStages) * 100);
 };
 
+const computeRoadmapCheckboxProgress = (data: unknown): { total: number; done: number } | null => {
+  if (!Array.isArray(data)) return null;
+  let total = 0;
+  let done = 0;
+  for (const roadmap of data) {
+    const stages = (roadmap as { stagesToDreamJob?: unknown }).stagesToDreamJob;
+    if (!Array.isArray(stages)) continue;
+    for (const stage of stages) {
+      const s = stage as { isDone?: boolean; content?: { actions?: unknown }; completedActions?: unknown };
+      const actions = Array.isArray(s.content?.actions) ? (s.content?.actions as string[]) : [];
+      if (actions.length === 0) continue;
+      total += actions.length;
+      if (s.isDone) {
+        done += actions.length;
+        continue;
+      }
+      const completed = Array.isArray(s.completedActions) ? (s.completedActions as string[]) : [];
+      done += completed.filter((action) => actions.includes(action)).length;
+    }
+  }
+  return { total, done };
+};
+
 const getInitials = (u: User) =>
   (u.firstName.charAt(0) + u.lastName.charAt(0)).toUpperCase();
 
@@ -73,11 +96,11 @@ const FEATURE_CARDS = [
     id: 'skills',
     route: '/skill-matcher',
     title: 'Skill Tracker',
-    description: 'Check off skills as you learn them. See your progress toward each job requirement.',
+    description: 'Every roadmap checkbox in one place, with a clear percentage of how much you\'ve done.',
     icon: iconZap,
     colorClass: 'dash-card--purple',
     statKey: 'skills' as keyof QuickStats,
-    statLabel: 'skills to develop',
+    statLabel: 'checkboxes',
   },
   {
     id: 'pipeline',
@@ -138,17 +161,10 @@ export const Dashboard = ({ user }: DashboardProps) => {
     ).then(async (r) => {
       if (!r.ok) return null;
       const d: unknown = await r.json();
-      return computeRoadmapProgress(d);
-    }).catch(() => null);
-
-    const fetchSkills = apiFetch(
-      `${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, headers
-    ).then(async (r) => {
-      if (!r.ok) return null;
-      const d = await r.json() as Array<{ skillToImprove: Array<{ isDone: boolean }> }>;
-      if (!Array.isArray(d)) return null;
-      const allSkills = d.flatMap((ds) => ds.skillToImprove);
-      return { total: allSkills.length, done: allSkills.filter((s) => s.isDone).length };
+      return {
+        roadmapPct: computeRoadmapProgress(d),
+        checkboxes: computeRoadmapCheckboxProgress(d),
+      };
     }).catch(() => null);
 
     const fetchJobs = apiFetch(
@@ -160,12 +176,12 @@ export const Dashboard = ({ user }: DashboardProps) => {
       return Array.isArray(d) ? d.length : null;
     }).catch(() => null);
 
-    Promise.all([fetchRoadmaps, fetchSkills, fetchJobs]).then(
-      ([roadmapPct, skillsResult, jobs]) => {
+    Promise.all([fetchRoadmaps, fetchJobs]).then(
+      ([roadmapResult, jobs]) => {
         setStats({
-          roadmapPct: typeof roadmapPct === 'number' ? roadmapPct : null,
-          skills: skillsResult && typeof skillsResult === 'object' ? skillsResult.total : null,
-          skillsDone: skillsResult && typeof skillsResult === 'object' ? skillsResult.done : null,
+          roadmapPct: roadmapResult?.roadmapPct ?? null,
+          skills: roadmapResult?.checkboxes?.total ?? null,
+          skillsDone: roadmapResult?.checkboxes?.done ?? null,
           jobs: typeof jobs === 'number' ? jobs : null,
         });
       }

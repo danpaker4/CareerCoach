@@ -1,11 +1,13 @@
 import { ACTIONS_CATALOG, RESOURCES_CATALOG, STAGE_TEMPLATES } from "../catalog/actions-resources.consts";
 import type { CatalogAction, CatalogResource, StageTemplate } from "../catalog/catalog.types";
 import { CAPABILITY_BY_ID } from "../catalog/capability-catalog.consts";
+import { familyRank, resolveCapabilityFamily, resolveStageFocusLabel } from "../catalog/capability-families.utils";
 import { getCapabilityMinCalendarWeeks } from "../catalog/capability-normalization";
 import { MAX_PRIMARY_CAPABILITIES_PER_STAGE } from "../cleaning/market-requirement-cleaner.consts";
 import { buildCapabilityDependencyOrder } from "../deps/capability-dependency-graph";
 import { DEFAULT_AVAILABLE_HOURS_PER_WEEK } from "../generation-meta.consts";
 import type { RoleMilestonePlan } from "../path/role-milestones.types";
+import { MAX_STAGE_COUNT } from "../roadmap-generation.consts";
 import type { CapabilityGap } from "../structured/structured-gap.types";
 import { computeBaseWeeks, formatMonthRangeAsTimeframe } from "../scoring/roadmap-scoring";
 import type { CompletionCriterion, DeterministicStage } from "./deterministic-stage-builder.types";
@@ -266,61 +268,51 @@ const chunkGapsIntoArcStages = (
 ): CapabilityGap[][] => {
     if (gaps.length === 0) return [];
 
-    const templates = STAGE_TEMPLATES;
-    const buckets = new Map<number, CapabilityGap[]>();
+    const sorted = [...gaps].sort((a, b) => {
+        const familyDelta = familyRank(a) - familyRank(b);
+        if (familyDelta !== 0) return familyDelta;
+        return b.priorityScore - a.priorityScore;
+    });
 
-    for (const gap of gaps) {
-        const templateIndex = templates.findIndex((template) => template.categories.includes(gap.category));
-        const index = templateIndex >= 0 ? templateIndex : Math.min(templates.length - 1, 4);
-        const bucket = buckets.get(index) ?? [];
+    const byFamily = new Map<string, CapabilityGap[]>();
+    for (const gap of sorted) {
+        const family = resolveCapabilityFamily(gap);
+        const key = family.id === "other" ? `other:${gap.capabilityId}` : family.id;
+        const bucket = byFamily.get(key) ?? [];
         bucket.push(gap);
-        buckets.set(index, bucket);
+        byFamily.set(key, bucket);
     }
 
-    const orderedChunks: CapabilityGap[][] = [...buckets.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([, chunkGaps]) =>
-            [...chunkGaps]
-                .sort((a, b) => b.priorityScore - a.priorityScore)
-                .slice(0, MAX_PRIMARY_CAPABILITIES_PER_STAGE)
-        );
+    const maxGapsForFamily = (familyKey: string): number => {
+        if (familyKey.startsWith("other:")) return 1;
+        if (familyKey === "programming" || familyKey === "data_ml" || familyKey === "cloud_infra" || familyKey === "frontend") {
+            return 2;
+        }
+        return Math.min(MAX_PRIMARY_CAPABILITIES_PER_STAGE, 3);
+    };
 
-    if (orderedChunks.length === 0) return [[...gaps].slice(0, MAX_PRIMARY_CAPABILITIES_PER_STAGE)];
-
-    const targetCount = Math.max(
-        2,
-        Math.min(preferredStageCount, Math.max(orderedChunks.length, 2), templates.length)
-    );
-
-    // If we have few thematic buckets but enough gaps, split the largest bucket so
-    // we still produce multiple focused progression stages.
-    while (orderedChunks.length < targetCount) {
-        const largestIndex = orderedChunks.reduce(
-            (best, chunk, index, all) => (chunk.length > (all[best]?.length ?? 0) ? index : best),
-            0
-        );
-        const largest = orderedChunks[largestIndex];
-        if (!largest || largest.length < 2) break;
-        const mid = Math.ceil(largest.length / 2);
-        orderedChunks.splice(largestIndex, 1, largest.slice(0, mid), largest.slice(mid));
+    const familyChunks: CapabilityGap[][] = [];
+    for (const [familyKey, familyGaps] of byFamily.entries()) {
+        const maxGaps = maxGapsForFamily(familyKey);
+        const ordered = [...familyGaps].sort((a, b) => b.priorityScore - a.priorityScore);
+        for (let index = 0; index < ordered.length; index += maxGaps) {
+            familyChunks.push(ordered.slice(index, index + maxGaps));
+        }
     }
 
-    if (orderedChunks.length <= targetCount) return orderedChunks;
+    familyChunks.sort((left, right) => {
+        const leftRank = familyRank(left[0]!);
+        const rightRank = familyRank(right[0]!);
+        if (leftRank !== rightRank) return leftRank - rightRank;
+        return (right[0]?.priorityScore ?? 0) - (left[0]?.priorityScore ?? 0);
+    });
 
-    const merged: CapabilityGap[][] = orderedChunks.map((chunk) => [...chunk]);
-    while (merged.length > targetCount) {
-        const mergeAt = merged.length - 2;
-        const left = merged[mergeAt] ?? [];
-        const right = merged[mergeAt + 1] ?? [];
-        merged.splice(
-            mergeAt,
-            2,
-            [...left, ...right]
-                .sort((a, b) => b.priorityScore - a.priorityScore)
-                .slice(0, MAX_PRIMARY_CAPABILITIES_PER_STAGE)
-        );
-    }
-    return merged;
+    const maxStages = Math.min(MAX_STAGE_COUNT, Math.max(preferredStageCount, familyChunks.length, 2));
+    if (familyChunks.length <= maxStages) return familyChunks;
+
+    // Prefer dropping lowest-priority leftover gaps over merging unrelated skill families.
+    const kept = familyChunks.slice(0, maxStages);
+    return kept.map((chunk) => chunk.slice(0, maxGapsForFamily(resolveCapabilityFamily(chunk[0]!).id)));
 };
 
 const resolveTemplateForChunk = (gaps: readonly CapabilityGap[], index: number, total: number): StageTemplate => {
@@ -574,7 +566,7 @@ export const buildDeterministicStages = (params: {
     return gapChunks.map((gaps, index) => {
         const primaryGaps = gaps.slice(0, MAX_PRIMARY_CAPABILITIES_PER_STAGE);
         const template = resolveTemplateForChunk(primaryGaps, index, gapChunks.length);
-        const focus = primaryGaps.find(isSkillLikeGap)?.label ?? primaryGaps[0]?.label ?? "core capabilities";
+        const focus = resolveStageFocusLabel(primaryGaps);
         const actions = pickActionsForGaps(primaryGaps);
         const resources = pickResourcesForGaps(primaryGaps);
         const effortHours = actions.reduce((sum, action) => sum + action.effortHours, 0);

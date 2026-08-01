@@ -38,5 +38,6 @@ export const CERTIFICATION_ALIASES: ReadonlyMap<string, string> = new Map([
     ["aws certified", "AWS certification"],
 ]);
 
-export const MAX_PRIMARY_CAPABILITIES_PER_STAGE = 6;
-export const MIN_PRIMARY_CAPABILITIES_PER_STAGE = 2;
+/** Keep stages focused: one coherent skill family per milestone. */
+export const MAX_PRIMARY_CAPABILITIES_PER_STAGE = 3;
+export const MIN_PRIMARY_CAPABILITIES_PER_STAGE = 1;

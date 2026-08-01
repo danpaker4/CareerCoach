@@ -114,7 +114,7 @@ describe("roadmap promptfoo fixtures (offline)", () => {
                 assert.ok(result.stages.every((stage: GeneratedStageContent) => (stage.whatYouGain?.length ?? 0) >= 40));
             }
 
-            const maxCaps = expected.maxRequiredCapabilitiesPerStage ?? 6;
+            const maxCaps = expected.maxRequiredCapabilitiesPerStage ?? 3;
             for (const stage of result.stages) {
                 assert.ok((stage.requiredCapabilities?.length ?? 0) <= maxCaps);
                 const blob = [

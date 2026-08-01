@@ -9,18 +9,12 @@ import iconUser from '../../assets/icon-user.svg';
 import iconTarget from '../../assets/icon-target.svg';
 import './MySkills.css';
 import type { User } from '../../types/user';
-
-interface SkillToImprove {
-  skill: string;
-  isDone: boolean;
-}
-
-interface SkillDataset {
-  id: string;
-  userId: string;
-  jobId: number;
-  skillToImprove: SkillToImprove[];
-}
+import {
+  buildSkillSetsFromRoadmaps,
+  parseCareerRoadmaps,
+  summarizeSkillProgress,
+} from '../skill-matcher/skill-matcher-from-roadmap.utils';
+import type { RoadmapSkillSet } from '../skill-matcher/skill-matcher.types';
 
 interface MySkillsProps {
   user: User;
@@ -31,27 +25,13 @@ type FetchState = 'idle' | 'loading' | 'success' | 'error';
 const GITHUB_PROJECT_COUNT_SKILL_SUFFIX = ' github projects';
 const USERS_URL = (userId: string) => `${ENV.USERS_SERVICE_BASE_URL}/users/${userId}`;
 
-const parseSkillDatasets = (data: unknown): SkillDataset[] => {
-  if (!Array.isArray(data)) return [];
-  return data.filter((item): item is SkillDataset => {
-    if (typeof item !== 'object' || item === null) return false;
-    const obj = item as Record<string, unknown>;
-    return (
-      typeof obj.id === 'string' &&
-      typeof obj.userId === 'string' &&
-      typeof obj.jobId === 'number' &&
-      Array.isArray(obj.skillToImprove)
-    );
-  });
-};
-
 const uniqueTrimmedStrings = (items: readonly string[]): string[] =>
   [...new Set(items.map((item) => item.trim()).filter((item) => item.length > 0))];
 
 export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
   const [profileUser, setProfileUser] = useState<User>(user);
   const [skillState, setSkillState] = useState<FetchState>('idle');
-  const [datasets, setDatasets] = useState<SkillDataset[]>([]);
+  const [skillSets, setSkillSets] = useState<RoadmapSkillSet[]>([]);
   const [skillError, setSkillError] = useState('');
   const onUserUpdatedRef = useRef(onUserUpdated);
   onUserUpdatedRef.current = onUserUpdated;
@@ -71,11 +51,11 @@ export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
   const loadSkills = useCallback(() => {
     if (!user.id) return;
     setSkillState('loading');
-    apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/skill-matcher/${user.id}`, { credentials: 'include' })
+    apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${user.id}`, { credentials: 'include' })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Server returned ${res.status}`);
         const data: unknown = await res.json();
-        setDatasets(parseSkillDatasets(data));
+        setSkillSets(buildSkillSetsFromRoadmaps(parseCareerRoadmaps(data)));
         setSkillState('success');
       })
       .catch((err: unknown) => {
@@ -101,15 +81,14 @@ export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
     loadSkills();
   }, [user.id, loadSkills]);
 
-  const allSkills = datasets.flatMap((dataset) => dataset.skillToImprove);
-  const skillsCompleted = allSkills.filter((skill) => skill.isDone).length;
+  const { total: allSkillsCount, done: skillsCompleted, pct: overallPct } = summarizeSkillProgress(skillSets);
 
   return (
     <div className="myskills-page">
       <div className="myskills-container">
         <div className="myskills-header">
           <h1 className="myskills-title">My Skills</h1>
-          <p className="myskills-subtitle">Skills from your CV, chat, GitHub and assigned tracker</p>
+          <p className="myskills-subtitle">Skills from your CV, chat, GitHub and roadmap checkboxes</p>
         </div>
 
         <section className="myskills-section">
@@ -205,9 +184,9 @@ export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
         <section className="myskills-section">
           <div className="myskills-section-header">
             <img src={iconTarget} alt="" aria-hidden="true" className="section-icon section-icon--green" />
-            <h2 className="myskills-section-title">Skills to Develop</h2>
-            {allSkills.length > 0 && (
-              <span className="myskills-section-count">{skillsCompleted}/{allSkills.length}</span>
+            <h2 className="myskills-section-title">Roadmap checkboxes</h2>
+            {allSkillsCount > 0 && (
+              <span className="myskills-section-count">{skillsCompleted}/{allSkillsCount} · {overallPct}%</span>
             )}
           </div>
 
@@ -224,26 +203,26 @@ export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
             </div>
           )}
 
-          {skillState === 'success' && datasets.length === 0 && (
+          {skillState === 'success' && skillSets.length === 0 && (
             <div className="surface-card myskills-empty">
               <img src={iconZap} alt="" className="myskills-empty-icon" aria-hidden="true" />
-              <p>No skills assigned yet. Visit the Skill Tracker to add skills.</p>
+              <p>No roadmap checkboxes yet. Create a career roadmap to track progress here.</p>
             </div>
           )}
 
-          {skillState === 'success' && datasets.length > 0 && (
+          {skillState === 'success' && skillSets.length > 0 && (
             <div className="skillsets-list">
-              {datasets.map((dataset) => {
-                const done = dataset.skillToImprove.filter((skill) => skill.isDone).length;
-                const total = dataset.skillToImprove.length;
+              {skillSets.map((skillSet) => {
+                const done = skillSet.skillToImprove.filter((skill) => skill.isDone).length;
+                const total = skillSet.skillToImprove.length;
                 const pct = total === 0 ? 0 : Math.round((done / total) * 100);
 
                 return (
-                  <div key={dataset.id} className="skillset-card surface-card">
+                  <div key={skillSet.id} className="skillset-card surface-card">
                     <div className="skillset-header">
                       <div>
-                        <h3 className="skillset-title">Job #{dataset.jobId}</h3>
-                        <p className="skillset-sub">{done} of {total} completed</p>
+                        <h3 className="skillset-title">{skillSet.stageLabel}</h3>
+                        <p className="skillset-sub">Toward {skillSet.dreamJob} · {done} of {total} completed</p>
                       </div>
                       <div className="skillset-pct-wrap">
                         <span className="skillset-pct-badge">{pct}%</span>
@@ -253,7 +232,7 @@ export const MySkills = ({ user, onUserUpdated }: MySkillsProps) => {
                       </div>
                     </div>
                     <ul className="skillset-checklist">
-                      {dataset.skillToImprove.map((skill) => (
+                      {skillSet.skillToImprove.map((skill) => (
                         <li key={skill.skill} className={`skillset-item${skill.isDone ? ' skillset-item--done' : ''}`}>
                           <span className={`skillset-checkbox${skill.isDone ? ' skillset-checkbox--checked' : ''}`}>
                             {skill.isDone && <img src={iconCheck} alt="" aria-hidden="true" className="skillset-check-img" />}

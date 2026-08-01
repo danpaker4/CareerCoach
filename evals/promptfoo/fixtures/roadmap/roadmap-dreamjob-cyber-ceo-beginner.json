@@ -37,7 +37,7 @@
     "mustIncludeStageLabelPatterns": ["cybersecurity", "team lead|managing"],
     "requireHowToGetThere": true,
     "requireWhatYouGain": true,
-    "maxRequiredCapabilitiesPerStage": 6,
+    "maxRequiredCapabilitiesPerStage": 3,
     "forbidCapabilityPatterns": ["we offer", "eagerness", "10\\+ years", "performance systems"],
     "degreeTimelineMustMentionYears": true,
     "mustRemoveNoise": true

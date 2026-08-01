@@ -10,6 +10,7 @@ import { rankCareerPaths } from "../path/path-ranking";
 import { resolveSelectedCareerPath } from "../path/career-path-resolution";
 import { resolveRoleMilestonePlan } from "../path/role-milestones";
 import type { UserCareerContext } from "../gap-analysis.types";
+import type { CapabilityGap } from "../structured/structured-gap.types";
 
 describe("market requirement cleaner", () => {
     it("rejects job-ad fluff, company names, personality, and years-as-skills", () => {
@@ -244,8 +245,127 @@ describe("deterministic stage builder", () => {
         assert.ok(stages.every((stage) => stage.actions.length > 0));
         assert.ok(stages.every((stage) => stage.timelineMeta.effortHours > 0));
         assert.ok(stages.every((stage) => stage.completionCriteria.length > 0));
-        assert.ok(stages.every((stage) => stage.requiredCapabilities.length <= 6));
+        assert.ok(stages.every((stage) => stage.requiredCapabilities.length <= 3));
         assert.ok(stages.every((stage) => !stage.resources.some((resource) => resource.url.length === 0)));
+    });
+
+    it("splits unrelated technical skills into focused stages instead of one Python mega-stage", () => {
+        const gaps: CapabilityGap[] = [
+            {
+                gapId: "gap.cap.python",
+                capabilityId: "cap.python",
+                label: "Python",
+                category: "technical",
+                requiredLevel: 3,
+                currentLevel: 0,
+                gapScore: 3,
+                marketImportance: 1,
+                transitionRelevance: 1,
+                dependencyWeight: 1,
+                confidence: 0.9,
+                priorityScore: 3.2,
+                reasonCodes: ["MARKET"],
+            },
+            {
+                gapId: "gap.cap.machine.learning",
+                capabilityId: "cap.machine.learning",
+                label: "Machine learning",
+                category: "technical",
+                requiredLevel: 3,
+                currentLevel: 0,
+                gapScore: 3,
+                marketImportance: 1,
+                transitionRelevance: 1,
+                dependencyWeight: 1,
+                confidence: 0.9,
+                priorityScore: 3.1,
+                reasonCodes: ["MARKET"],
+            },
+            {
+                gapId: "gap.cap.cloud.basics",
+                capabilityId: "cap.cloud.basics",
+                label: "Cloud fundamentals",
+                category: "technical",
+                requiredLevel: 2,
+                currentLevel: 0,
+                gapScore: 2,
+                marketImportance: 1,
+                transitionRelevance: 1,
+                dependencyWeight: 1,
+                confidence: 0.9,
+                priorityScore: 2.8,
+                reasonCodes: ["MARKET"],
+            },
+            {
+                gapId: "gap.cap.communication",
+                capabilityId: "cap.communication",
+                label: "Professional communication",
+                category: "soft",
+                requiredLevel: 2,
+                currentLevel: 0,
+                gapScore: 2,
+                marketImportance: 0.8,
+                transitionRelevance: 1,
+                dependencyWeight: 1,
+                confidence: 0.8,
+                priorityScore: 2.4,
+                reasonCodes: ["MARKET"],
+            },
+            {
+                gapId: "gap.dyn.spark.kafka",
+                capabilityId: "dyn.deep.knowledge.of.spark.kafka",
+                label: "Deep knowledge of Spark/Kafka",
+                category: "technical",
+                requiredLevel: 3,
+                currentLevel: 0,
+                gapScore: 3,
+                marketImportance: 1,
+                transitionRelevance: 1,
+                dependencyWeight: 1,
+                confidence: 0.7,
+                priorityScore: 2.9,
+                reasonCodes: ["MARKET"],
+            },
+        ];
+
+        const stages = buildDeterministicStages({
+            dreamJob: "Principal Architect",
+            preferredStageCount: 6,
+            gaps,
+            hoursPerWeek: 10,
+            assumedAvailability: false,
+            measurableCompletionEnabled: true,
+            structuredEvidenceEnabled: true,
+        });
+
+        assert.ok(stages.length >= 4);
+        assert.ok(stages.every((stage) => stage.requiredCapabilities.length <= 3));
+
+        const pythonStage = stages.find((stage) => /python/i.test(stage.label));
+        assert.ok(pythonStage);
+        assert.ok(pythonStage.requiredCapabilities.every((cap) => !/machine learning|cloud|spark|kafka|communication/i.test(cap)));
+        assert.ok(pythonStage.skillsToBuild.every((skill) => !/machine learning|cloud|spark|kafka/i.test(skill)));
+
+        const mlStage = stages.find(
+            (stage) => /machine learning|data and machine learning|spark|kafka/i.test(stage.label) ||
+                stage.requiredCapabilities.some((cap) => /machine learning|spark|kafka/i.test(cap))
+        );
+        assert.ok(mlStage);
+        assert.notEqual(mlStage.stageId, pythonStage.stageId);
+
+        const cloudStage = stages.find(
+            (stage) => /cloud/i.test(stage.label) || stage.requiredCapabilities.some((cap) => /cloud/i.test(cap))
+        );
+        assert.ok(cloudStage);
+        assert.notEqual(cloudStage.stageId, pythonStage.stageId);
+
+        const communicationStage = stages.find(
+            (stage) =>
+                /communication/i.test(stage.label) ||
+                stage.requiredCapabilities.some((cap) => /communication/i.test(cap))
+        );
+        assert.ok(communicationStage);
+        assert.notEqual(communicationStage.stageId, pythonStage.stageId);
     });
 
     it("uses multi-year timelines for degree credentials instead of two-week practice", () => {
@@ -346,7 +466,7 @@ describe("deterministic stage builder", () => {
         assert.ok(stages.length <= 7);
         const prepareCount = stages.filter((stage) => /^Prepare for /i.test(stage.label) || /^Package evidence/i.test(stage.label)).length;
         assert.ok(prepareCount <= 1);
-        assert.ok(stages.every((stage) => stage.requiredCapabilities.length <= 6));
+        assert.ok(stages.every((stage) => stage.requiredCapabilities.length <= 3));
         assert.ok(stages.every((stage) => stage.actions.every((action) => !/we offer|eagerness|10\+ years/i.test(action))));
         assert.ok(stages.every((stage) => stage.requiredCapabilities.every((cap) => !/we offer|eagerness|10\+ years|inc\b/i.test(cap))));
         assert.ok(structured.gaps.some((gap) => gap.capabilityId === "cap.cybersecurity"));

@@ -191,7 +191,7 @@ export const assertNoFluffCapabilities = async (
                 return fail(`Stage "${stage.label}" contains forbidden pattern /${pattern}/i`);
             }
         }
-        const maxCaps = expected.maxRequiredCapabilitiesPerStage ?? 6;
+        const maxCaps = expected.maxRequiredCapabilitiesPerStage ?? 3;
         if ((stage.requiredCapabilities?.length ?? 0) > maxCaps) {
             return fail(`Stage "${stage.label}" has too many requiredCapabilities`);
         }

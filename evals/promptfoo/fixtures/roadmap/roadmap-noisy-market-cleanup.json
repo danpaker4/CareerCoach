@@ -39,6 +39,6 @@
       "10\\+ years",
       "acme"
     ],
-    "maxRequiredCapabilitiesPerStage": 6
+    "maxRequiredCapabilitiesPerStage": 3
   }
 }

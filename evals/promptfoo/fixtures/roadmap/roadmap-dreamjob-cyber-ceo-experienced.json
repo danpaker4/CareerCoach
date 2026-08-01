@@ -28,6 +28,6 @@
     "mustIncludeStageLabelPatterns": ["team lead|managing|director|executive"],
     "requireHowToGetThere": true,
     "requireWhatYouGain": true,
-    "maxRequiredCapabilitiesPerStage": 6
+    "maxRequiredCapabilitiesPerStage": 3
   }
 }
