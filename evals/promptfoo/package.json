@@ -10,8 +10,10 @@
   "scripts": {
     "eval": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.ts",
     "eval:compare": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.compare.ts",
+    "eval:roadmap": "tsx scripts/run-promptfoo.ts eval -c promptfooconfig.roadmap.ts",
     "view": "tsx scripts/run-promptfoo.ts view -n",
     "update": "tsx scripts/generate-promptfoo-tests.ts",
+    "update:roadmap": "tsx scripts/generate-roadmap-promptfoo-tests.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

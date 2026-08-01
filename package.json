@@ -25,6 +25,8 @@
     "eval:promptfoo:view": "npm --prefix evals/promptfoo run view",
     "eval:promptfoo:update": "npm --prefix evals/promptfoo run update",
     "eval:promptfoo:compare": "npm --prefix evals/promptfoo run eval:compare",
+    "eval:promptfoo:roadmap": "npm --prefix evals/promptfoo run update:roadmap && npm --prefix evals/promptfoo run eval:roadmap",
+    "eval:promptfoo:roadmap:update": "npm --prefix evals/promptfoo run update:roadmap",
     "langfuse:config": "docker compose --env-file .env.langfuse -f docker-compose.yml -f docker-compose.langfuse-cloud.yml config --no-interpolate",
     "langfuse:up": "docker compose --env-file .env.langfuse -f docker-compose.yml -f docker-compose.langfuse-cloud.yml up -d --force-recreate otel-collector",
     "langfuse:stop": "docker compose --env-file .env.langfuse -f docker-compose.yml -f docker-compose.langfuse-cloud.yml stop otel-collector"

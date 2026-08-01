@@ -178,6 +178,33 @@ fixtures/*.json  --generate-->  generated/tests.yaml
 
 Delete `evals/` and the `eval:promptfoo*` scripts from the root `package.json`. Nothing in production depends on this package.
 
+## Dream-job roadmap evals (separate suite)
+
+Chat Promptfoo cases do **not** score roadmap generation. Use the roadmap suite:
+
+```bash
+# Offline (no Promptfoo UI; uses same fixtures via roadmap-service unit tests)
+npm --prefix roadmap-service test
+
+# Promptfoo dashboard path (requires roadmap-service on :3005)
+npm run eval:promptfoo:roadmap:update
+npm run eval:promptfoo:roadmap
+npm run eval:promptfoo:view
+```
+
+Fixtures live in [`fixtures/roadmap/`](./fixtures/roadmap/). They call `POST /roadmap/generate/eval-fixture` with an explicit starting point + market payload (no live user profile required).
+
+Assertions check:
+
+- beginner cyber-CEO path starts with degree/foundations
+- includes cybersecurity job and team-lead stages
+- `howToGetThere` / `whatYouGain` present
+- no JD fluff / company names / years-as-skills as capabilities
+- degree timelines mention years
+- noisy inputs appear in `removedInputExamples`
+
+Add a fixture JSON under `fixtures/roadmap/`, then `npm run eval:promptfoo:roadmap:update`.
+
 ## Exact commands (cheat sheet)
 
 ```bash

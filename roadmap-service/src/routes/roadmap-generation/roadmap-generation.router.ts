@@ -40,4 +40,5 @@ export const roadmapGenerationRouter = (
         const controller = new RoadmapGenerationController(service);
 
         app.post("/roadmap/generate", controller.generate);
+        app.post("/roadmap/generate/eval-fixture", controller.generateEvalFixture);
     };

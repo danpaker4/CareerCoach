@@ -15,6 +15,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["providers/**/*", "assertions/**/*", "scripts/**/*", "promptfooconfig.ts", "promptfooconfig.compare.ts"],
+  "include": ["providers/**/*", "assertions/**/*", "scripts/**/*", "promptfooconfig.ts", "promptfooconfig.compare.ts", "promptfooconfig.roadmap.ts"],
   "exclude": ["node_modules", "dist", "generated"]
 }

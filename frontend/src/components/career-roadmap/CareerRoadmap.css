@@ -953,6 +953,7 @@
 }
 
 .journey-context-today,
+.journey-context-skills,
 .journey-context-target,
 .journey-context-reasoning {
   font-size: var(--fz-sm);

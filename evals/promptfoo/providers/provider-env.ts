@@ -4,6 +4,7 @@ const optionalEmptyString = (value: unknown): unknown => (value === "" ? undefin
 
 export const PromptfooEnvSchema = z.object({
     EVALUATION_SERVICE_BASE_URL: z.string().url().default("http://127.0.0.1:3004"),
+    ROADMAP_SERVICE_BASE_URL: z.string().url().default("http://127.0.0.1:3005"),
     CANDIDATE_EVALUATION_SERVICE_BASE_URL: z.preprocess(
         optionalEmptyString,
         z.string().url().optional(),

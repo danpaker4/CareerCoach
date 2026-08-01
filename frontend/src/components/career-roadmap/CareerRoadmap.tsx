@@ -394,6 +394,13 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                           <strong>Where you are:</strong> {activeRoadmap.progressionMeta.currentRoleSummary}
                         </p>
                       )}
+                      {activeRoadmap.progressionMeta.gapAnalysis?.skillsPresent &&
+                        activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.length > 0 && (
+                          <p className="journey-context-skills">
+                            <strong>Skills we know:</strong>{' '}
+                            {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.join(', ')}
+                          </p>
+                        )}
                       <p className="journey-context-target">
                         <strong>Target role:</strong>{' '}
                         {activeRoadmap.progressionMeta.dreamRoleCategory ?? activeRoadmap.dreamJob}
@@ -416,6 +423,9 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                           </button>
                           {gapExpanded && (
                             <ul className="journey-gap-list">
+                              {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.length > 0 && (
+                                <li><strong>Skills already on file:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.join(', ')}</li>
+                              )}
                               {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.length > 0 && (
                                 <li><strong>Skills to build:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.join(', ')}</li>
                               )}

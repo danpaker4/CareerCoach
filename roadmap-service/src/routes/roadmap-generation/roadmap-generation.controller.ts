@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import { StatusCodes } from "http-status-codes";
 import type { RoadmapGenerationService } from "./roadmap-generation.service";
 import type { RoadmapGenerationRequestBody } from "./roadmap-generation.types";
+import type { RoadmapEvalFixtureRequestBody } from "./roadmap-generation.fixture.types";
 import { MAX_TARGET_YEARS, MIN_TARGET_YEARS } from "./roadmap-generation.consts";
 
 export class RoadmapGenerationController {
@@ -55,6 +56,44 @@ export class RoadmapGenerationController {
             request.log.error({ err: error }, "Roadmap generation failed");
             reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
                 error: "Failed to generate roadmap. Please try again.",
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
+    };
+
+    generateEvalFixture = async (
+        request: FastifyRequest<{ Body: RoadmapEvalFixtureRequestBody }>,
+        reply: FastifyReply
+    ): Promise<void> => {
+        const body = request.body as RoadmapEvalFixtureRequestBody | undefined;
+        if (!body || typeof body !== "object") {
+            reply.code(StatusCodes.BAD_REQUEST).send({ error: "Request body is required" });
+            return;
+        }
+
+        if (
+            !body.dreamJob?.trim() ||
+            !body.targetYears ||
+            !Number.isInteger(body.targetYears) ||
+            body.targetYears < MIN_TARGET_YEARS ||
+            body.targetYears > MAX_TARGET_YEARS ||
+            !body.startingPoint ||
+            typeof body.startingPoint.isEntryLevel !== "boolean" ||
+            !body.startingPoint.currentJob?.trim()
+        ) {
+            reply.code(StatusCodes.BAD_REQUEST).send({
+                error: "dreamJob, targetYears, and startingPoint { currentJob, isEntryLevel } are required",
+            });
+            return;
+        }
+
+        try {
+            const result = this.service.generateFromFixture(body);
+            reply.code(StatusCodes.OK).send(result);
+        } catch (error) {
+            request.log.error({ err: error }, "Roadmap eval fixture generation failed");
+            reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+                error: "Failed to generate roadmap fixture.",
                 details: error instanceof Error ? error.message : String(error),
             });
         }

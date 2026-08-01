@@ -1,0 +1,33 @@
+{
+  "id": "roadmap-dreamjob-cyber-ceo-experienced",
+  "description": "Experienced cyber IC skips pure degree-first stage and still gets leadership progression",
+  "tags": ["roadmap", "dreamjob", "cyber", "experienced"],
+  "request": {
+    "dreamJob": "CEO of cybersecurity company",
+    "targetYears": 8,
+    "startingPoint": {
+      "currentJob": "Security Engineer",
+      "currentRoleSummary": "Security Engineer with 4 years",
+      "userSkills": ["Cybersecurity", "Python", "Cloud"],
+      "isEntryLevel": false,
+      "roleExperienceYears": 4,
+      "roleExperienceLevel": "mid"
+    },
+    "market": {
+      "roleCategory": "CEO",
+      "commonSkills": ["Cybersecurity", "Leadership", "Business acumen"],
+      "responsibilities": ["Own security outcomes"],
+      "leadershipSignals": ["Manage teams"],
+      "architectureSignals": ["Security architecture"],
+      "seniorityDistribution": { "senior": 3 }
+    }
+  },
+  "expected": {
+    "minStages": 3,
+    "firstStageLabelMustNotInclude": ["Get the basics: CS degree"],
+    "mustIncludeStageLabelPatterns": ["team lead|managing|director|executive"],
+    "requireHowToGetThere": true,
+    "requireWhatYouGain": true,
+    "maxRequiredCapabilitiesPerStage": 6
+  }
+}
