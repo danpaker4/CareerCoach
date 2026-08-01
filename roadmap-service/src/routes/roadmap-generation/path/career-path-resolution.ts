@@ -23,6 +23,27 @@ const EXECUTIVE_CYBER_PATH = [
     "CEO (cybersecurity company)",
 ] as const;
 
+const ARCHITECTURE_PATH_BEGINNER = [
+    "Software Engineer (first job)",
+    "Senior Software Engineer",
+    "Staff Engineer / Lead Architect",
+    "Principal Engineer",
+    "Principal Architect",
+] as const;
+
+const ARCHITECTURE_PATH = [
+    "Senior Software Engineer / Software Architect",
+    "Staff Engineer / Lead Architect",
+    "Principal Engineer / Principal Architect",
+    "Principal Architect",
+] as const;
+
+const ENGINEERING_PATH = [
+    "Software Engineer",
+    "Senior Software Engineer",
+    "Staff Engineer",
+] as const;
+
 const trimPathToTargetYears = (steps: readonly string[], targetYears: number): string[] => {
     if (targetYears <= 3) return [...steps.slice(0, 3), steps[steps.length - 1]!].filter(Boolean);
     if (targetYears <= 6) return [...steps.slice(0, 5), steps[steps.length - 1]!].filter(Boolean);
@@ -38,21 +59,33 @@ export const resolveSelectedCareerPath = (params: {
     readonly hasNoSkills?: boolean;
 }): ResolvedCareerPath => {
     const archetype = resolveRoleArchetype(params.dreamJob);
+    const zeroKnowledge = params.isEntryLevel === true || params.hasNoSkills === true;
+
     if (archetype === "executive_cyber") {
-        const base =
-            params.isEntryLevel === true || params.hasNoSkills === true
-                ? EXECUTIVE_CYBER_PATH_BEGINNER
-                : EXECUTIVE_CYBER_PATH;
+        const base = zeroKnowledge ? EXECUTIVE_CYBER_PATH_BEGINNER : EXECUTIVE_CYBER_PATH;
         const steps = trimPathToTargetYears(base, params.targetYears);
         return {
             steps: [...steps],
             reasonCodes: [
                 "path_executive_cyber",
                 "intermediate_roles_required",
-                ...(params.isEntryLevel === true || params.hasNoSkills === true
-                    ? ["beginner_degree_then_job_then_lead"]
-                    : []),
+                ...(zeroKnowledge ? ["beginner_degree_then_job_then_lead"] : []),
             ],
+        };
+    }
+
+    if (archetype === "architecture_ic") {
+        const base = zeroKnowledge ? ARCHITECTURE_PATH_BEGINNER : ARCHITECTURE_PATH;
+        return {
+            steps: trimPathToTargetYears(base, params.targetYears),
+            reasonCodes: ["path_architecture_ic", "jobs_plus_learning", "intermediate_roles_required"],
+        };
+    }
+
+    if (archetype === "engineering_ic") {
+        return {
+            steps: trimPathToTargetYears(ENGINEERING_PATH, params.targetYears),
+            reasonCodes: ["path_engineering_ic", "jobs_plus_learning", "intermediate_roles_required"],
         };
     }
 

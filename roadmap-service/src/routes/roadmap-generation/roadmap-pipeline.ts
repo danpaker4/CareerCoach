@@ -164,7 +164,11 @@ export const buildRoadmapPipeline = (input: RoadmapPipelineInput): RoadmapPipeli
                 dreamRoleCategory: dreamJob,
                 estimatedYearsToGoal: `${totalTimeline.minYears}–${totalTimeline.maxYears} years (overlapping stages; not guaranteed)`,
                 progressionReasoning: milestonePlan
-                    ? "Role-based path: foundations → cybersecurity job → senior IC → team lead → org leadership → executive/commercial readiness."
+                    ? milestonePlan.reasonCodes.includes("architecture_ic")
+                      ? "Role-based path: focused skill gaps → senior/architect job → staff scope → principal scope → pursue Principal Architect roles."
+                      : milestonePlan.reasonCodes.includes("engineering_ic")
+                        ? "Role-based path: close skill gaps → engineering job → senior IC growth."
+                        : "Role-based path: foundations → cybersecurity job → senior IC → team lead → org leadership → executive/commercial readiness."
                     : input.startingPoint.isEntryLevel
                       ? "Cleaned market inputs into an experience-first path with intermediate roles toward the target."
                       : "Cleaned market inputs, ranked transitions, and built focused stages with measurable evidence.",

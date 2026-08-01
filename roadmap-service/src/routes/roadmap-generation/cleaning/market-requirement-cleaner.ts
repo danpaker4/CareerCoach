@@ -26,8 +26,9 @@ const looksLikeCompanyName = (text: string): boolean => {
 
 const looksLikeJobAdSentence = (text: string): boolean => {
     const trimmed = normalizeWhitespace(text);
-    if (trimmed.length > 140) return true;
-    if (/[.!?]$/.test(trimmed) && trimmed.split(" ").length > 12) return true;
+    if (trimmed.length > 100) return true;
+    if (/[.!?]$/.test(trimmed) && trimmed.split(" ").length > 10) return true;
+    if (/^(you will|you'll|your work will|we expect|responsible for)\b/i.test(trimmed)) return true;
     return JOB_AD_FLUFF_PATTERNS.some((pattern) => pattern.test(trimmed));
 };
 
@@ -112,13 +113,20 @@ export const cleanMarketRequirementTexts = (texts: readonly string[]): MarketCle
             }
         }
         if (looksLikeJobAdSentence(input)) {
-            // Try to salvage an underlying capability from long sentences.
+            // Try to salvage an underlying catalog skill from long duty sentences.
             const salvage = normalizeCapabilityText(input);
+            const isDutyFluff = JOB_AD_FLUFF_PATTERNS.some((pattern) => pattern.test(input));
             if (
                 salvage.id.startsWith("cap.dynamic.") ||
-                salvage.label.length > 80 ||
-                JOB_AD_FLUFF_PATTERNS.some((pattern) => pattern.test(input))
+                salvage.label.length > 60 ||
+                isDutyFluff ||
+                input.split(" ").length > 12
             ) {
+                removed.push({ input, reason: "job-ad-text" });
+                continue;
+            }
+            // Only keep salvage when it collapses to a short known catalog skill.
+            if (!salvage.id.startsWith("cap.") || salvage.id.startsWith("cap.dynamic.")) {
                 removed.push({ input, reason: "job-ad-text" });
                 continue;
             }

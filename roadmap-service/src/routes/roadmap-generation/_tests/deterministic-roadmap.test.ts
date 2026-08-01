@@ -32,6 +32,25 @@ describe("market requirement cleaner", () => {
         assert.ok(result.kept.some((item) => item.classification === "EDUCATION"));
         assert.ok(!result.kept.some((item) => /we offer/i.test(item.normalizedName)));
     });
+
+    it("rejects JD duty sentences that are not real skill names", () => {
+        const result = cleanMarketRequirementTexts([
+            "You will develop test scripts using Selenium and Java",
+            "Your work will directly impact the safety and security of our users",
+            "You will be responsible for designing, developing, and maintaining large-scale systems",
+            "Proven track record of delivering impactful ML solutions",
+            "Python",
+            "System design",
+        ]);
+
+        assert.ok(result.removed.some((item) => /you will develop/i.test(item.input) && item.reason === "job-ad-text"));
+        assert.ok(result.removed.some((item) => /your work will/i.test(item.input)));
+        assert.ok(result.removed.some((item) => /responsible for designing/i.test(item.input)));
+        assert.ok(result.removed.some((item) => /proven track record/i.test(item.input)));
+        assert.ok(result.kept.some((item) => item.capabilityId === "cap.python"));
+        assert.ok(result.kept.some((item) => item.capabilityId === "cap.system.design"));
+        assert.ok(!result.kept.some((item) => /you will/i.test(item.normalizedName)));
+    });
 });
 
 describe("capability normalization", () => {
@@ -174,6 +193,20 @@ describe("career path resolution", () => {
         assert.ok(path.steps.some((step) => /security|cyber/i.test(step)));
         assert.ok(path.steps.some((step) => /ceo/i.test(step)));
     });
+
+    it("returns architect job ladder roles instead of random junior titles", () => {
+        const path = resolveSelectedCareerPath({
+            currentJob: "Software Engineer",
+            dreamJob: "principal architect at google",
+            targetYears: 6,
+            isEntryLevel: false,
+            hasNoSkills: false,
+            knownPathRoles: ["Junior Qa Engineer", "Junior Ux Designer"],
+        });
+        assert.ok(path.reasonCodes.includes("path_architecture_ic"));
+        assert.ok(path.steps.some((step) => /senior|staff|principal/i.test(step)));
+        assert.ok(!path.steps.some((step) => /junior qa|junior ux/i.test(step)));
+    });
 });
 
 describe("role milestone stages", () => {
@@ -202,6 +235,43 @@ describe("role milestone stages", () => {
         assert.ok(stages.some((stage) => /team lead|managing/i.test(stage.label)));
         assert.ok(stages.every((stage) => (stage.howToGetThere?.length ?? 0) > 40));
         assert.ok(stages.every((stage) => (stage.whatYouGain?.length ?? 0) > 40));
+    });
+
+    it("builds jobs-plus-learning milestones for principal architect without CS degree restart", () => {
+        const plan = resolveRoleMilestonePlan({
+            dreamJob: "Principal Architect at Google",
+            targetYears: 6,
+            isEntryLevel: false,
+            hasNoSkills: false,
+        });
+        assert.ok(plan);
+        assert.ok(plan.reasonCodes.includes("architecture_ic"));
+        assert.ok(plan.reasonCodes.includes("jobs_plus_learning"));
+        assert.ok(plan.milestones.some((stage) => stage.progressionType === "learning"));
+        assert.ok(plan.milestones.some((stage) => stage.progressionType === "experience"));
+        assert.ok(plan.milestones.some((stage) => /senior software engineer|software architect/i.test(stage.label)));
+        assert.ok(plan.milestones.some((stage) => /staff engineer/i.test(stage.label)));
+        assert.ok(plan.milestones.some((stage) => /principal/i.test(stage.label)));
+        assert.ok(!plan.milestones.some((stage) => /cs degree|computer science degree/i.test(stage.label)));
+
+        const stages = buildDeterministicStages({
+            dreamJob: "Principal Architect at Google",
+            preferredStageCount: 6,
+            gaps: [],
+            milestonePlan: plan,
+            hoursPerWeek: 10,
+            assumedAvailability: false,
+            measurableCompletionEnabled: true,
+            structuredEvidenceEnabled: true,
+        });
+        assert.ok(stages.length >= 4);
+        assert.ok(stages.some((stage) => stage.progressionType === "experience"));
+        assert.ok(stages.some((stage) => stage.roleCategories.some((role) => /senior|staff|principal/i.test(role))));
+        assert.ok(
+            stages
+                .filter((stage) => stage.progressionType === "learning")
+                .every((stage) => stage.roleCategories.length === 0)
+        );
     });
 });
 

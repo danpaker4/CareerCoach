@@ -41,7 +41,33 @@ export const buildUserCapabilities = (user: UserCareerContext): UserCapability[]
     };
 
     for (const cap of skillCaps) {
-        upsert(cap.id, cap.label, cap.category, cap.sourceText, "profile", LEVEL.working);
+        const skillLevel =
+            !user.isEntryLevel || user.userSkills.length >= 5 ? LEVEL.proficient : LEVEL.working;
+        upsert(cap.id, cap.label, cap.category, cap.sourceText, "profile", skillLevel);
+    }
+    // Strong language/stack evidence implies programming fundamentals are already covered.
+    if (skillCaps.some((cap) =>
+        ["cap.python", "cap.javascript", "cap.typescript", "cap.react", "cap.sql"].includes(cap.id) ||
+        /\b(java|go|kotlin|rust|c\+\+|nodejs|node\.js)\b/i.test(cap.label)
+    )) {
+        upsert(
+            "cap.programming.fundamentals",
+            "Programming fundamentals",
+            "technical",
+            "Inferred from existing engineering skills",
+            "inferred",
+            LEVEL.proficient
+        );
+    }
+    if (!user.isEntryLevel && user.userSkills.length >= 3) {
+        upsert(
+            "cap.credential.cs.degree",
+            "Computer science degree or equivalent",
+            "credential",
+            "Treated as satisfied for experienced profiles with substantial skills",
+            "inferred",
+            LEVEL.proficient
+        );
     }
     for (const cap of responsibilityCaps) {
         upsert(

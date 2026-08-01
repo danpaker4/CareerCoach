@@ -10,6 +10,14 @@ export const JOB_AD_FLUFF_PATTERNS: readonly RegExp[] = [
     /\bwork[- ]life balance\b/i,
     /\bremote[- ]friendly\b/i,
     /\bperformance systems?\b/i,
+    /\byou will\b/i,
+    /\byou('ll| will be)\b/i,
+    /\bwe expect you to\b/i,
+    /\byour work will\b/i,
+    /\bresponsible for (developing|building|designing|managing|maintaining|deploying)\b/i,
+    /\b(develop|build|design|maintain|deploy)(ing)? and (develop|build|design|maintain|deploy)/i,
+    /\bproven track record of\b/i,
+    /\bdirectly impact the\b/i,
 ];
 
 export const PERSONAL_TRAIT_PATTERNS: readonly RegExp[] = [

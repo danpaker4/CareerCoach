@@ -420,6 +420,11 @@ const buildStagesFromRoleMilestones = (params: {
                   targetValue: 1,
               }))
             : [];
+        const roleCategories =
+            milestone.progressionType === "learning" ? [] : [milestone.targetRole];
+        const futureOpportunities = [milestone.targetRole, params.dreamJob].filter(
+            (role, roleIndex, all) => all.indexOf(role) === roleIndex
+        );
 
         return {
             stageId,
@@ -444,10 +449,8 @@ const buildStagesFromRoleMilestones = (params: {
             skillsToBuild,
             responsibilitiesToGain,
             requiredCapabilities: labels,
-            roleCategories: [milestone.targetRole],
-            futureOpportunities: [milestone.targetRole, params.dreamJob].filter(
-                (role, roleIndex, all) => all.indexOf(role) === roleIndex
-            ),
+            roleCategories,
+            futureOpportunities,
             experienceAccumulation: `What you gain: ${milestone.whatYouGain}`,
             completionCriteria,
             timelineMeta: {
@@ -588,6 +591,7 @@ export const buildDeterministicStages = (params: {
             .map((gap) => gap.label);
         const roleForStage =
             preparedForRoles[Math.min(index, preparedForRoles.length - 1)] ?? params.dreamJob;
+        const isLearningStage = template.progressionType === "learning";
 
         const assumptions = [
             ...(assumedAvailability ? [`Assumes ~${hoursPerWeek} hours/week available`] : []),
@@ -616,10 +620,12 @@ export const buildDeterministicStages = (params: {
             skillsToBuild,
             responsibilitiesToGain,
             requiredCapabilities,
-            roleCategories: [roleForStage],
-            futureOpportunities: [roleForStage, params.dreamJob].filter(
-                (role, roleIndex, all) => all.indexOf(role) === roleIndex
-            ),
+            roleCategories: isLearningStage ? [] : [roleForStage],
+            futureOpportunities: isLearningStage
+                ? [params.dreamJob]
+                : [roleForStage, params.dreamJob].filter(
+                      (role, roleIndex, all) => all.indexOf(role) === roleIndex
+                  ),
             experienceAccumulation: buildExperienceTarget(primaryGaps),
             completionCriteria: measurableCompletionEnabled
                 ? buildCompletionCriteria(stageId, primaryGaps)

@@ -7,6 +7,9 @@ export const resolveRoleArchetype = (dreamJob: string): RoleArchetypeId => {
     const isExecutive = /\b(ceo|chief|founder|co-founder|executive|vp|vice president|ciso|cto|coo)\b/.test(text);
     const isCyber = /\b(cybersecurity|cyber|infosec|information security|security)\b/.test(text);
     if (isExecutive && isCyber) return "executive_cyber";
+    if (/\b(architect|architecture|principal|staff engineer|staff)\b/.test(text)) {
+        return "architecture_ic";
+    }
     if (/\b(engineer|developer|software|frontend|backend|fullstack|full stack)\b/.test(text)) {
         return "engineering_ic";
     }
