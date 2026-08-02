@@ -129,6 +129,7 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set in .env next to this compose file}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       COLLEGE_LLM_BASE_URL: ${COLLEGE_LLM_BASE_URL:-http://10.10.248.41}
+      COLLEGE_LLM_AUTH_HEADER: ${COLLEGE_LLM_AUTH_HEADER:-}
       LOCAL_OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_LOCAL_MODEL: ${OLLAMA_LOCAL_MODEL:-llama3.2:1b}
     volumes:

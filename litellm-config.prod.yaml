@@ -4,14 +4,18 @@
 # Chain: college gateway (best quality) -> Gemini (cloud) -> tiny local Ollama (always available).
 #
 # The college gateway sits behind nginx HTTP Basic Auth and only answers on its IP vhost
-# (Host: llm.cs.colman.ac.il returns 403). Credentials are passed as URL userinfo via
-# COLLEGE_LLM_BASE_URL, e.g. http://user:password@10.10.248.41
+# (Host: llm.cs.colman.ac.il returns 403), so COLLEGE_LLM_BASE_URL must be the raw IP.
+# Credentials go in an explicit header - LiteLLM rejects userinfo embedded in the URL
+# ("Cannot combine AUTHORIZATION header with credentials encoded in URL").
+# COLLEGE_LLM_AUTH_HEADER = "Basic " + base64("user:password")
 
 model_list:
   - model_name: chat-default
     litellm_params:
       model: ollama_chat/llama3.1:8b
       api_base: os.environ/COLLEGE_LLM_BASE_URL
+      extra_headers:
+        Authorization: os.environ/COLLEGE_LLM_AUTH_HEADER
 
   - model_name: chat-gemini
     litellm_params:
