@@ -1,0 +1,39 @@
+# LiteLLM routing for the college VM. Deploy config only - no application code depends on it.
+# chat-service talks to this proxy (LITELLM_BASE_URL); routing/fallbacks live here.
+#
+# Chain: college gateway (best quality) -> Gemini (cloud) -> tiny local Ollama (always available).
+#
+# The college gateway sits behind nginx HTTP Basic Auth and only answers on its IP vhost
+# (Host: llm.cs.colman.ac.il returns 403). Credentials are passed as URL userinfo via
+# COLLEGE_LLM_BASE_URL, e.g. http://user:password@10.10.248.41
+
+model_list:
+  - model_name: chat-default
+    litellm_params:
+      model: ollama_chat/llama3.1:8b
+      api_base: os.environ/COLLEGE_LLM_BASE_URL
+
+  - model_name: chat-gemini
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: chat-local
+    litellm_params:
+      model: ollama_chat/llama3.2:1b
+      api_base: os.environ/LOCAL_OLLAMA_BASE_URL
+
+router_settings:
+  fallbacks:
+    - chat-default:
+        - chat-gemini
+        - chat-local
+    - chat-gemini:
+        - chat-local
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 120
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
