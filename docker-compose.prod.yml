@@ -210,6 +210,11 @@ services:
     env_file: ./deploy/env/evaluation-service.env
     ports:
       - "127.0.0.1:3004:3004"
+    volumes:
+      # Promptfoo runs as a child process from the evaluation service; the package
+      # lives outside this service's build context, so mount it (needs node_modules
+      # installed on the host: see deploy/README.md).
+      - ./evals/promptfoo:/evals/promptfoo
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
