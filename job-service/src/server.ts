@@ -7,7 +7,6 @@ import { UserEmbeddingCache } from "./cache/user-embedding.cache";
 import { startUserChangeStream } from "./cache/user-change-stream";
 import { pipelineRouter } from "./routes/MyPipline/pipeline.router";
 import { pipelineJobRouter } from "./routes/jobsInPipeline/pipeline-job.router";
-import { skillMatcherRouter } from "./routes/skillMatcher/skill-matcher.router";
 import { careerRoadMapRouter } from "./routes/careerRoadMap/career-roadmap.router";
 import { careerKnowledgeRouter } from "./routes/careerKnowledge/career-knowledge.router";
 import { CareerKnowledgeService } from "./routes/careerKnowledge/career-knowledge.service";
@@ -56,7 +55,6 @@ export class Server {
 
             await this.app.register(pipelineRouter(this.DBClient.pipelines));
             await this.app.register(pipelineJobRouter(this.DBClient.pipelineJobs));
-            await this.app.register(skillMatcherRouter(this.DBClient.skillMatchers));
             await this.app.register(careerRoadMapRouter(this.DBClient.careerRoadMaps, this.DBClient.jobs));
             await this.app.register(careerKnowledgeRouter(
                 this.DBClient.jobs,

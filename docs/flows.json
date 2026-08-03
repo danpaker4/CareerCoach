@@ -28,7 +28,7 @@
     { "path": "/dashboard", "auth": true, "page": "User overview" },
     { "path": "/chat", "auth": true, "page": "AI Career Coach (multi-tab conversations)" },
     { "path": "/roadmap", "auth": true, "page": "Career roadmap (dream job + milestones)" },
-    { "path": "/skill-matcher", "auth": true, "page": "Skill-gap analysis vs target role" },
+    { "path": "/skill-matcher", "auth": true, "page": "Skill Tracker — roadmap checkbox progress" },
     { "path": "/pipeline", "auth": true, "page": "Kanban job application board" },
     { "path": "/my-skills", "auth": true, "page": "Skills from CV + GitHub + skill gaps" },
     { "path": "/job-suggestions", "auth": true, "page": "Job search & AI recommendations" },
@@ -193,19 +193,19 @@
     },
     {
       "id": "skill-matcher",
-      "name": "Skill Matcher for Jobs",
+      "name": "Skill Tracker (roadmap checkboxes)",
       "category": "Jobs",
-      "purpose": "Score user skills against the requirements of a specific job.",
-      "frontend": { "route": "/skill-matcher", "trigger": "Select job → rate skills" },
+      "purpose": "Show every career-roadmap action checkbox with overall and per-stage progress percentage.",
+      "frontend": { "route": "/skill-matcher", "trigger": "Open Skill Tracker from nav" },
       "endpoints": [
-        { "method": "GET", "service": "job-service", "path": "/skill-matcher/:userId" },
-        { "method": "POST", "service": "job-service", "path": "/skill-matcher/:id/skill" },
-        { "method": "PATCH", "service": "job-service", "path": "/skill-matcher/:userId/:jobId/:skill" }
+        { "method": "GET", "service": "job-service", "path": "/career-roadmap/:userId" },
+        { "method": "PATCH", "service": "job-service", "path": "/career-roadmap/:id/stages", "notes": "Toggle checkbox completion; syncs with My Roadmap" }
       ],
       "dataFlow": [
-        "Load user assessments",
-        "Add / update per-skill rating",
-        "Aggregate match score back to UI"
+        "Load user career roadmaps",
+        "Flatten stage actions into Skill Tracker checklist groups",
+        "PATCH stages when a checkbox is toggled",
+        "Overall % = done checkboxes / total checkboxes"
       ]
     },
     {

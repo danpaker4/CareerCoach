@@ -99,8 +99,6 @@ export const normalizeCapabilityTexts = (texts: readonly string[]): NormalizedCa
     return results;
 };
 
-export const getCatalogCapability = (id: string): CapabilityDefinition | undefined => CAPABILITY_BY_ID.get(id);
-
 export const getCapabilityDependencies = (id: string): readonly string[] =>
     CAPABILITY_BY_ID.get(id)?.dependsOn ?? [];
 

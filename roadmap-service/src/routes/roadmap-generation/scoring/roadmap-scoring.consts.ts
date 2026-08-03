@@ -28,7 +28,6 @@ export const LEVEL = {
     expert: 4,
 } as const;
 
-export const DEFAULT_REQUIRED_LEVEL = LEVEL.working;
 export const DEFAULT_CURRENT_LEVEL = LEVEL.none;
 
 export const TIMELINE_MULTIPLIERS = {

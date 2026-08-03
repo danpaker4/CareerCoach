@@ -141,7 +141,6 @@ export class RoadmapGenerationService {
                 ...this.featureFlags,
                 aiPolishEnabled: false,
             },
-            disablePolish: true,
         }).response;
     };
 

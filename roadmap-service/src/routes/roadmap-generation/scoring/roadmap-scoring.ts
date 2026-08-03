@@ -43,22 +43,6 @@ export const computeBaseWeeks = (input: TimelineWeeksInput): number => {
     return base * dependencyOverhead * parallelizationDiscount * buffer;
 };
 
-export const formatWeeksAsTimeframe = (weeks: number): string => {
-    if (weeks < 4) {
-        const roundedWeeks = Math.max(1, Math.round(weeks));
-        return roundedWeeks === 1 ? "1 week" : `${roundedWeeks} weeks`;
-    }
-    if (weeks >= 52) {
-        const years = weeks / 52;
-        const roundedYears = Math.round(years * 2) / 2;
-        if (roundedYears === 1) return "about 1 year";
-        if (Number.isInteger(roundedYears)) return `about ${roundedYears} years`;
-        return `about ${roundedYears} years`;
-    }
-    const months = Math.max(1, Math.round(weeks / 4.345));
-    return months === 1 ? "1 month" : `${months} months`;
-};
-
 export const formatMonthRangeAsTimeframe = (minMonths: number, maxMonths: number): string => {
     const min = Math.max(1, Math.round(minMonths));
     const max = Math.max(min, Math.round(maxMonths));

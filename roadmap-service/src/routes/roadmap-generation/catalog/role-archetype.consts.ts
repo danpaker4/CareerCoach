@@ -91,12 +91,3 @@ export const isCredentialLikeText = (text: string): boolean => {
         /\beducation\b/.test(normalized)
     );
 };
-
-export const isNonActionableMarketFluff = (text: string): boolean => {
-    const normalized = text.trim().toLowerCase();
-    if (isCredentialLikeText(normalized)) return false;
-    return (
-        normalized.length > 120 ||
-        /\b(years? of experience|must have|preferred qualifications|equal opportunity)\b/.test(normalized)
-    );
-};

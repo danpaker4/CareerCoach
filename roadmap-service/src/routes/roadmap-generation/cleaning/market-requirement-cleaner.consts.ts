@@ -48,4 +48,3 @@ export const CERTIFICATION_ALIASES: ReadonlyMap<string, string> = new Map([
 
 /** Keep stages focused: one coherent skill family per milestone. */
 export const MAX_PRIMARY_CAPABILITIES_PER_STAGE = 3;
-export const MIN_PRIMARY_CAPABILITIES_PER_STAGE = 1;

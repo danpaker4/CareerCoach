@@ -29,9 +29,3 @@ export type UserCareerContext = {
     longTermGoals: string[];
     isEntryLevel?: boolean;
 };
-
-export type GapAnalysisInput = {
-    user: UserCareerContext;
-    market: MarketRequirementsContext | null;
-    dreamJob: string;
-};

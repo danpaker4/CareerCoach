@@ -1,7 +1,5 @@
 import type { CapabilityDefinition } from "./capability-catalog.types";
 
-export const CAPABILITY_CATALOG_VERSION = "1.1.0";
-
 export const CAPABILITY_CATALOG: readonly CapabilityDefinition[] = [
     {
         id: "cap.programming.fundamentals",

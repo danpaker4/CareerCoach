@@ -206,33 +206,3 @@ export const resolveUserStartingPoint = (
         longTermGoals: careerProfile?.longTermGoals ?? [],
     };
 };
-
-export const formatStartingPointForPrompt = (startingPoint: UserStartingPoint): string => {
-    if (startingPoint.isEntryLevel && startingPoint.userSkills.length === 0) {
-        return [
-            "STARTING POINT: User recently finished high school.",
-            "No CV, skills list, or work experience was provided.",
-            "Do NOT assume any seniority level, domain expertise, or current job title.",
-            "Treat the user as a complete beginner entering the workforce.",
-            "Early roadmap stages must focus on foundational learning before job applications.",
-        ].join("\n");
-    }
-
-    if (startingPoint.isEntryLevel) {
-        return [
-            "STARTING POINT: User has no professional work experience or CV yet.",
-            `Demonstrated skills (GitHub/profile — treat as real evidence): ${startingPoint.userSkills.join(", ")}`,
-            "Do NOT invent seniority, past job titles, or years of industry experience.",
-            "Build on existing demonstrated skills while closing leadership, business, and experience gaps for the dream role.",
-            `Summary: ${startingPoint.currentRoleSummary}`,
-        ].join("\n");
-    }
-
-    return [
-        `Current role: ${startingPoint.currentJob}`,
-        `Summary: ${startingPoint.currentRoleSummary}`,
-        `Experience: ${startingPoint.roleExperienceYears} years at ${startingPoint.roleExperienceLevel} level`,
-        `Skills on file: ${startingPoint.userSkills.join(", ") || "none listed"}`,
-        "Use ONLY the facts above for currentRoleSummary — do not invent seniority or domains.",
-    ].join("\n");
-};

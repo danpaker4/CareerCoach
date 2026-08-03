@@ -6,9 +6,6 @@ import type {
     DreamJobRoadmapPersistence,
 } from "./chat.dream-job-roadmap.types";
 
-/** @deprecated Prefer DREAM_JOB_ROADMAP_DEFAULT_TARGET_YEARS; kept for tests expecting 4 stages at 2 years. */
-export const DREAM_JOB_ROADMAP_STAGE_COUNT = 4;
-
 export const createDreamJobRoadmap = async (params: {
     readonly generator: DreamJobRoadmapGenerator;
     readonly persistence: DreamJobRoadmapPersistence;

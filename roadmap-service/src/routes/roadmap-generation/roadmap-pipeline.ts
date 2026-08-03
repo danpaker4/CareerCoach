@@ -23,8 +23,6 @@ export type RoadmapPipelineInput = {
     readonly careerPaths: readonly CareerPathSummary[];
     readonly directionSkills?: readonly string[];
     readonly featureFlags: RoadmapFeatureFlags;
-    /** When true, skip AI polish even if the flag is on (eval determinism). */
-    readonly disablePolish?: boolean;
 };
 
 export type RoadmapPipelineResult = {
