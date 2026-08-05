@@ -6,7 +6,8 @@ behaviour differences come from configuration.
 Production runs on the college VM (Ubuntu, internal IP `10.10.248.80`) behind host nginx at
 **https://careercoach.cs.colman.ac.il**. Backend services run as Docker containers
 (`docker-compose.prod.yml`); the frontend is a static Vite build served by nginx from
-`/var/www/careercoach`. MongoDB is the VM's host instance on port `21771`.
+`/var/www/careercoach`. MongoDB runs in-stack (`mongodb/mongodb-atlas-local`, which bundles
+mongod + mongot so `$vectorSearch` works); the VM's preinstalled MongoDB on 21771 is unused.
 
 ## Stack
 
@@ -18,7 +19,9 @@ Production runs on the college VM (Ubuntu, internal IP `10.10.248.80`) behind ho
 | jaeger | trace UI | via nginx `/jaeger/` (basic auth) |
 | otel-collector | receives OTLP from services → Jaeger | `127.0.0.1:4317/4318` |
 | litellm | LLM router for chat-service | `127.0.0.1:4000` |
-| ollama + ollama-init | tiny local last-resort model | `127.0.0.1:11434` |
+| ollama + ollama-init | tiny local model (first link in the chain) | `127.0.0.1:11434` |
+| mongodb | MongoDB + mongot (Atlas Search), provides $vectorSearch | `127.0.0.1:27018` |
+| promptfoo-view | evaluation results UI | via nginx `/promptfoo-view/` (basic auth) |
 
 ## LLM routing
 
@@ -26,12 +29,13 @@ Production runs on the college VM (Ubuntu, internal IP `10.10.248.80`) behind ho
 [`litellm-config.prod.yaml`](../litellm-config.prod.yaml) defines the chain:
 
 ```
-chat-default (college llama3.1:8b) → chat-gemini (gemini-2.5-flash) → chat-local (llama3.2:1b)
+chat-default (local llama3.2:1b) → chat-college (llama3.1:8b) → chat-gemini (gemini-2.5-flash)
 ```
 
 Two things to know about the college gateway: it requires HTTP Basic Auth, and its nginx only
 serves the **IP** vhost (`Host: llm.cs.colman.ac.il` returns 403). Both are handled by putting
-credentials in the URL: `COLLEGE_LLM_BASE_URL=http://user:password@10.10.248.41`.
+an explicit header: `COLLEGE_LLM_AUTH_HEADER="Basic $(printf user:pass | base64)"` with
+`COLLEGE_LLM_BASE_URL=http://10.10.248.41` (LiteLLM rejects credentials embedded in the URL).
 
 The other services (users / job / roadmap) have no Basic Auth support in code, so they use
 **Gemini** directly. Changing that would require application changes.
@@ -85,12 +89,11 @@ curl -s http://127.0.0.1:16686/ -o /dev/null -w "jaeger %{http_code}\n"
   1 minute idle (`OLLAMA_KEEP_ALIVE=1m`).
 - **Jobs ETL is off**: the poller calls are commented out in `job-service/src/poller/job-poller.ts`.
   Setting `THEIRSTACK_API_KEY` alone does not start it.
-- **Vector search is off**: `$vectorSearch` needs MongoDB + `mongot`, which the VM's host MongoDB
-  does not run. Keep `JOBS_VECTOR_SEARCH_ENABLED=false` unless that pair is deployed.
+- **Vector search is ON**: served by the in-stack `mongodb` container (atlas-local bundles mongot).
 - **Public access** requires the college firewall to forward inbound 80/443 to the VM and public
   DNS for `careercoach.cs.colman.ac.il`. Until then the site works over VPN only.
 - Mongo backups are our responsibility:
-  `mongodump --uri "mongodb://admin:<pw>@127.0.0.1:21771/careerCoachDB?authSource=admin"`
+  `mongodump --uri "mongodb://<user>:<pw>@127.0.0.1:27018/careerCoachDB?authSource=admin"`
 
 ## Disk hygiene (the VM has a 40 GB disk and has filled up before)
 
