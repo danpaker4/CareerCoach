@@ -235,7 +235,9 @@ services:
     image: node:22
     container_name: careercoach-promptfoo-view
     working_dir: /evals/promptfoo
-    command: ["npx", "--yes", "promptfoo@latest", "view", "--yes", "--port", "15500"]
+    # Use the promptfoo already installed in the mounted package. Running it via
+    # `npx promptfoo@latest` re-downloads ~3 GB into the container layer on every start.
+    command: ["./node_modules/.bin/promptfoo", "view", "--yes", "--port", "15500"]
     environment:
       PROMPTFOO_DISABLE_TELEMETRY: "1"
       PROMPTFOO_DISABLE_UPDATE: "1"
