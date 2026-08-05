@@ -13,8 +13,18 @@ x-tcp-health: &tcp-health
   retries: 3
   start_period: 25s
 
+# Container logs are unbounded by default and live on the same 40 GB disk as
+# MongoDB - a chatty service can fill it and take the database down with it.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   rabbitmq:
+    mem_limit: 512m
+    logging: *logging
     image: rabbitmq:3-management
     container_name: careercoach-rabbitmq
     ports:
@@ -31,6 +41,8 @@ services:
     networks: [careercoach]
 
   minio:
+    mem_limit: 512m
+    logging: *logging
     image: minio/minio:latest
     container_name: careercoach-minio
     command: server /data --console-address ":9001"
@@ -51,6 +63,8 @@ services:
     networks: [careercoach]
 
   minio-setup:
+    mem_limit: 128m
+    logging: *logging
     image: minio/mc:latest
     container_name: careercoach-minio-setup
     depends_on:
@@ -66,6 +80,8 @@ services:
   # ---------- observability ----------
 
   jaeger:
+    mem_limit: 512m
+    logging: *logging
     image: jaegertracing/all-in-one:1.76.0
     container_name: careercoach-jaeger
     environment:
@@ -82,6 +98,8 @@ services:
   # contrib image: needed for the basicauth extension used by the Langfuse exporter.
   # Pipelines: every span -> Jaeger; spans tagged langfuse.export=true -> Langfuse Cloud.
   otel-collector:
+    mem_limit: 256m
+    logging: *logging
     image: otel/opentelemetry-collector-contrib:0.153.0
     container_name: careercoach-otel-collector
     command: ["--config=/etc/otelcol/config.yml"]
@@ -104,6 +122,8 @@ services:
   # Tiny local model: last-resort fallback so chat still answers if the college
   # gateway and Gemini are both unreachable. Kept small on purpose (VM has ~4 GB RAM).
   ollama:
+    mem_limit: 2g
+    logging: *logging
     image: ollama/ollama:latest
     container_name: careercoach-ollama
     environment:
@@ -117,6 +137,8 @@ services:
     networks: [careercoach]
 
   ollama-init:
+    mem_limit: 256m
+    logging: *logging
     image: ollama/ollama:latest
     container_name: careercoach-ollama-init
     depends_on:
@@ -128,6 +150,8 @@ services:
     networks: [careercoach]
 
   litellm:
+    mem_limit: 768m
+    logging: *logging
     image: ghcr.io/berriai/litellm:main-stable
     container_name: careercoach-litellm
     command: ["--config", "/app/config.yaml", "--port", "4000"]
@@ -150,6 +174,8 @@ services:
   # ---------- application ----------
 
   users-service:
+    mem_limit: 512m
+    logging: *logging
     build: ./users-service
     container_name: careercoach-users
     env_file: ./deploy/env/users-service.env
@@ -167,6 +193,8 @@ services:
     networks: [careercoach]
 
   chat-service:
+    mem_limit: 512m
+    logging: *logging
     build: ./chat-service
     container_name: careercoach-chat
     env_file: ./deploy/env/chat-service.env
@@ -184,6 +212,8 @@ services:
     networks: [careercoach]
 
   chat-worker:
+    mem_limit: 512m
+    logging: *logging
     build: ./chat-service
     container_name: careercoach-chat-worker
     command: ["node", "dist/chat-flow/api/worker/chat.worker.js"]
@@ -197,6 +227,8 @@ services:
     networks: [careercoach]
 
   job-service:
+    mem_limit: 512m
+    logging: *logging
     build: ./job-service
     container_name: careercoach-job
     env_file: ./deploy/env/job-service.env
@@ -211,6 +243,8 @@ services:
     networks: [careercoach]
 
   evaluation-service:
+    mem_limit: 768m
+    logging: *logging
     build: ./evaluation-service
     container_name: careercoach-evaluation
     env_file: ./deploy/env/evaluation-service.env
@@ -232,6 +266,8 @@ services:
   # Promptfoo results viewer - the management page embeds it in an iframe.
   # Shares the same package (and its results DB) as the evaluation service.
   promptfoo-view:
+    mem_limit: 512m
+    logging: *logging
     image: node:22
     container_name: careercoach-promptfoo-view
     working_dir: /evals/promptfoo
@@ -250,6 +286,8 @@ services:
     networks: [careercoach]
 
   roadmap-service:
+    mem_limit: 512m
+    logging: *logging
     build: ./roadmap-service
     container_name: careercoach-roadmap
     env_file: ./deploy/env/roadmap-service.env
