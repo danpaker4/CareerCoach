@@ -79,14 +79,20 @@ services:
     restart: unless-stopped
     networks: [careercoach]
 
+  # contrib image: needed for the basicauth extension used by the Langfuse exporter.
+  # Pipelines: every span -> Jaeger; spans tagged langfuse.export=true -> Langfuse Cloud.
   otel-collector:
-    image: otel/opentelemetry-collector:0.153.0
+    image: otel/opentelemetry-collector-contrib:0.153.0
     container_name: careercoach-otel-collector
     command: ["--config=/etc/otelcol/config.yml"]
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?set in .env next to this compose file}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?set in .env next to this compose file}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
     depends_on:
       - jaeger
     volumes:
-      - ./otel-collector-config.yml:/etc/otelcol/config.yml:ro
+      - ./otel-collector-langfuse-config.yml:/etc/otelcol/config.yml:ro
     ports:
       - "127.0.0.1:4317:4317"
       - "127.0.0.1:4318:4318"
