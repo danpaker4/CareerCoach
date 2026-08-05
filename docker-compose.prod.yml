@@ -290,6 +290,9 @@ services:
       # lives outside this service's build context, so mount it (needs node_modules
       # installed on the host: see deploy/README.md).
       - ./evals/promptfoo:/evals/promptfoo
+      # Shared with promptfoo-view: promptfoo stores eval results in its home dir,
+      # so the runner and the viewer must point at the same one or the UI shows nothing.
+      - promptfoo_home:/root/.promptfoo
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
