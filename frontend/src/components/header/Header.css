@@ -24,6 +24,13 @@
   text-decoration: none;
 }
 
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  display: block;
+  flex-shrink: 0;
+}
+
 .brand-text {
   font-size: var(--fz-lg);
   font-weight: 800;

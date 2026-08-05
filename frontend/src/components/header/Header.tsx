@@ -11,6 +11,7 @@ import iconMenu from '../../assets/icon-menu.svg';
 import iconX from '../../assets/icon-x.svg';
 import iconSun from '../../assets/icon-sun.svg';
 import iconMoon from '../../assets/icon-moon.svg';
+import logo from '../../assets/logo.svg';
 import './Header.css';
 import type { HeaderProps } from './header.types';
 import { getInitials } from './header.utils';
@@ -104,6 +105,7 @@ export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: Head
     <header className="navbar" ref={menuRef}>
       <div className="navbar-brand">
         <Link to={homePath} className="brand-link">
+          <img className="brand-logo" src={logo} alt="" aria-hidden="true" />
           <span className="brand-text">CareerCoach</span>
         </Link>
       </div>

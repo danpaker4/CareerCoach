@@ -223,6 +223,24 @@ services:
     restart: unless-stopped
     networks: [careercoach]
 
+  # Promptfoo results viewer - the management page embeds it in an iframe.
+  # Shares the same package (and its results DB) as the evaluation service.
+  promptfoo-view:
+    image: node:22
+    container_name: careercoach-promptfoo-view
+    working_dir: /evals/promptfoo
+    command: ["npx", "--yes", "promptfoo@latest", "view", "--yes", "--port", "15500"]
+    environment:
+      PROMPTFOO_DISABLE_TELEMETRY: "1"
+      PROMPTFOO_DISABLE_UPDATE: "1"
+    volumes:
+      - ./evals/promptfoo:/evals/promptfoo
+      - promptfoo_home:/root/.promptfoo
+    ports:
+      - "127.0.0.1:15500:15500"
+    restart: unless-stopped
+    networks: [careercoach]
+
   roadmap-service:
     build: ./roadmap-service
     container_name: careercoach-roadmap
@@ -245,3 +263,4 @@ volumes:
   rabbitmq_data:
   minio_data:
   ollama_data:
+  promptfoo_home:

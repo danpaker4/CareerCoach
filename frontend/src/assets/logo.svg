@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CareerCoach">
+  <defs>
+    <linearGradient id="ccCase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1c63f2"/>
+      <stop offset="100%" stop-color="#1550d8"/>
+    </linearGradient>
+    <linearGradient id="ccFront" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a2a63"/>
+      <stop offset="100%" stop-color="#02143c"/>
+    </linearGradient>
+    <linearGradient id="ccArrow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1c63f2"/>
+      <stop offset="100%" stop-color="#0aa3ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- handle -->
+  <path d="M196 218v-32a34 34 0 0 1 34-34h52a34 34 0 0 1 34 34v32"
+        fill="none" stroke="url(#ccCase)" stroke-width="30" stroke-linecap="round"/>
+
+  <!-- case body -->
+  <rect x="104" y="214" width="304" height="192" rx="26" fill="url(#ccCase)"/>
+
+  <!-- front panel with the V fold -->
+  <path d="M104 306l152 40 152-40v74a26 26 0 0 1-26 26H130a26 26 0 0 1-26-26z" fill="url(#ccFront)"/>
+
+  <!-- clasp -->
+  <rect x="232" y="310" width="48" height="52" rx="10" fill="url(#ccCase)"/>
+  <rect x="243" y="322" width="26" height="26" rx="5" fill="#0d47c4"/>
+
+  <!-- growth line rising out of the case -->
+  <path d="M150 320l106-42 42 34c46-24 78-66 96-118"
+        fill="none" stroke="#ffffff" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M150 320l106-42 42 34c46-24 78-66 96-118"
+        fill="none" stroke="url(#ccArrow)" stroke-width="14"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M344 128l64-16-12 64z" fill="url(#ccArrow)" stroke="url(#ccArrow)"
+        stroke-width="10" stroke-linejoin="round"/>
+
+  <!-- sparkle -->
+  <path d="M424 62c6 30 12 36 42 42-30 6-36 12-42 42-6-30-12-36-42-42 30-6 36-12 42-42z"
+        fill="#0aa3ff"/>
+</svg>

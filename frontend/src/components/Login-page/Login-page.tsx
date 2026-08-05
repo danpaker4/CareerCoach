@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { normalizeUser } from '../../lib/authResponse'
 import type { LoginPageProps } from './login-page.types'
 import { LINKEDIN_CLIENT_ID } from './login-page.consts'
+import logo from '../../assets/logo.svg'
 
 export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
   const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
@@ -103,6 +104,7 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     <div className="login-container">
       <Card className={isSignUpView ? 'auth-card auth-card--signup' : 'auth-card'}>
         <div className="card-header">
+          <img className="auth-logo" src={logo} alt="" aria-hidden="true" />
           <h2 className="card-title">Welcome to CareerCoach</h2>
           <p className="card-subtitle">Your smart career management platform</p>
         </div>

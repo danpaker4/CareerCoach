@@ -23,11 +23,11 @@ model_list:
       extra_headers:
         Authorization: os.environ/COLLEGE_LLM_AUTH_HEADER
 
-  # gemini-2.5-flash is no longer served to new API projects; the -latest alias
-  # always resolves to a model the project is allowed to call.
+  # Note: gemini-2.5-flash is gated per API project - some projects get 404
+  # "no longer available to new users". Fall back to gemini-flash-latest if so.
   - model_name: chat-gemini
     litellm_params:
-      model: gemini/gemini-flash-latest
+      model: gemini/gemini-2.5-flash
       api_key: os.environ/GEMINI_API_KEY
 
 router_settings:
