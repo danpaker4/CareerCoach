@@ -22,6 +22,32 @@ x-logging: &logging
     max-file: "3"
 
 services:
+  # MongoDB with Atlas Search built in (mongod + mongot in one image), which is
+  # what $vectorSearch needs. The VM's preinstalled MongoDB is a plain standalone
+  # 8.0 with no mongot, so it cannot serve vector queries.
+  # Starts as a single-node replica set automatically - no init containers needed.
+  mongodb:
+    mem_limit: 1g
+    logging: *logging
+    image: mongodb/mongodb-atlas-local:8.0
+    container_name: careercoach-mongodb
+    environment:
+      MONGODB_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?set in .env next to this compose file}
+      MONGODB_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?set in .env next to this compose file}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    ports:
+      - "127.0.0.1:27018:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+    networks: [careercoach]
+
   rabbitmq:
     mem_limit: 512m
     logging: *logging
@@ -184,6 +210,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
+      mongodb:
+        condition: service_healthy
       minio:
         condition: service_healthy
     healthcheck:
@@ -203,6 +231,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
+      mongodb:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     healthcheck:
@@ -221,6 +251,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
+      mongodb:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
@@ -240,6 +272,9 @@ services:
       test: ["CMD", "node", "-e", "require('net').connect(3003,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       <<: *tcp-health
     restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks: [careercoach]
 
   evaluation-service:
@@ -261,6 +296,9 @@ services:
       test: ["CMD", "node", "-e", "require('net').connect(3004,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       <<: *tcp-health
     restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks: [careercoach]
 
   # Promptfoo results viewer - the management page embeds it in an iframe.
@@ -299,6 +337,9 @@ services:
       test: ["CMD", "node", "-e", "require('net').connect(3005,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       <<: *tcp-health
     restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks: [careercoach]
 
 networks:
@@ -306,6 +347,8 @@ networks:
     driver: bridge
 
 volumes:
+  mongodb_data:
+  mongodb_config:
   rabbitmq_data:
   minio_data:
   ollama_data:
