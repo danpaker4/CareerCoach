@@ -21,7 +21,7 @@ export type EnrichedJob = AdaptedJob & {
 };
 
 export type GeminiExtract = {
-  salary?: number;
+  salary?: number | null;
   requirements?: string[];
   benefits?: string[];
   languages?: string[];

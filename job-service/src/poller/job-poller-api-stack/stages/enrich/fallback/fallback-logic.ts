@@ -13,13 +13,6 @@ const detectKnownTerms = (description: string, map: Record<string, string>): str
 };
 
 export const inferFallback = (job: AdaptedJob): Pick<EnrichedJob, "salary" | "requirements" | "benefits" | "languages" | "frameworks" | "databases" | "platforms" | "tools" | "mustKnowSkills" | "niceToHaveSkills"> => {
-  const seniorityHint = job.seniority.toLowerCase();
-  const seniorityLevel = seniorityHint.includes("senior")
-    ? "senior"
-    : seniorityHint.includes("junior")
-      ? "junior"
-      : "mid";
-
   const languages = detectKnownTerms(job.description, {
     typescript: "TypeScript",
     javascript: "JavaScript",
@@ -59,11 +52,7 @@ export const inferFallback = (job: AdaptedJob): Pick<EnrichedJob, "salary" | "re
 
   return {
     salary: 100,
-    requirements: [
-      `${seniorityLevel} level experience relevant to ${job.jobTitle}`,
-      "Strong communication and collaboration skills",
-      "Ability to deliver features in production environments",
-    ],
+    requirements: [],
     benefits: [
       "Health and wellness package",
       "Paid time off",

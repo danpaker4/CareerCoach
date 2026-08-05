@@ -4,7 +4,7 @@ export const buildEnrichmentPrompt = (job: AdaptedJob): string => `
 You are extracting structured data from a job description.
 Return ONLY valid JSON with this exact shape:
 {
-  "salary": "number",
+  "salary": null,
   "requirements": ["string"],
   "benefits": ["string"],
   "languages": ["string"],
@@ -17,7 +17,7 @@ Return ONLY valid JSON with this exact shape:
 }
 
 Rules:
-- salary must be numeric and represent dollars per hour.
+- salary must be numeric and represent dollars per hour when stated; otherwise return null.
 - Extract only values grounded in the job text. Do not invent technologies or benefits not implied by the description.
 - If a field is missing, return an empty array for that field.
 - Keep requirements and benefits short bullet-style phrases.

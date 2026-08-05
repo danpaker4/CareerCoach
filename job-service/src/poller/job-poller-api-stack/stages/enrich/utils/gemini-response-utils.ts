@@ -15,7 +15,7 @@ const isGeminiExtract = (payload: unknown): payload is GeminiExtract => {
     return false;
   }
 
-  const salaryIsValid = !("salary" in payload) || typeof payload.salary === "number";
+  const salaryIsValid = !("salary" in payload) || payload.salary === null || typeof payload.salary === "number";
   const requirementsAreValid = !("requirements" in payload) || Array.isArray(payload.requirements);
   const benefitsAreValid = !("benefits" in payload) || Array.isArray(payload.benefits);
   const languagesAreValid = !("languages" in payload) || Array.isArray(payload.languages);
