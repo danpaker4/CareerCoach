@@ -150,7 +150,7 @@ services:
     networks: [careercoach]
 
   litellm:
-    mem_limit: 768m
+    mem_limit: 1600m
     logging: *logging
     image: ghcr.io/berriai/litellm:main-stable
     container_name: careercoach-litellm
