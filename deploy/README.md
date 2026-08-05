@@ -91,3 +91,28 @@ curl -s http://127.0.0.1:16686/ -o /dev/null -w "jaeger %{http_code}\n"
   DNS for `careercoach.cs.colman.ac.il`. Until then the site works over VPN only.
 - Mongo backups are our responsibility:
   `mongodump --uri "mongodb://admin:<pw>@127.0.0.1:21771/careerCoachDB?authSource=admin"`
+
+## Disk hygiene (the VM has a 40 GB disk and has filled up before)
+
+A full disk takes MongoDB down with it — mongod aborts on `FileStreamFailed` when it
+cannot write. Check `df -h /` before pulling images.
+
+Reclaim, in order of yield:
+
+```bash
+docker builder prune -af          # build cache
+docker image prune -f             # dangling images
+sudo journalctl --vacuum-size=100M
+```
+
+Orphaned systemd journals are the non-obvious one: if the VM was ever re-imaged,
+`/var/log/journal/` keeps directories for old machine-ids that journald no longer
+manages, so `--vacuum-*` reports 0 B freed while `du` shows hundreds of MB. Remove any
+directory whose name differs from `/etc/machine-id` (541 MB was reclaimed this way).
+
+Container logs are capped at 30 MB each by the `x-logging` anchor in
+docker-compose.prod.yml, and journald is capped at 200 MB by
+/etc/systemd/journald.conf.d/99-cap.conf.
+
+Largest remaining consumer is the ollama image plus its model volume (~6 GB). Dropping
+the local model would free that, at the cost of the first link in the LLM fallback chain.
