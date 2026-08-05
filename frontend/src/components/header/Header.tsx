@@ -11,7 +11,7 @@ import iconMenu from '../../assets/icon-menu.svg';
 import iconX from '../../assets/icon-x.svg';
 import iconSun from '../../assets/icon-sun.svg';
 import iconMoon from '../../assets/icon-moon.svg';
-import logo from '../../assets/logo.svg';
+import logo from '../../assets/logo.png';
 import './Header.css';
 import type { HeaderProps } from './header.types';
 import { getInitials } from './header.utils';

@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { normalizeUser } from '../../lib/authResponse'
 import type { LoginPageProps } from './login-page.types'
 import { LINKEDIN_CLIENT_ID } from './login-page.consts'
-import logo from '../../assets/logo.svg'
+import logo from '../../assets/logo.png'
 
 export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
   const [activeButton, setActiveButton] = useState<LoginType>(Login.signIn)
