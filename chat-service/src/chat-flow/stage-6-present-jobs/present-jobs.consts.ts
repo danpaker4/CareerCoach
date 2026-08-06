@@ -1,3 +1,6 @@
+/** How many ranked matches are shown as cards in one reply. */
+export const MAX_PRESENTED_JOBS = 5;
+
 export const EXHAUSTED_JOBS_REPLY =
     "Every match in the current list was already skipped or saved. Tell me a nearby title, skill, or domain to lean into and I will run a broader search.";
 

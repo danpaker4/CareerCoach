@@ -30,34 +30,18 @@ const extractWishlistDetails = async (
     }
 };
 
-export const tryWishlistConfirmationResponse = async (
+/**
+ * Parses the role details out of the user's own words and saves the wishlist entry.
+ * Shared by the "yes, save it" confirmation and the broaden-or-save choice after a rejection.
+ */
+export const saveWishlistFromMessage = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
-): Promise<ChatMessageResponse | null> => {
-    const messages = ctx.conversationAfterUserMessage.messages;
+    ctx: SendMessagePreparedContext,
+    proposedTitle: string
+): Promise<ChatMessageResponse> => {
     const mode = ctx.modeDetection.mode;
-    if (!wasWishlistSavePromptLast(messages)) {
-        return null;
-    }
-    const declined = isNegativeConfirmation(ctx.normalizedMessage) || isWishlistDecline(ctx.normalizedMessage);
-    if (declined) {
-        const reply = "No problem — I won't save it. Want me to look for something else?";
-        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
-        return { reply, mode, confidenceSummary: ctx.confidenceSummary };
-    }
-
-    // Proceed when the user confirms ("yes") or explicitly asks to "save …".
-    // Anything else (a brand new request) falls through to the normal flow.
-    const affirmative = isAffirmativeConfirmation(ctx.normalizedMessage);
-    if (!isWishlistSaveConfirmation(ctx.normalizedMessage, affirmative)) {
-        return null;
-    }
-
-    // Let the LLM parse the role title, experience level, location and preferred company out
-    // of the user's reply (regex would dump everything into the title).
-    const proposed = extractProposedWishlistTitle(messages) ?? "";
-    const details = await extractWishlistDetails(deps, ctx.normalizedMessage, proposed, ctx.userId);
-    const title = details.jobTitle.trim() || proposed;
+    const details = await extractWishlistDetails(deps, ctx.normalizedMessage, proposedTitle, ctx.userId);
+    const title = details.jobTitle.trim() || proposedTitle;
     if (!title) {
         const reply = "Tell me the role title and I'll add it to your wishlist.";
         await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
@@ -97,4 +81,33 @@ export const tryWishlistConfirmationResponse = async (
     const reply = `Saved "${title}"${detailLine} to your wishlist. I'll let you know the moment a matching role is added.`;
     await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
     return { reply, mode, confidenceSummary: ctx.confidenceSummary };
+};
+
+export const tryWishlistConfirmationResponse = async (
+    deps: ChatFlowDeps,
+    ctx: SendMessagePreparedContext
+): Promise<ChatMessageResponse | null> => {
+    const messages = ctx.conversationAfterUserMessage.messages;
+    const mode = ctx.modeDetection.mode;
+    if (!wasWishlistSavePromptLast(messages)) {
+        return null;
+    }
+    const declined = isNegativeConfirmation(ctx.normalizedMessage) || isWishlistDecline(ctx.normalizedMessage);
+    if (declined) {
+        const reply = "No problem — I won't save it. Want me to look for something else?";
+        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+        return { reply, mode, confidenceSummary: ctx.confidenceSummary };
+    }
+
+    // Proceed when the user confirms ("yes") or explicitly asks to "save …".
+    // Anything else (a brand new request) falls through to the normal flow.
+    const affirmative = isAffirmativeConfirmation(ctx.normalizedMessage);
+    if (!isWishlistSaveConfirmation(ctx.normalizedMessage, affirmative)) {
+        return null;
+    }
+
+    // Let the LLM parse the role title, experience level, location and preferred company out
+    // of the user's reply (regex would dump everything into the title).
+    const proposed = extractProposedWishlistTitle(messages) ?? "";
+    return await saveWishlistFromMessage(deps, ctx, proposed);
 };

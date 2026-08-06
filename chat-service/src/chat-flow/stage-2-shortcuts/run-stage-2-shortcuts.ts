@@ -5,6 +5,7 @@ import { runDreamJobFlow } from "./dream-job/dream-job-flow";
 import { tryFollowUpShortcutResponse } from "./follow-up/follow-up-shortcut";
 import { runNearTermSearchFlow } from "./near-term/near-term-search-flow";
 import { tryOfferJobShortcutResponse } from "./offer-job/offer-job-shortcut";
+import { tryRejectChoiceResponse } from "./pipeline/pipeline-reject/reject-choice-shortcut";
 import { checkIfNeededAddToPipeline } from "./pipeline/pipeline-shortcuts";
 import { tryQuickHelpShortcutResponse } from "./quick-help/run-quick-help";
 import { tryRefineSearchOfferResponse } from "./refine-search/refine-search-shortcut";
@@ -28,6 +29,12 @@ export const runStage2Shortcuts = async (
     const wishlistResponse = await tryWishlistConfirmationResponse(deps, ctx);
     if (wishlistResponse) {
         return wishlistResponse;
+    }
+
+    // Answers the broaden-or-save question a rejection raises, before the generic intents run.
+    const rejectChoiceResponse = await tryRejectChoiceResponse(deps, ctx);
+    if (rejectChoiceResponse) {
+        return rejectChoiceResponse;
     }
 
     const offerJobResponse = await tryOfferJobShortcutResponse(deps, ctx);
