@@ -23,24 +23,6 @@
   gap: 12px;
 }
 
-.chat-coach-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--clr-primary) 0%, #6366f1 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
-}
-
-.chat-coach-avatar svg {
-  width: 24px;
-  height: 24px;
-}
-
 .chat-coach-name {
   margin: 0;
   font-weight: 700;
