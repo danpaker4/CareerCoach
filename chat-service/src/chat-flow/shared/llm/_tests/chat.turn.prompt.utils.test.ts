@@ -30,16 +30,18 @@ describe("buildTurnDecisionPrompt", () => {
             updatedAt: new Date(2026, 0, 8),
         };
 
-        const prompt = buildTurnDecisionPrompt(conversation, latestUserMessage, [], "account context");
-        const recentHistory = prompt
+        const request = buildTurnDecisionPrompt(conversation, latestUserMessage, [], "account context");
+        const recentHistory = request.userPrompt
             .split("Recent conversation:\n")[1]
             ?.split("\nLatest:")[0];
-        const latestMessageOccurrences = prompt.split(latestUserMessage).length - 1;
+        const latestMessageOccurrences = request.userPrompt.split(latestUserMessage).length - 1;
 
         assert.equal(latestMessageOccurrences, 1);
         assert.equal(recentHistory?.split("\n").length, 6);
         assert.doesNotMatch(recentHistory ?? "", /prior-message-1/);
         assert.match(recentHistory ?? "", /prior-message-2/);
-        assert.match(prompt, new RegExp(`Latest: ${latestUserMessage}`));
+        assert.match(request.userPrompt, new RegExp(`Latest: ${latestUserMessage}`));
+        assert.doesNotMatch(request.systemPrompt, new RegExp(latestUserMessage));
+        assert.equal(request.responseFormat, "json");
     });
 });

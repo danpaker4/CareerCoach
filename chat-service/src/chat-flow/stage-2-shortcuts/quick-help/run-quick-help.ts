@@ -1,5 +1,5 @@
 import type { ChatMessageResponse } from "../../api/shared/chat.types";
-import type { ChatFlowDeps, SendMessagePreparedContext } from "../../chat-flow.types";
+import type { ChatFlowDeps, SendMessageBaseContext } from "../../chat-flow.types";
 import { detectQuickHelpIntent } from "./shared/quick-help.utils";
 import { runCvImproveFlow } from "./cv-improve/cv-improve-flow";
 import { runInterviewPrepFlow } from "./interview-prep/interview-prep-flow";
@@ -13,7 +13,7 @@ import { runSkillsGapFlow } from "./skills-gap/skills-gap-flow";
  */
 export const tryQuickHelpShortcutResponse = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
+    ctx: SendMessageBaseContext
 ): Promise<ChatMessageResponse | null> => {
     const activeFlow = ctx.conversationAfterUserMessage.quickHelpFlow;
     const intent = detectQuickHelpIntent(ctx.normalizedMessage);

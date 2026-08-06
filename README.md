@@ -71,9 +71,17 @@ docker compose up -d litellm
 
 This mounts `litellm-config.yaml`, which defines:
 
-- `chat-default` → `ollama/llama3` at `host.docker.internal:9009`
+- `chat-default` → `ollama/careercoach-chat` at `host.docker.internal:11434`
 - `chat-fallback` → `gemini/gemini-2.5-flash` (uses `GEMINI_API_KEY` if set)
 - router fallback from `chat-default` to `chat-fallback`
+
+Build the local chat model before starting the proxy. The project model uses Llama 3.2 3B so its
+quantized weights fit on common 4 GB development GPUs:
+
+```bash
+ollama pull llama3.2:3b
+ollama create careercoach-chat -f ollama-careercoach-chat.Modelfile
+```
 
 2. In `chat-service/.env`, set:
 

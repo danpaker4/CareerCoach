@@ -1,9 +1,10 @@
 import type { TextCompletionPort } from "../../../../litellm/text-completion/text-completion.types";
-import { parseJsonObjectFromLlm } from "../shared/quick-help.utils";
 import { QUICK_HELP_INTERVIEW_QUESTION_COUNT } from "./interview-prep.consts";
 import { buildInterviewGradePrompt, buildInterviewQuestionsPrompt } from "./interview-prep.prompt.utils";
 import type { InterviewGradeLlmResult, InterviewQuestionsLlmResult } from "./interview-prep.types";
 import { isClearlyInsufficientInterviewAnswer } from "./interview-prep.utils";
+import { interviewGradeLlmResultSchema, interviewQuestionsLlmResultSchema } from "./interview-prep.schema";
+import { parseLlmJsonWithSchema } from "../../../shared/llm/chat.llm.validation.utils";
 
 export const generateInterviewQuestions = async (
     textCompletion: TextCompletionPort,
@@ -13,15 +14,13 @@ export const generateInterviewQuestions = async (
         buildInterviewQuestionsPrompt({ topic: params.topic, count: QUICK_HELP_INTERVIEW_QUESTION_COUNT }),
         { operation: "chat.quick_help.interview_questions", userId: params.userId }
     );
-    const parsed = parseJsonObjectFromLlm(raw);
-    const questions = Array.isArray(parsed?.questions)
-        ? parsed.questions
-              .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-              .map((item) => item.trim())
-              .slice(0, QUICK_HELP_INTERVIEW_QUESTION_COUNT)
-        : [];
-    if (questions.length > 0) {
-        return { questions };
+    const parsed = parseLlmJsonWithSchema(
+        "chat.quick_help.interview_questions",
+        raw,
+        interviewQuestionsLlmResultSchema
+    );
+    if (parsed) {
+        return { questions: parsed.questions.slice(0, QUICK_HELP_INTERVIEW_QUESTION_COUNT) };
     }
     return {
         questions: [
@@ -54,14 +53,10 @@ export const gradeInterviewAnswer = async (
         }),
         { operation: "chat.quick_help.interview_grade", userId: params.userId }
     );
-    const parsed = parseJsonObjectFromLlm(raw);
-    const feedback =
-        typeof parsed?.feedback === "string" && parsed.feedback.trim().length > 0
-            ? parsed.feedback.trim()
-            : "Incorrect — try again with a clearer conceptual answer.";
-    const correct = parsed?.correct === true;
-    if (correct) {
-        return { correct: true, feedback };
+    const parsed = parseLlmJsonWithSchema("chat.quick_help.interview_grade", raw, interviewGradeLlmResultSchema);
+    const feedback = parsed?.feedback ?? "Incorrect — try again with a clearer conceptual answer.";
+    if (parsed?.correct === true) {
+        return { correct: true, feedback: parsed.feedback };
     }
     const withIncorrectLabel = /\bincorrect\b/i.test(feedback) ? feedback : `Incorrect. ${feedback}`;
     return { correct: false, feedback: withIncorrectLabel };

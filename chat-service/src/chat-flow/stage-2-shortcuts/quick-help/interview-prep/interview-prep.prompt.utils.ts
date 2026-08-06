@@ -1,7 +1,10 @@
+import type { TextCompletionRequest } from "../../../../litellm/text-completion/text-completion.types";
+
 export const buildInterviewQuestionsPrompt = (params: {
     topic: string;
     count: number;
-}): string => `Create ${params.count} interview practice questions about: ${params.topic}
+}): TextCompletionRequest => ({
+    systemPrompt: `Create interview practice questions for the requested topic.
 
 Rules:
 - Questions must be theoretical / conceptual (definitions, tradeoffs, when to use X, how concepts relate).
@@ -14,17 +17,17 @@ Return ONLY JSON:
   "questions": ["question1", "question2"]
 }
 
-No spoilers or answer keys in the questions.`;
+No spoilers or answer keys in the questions.`,
+    userPrompt: `Create ${params.count} interview practice questions about: ${params.topic}`,
+    responseFormat: "json",
+});
 
 export const buildInterviewGradePrompt = (params: {
     topic: string;
     question: string;
     answer: string;
-}): string => `You are a strict interview grader for a theoretical / conceptual question (not a coding exercise).
-
-Topic: ${params.topic}
-Question: ${params.question}
-Candidate answer: ${params.answer}
+}): TextCompletionRequest => ({
+    systemPrompt: `You are a strict interview grader for a theoretical / conceptual question (not a coding exercise).
 
 Grading rules:
 - Set "correct" to true ONLY if the answer is factually accurate AND directly answers the question with enough substance.
@@ -37,4 +40,9 @@ Return ONLY JSON:
 {
   "correct": false,
   "feedback": "Incorrect. Short explanation of the better answer."
-}`;
+}`,
+    userPrompt: `Topic: ${params.topic}
+Question: ${params.question}
+Candidate answer: ${params.answer}`,
+    responseFormat: "json",
+});

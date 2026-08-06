@@ -1,12 +1,10 @@
+import type { TextCompletionRequest } from "../../../../litellm/text-completion/text-completion.types";
+
 export const buildSkillsGapPrompt = (params: {
     targetRole: string;
     userAccountContext: string;
-}): string => `You are a career coach. Compare the user's background to what the target role usually requires.
-
-Target role: ${params.targetRole}
-
-User background:
-${params.userAccountContext}
+}): TextCompletionRequest => ({
+    systemPrompt: `You are a career coach. Compare the user's background to what the target role usually requires.
 
 Return ONLY JSON:
 {
@@ -14,4 +12,10 @@ Return ONLY JSON:
   "skillsToLearn": ["skill1", "skill2"]
 }
 
-Do not invent employer offers. Focus on learnable gaps.`;
+Do not invent employer offers. Focus on learnable gaps.`,
+    userPrompt: `Target role: ${params.targetRole}
+
+User background:
+${params.userAccountContext}`,
+    responseFormat: "json",
+});

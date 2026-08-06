@@ -1,5 +1,5 @@
 import type { ChatMessageResponse } from "../../../api/shared/chat.types";
-import type { ChatFlowDeps, SendMessagePreparedContext } from "../../../chat-flow.types";
+import type { ChatFlowDeps, SendMessageBaseContext } from "../../../chat-flow.types";
 import { CONVERSATION_MODE } from "../../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { sanitizeReply } from "../../../stage-6-present-jobs/presentation/chat.validation.service";
 import type { InterviewPrepQuickHelpFlow } from "../../../../routes/conversation/conversation.types";
@@ -14,7 +14,7 @@ const formatQuestionPrompt = (index: number, total: number, question: string): s
 
 const finishInterview = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext,
+    ctx: SendMessageBaseContext,
     closing: string
 ): Promise<ChatMessageResponse> => {
     const reply = sanitizeReply(closing);
@@ -29,7 +29,7 @@ const finishInterview = async (
 
 export const runInterviewPrepFlow = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext,
+    ctx: SendMessageBaseContext,
     isNewIntent: boolean
 ): Promise<ChatMessageResponse> => {
     const flow = ctx.conversationAfterUserMessage.quickHelpFlow;

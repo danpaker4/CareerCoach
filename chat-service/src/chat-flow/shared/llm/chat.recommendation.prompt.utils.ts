@@ -1,6 +1,7 @@
 import type { UserAchievement } from "../../api/shared/chat.model";
 import type { JobSearchResultItem } from "../../api/shared/chat.types";
 import type { Conversation } from "../../../routes/conversation/conversation.model";
+import type { TextCompletionRequest } from "../../../litellm/text-completion/text-completion.types";
 
 const MAX_ACCOUNT_CONTEXT_CHARS = 1_200;
 const MAX_HISTORY_MESSAGES = 4;
@@ -36,15 +37,14 @@ export const buildRecommendationPrompt = (
     jobs: readonly JobSearchResultItem[],
     userAchievements: readonly UserAchievement[],
     userAccountContext: string = "No structured account context is available."
-): string => `
-You are a concise career coach. Return ONLY compact JSON, no markdown:
+): TextCompletionRequest => ({
+    systemPrompt: `You are a concise career coach. Return ONLY compact JSON, no markdown:
 {"r":"one short recommendation ending with a pipeline question","ids":["exact job id"]}
 
 Recommend only listed jobs and copy ids exactly. Never show ids to the user or invent job facts.
 Prefer one best match unless multiple were requested. Briefly explain the fit, then ask whether to add it to the interview-tracking pipeline.
-Use the user's language. Keep r to at most two short sentences. Never expose internal scores.
-
-Jobs:
+Use the user's language. Keep r to at most two short sentences. Never expose internal scores.`,
+    userPrompt: `Jobs:
 ${buildJobs(jobs)}
 Achievements: ${buildAchievements(userAchievements)}
 Account:
@@ -52,4 +52,6 @@ ${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}
 Recent conversation:
 ${buildRecentHistory(conversation)}
 Latest: ${latestUserMessage}
-`;
+`,
+    responseFormat: "json",
+});

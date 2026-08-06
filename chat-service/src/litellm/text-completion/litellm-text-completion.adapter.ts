@@ -1,4 +1,4 @@
-import type { TextCompletionPort } from "./text-completion.types";
+import type { TextCompletionPort, TextCompletionRequest } from "./text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../ai/token-usage/token-usage.types";
 import { readOpenAiUsage, recordLlmTokenUsage, toLlmErrorMessage } from "../../ai/token-usage/utils/token-usage.utils";
 import {
@@ -42,8 +42,12 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
         this.completionsUrl = `${trimTrailingSlashes(baseUrl)}${LITELLM_CHAT_COMPLETIONS_PATH}`;
     }
 
-    readonly complete = async (prompt: string, context?: LlmTokenUsageContext): Promise<string> =>
-        await withSpan("llm.complete", {
+    readonly complete = async (
+        request: TextCompletionRequest,
+        context?: LlmTokenUsageContext
+    ): Promise<string> => {
+        const observedInput = `SYSTEM:\n${request.systemPrompt}\n\nUSER:\n${request.userPrompt}`;
+        return await withSpan("llm.complete", {
             "llm.provider": "litellm",
             "llm.model": this.model,
             "llm.operation": context?.operation ?? "chat.text_completion",
@@ -72,7 +76,13 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
                     headers,
                     body: JSON.stringify({
                         model: this.model,
-                        messages: [{ role: "user", content: prompt }],
+                        messages: [
+                            { role: "system", content: request.systemPrompt },
+                            { role: "user", content: request.userPrompt },
+                        ],
+                        ...(request.responseFormat === "json"
+                            ? { response_format: { type: "json_object" } }
+                            : {}),
                         temperature: 0.3,
                         max_tokens: MAX_CHAT_COMPLETION_TOKENS,
                     }),
@@ -101,7 +111,7 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
                     "llm.usage.completion_tokens": usage?.completionTokens ?? 0,
                     "llm.usage.total_tokens": usage?.totalTokens ?? 0,
                     ...createLangfuseUsageAttributes(usage),
-                    ...createLangfuseContentAttributes(prompt, text),
+                    ...createLangfuseContentAttributes(observedInput, text),
                 });
                 await recordLlmTokenUsage(this.tokenUsageRecorder, {
                     sourceService: "chat-service",
@@ -133,4 +143,5 @@ export class LiteLlmTextCompletionAdapter implements TextCompletionPort {
                 throw wrappedError;
             }
         });
+    };
 }

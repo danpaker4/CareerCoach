@@ -30,6 +30,12 @@ const successPayload = {
     },
 };
 
+const textCompletionRequest = {
+    systemPrompt: "You are a career coach.",
+    userPrompt: "ping",
+    responseFormat: "text" as const,
+};
+
 describe("LiteLlmTextCompletionAdapter", () => {
     it("posts an OpenAI-compatible body with Authorization when an API key is set", async () => {
         const { recorder, records } = createRecorder();
@@ -52,14 +58,22 @@ describe("LiteLlmTextCompletionAdapter", () => {
             "proxy-key",
             recorder
         );
-        const text = await adapter.complete("ping");
+        const text = await adapter.complete({
+            systemPrompt: "You are a career coach.",
+            userPrompt: "ping",
+            responseFormat: "json",
+        });
 
         assert.equal(text, "hello from litellm");
         assert.equal(captured.url, "http://127.0.0.1:4000/chat/completions");
         assert.match(JSON.stringify(captured.headers), /Bearer proxy-key/);
         assert.deepEqual(JSON.parse(captured.body), {
             model: "openai/gpt-4o-mini",
-            messages: [{ role: "user", content: "ping" }],
+            messages: [
+                { role: "system", content: "You are a career coach." },
+                { role: "user", content: "ping" },
+            ],
+            response_format: { type: "json_object" },
             temperature: 0.3,
             max_tokens: 300,
         });
@@ -82,7 +96,7 @@ describe("LiteLlmTextCompletionAdapter", () => {
         }) as typeof fetch;
 
         const adapter = new LiteLlmTextCompletionAdapter("http://127.0.0.1:4000/", "openai/gpt-4o-mini", undefined);
-        await adapter.complete("ping");
+        await adapter.complete(textCompletionRequest);
 
         assert.equal(JSON.stringify(captured.headers).includes("Authorization"), false);
     });
@@ -103,7 +117,7 @@ describe("LiteLlmTextCompletionAdapter", () => {
             recorder
         );
 
-        await assert.rejects(() => adapter.complete("ping"), /LiteLLM completion failed/);
+        await assert.rejects(() => adapter.complete(textCompletionRequest), /LiteLLM completion failed/);
         assert.equal(records[0]?.requestStatus, "error");
         assert.match(records[0]?.errorMessage ?? "", /LiteLLM completion failed/);
     });
@@ -113,7 +127,7 @@ describe("LiteLlmTextCompletionAdapter", () => {
             new Response(JSON.stringify({ not: "valid" }), { status: 200 })) as typeof fetch;
 
         const adapter = new LiteLlmTextCompletionAdapter("http://127.0.0.1:4000", "openai/gpt-4o-mini", undefined);
-        await assert.rejects(() => adapter.complete("ping"), /invalid response shape/);
+        await assert.rejects(() => adapter.complete(textCompletionRequest), /invalid response shape/);
     });
 
     it("throws for empty completions", async () => {
@@ -124,6 +138,6 @@ describe("LiteLlmTextCompletionAdapter", () => {
             )) as typeof fetch;
 
         const adapter = new LiteLlmTextCompletionAdapter("http://127.0.0.1:4000", "openai/gpt-4o-mini", undefined);
-        await assert.rejects(() => adapter.complete("ping"), /empty completion/);
+        await assert.rejects(() => adapter.complete(textCompletionRequest), /empty completion/);
     });
 });

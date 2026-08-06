@@ -7,8 +7,9 @@ export const EMPTY_LLM_SEARCH_FILTERS: JobSearchRequest = {
     keywords: [],
 };
 
-export const LLM_DECISION_PARSE_FALLBACK_REPLY =
-    "Thanks, that helps. Could you share the type of role and tech stack you enjoy most?";
-
-export const LLM_JOB_AWARE_PARSE_FALLBACK_REPLY =
-    "I found relevant jobs. Tell me which one sounds closest to your goals, and I will help you refine it.";
+export const LLM_DECISION_PARSE_FALLBACK_REPLIES = {
+    achievements: "What project, responsibility, or accomplishment best shows what you can do?",
+    timeline: "Are you looking for your next role soon, or exploring a longer-term direction?",
+    preferences: "What kind of work do you want more of in your next role?",
+    default: "What career goal would you like help with right now?",
+} as const;

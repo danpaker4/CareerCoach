@@ -1,5 +1,5 @@
 import type { ChatMessageResponse } from "../../../api/shared/chat.types";
-import type { ChatFlowDeps, SendMessagePreparedContext } from "../../../chat-flow.types";
+import type { ChatFlowDeps, SendMessageBaseContext } from "../../../chat-flow.types";
 import { CONVERSATION_MODE } from "../../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { buildWorkDirectionFilters } from "../../../stage-5-job-search/direction-filters/chat.direction.utils";
 import { searchJobsWithBroaderFallback } from "../../../stage-5-job-search/search-jobs";
@@ -13,7 +13,7 @@ import { buildProfileJobSearchQuery } from "./profile-job-match.utils";
 
 export const runProfileJobMatchFlow = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
+    ctx: SendMessageBaseContext
 ): Promise<ChatMessageResponse> => {
     const query = buildProfileJobSearchQuery({
         profile: ctx.profile,

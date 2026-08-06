@@ -1,7 +1,13 @@
 import type { LlmTokenUsageContext } from "../../ai/token-usage/token-usage.types";
 
+export type TextCompletionRequest = {
+    readonly systemPrompt: string;
+    readonly userPrompt: string;
+    readonly responseFormat: "json" | "text";
+};
+
 export type TextCompletionPort = {
-    readonly complete: (prompt: string, context?: LlmTokenUsageContext) => Promise<string>;
+    readonly complete: (request: TextCompletionRequest, context?: LlmTokenUsageContext) => Promise<string>;
 };
 
 export type LiteLlmChatResponse = {

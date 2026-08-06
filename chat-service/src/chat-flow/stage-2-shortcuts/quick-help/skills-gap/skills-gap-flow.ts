@@ -1,5 +1,5 @@
 import type { ChatMessageResponse } from "../../../api/shared/chat.types";
-import type { ChatFlowDeps, SendMessagePreparedContext } from "../../../chat-flow.types";
+import type { ChatFlowDeps, SendMessageBaseContext } from "../../../chat-flow.types";
 import { CONVERSATION_MODE } from "../../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { sanitizeReply } from "../../../stage-6-present-jobs/presentation/chat.validation.service";
 import { QUICK_HELP_EXIT_REPLY } from "../shared/quick-help.consts";
@@ -9,7 +9,7 @@ import { generateSkillsGapAdvice } from "./skills-gap.llm";
 
 export const runSkillsGapFlow = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext,
+    ctx: SendMessageBaseContext,
     isNewIntent: boolean
 ): Promise<ChatMessageResponse> => {
     const flow = ctx.conversationAfterUserMessage.quickHelpFlow;

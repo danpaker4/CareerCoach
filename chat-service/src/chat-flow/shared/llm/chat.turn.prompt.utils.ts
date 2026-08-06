@@ -1,6 +1,7 @@
 import type { UserAchievement } from "../../api/shared/chat.model";
 import type { Conversation } from "../../../routes/conversation/conversation.model";
 import type { ConversationStage } from "../../../routes/conversation/conversation.types";
+import type { TextCompletionRequest } from "../../../litellm/text-completion/text-completion.types";
 
 const MAX_ACCOUNT_CONTEXT_CHARS = 1_600;
 const MAX_HISTORY_MESSAGES = 6;
@@ -42,8 +43,8 @@ export const buildTurnDecisionPrompt = (
     userAchievements: readonly UserAchievement[],
     userAccountContext: string,
     currentStage?: ConversationStage | null
-): string => `
-You are a concise career coach. Return ONLY compact JSON, no markdown:
+): TextCompletionRequest => ({
+    systemPrompt: `You are a concise career coach. Return ONLY compact JSON, no markdown:
 {"r":"one short reply","m":"G","ready":false,"target":null,"advance":false,"search":false,"skills":[],"interests":[],"level":"","keywords":[]}
 
 m: G=guided/unclear, N=next job within about a year, D=long-term dream. Follow the latest clear pivot.
@@ -54,11 +55,13 @@ Guided objective: "${currentStage?.objective ?? "No guided stage remains."}"
 advance=true only when the conversation satisfies that objective; otherwise ask one high-impact question.
 r must use the user's language and be one short sentence or question. Use known context without asking for repetition.
 Never expose internal scores/IDs, ask workplace-location preferences, or invent job facts. Use JOBS only for company/salary facts.
-
-Achievements: ${buildAchievements(userAchievements)}
+`,
+    userPrompt: `Achievements: ${buildAchievements(userAchievements)}
 Account:
 ${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}
 Recent conversation:
 ${buildRecentHistory(conversation, latestUserMessage)}
 Latest: ${latestUserMessage}
-`;
+`,
+    responseFormat: "json",
+});

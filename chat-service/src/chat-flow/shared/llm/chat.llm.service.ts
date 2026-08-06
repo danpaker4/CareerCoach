@@ -7,15 +7,13 @@ import type {
     LlmDecision,
 } from "../../api/shared/chat.types";
 import type { ChatFlowDeps, SendMessageBaseContext } from "../../chat-flow.types";
+import { getCurrentStage } from "../../../routes/conversation/conversation.stage.utils";
 import { DEFAULT_MODE_DETECTION_RESULT } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
-import {
-    EMPTY_LLM_SEARCH_FILTERS,
-    LLM_DECISION_PARSE_FALLBACK_REPLY,
-    LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
-} from "./chat.llm.consts";
+import { EMPTY_LLM_SEARCH_FILTERS } from "./chat.llm.consts";
 import {
     parseChatTurnDecisionFromJson,
     parseLlmDecisionFromJson,
+    resolveDecisionParseFallbackReply,
 } from "./chat.llm.utils";
 import { buildDreamJobPrompt } from "../../stage-2-shortcuts/dream-job/chat.dream-job.prompt.utils";
 import {
@@ -26,7 +24,7 @@ import type { DreamJobLlmDecision } from "../../stage-2-shortcuts/dream-job/chat
 import { buildRecommendationPrompt } from "./chat.recommendation.prompt.utils";
 import { buildTurnDecisionPrompt } from "./chat.turn.prompt.utils";
 import type { ChatLlmObservedOperation, ChatLlmObserver } from "./chat.llm.types";
-import { getCurrentStage } from "../../../routes/conversation/conversation.stage.utils";
+import { logLlmParseFailure } from "./chat.llm.validation.utils";
 
 const recordParseEvent = (
     observer: ChatLlmObserver | undefined,
@@ -35,6 +33,15 @@ const recordParseEvent = (
     parseStatus: "success" | "fallback"
 ): void => {
     observer?.recordParseEvent({ operation, rawText, parseStatus });
+};
+
+const buildJobAwareParseFallbackReply = (jobs: readonly JobSearchResultItem[]): string => {
+    const focusJob = jobs[0];
+    if (!focusJob) {
+        return "I found matching roles, but I couldn't format the recommendation reliably.";
+    }
+    const company = focusJob.company.trim().length > 0 ? ` at ${focusJob.company.trim()}` : "";
+    return `The strongest match I found is ${focusJob.title}${company}.`;
 };
 
 export const decideNextStep = async (
@@ -58,10 +65,11 @@ export const decideNextStep = async (
         const parsed = parseChatTurnDecisionFromJson(rawText);
         recordParseEvent(deps.llmObserver, "chat.decision", rawText, "success");
         return parsed;
-    } catch {
+    } catch (error: unknown) {
         recordParseEvent(deps.llmObserver, "chat.decision", rawText, "fallback");
+        logLlmParseFailure("chat.decision", rawText, error);
         return {
-            reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
+            reply: resolveDecisionParseFallbackReply(currentStage),
             shouldSearchJobs: false,
             recommendedJobIds: [],
             searchFilters: EMPTY_LLM_SEARCH_FILTERS,
@@ -89,10 +97,11 @@ export const generateJobAwareReply = async (
         const parsed = parseLlmDecisionFromJson(rawText);
         recordParseEvent(observer, "chat.job_aware_reply", rawText, "success");
         return parsed;
-    } catch {
+    } catch (error: unknown) {
         recordParseEvent(observer, "chat.job_aware_reply", rawText, "fallback");
+        logLlmParseFailure("chat.job_aware_reply", rawText, error);
         return {
-            reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
+            reply: buildJobAwareParseFallbackReply(jobs),
             shouldSearchJobs: false,
             recommendedJobIds: jobs.map((job) => job.id),
             searchFilters: EMPTY_LLM_SEARCH_FILTERS,
@@ -114,7 +123,8 @@ export const decideDreamJobStep = async (
 
     try {
         return parseDreamJobLlmDecisionFromJson(rawText);
-    } catch {
+    } catch (error: unknown) {
+        logLlmParseFailure("chat.dream_job", rawText, error);
         return {
             reply: DREAM_JOB_LLM_PARSE_FALLBACK_REPLY,
             awaitingConfirmation: false,
