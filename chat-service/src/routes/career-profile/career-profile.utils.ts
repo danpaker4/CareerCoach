@@ -1,112 +1,78 @@
-import type { CareerProfileSignalBucketKey, CareerProfileSignalUpdate, CareerSignal, UserCareerProfile } from "./career-profile.types";
-import { CAREER_PROFILE_SIGNAL_BUCKETS, SIGNAL_CONFIDENCE_WEAK_OVERRIDE_GAP } from "./career-profile.consts";
+import type { ProfileInput } from "../conversation/conversation.types";
+import { EXPLICIT_USER_SIGNAL_CONFIDENCE } from "./career-profile.consts";
+import type { CareerProfileSignalUpdate, CareerSignal } from "./career-profile.types";
 
-const normalizeSignalValue = (value: string): string => value.trim().toLowerCase();
+const MAX_PROFILE_EVIDENCE_CHARS = 1_000;
 
-const uniqueEvidence = (evidence: readonly string[]): string[] =>
-    [...new Set(evidence.map((item) => item.trim()).filter((item) => item.length > 0))];
-
-const clampConfidence = (confidence: number): number =>
-    Math.max(0, Math.min(1, confidence));
-
-const mergeSignalsForBucket = (existingSignals: readonly CareerSignal[], incomingSignals: readonly CareerSignal[]): CareerSignal[] => {
-    const mergedByValue = new Map<string, CareerSignal>();
-    for (const signal of existingSignals) {
-        mergedByValue.set(normalizeSignalValue(signal.value), {
-            ...signal,
-            confidence: clampConfidence(signal.confidence),
-            evidence: uniqueEvidence(signal.evidence),
-        });
-    }
-
-    for (const signal of incomingSignals) {
-        const key = normalizeSignalValue(signal.value);
-        const existing = mergedByValue.get(key);
-        const normalizedIncoming: CareerSignal = {
-            ...signal,
-            value: signal.value.trim(),
-            confidence: clampConfidence(signal.confidence),
-            evidence: uniqueEvidence(signal.evidence),
-        };
-
-        if (!existing) {
-            mergedByValue.set(key, normalizedIncoming);
-            continue;
+const normalizeValues = (values: readonly string[]): string[] => {
+    const valuesByKey = new Map<string, string>();
+    values.forEach((value) => {
+        const trimmedValue = value.trim();
+        if (trimmedValue.length > 0 && !valuesByKey.has(trimmedValue.toLowerCase())) {
+            valuesByKey.set(trimmedValue.toLowerCase(), trimmedValue);
         }
-
-        const incomingClearlyStronger = normalizedIncoming.confidence >= existing.confidence + SIGNAL_CONFIDENCE_WEAK_OVERRIDE_GAP;
-        const preferredValue = incomingClearlyStronger ? normalizedIncoming.value : existing.value;
-        const preferredSource = incomingClearlyStronger ? normalizedIncoming.source : existing.source;
-        const preferredConfidence = incomingClearlyStronger
-            ? normalizedIncoming.confidence
-            : Math.max(existing.confidence, normalizedIncoming.confidence * 0.95);
-        const latestUpdate = normalizedIncoming.updatedAt > existing.updatedAt ? normalizedIncoming.updatedAt : existing.updatedAt;
-
-        mergedByValue.set(key, {
-            value: preferredValue,
-            source: preferredSource,
-            confidence: preferredConfidence,
-            evidence: uniqueEvidence([...existing.evidence, ...normalizedIncoming.evidence]),
-            updatedAt: latestUpdate,
-        });
-    }
-
-    return [...mergedByValue.values()];
+    });
+    return [...valuesByKey.values()];
 };
 
-export const createEmptyProfileSignals = (): Record<CareerProfileSignalBucketKey, CareerSignal[]> => ({
-    strengths: [],
-    weakSignals: [],
-    preferredRoles: [],
-    dislikedRoles: [],
-    preferredDomains: [],
-    dislikedDomains: [],
-    technologies: [],
-    softSkills: [],
-    motivations: [],
-    interests: [],
-    dislikes: [],
-    workStyle: [],
-    personalitySignals: [],
-    longTermGoals: [],
-    shortTermGoals: [],
-    extractedKeywords: [],
-});
+const buildProfileEvidence = (profile: ProfileInput): string =>
+    [
+        profile.currentJob ?? "",
+        ...(profile.achievements?.map((achievement) => achievement.name) ?? []),
+        ...(profile.technologies ?? []),
+        ...(profile.interests ?? []),
+        ...(profile.githubSkills ?? []),
+        ...(profile.knownSkills ?? []),
+        profile.cvExcerpt ?? "",
+    ]
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+        .join(" | ")
+        .slice(0, MAX_PROFILE_EVIDENCE_CHARS);
 
-export const mergeProfileSignals = (existingProfile: UserCareerProfile, updates: CareerProfileSignalUpdate): UserCareerProfile => {
-    const mergedSignals = createEmptyProfileSignals();
-    for (const bucket of CAREER_PROFILE_SIGNAL_BUCKETS) {
-        mergedSignals[bucket] = mergeSignalsForBucket(existingProfile[bucket], updates[bucket] ?? []);
+const toExplicitSignals = (values: readonly string[], evidence: string, updatedAt: Date): CareerSignal[] =>
+    normalizeValues(values).map((value) => ({
+        value,
+        confidence: EXPLICIT_USER_SIGNAL_CONFIDENCE,
+        evidence: evidence.length > 0 ? [evidence] : [value],
+        source: "cv",
+        updatedAt,
+    }));
+
+export const hasUsableProfileInput = (profile?: ProfileInput): profile is ProfileInput => {
+    if (!profile) {
+        return false;
     }
+    return Boolean(
+        profile.currentJob?.trim()
+        || profile.cvExcerpt?.trim()
+        || (profile.achievements && profile.achievements.length > 0)
+        || (profile.technologies && profile.technologies.length > 0)
+        || (profile.interests && profile.interests.length > 0)
+        || (profile.githubSkills && profile.githubSkills.length > 0)
+        || (profile.knownSkills && profile.knownSkills.length > 0)
+    );
+};
+
+export const toCareerProfileSignalUpdateFromProfileInput = (profile: ProfileInput): CareerProfileSignalUpdate => {
+    const updatedAt = new Date();
+    const evidence = buildProfileEvidence(profile);
+    const technologies = [
+        ...(profile.technologies ?? []),
+        ...(profile.githubSkills ?? []),
+        ...(profile.knownSkills ?? []),
+    ];
+    const interests = profile.interests ?? [];
+    const extractedKeywords = [
+        profile.currentJob ?? "",
+        ...(profile.achievements?.map((achievement) => achievement.name) ?? []),
+        ...technologies,
+        ...interests,
+    ];
 
     return {
-        ...existingProfile,
-        ...mergedSignals,
-        salaryExpectation: updates.salaryExpectation ?? existingProfile.salaryExpectation,
-        locationPreference: updates.locationPreference ?? existingProfile.locationPreference,
-        remotePreference: updates.remotePreference ?? existingProfile.remotePreference,
-        senioritySignal: updates.senioritySignal ?? existingProfile.senioritySignal,
-        uncertaintyLevel: typeof updates.uncertaintyLevel === "number" ? Math.max(0, Math.min(1, updates.uncertaintyLevel)) : existingProfile.uncertaintyLevel,
-        updatedAt: new Date(),
+        technologies: toExplicitSignals(technologies, evidence, updatedAt),
+        interests: toExplicitSignals(interests, evidence, updatedAt),
+        extractedKeywords: toExplicitSignals(extractedKeywords, evidence, updatedAt),
     };
-};
-
-export const toProfileSummaryText = (profile: UserCareerProfile): string => {
-    const bucketSection = (bucket: CareerProfileSignalBucketKey, title: string): string => {
-        const values = profile[bucket].map((item) => item.value).slice(0, 8);
-        return `${title}: ${values.length > 0 ? values.join(", ") : "none"}`;
-    };
-
-    return [
-        `User ${profile.userId}`,
-        bucketSection("preferredRoles", "Preferred roles"),
-        bucketSection("technologies", "Technologies"),
-        bucketSection("interests", "Interests"),
-        bucketSection("workStyle", "Work style"),
-        bucketSection("shortTermGoals", "Short-term goals"),
-        bucketSection("longTermGoals", "Long-term goals"),
-        `Seniority: ${profile.senioritySignal ?? "unknown"}`,
-        `Location preference: ${profile.locationPreference ?? "unknown"}`,
-        `Remote preference: ${profile.remotePreference ?? "unknown"}`,
-    ].join("\n");
 };

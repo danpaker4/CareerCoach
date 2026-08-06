@@ -41,6 +41,8 @@ import type {
   EvaluationMessageRole,
   EvaluationRunResult,
   LlmProvider,
+  PromptfooRunSnapshot,
+  PromptfooRunStatus,
   TokenUsageDays,
 } from './management.types';
 
@@ -174,7 +176,7 @@ export const getAdminUserDisplayName = (user: AdminUserSummary): string =>
   `${user.firstName} ${user.lastName}`.trim();
 
 const isLlmProvider = (value: unknown): value is LlmProvider =>
-  value === 'gemini' || value === 'openai' || value === 'custom' || value === 'ollama';
+  value === 'gemini' || value === 'openai' || value === 'custom' || value === 'ollama' || value === 'litellm';
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
@@ -601,7 +603,7 @@ const isEvaluationMessageRole = (value: unknown): value is EvaluationMessageRole
   value === 'user' || value === 'assistant' || value === 'system';
 
 const isEvaluationMode = (value: unknown): value is EvaluationExpected['mode'] =>
-  value === 'FAST_SEARCH' || value === 'GUIDED' || value === 'DEEP_DISCOVERY' || value === 'DREAMJOB';
+  value === 'DREAMJOB' || value === 'NEAR_TERM' || value === 'GUIDED';
 
 const isEvaluationMessage = (value: unknown): value is EvaluationMessage => {
   if (typeof value !== 'object' || value === null) {
@@ -837,3 +839,38 @@ export const parseEvaluationRunResult = (value: unknown): EvaluationRunResult | 
     mode: typeof payload.mode === 'string' ? payload.mode : undefined,
   };
 };
+
+const isPromptfooRunStatus = (value: unknown): value is PromptfooRunStatus =>
+  value === 'idle' || value === 'running' || value === 'completed' || value === 'failed';
+
+export const parsePromptfooRunSnapshot = (value: unknown): PromptfooRunSnapshot | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (!isPromptfooRunStatus(payload.status) || !Array.isArray(payload.logTail)) {
+    return null;
+  }
+
+  const optionsRaw =
+    typeof payload.options === 'object' && payload.options !== null
+      ? (payload.options as Record<string, unknown>)
+      : {};
+
+  return {
+    runId: typeof payload.runId === 'string' ? payload.runId : null,
+    status: payload.status,
+    startedAt: typeof payload.startedAt === 'string' ? payload.startedAt : null,
+    finishedAt: typeof payload.finishedAt === 'string' ? payload.finishedAt : null,
+    exitCode: typeof payload.exitCode === 'number' ? payload.exitCode : null,
+    options: {
+      filterFirstN: typeof optionsRaw.filterFirstN === 'number' ? optionsRaw.filterFirstN : undefined,
+      filterPattern: typeof optionsRaw.filterPattern === 'string' ? optionsRaw.filterPattern : undefined,
+      noCache: typeof optionsRaw.noCache === 'boolean' ? optionsRaw.noCache : undefined,
+    },
+    logTail: payload.logTail.filter((line): line is string => typeof line === 'string'),
+    error: typeof payload.error === 'string' ? payload.error : null,
+  };
+};
+

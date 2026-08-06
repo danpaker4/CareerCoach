@@ -1,7 +1,7 @@
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
 import { readOpenAiUsage, recordLlmTokenUsage, toLlmErrorMessage } from "../../token-usage.utils";
-import { withSpan } from "../../../observability/tracing";
+import { setLangfuseGenerationResult, withSpan } from "../../../observability/tracing";
 import { OPENAI_CHAT_COMPLETIONS_URL } from "./openai-text-completion.consts";
 import { formatOpenAiErrorMessage, isOpenAiChatResponse } from "./openai-text-completion.utils";
 
@@ -55,6 +55,7 @@ export class OpenAiTextCompletionAdapter implements TextCompletionPort {
                     "llm.usage.completion_tokens": usage?.completionTokens ?? 0,
                     "llm.usage.total_tokens": usage?.totalTokens ?? 0,
                 });
+                setLangfuseGenerationResult(span, prompt, text, usage);
                 await recordLlmTokenUsage(this.tokenUsageRecorder, {
                     sourceService: "roadmap-service",
                     operation: context?.operation ?? "chat.text_completion",

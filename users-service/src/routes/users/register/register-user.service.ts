@@ -7,6 +7,8 @@ import { extractTextFromCv } from "../../cv/cv-parser.service";
 import { extractAchievementsWithGemini } from "../../cv/enrich-with-gemini/gemini.service";
 import { uploadCvToS3 } from "../../cv/s3-upload/s3-upload.service";
 import type { RegisterUserInput } from "./register-user.types";
+import { truncateCvTextForStorage } from "../users-cv.consts";
+import { regenerateProfileEmbedding } from "../user-embedding.service";
 import {
   throwIfUserAlreadyExists,
   validatePdfFile,
@@ -81,24 +83,27 @@ export const registerUser = async (
   const { cvFile } = input;
   validatePdfFile(cvFile);
 
-  const { cvS3Path, achievementsFromGemini } = cvFile
+  const { cvS3Path, cvText, achievementsFromGemini } = cvFile
     ? await (async () => {
       const cvBuffer = await cvFile.toBuffer();
       validateCvBuffer(cvBuffer);
       const uploadedCvS3Path = await uploadCvToS3(userId, cvBuffer);
-      const cvText = await extractTextFromCv(cvBuffer);
+      const extractedCvText = await extractTextFromCv(cvBuffer);
+      const storedCvText = truncateCvTextForStorage(extractedCvText);
       const extractedAchievements = await extractAchievementsWithGemini({
-        cvText,
+        userId,
+        cvText: storedCvText,
         currentJob,
         linkedInUrl,
         githubUrl,
       });
       return {
         cvS3Path: uploadedCvS3Path,
+        cvText: storedCvText,
         achievementsFromGemini: extractedAchievements,
       };
     })()
-    : { cvS3Path: undefined, achievementsFromGemini: [] };
+    : { cvS3Path: undefined, cvText: undefined, achievementsFromGemini: [] };
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const achievementTexts = achievementsFromGemini.map((achievement) => achievement.name);
@@ -119,6 +124,7 @@ export const registerUser = async (
     githubUrl: githubUrl || undefined,
     githubSkills: [],
     cv: cvS3Path,
+    cvText,
     achievements: achievementsFromGemini.map((achievement) => ({
       id: randomUUID(),
       name: achievement.name,
@@ -131,6 +137,9 @@ export const registerUser = async (
   };
 
   await usersCollection.insertOne(toUserDocument(newUser));
+  regenerateProfileEmbedding(usersCollection, newUser.id).catch((error: unknown) => {
+    console.error("Profile embedding creation failed after registration", error);
+  });
 
   const { password: _password, ...safeUser } = newUser;
   return safeUser;

@@ -1,14 +1,18 @@
 import { ObjectId } from "mongodb";
-import type { LlmTokenUsageRecordInput, LlmTokenUsageRecorder } from "../../ai/token-usage.types";
-import type { ChatLlmParseEvent, ChatLlmObserver } from "../chat/llm/chat.llm.types";
+import type { LlmTokenUsageRecordInput, LlmTokenUsageRecorder } from "../../ai/token-usage/token-usage.types";
+import type { ChatLlmParseEvent, ChatLlmObserver } from "../../chat-flow/shared/llm/chat.llm.types";
 import type {
     BenchmarkCase,
     BenchmarkCaseResult,
+    BenchmarkCandidateId,
     BenchmarkCandidateRunResult,
     BenchmarkMetricBreakdown,
     BenchmarkRunDocument,
     BenchmarkRunSummary,
 } from "./benchmark.types";
+
+export const isBenchmarkCandidateId = (value: unknown): value is BenchmarkCandidateId =>
+    value === "ollama-llama" || value === "gemini";
 
 const clampScore = (score: number): number => Math.max(0, Math.min(100, Math.round(score)));
 

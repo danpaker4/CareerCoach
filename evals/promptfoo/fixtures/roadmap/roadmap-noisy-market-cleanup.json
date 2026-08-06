@@ -1,0 +1,44 @@
+{
+  "id": "roadmap-noisy-market-cleanup",
+  "description": "Noisy JD market text is cleaned; fluff does not appear as capabilities",
+  "tags": ["roadmap", "cleanup", "dreamjob"],
+  "request": {
+    "dreamJob": "Security Engineer",
+    "targetYears": 3,
+    "startingPoint": {
+      "currentJob": "Junior Developer",
+      "userSkills": ["JavaScript"],
+      "isEntryLevel": false,
+      "roleExperienceYears": 1,
+      "roleExperienceLevel": "junior"
+    },
+    "market": {
+      "roleCategory": "Security Engineer",
+      "commonSkills": [
+        "Python",
+        "Join our supportive team today",
+        "We are looking for enthusiastic engineers",
+        "Eagerness to learn",
+        "10+ years experience",
+        "Acme Security Corp"
+      ],
+      "responsibilities": ["Threat modeling"],
+      "leadershipSignals": [],
+      "architectureSignals": ["System design"],
+      "seniorityDistribution": { "mid": 4 }
+    }
+  },
+  "expected": {
+    "minStages": 2,
+    "mustRemoveNoise": true,
+    "forbidCapabilityPatterns": [
+      "join our",
+      "supportive team",
+      "enthusiastic",
+      "eagerness",
+      "10\\+ years",
+      "acme"
+    ],
+    "maxRequiredCapabilitiesPerStage": 3
+  }
+}

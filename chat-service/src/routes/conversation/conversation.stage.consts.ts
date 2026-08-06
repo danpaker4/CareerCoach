@@ -1,7 +1,4 @@
-export type ConversationStage = {
-    id: string;
-    objective: string;
-};
+import type { ConversationStage } from "./conversation.types";
 
 export const STAGE_SIGNALS: Readonly<Record<string, readonly string[]>> = {
     achievements: ["experience", "project", "built", "developed", "worked", "achievement", "skill", "stack"],

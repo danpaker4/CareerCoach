@@ -1,0 +1,45 @@
+{
+  "id": "roadmap-dreamjob-cyber-ceo-beginner",
+  "description": "Zero-knowledge user toward cybersecurity CEO gets degree → job → team lead milestones",
+  "tags": ["roadmap", "dreamjob", "cyber", "beginner"],
+  "request": {
+    "dreamJob": "CEO of cybersecurity company",
+    "targetYears": 10,
+    "availableHoursPerWeek": 10,
+    "startingPoint": {
+      "currentJob": "High school graduate",
+      "currentRoleSummary": "No professional experience",
+      "userSkills": [],
+      "isEntryLevel": true,
+      "roleExperienceYears": 0,
+      "roleExperienceLevel": "entry"
+    },
+    "market": {
+      "roleCategory": "CEO",
+      "commonSkills": [
+        "Bachelor's degree in Computer Science or related field",
+        "Cybersecurity",
+        "Leadership",
+        "We offer a supportive environment",
+        "Eagerness to learn",
+        "10+ years experience",
+        "Performance Systems Inc"
+      ],
+      "responsibilities": ["Set company strategy"],
+      "leadershipSignals": ["Lead executives"],
+      "architectureSignals": [],
+      "seniorityDistribution": { "executive": 5 }
+    }
+  },
+  "expected": {
+    "minStages": 4,
+    "firstStageLabelIncludes": ["degree", "foundation"],
+    "mustIncludeStageLabelPatterns": ["cybersecurity", "team lead|managing"],
+    "requireHowToGetThere": true,
+    "requireWhatYouGain": true,
+    "maxRequiredCapabilitiesPerStage": 3,
+    "forbidCapabilityPatterns": ["we offer", "eagerness", "10\\+ years", "performance systems"],
+    "degreeTimelineMustMentionYears": true,
+    "mustRemoveNoise": true
+  }
+}

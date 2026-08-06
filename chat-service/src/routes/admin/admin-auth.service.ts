@@ -1,18 +1,8 @@
-export type AdminSession = {
-    readonly adminUserId: string;
-    readonly adminUserName?: string;
-    readonly adminUserEmail?: string;
-};
-
-export type AdminAuthFailure = {
-    readonly statusCode: number;
-    readonly error: string;
-    readonly errorCode?: string;
-};
-
-export type AdminAuthResult =
-    | { readonly status: "success"; readonly session: AdminSession }
-    | { readonly status: "failure"; readonly failure: AdminAuthFailure };
+import type {
+    AdminAuthFailure,
+    AdminAuthResult,
+    AdminSession,
+} from "./admin-auth.types";
 
 const isAdminSession = (value: unknown): value is AdminSession => {
     if (typeof value !== "object" || value === null) {
@@ -94,3 +84,5 @@ export class AdminAuthService {
         return { status: "success", session: payload };
     };
 }
+
+export type { AdminAuthFailure, AdminAuthResult, AdminSession } from "./admin-auth.types";

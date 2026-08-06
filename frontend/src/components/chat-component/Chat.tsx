@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, type ChangeEvent, type KeyboardEvent } from 'react';
 import './Chat.css';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import { getStoredAccessToken } from '../../lib/authSession';
+import { normalizeUser } from '../../lib/authResponse';
 import type {
+    ChatInterfaceHandle,
     ChatProps,
     ChatQueuedResponse,
     ChatRequestEvent,
@@ -232,18 +234,28 @@ const parseJsonOrNull = (value: string): unknown => {
     }
 };
 
-export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, userProfile }: ChatProps) => {
+export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
+    userId,
+    conversationId,
+    onExportSnapshotChange,
+    onUserUpdated,
+    userProfile,
+}, ref) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingLabel, setLoadingLabel] = useState('Typing...');
+    const [cvUploading, setCvUploading] = useState(false);
+    const [cvUploadMessage, setCvUploadMessage] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const cvFileInputRef = useRef<HTMLInputElement>(null);
     const websocketRef = useRef<WebSocket | null>(null);
     const socketConnectionPromiseRef = useRef<Promise<boolean> | null>(null);
     const pendingRequestsRef = useRef<Map<string, PendingRequestHandler>>(new Map());
     const fallbackPollingRequestIdsRef = useRef<Set<string>>(new Set());
+    const isLoadingRef = useRef(false);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -479,19 +491,59 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
         }
     };
 
-    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSend();
+    const handleCvFileSelected = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) {
+            return;
+        }
+        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+            setCvUploadMessage('Please upload a PDF CV.');
+            return;
+        }
+
+        setCvUploading(true);
+        setCvUploadMessage('Uploading CV…');
+        try {
+            const formData = new FormData();
+            formData.append('cv', file);
+            const response = await apiFetch(`${ENV.USERS_SERVICE_BASE_URL}/users/${encodeURIComponent(userId)}/cv`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null) as { error?: string } | null;
+                throw new Error(payload?.error ?? 'Failed to upload CV');
+            }
+            const updatedUser = normalizeUser(await response.json());
+            if (!updatedUser) {
+                throw new Error('CV uploaded, but the user profile response was invalid');
+            }
+            onUserUpdated?.(updatedUser);
+            setCvUploadMessage('CV uploaded and read. Say “ready” for improvement tips, or ask a follow-up.');
+        } catch (error: unknown) {
+            setCvUploadMessage(error instanceof Error ? error.message : 'CV upload failed');
+        } finally {
+            setCvUploading(false);
         }
     };
 
-    const handleSend = async () => {
-        const text = input.trim();
-        if (!text.length) return;
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            void sendMessage(input);
+        }
+    };
 
+    const sendMessage = async (rawText: string): Promise<void> => {
+        const text = rawText.trim();
+        if (!text.length || isLoadingRef.current) {
+            return;
+        }
+
+        isLoadingRef.current = true;
         const userMessage = createMessage('user', text);
-        setMessages(prev => [...prev, userMessage]);
+        setMessages((prev) => [...prev, userMessage]);
         setInput('');
 
         if (textareaRef.current) {
@@ -511,39 +563,52 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
                     message: text,
                     userProfile,
                     accessToken: getStoredAccessToken() ?? undefined,
-                })
+                }),
             });
             if (!response.ok) {
                 const errorMessage = await readChatErrorMessage(response);
                 if (response.status === HTTP_TOO_MANY_REQUESTS) {
                     setInput(text);
                 }
-                setMessages(prev => [...prev, createMessage('assistant', errorMessage)]);
+                setMessages((prev) => [...prev, createMessage('assistant', errorMessage)]);
                 return;
             }
 
             if (response.status === HTTP_ACCEPTED) {
                 const queued = await readQueuedResponse(response);
                 if (!queued) {
-                    setMessages(prev => [...prev, createMessage('assistant', 'The chat request was queued, but I could not read its request id.')]);
+                    setMessages((prev) => [
+                        ...prev,
+                        createMessage('assistant', 'The chat request was queued, but I could not read its request id.'),
+                    ]);
                     return;
                 }
 
                 const data = await waitForQueuedResponse(queued.requestId);
-                setMessages(prev => [...prev, createMessage('assistant', formatAssistantResponse(data), extractJobCards(data))]);
+                setMessages((prev) => [...prev, createMessage('assistant', formatAssistantResponse(data), extractJobCards(data))]);
                 return;
             }
 
             const data = await readChatResponse(response);
-            setMessages(prev => [...prev, createMessage('assistant', formatAssistantResponse(data), extractJobCards(data))]);
+            setMessages((prev) => [...prev, createMessage('assistant', formatAssistantResponse(data), extractJobCards(data))]);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Server connection error.';
-            setMessages(prev => [...prev, createMessage('assistant', errorMessage || 'Server connection error.')]);
+            setMessages((prev) => [...prev, createMessage('assistant', errorMessage || 'Server connection error.')]);
         } finally {
+            isLoadingRef.current = false;
             setIsLoading(false);
             setLoadingLabel('Typing...');
         }
     };
+
+    const sendMessageRef = useRef(sendMessage);
+    sendMessageRef.current = sendMessage;
+
+    useImperativeHandle(ref, () => ({
+        sendPrompt: (text: string) => {
+            void sendMessageRef.current(text);
+        },
+    }), []);
 
     return (
         <div className="chat-container">
@@ -575,6 +640,26 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
             </div>
 
             <div className="input-area">
+                <input
+                    ref={cvFileInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="chat-cv-file-input"
+                    aria-label="Upload CV PDF"
+                    onChange={(event) => {
+                        handleCvFileSelected(event).catch(() => setCvUploadMessage('CV upload failed'));
+                    }}
+                />
+                <button
+                    type="button"
+                    className="chat-cv-upload-button"
+                    title="Upload CV (PDF)"
+                    aria-label="Upload CV PDF"
+                    disabled={isLoading || cvUploading}
+                    onClick={() => cvFileInputRef.current?.click()}
+                >
+                    {cvUploading ? '…' : 'CV'}
+                </button>
                 <textarea
                     ref={textareaRef}
                     placeholder="Type a message..."
@@ -583,8 +668,11 @@ export const ChatInterface = ({ userId, conversationId, onExportSnapshotChange, 
                     onKeyDown={handleKeyDown}
                     rows={1}
                 />
-                <button type="button" onClick={handleSend} disabled={isLoading || !input.trim()}>➤</button>
+                <button type="button" onClick={() => { void sendMessage(input); }} disabled={isLoading || !input.trim()}>➤</button>
             </div>
+            {cvUploadMessage ? <p className="chat-cv-upload-status" role="status">{cvUploadMessage}</p> : null}
         </div>
     );
-};
+});
+
+ChatInterface.displayName = 'ChatInterface';

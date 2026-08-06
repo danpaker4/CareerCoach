@@ -28,7 +28,7 @@
     { "path": "/dashboard", "auth": true, "page": "User overview" },
     { "path": "/chat", "auth": true, "page": "AI Career Coach (multi-tab conversations)" },
     { "path": "/roadmap", "auth": true, "page": "Career roadmap (dream job + milestones)" },
-    { "path": "/skill-matcher", "auth": true, "page": "Skill-gap analysis vs target role" },
+    { "path": "/skill-matcher", "auth": true, "page": "Skill Tracker — roadmap checkbox progress" },
     { "path": "/pipeline", "auth": true, "page": "Kanban job application board" },
     { "path": "/my-skills", "auth": true, "page": "Skills from CV + GitHub + skill gaps" },
     { "path": "/job-suggestions", "auth": true, "page": "Job search & AI recommendations" },
@@ -134,7 +134,7 @@
       "id": "ai-chat",
       "name": "AI Career Coach Chat",
       "category": "AI",
-      "purpose": "Multi-conversation chat where the LLM selects intent mode (GUIDED / FAST_SEARCH / DEEP_DISCOVERY / DREAMJOB) and grounds replies in the user's persistent career profile.",
+      "purpose": "Multi-conversation chat where the LLM selects intent mode (DREAMJOB / NEAR_TERM / GUIDED) with a readiness score and grounds replies in the user's persistent career profile.",
       "frontend": { "route": "/chat", "trigger": "Send message / switch conversation tab" },
       "endpoints": [
         { "method": "GET", "service": "chat-service", "path": "/chat/users/:userId/conversations", "notes": "List all conversations" },
@@ -143,7 +143,7 @@
         { "method": "GET", "service": "chat-service", "path": "/chat/:userId", "notes": "Ensure a conversation exists (creates if none)" },
         { "method": "POST", "service": "chat-service", "path": "/chat/message", "notes": "Send message; returns reply + detected mode + confidence + attachedJobs[]" }
       ],
-      "external": ["LLM chain (Ollama → Gemini → Custom)", "job-service (for FAST_SEARCH job lookup)"],
+      "external": ["LLM chain (Ollama → Gemini → Custom)", "job-service (for NEAR_TERM job lookup)"],
       "dataFlow": [
         "The chat decision prompt sends available modes and the LLM returns the selected mode in JSON",
         "Career profile loaded / materialized for context",
@@ -193,35 +193,36 @@
     },
     {
       "id": "skill-matcher",
-      "name": "Skill Matcher for Jobs",
+      "name": "Skill Tracker (roadmap checkboxes)",
       "category": "Jobs",
-      "purpose": "Score user skills against the requirements of a specific job.",
-      "frontend": { "route": "/skill-matcher", "trigger": "Select job → rate skills" },
+      "purpose": "Show every career-roadmap action checkbox with overall and per-stage progress percentage.",
+      "frontend": { "route": "/skill-matcher", "trigger": "Open Skill Tracker from nav" },
       "endpoints": [
-        { "method": "GET", "service": "job-service", "path": "/skill-matcher/:userId" },
-        { "method": "POST", "service": "job-service", "path": "/skill-matcher/:id/skill" },
-        { "method": "PATCH", "service": "job-service", "path": "/skill-matcher/:userId/:jobId/:skill" }
+        { "method": "GET", "service": "job-service", "path": "/career-roadmap/:userId" },
+        { "method": "PATCH", "service": "job-service", "path": "/career-roadmap/:id/stages", "notes": "Toggle checkbox completion; syncs with My Roadmap" }
       ],
       "dataFlow": [
-        "Load user assessments",
-        "Add / update per-skill rating",
-        "Aggregate match score back to UI"
+        "Load user career roadmaps",
+        "Flatten stage actions into Skill Tracker checklist groups",
+        "PATCH stages when a checkbox is toggled",
+        "Overall % = done checkboxes / total checkboxes"
       ]
     },
     {
       "id": "job-search",
       "name": "Job Search & Suggestions",
       "category": "Jobs",
-      "purpose": "Browse and filter aggregated jobs; results re-ranked using seniority compatibility.",
+      "purpose": "Browse personalized jobs in vector-ranked cursor pages and run profile-aware semantic searches.",
       "frontend": { "route": "/job-suggestions", "trigger": "Filters / search bar" },
       "endpoints": [
-        { "method": "GET", "service": "job-service", "path": "/jobs", "notes": "List all jobs" },
+        { "method": "GET", "service": "job-service", "path": "/jobs", "notes": "50-job page ranked by profile or profile + search; accepts an opaque continuation cursor" },
         { "method": "POST", "service": "job-service", "path": "/jobs/search", "notes": "Filters: location, stack, seniority" }
       ],
       "dataFlow": [
         "Background poller ingests jobs into MongoDB",
-        "Search applies filters",
-        "JobRankingService checks isJobSeniorityCompatibleWithRoleExperience",
+        "User and job embeddings are generated with the same configured model",
+        "Self-managed MongoDB Vector Search ranks the indexed catalog",
+        "IntersectionObserver requests the next cursor page",
         "Results rendered with save / add-to-pipeline actions"
       ]
     },

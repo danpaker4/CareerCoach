@@ -141,6 +141,16 @@
   color: var(--clr-purple);
 }
 
+.skill-chip--green {
+  background: var(--clr-success-bg);
+  color: var(--clr-success);
+}
+
+.skill-chip--orange {
+  background: var(--clr-warning-bg);
+  color: var(--clr-warning);
+}
+
 .skill-chip-count {
   background: rgba(0,0,0,0.08);
   border-radius: var(--r-full);

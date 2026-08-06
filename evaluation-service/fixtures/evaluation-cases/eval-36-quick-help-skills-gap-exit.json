@@ -1,0 +1,26 @@
+{
+    "id": "eval-36-quick-help-skills-gap-exit",
+    "messages": [
+        {
+            "role": "user",
+            "content": "What skills should I learn for my next role?"
+        },
+        {
+            "role": "assistant",
+            "content": "Which role are you aiming for next? Share the job title (for example: Frontend Engineer, QA Automation, Product Manager)."
+        },
+        {
+            "role": "user",
+            "content": "stop"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 6,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs"
+        ]
+    }
+}

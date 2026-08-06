@@ -1,3 +1,4 @@
+import "./observability/register";
 import dotenv from "dotenv";
 import { buildApp } from "./app";
 import { connectMongo, disconnectMongo } from "./models/evaluation-case.model";
@@ -12,11 +13,16 @@ const start = async (): Promise<void> => {
         await connectMongo(env.MONGO_CONNECTION_STRING);
         console.log("MongoDB connected");
 
-        const app = await buildApp({
-            chatServiceBaseUrl: env.CHAT_SERVICE_BASE_URL.replace(/\/$/, ""),
-            evaluationUserId: env.EVALUATION_USER_ID,
-            internalServiceApiKey: env.INTERNAL_SERVICE_API_KEY,
-        });
+        const app = await buildApp(
+            {
+                chatServiceBaseUrl: env.CHAT_SERVICE_BASE_URL.replace(/\/$/, ""),
+                evaluationUserId: env.EVALUATION_USER_ID,
+                internalServiceApiKey: env.INTERNAL_SERVICE_API_KEY,
+            },
+            {
+                packageDir: env.PROMPTFOO_PACKAGE_DIR,
+            },
+        );
 
         const address = await app.listen({
             port: env.PORT,

@@ -64,6 +64,28 @@ describe("user-starting-point.utils", () => {
         assert.equal(startingPoint.currentJob, "Junior Developer");
         assert.equal(startingPoint.roleExperienceLevel, "junior");
         assert.ok(startingPoint.userSkills.includes("TypeScript"));
+        assert.match(startingPoint.currentRoleSummary, /Junior Developer/);
+        assert.match(startingPoint.currentRoleSummary, /TypeScript/);
+    });
+
+    it("includes skills when CV is on file but current job is missing", () => {
+        const startingPoint = resolveUserStartingPoint(
+            {
+                cv: "s3://careercoach/cvs/user-123.pdf",
+                cvText: "Software engineer with experience in Python, AWS, and security operations.",
+                technologies: ["Python", "AWS", "SIEM", "Python", "Linux"],
+                knownSkills: ["Incident Response", "Threat Hunting"],
+            },
+            null
+        );
+
+        assert.equal(startingPoint.isEntryLevel, false);
+        assert.equal(startingPoint.currentJob, "Not specified");
+        assert.ok(startingPoint.userSkills.includes("Python"));
+        assert.ok(startingPoint.userSkills.includes("Incident Response"));
+        assert.match(startingPoint.currentRoleSummary, /skills include/i);
+        assert.match(startingPoint.currentRoleSummary, /Python/);
+        assert.doesNotMatch(startingPoint.currentRoleSummary, /^Early-career professional with CV on file$/);
     });
 
     it("does not count coach seniority alone as substantial background", () => {

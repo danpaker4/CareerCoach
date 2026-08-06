@@ -1,4 +1,84 @@
 services:
+  mongodb:
+    image: mongodb/mongodb-community-server:8.2.12-ubi9-slim
+    container_name: mongodb-careercoach
+    command:
+      - --config
+      - /etc/mongod.conf
+      - --replSetMember=mongodb:27017
+    ports:
+      - "127.0.0.1:${MONGODB_HOST_PORT:-27018}:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/mongod.conf:/etc/mongod.conf:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mongosh --quiet --host 127.0.0.1 --port 27017 --eval "quit(db.adminCommand(''ping'').ok ? 0 : 1)"'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  mongodb-init:
+    image: mongodb/mongodb-community-server:8.2.12-ubi9-slim
+    container_name: mongodb-init-careercoach
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      MONGOT_USERNAME: mongotUser
+      MONGOT_PASSWORD: ${MONGOT_PASSWORD:-careercoach-local-mongot-password}
+    volumes:
+      - ./docker/mongodb/init-mongodb.js:/docker-entrypoint-initdb.d/init-mongodb.js:ro
+    entrypoint:
+      - mongosh
+      - mongodb://mongodb:27017/admin?directConnection=true
+      - --quiet
+      - --file
+      - /docker-entrypoint-initdb.d/init-mongodb.js
+    restart: "no"
+
+  mongot-secrets:
+    image: mongodb/mongodb-community-search:1.70.1
+    container_name: mongot-secrets-careercoach
+    environment:
+      MONGOT_PASSWORD: ${MONGOT_PASSWORD:-careercoach-local-mongot-password}
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - umask 077 && printf '%s' "$${MONGOT_PASSWORD}" > /secrets/passwordFile
+    volumes:
+      - mongot_secrets:/secrets
+    restart: "no"
+
+  mongot:
+    image: mongodb/mongodb-community-search:1.70.1
+    container_name: mongot-careercoach
+    depends_on:
+      mongodb-init:
+        condition: service_completed_successfully
+      mongot-secrets:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${MONGOT_HEALTH_PORT:-8080}:8080"
+      - "127.0.0.1:${MONGOT_METRICS_PORT:-9946}:9946"
+    volumes:
+      - mongot_data:/data/mongot
+      - mongot_secrets:/secrets:ro
+      - ./docker/mongodb/mongot.conf:/mongot-community/config.default.yml:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl --fail --silent http://mongot:8080/health | grep --quiet SERVING'
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq-careercoach
@@ -65,12 +145,30 @@ services:
     depends_on:
       - jaeger
     ports:
-      - "4317:4317"
-      - "4318:4318"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
     volumes:
       - ./otel-collector-config.yml:/etc/otelcol/config.yml:ro
     restart: unless-stopped
 
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm-careercoach
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: sk-litellm-local-dev
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
+  mongodb_data:
+  mongot_data:
+  mongot_secrets:
   rabbitmq_data:
   minio_data:

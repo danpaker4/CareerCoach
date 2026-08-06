@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import type { EnrichedJob } from "../../poller/job-poller-api-stack/stages/enrich/types";
 import type { JobSearchPlanRequest, JobSearchRequest, JobSearchResponseItem } from "./job-search.types";
 import { generateQueryVector } from "../../ai/embedding.utils";
+import { semanticSearchJobs } from "../jobs/semantic-search";
 
 const isJobSearchRequest = (body: unknown): body is JobSearchRequest => {
     if (typeof body !== "object" || body === null) {
@@ -38,18 +39,11 @@ const isJobSearchPlanRequest = (body: unknown): body is JobSearchPlanRequest => 
     );
 };
 
-const VECTOR_INDEX_NAME = process.env.JOB_VECTOR_INDEX_NAME || "jobs_vector_index";
 const SEARCH_LIMIT = 10;
-const NUM_CANDIDATES = 100;
 
 type EmbeddingFetchError = {
     status?: number;
     statusText?: string;
-};
-
-type MongoSearchError = {
-    code?: number;
-    codeName?: string;
 };
 
 const buildQueryText = (request: JobSearchRequest): string => {
@@ -195,34 +189,8 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
                     continue;
                 }
 
-                const rankedJobs = await jobsCollection.aggregate([
-                    {
-                        $vectorSearch: {
-                            index: VECTOR_INDEX_NAME,
-                            path: "searchEmbedding",
-                            queryVector,
-                            numCandidates: NUM_CANDIDATES,
-                            limit: SEARCH_LIMIT,
-                        },
-                    },
-                    {
-                        $project: {
-                            _id: 0,
-                            id: 1,
-                            jobTitle: 1,
-                            url: 1,
-                            seniority: 1,
-                            description: 1,
-                            company: 1,
-                            salary: 1,
-                            requirements: 1,
-                            mustKnowSkills: 1,
-                            niceToHaveSkills: 1,
-                            benefits: 1,
-                        },
-                    },
-                ]).toArray();
-                const responsePayload = rankedJobs.map((job) => toJobSearchResponseItem(job as EnrichedJob));
+                const rankedJobs = await semanticSearchJobs(jobsCollection, queryVector, SEARCH_LIMIT);
+                const responsePayload = rankedJobs.map((job) => toJobSearchResponseItem(job));
                 if (responsePayload.length > 0) {
                     allResults.push(...responsePayload);
                     continue;
@@ -236,14 +204,6 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
         } catch (error) {
             const embeddingError = error as EmbeddingFetchError;
             if (embeddingError.status === 429) {
-                const fallbackRequest = normalizedSearches[0];
-                const fallbackResults = await searchByJobTitleFallback(fallbackRequest);
-                reply.status(StatusCodes.OK).send(fallbackResults);
-                return;
-            }
-            const mongoError = error as MongoSearchError;
-            const isSearchNotEnabled = mongoError.code === 31082 || mongoError.codeName === "SearchNotEnabled";
-            if (isSearchNotEnabled) {
                 const fallbackRequest = normalizedSearches[0];
                 const fallbackResults = await searchByJobTitleFallback(fallbackRequest);
                 reply.status(StatusCodes.OK).send(fallbackResults);

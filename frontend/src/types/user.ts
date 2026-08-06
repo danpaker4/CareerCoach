@@ -18,7 +18,10 @@ export interface User {
   githubUrl?: string;
   githubSkills?: string[];
   knownSkills?: string[];
+  /** S3 URI for the uploaded CV PDF. */
   cv?: string;
+  /** Extracted plain text from the CV for coaching. */
+  cvText?: string;
   achievements?: Achievement[];
   technologies?: string[];
   interests?: string[];

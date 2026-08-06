@@ -1,0 +1,3 @@
+export const ROADMAP_GENERATION_VERSION = "2.0.0";
+
+export const DEFAULT_AVAILABLE_HOURS_PER_WEEK = 10;

@@ -1,3 +1,5 @@
+import type { ObjectId } from "mongodb";
+
 type CareerSignalSource = "cv" | "chat" | "job_interaction" | "llm_inference";
 
 export type CareerSignal = {
@@ -50,6 +52,9 @@ export type CareerProfileSignalUpdate = Partial<CareerProfileSignals> & {
     salaryExpectation?: string | null;
     locationPreference?: string | null;
     remotePreference?: string | null;
-    senioritySignal?: string | null;
     uncertaintyLevel?: number;
+};
+
+export type UserCareerProfileDocument = UserCareerProfile & {
+    _id?: ObjectId;
 };

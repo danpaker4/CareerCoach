@@ -1,11 +1,16 @@
 {
-  "id": "eval-09-fast-search-find-now",
-  "messages": [
-    { "role": "user", "content": "find jobs now for junior frontend developer remote" }
-  ],
-  "expected": {
-    "mode": "FAST_SEARCH",
-    "maxLines": 15,
-    "forbiddenWords": ["you must become"]
-  }
+    "id": "eval-09-fast-search-find-now",
+    "messages": [
+        {
+            "role": "user",
+            "content": "find jobs now for junior frontend developer remote"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15,
+        "forbiddenWords": [
+            "you must become"
+        ]
+    }
 }

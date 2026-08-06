@@ -34,9 +34,11 @@ export const roadmapGenerationRouter = (
             externalService,
             dbClient.careerDirectionExamples,
             embedding,
-            roadmapConfig.careerDirectionVectorIndexName
+            roadmapConfig.careerDirectionVectorIndexName,
+            roadmapConfig.featureFlags
         );
         const controller = new RoadmapGenerationController(service);
 
         app.post("/roadmap/generate", controller.generate);
+        app.post("/roadmap/generate/eval-fixture", controller.generateEvalFixture);
     };

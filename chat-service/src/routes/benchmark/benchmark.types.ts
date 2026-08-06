@@ -1,9 +1,9 @@
-import type { LlmProvider, LlmTokenUsageRecordInput } from "../../ai/token-usage.types";
+import type { LlmProvider, LlmTokenUsageRecordInput } from "../../ai/token-usage/token-usage.types";
 import type { ObjectId } from "mongodb";
 import type { ProfileInput } from "../conversation/conversation.types";
-import type { JobSearchResultItem } from "../chat/chat.types";
-import type { RoleExperienceEntry } from "../external-chat/role-experience.types";
-import type { ChatLlmParseEvent } from "../chat/llm/chat.llm.types";
+import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
+import type { RoleExperienceEntry } from "../external-chat-tools/role-experience.types";
+import type { ChatLlmParseEvent } from "../../chat-flow/shared/llm/chat.llm.types";
 
 export type BenchmarkCandidateId = "ollama-llama" | "gemini";
 

@@ -2,7 +2,6 @@ import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClien
 import { Service } from "../types/service";
 import type { Pipeline } from "../routes/MyPipline/pipeline.model";
 import type { PipelineJob } from "../routes/jobsInPipeline/pipeline-job.model";
-import type { SkillMatcher } from "../routes/skillMatcher/skill-matcher.model";
 import type { CareerRoadMap } from "../routes/careerRoadMap/career-roadmap.model";
 import type { EnrichedJob } from "../poller/job-poller-api-stack/stages/enrich/types";
 import type {
@@ -14,13 +13,14 @@ import type {
 import type { LlmTokenUsageDocument } from "../llm-token-usage/llm-token-usage.types";
 import type { WantedJob } from "../routes/wantedJobs/wanted-job.model";
 import type { Notification } from "../routes/notifications/notification.model";
+import { getJobEmbeddingConfig } from "../ai/job-embedding.config";
+import { ensureJobVectorSearchIndex } from "./job-vector-index.service";
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
     private readonly connectionOptions: MongoClientOptions;
     private db: Db | null = null;
     private pipelinesCollection: Collection<Pipeline> | null = null;
     private pipelineJobsCollection: Collection<PipelineJob> | null = null;
-    private skillMatchersCollection: Collection<SkillMatcher> | null = null;
     private careerRoadMapsCollection: Collection<CareerRoadMap> | null = null;
     private jobsCollection: Collection<EnrichedJob> | null = null;
     private careerRoleProfilesCollection: Collection<CareerRoleProfile> | null = null;
@@ -46,7 +46,6 @@ export class MongoClient implements Service {
             
             this.pipelinesCollection = this.db.collection<Pipeline>("pipelines");
             this.pipelineJobsCollection = this.db.collection<PipelineJob>("pipelineJobs");
-            this.skillMatchersCollection = this.db.collection<SkillMatcher>("skillMatchers");
             this.careerRoadMapsCollection = this.db.collection<CareerRoadMap>("careerRoadMaps");
             this.jobsCollection = this.db.collection<EnrichedJob>("jobs");
             this.careerRoleProfilesCollection = this.db.collection<CareerRoleProfile>("career_role_profiles");
@@ -63,6 +62,13 @@ export class MongoClient implements Service {
             await this.notificationsCollection.createIndex({ userId: 1, createdAt: -1 });
             await this.notificationsCollection.createIndex({ id: 1 }, { unique: true });
             await this.notificationsCollection.createIndex({ userId: 1, read: 1, createdAt: -1 });
+            await this.jobsCollection.createIndex({ createdAt: -1, id: 1 });
+            if (
+                process.env.NODE_ENV !== "test" &&
+                getJobEmbeddingConfig().JOBS_VECTOR_SEARCH_ENABLED
+            ) {
+                await this.ensureJobsVectorSearchIndex();
+            }
 
             console.log('MongoDb Connection Succeeded');
         } catch (err) {
@@ -71,12 +77,18 @@ export class MongoClient implements Service {
         }
     };
 
+    private ensureJobsVectorSearchIndex = async (): Promise<void> => {
+        if (!this.jobsCollection) return;
+        const config = getJobEmbeddingConfig();
+        await ensureJobVectorSearchIndex(this.jobsCollection, config);
+        console.log(`[VectorSearch] Jobs index ${config.JOB_VECTOR_INDEX_NAME} is queryable`);
+    };
+
     stop = async (): Promise<void> => {
         await this.mongoClient.close();
         this.db = null;
         this.pipelinesCollection = null;
         this.pipelineJobsCollection = null;
-        this.skillMatchersCollection = null;
         this.careerRoadMapsCollection = null;
         this.jobsCollection = null;
         this.careerRoleProfilesCollection = null;
@@ -101,13 +113,6 @@ export class MongoClient implements Service {
             throw new Error("Pipeline jobs collection is not initialized");
         }
         return this.pipelineJobsCollection;
-    }
-
-    get skillMatchers(): Collection<SkillMatcher> {
-        if (!this.skillMatchersCollection) {
-            throw new Error("Skill matchers collection is not initialized");
-        }
-        return this.skillMatchersCollection;
     }
 
     get careerRoadMaps(): Collection<CareerRoadMap> {

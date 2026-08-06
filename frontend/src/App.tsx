@@ -14,6 +14,7 @@ import { JobSuggestions } from './components/job-suggestions/JobSuggestions';
 import { Management } from './components/management/Management';
 import { ManagementBenchmarks } from './components/management/ManagementBenchmarks';
 import { ManagementLlmEvaluation } from './components/management/ManagementLlmEvaluation';
+import { ManagementPromptfoo } from './components/management/ManagementPromptfoo';
 import { ManagementRateLimits } from './components/management/ManagementRateLimits';
 import { ManagementUsage } from './components/management/ManagementUsage';
 import { ManagementUsers } from './components/management/ManagementUsers';
@@ -241,7 +242,15 @@ export const App = () => {
               path="/my-skills"
               element={
                 <ProtectedRoute user={currentUser}>
-                  {currentUser ? <MySkills user={currentUser} /> : null}
+                  {currentUser
+                    ? <MySkills
+                        user={currentUser}
+                        onUserUpdated={(u) => {
+                          persistUser(u);
+                          setCurrentUser(u);
+                        }}
+                      />
+                    : null}
                 </ProtectedRoute>
               }
             />
@@ -314,6 +323,15 @@ export const App = () => {
               element={
                 <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
                   <ManagementLlmEvaluation />
+                </AdminRoute>
+              }
+            />
+
+            <Route
+              path="/management/promptfoo"
+              element={
+                <AdminRoute user={currentUser} sessionVerified={sessionVerified}>
+                  <ManagementPromptfoo />
                 </AdminRoute>
               }
             />

@@ -2,11 +2,17 @@ import { z } from "zod";
 import type { ServerConfig } from "./server.types";
 import { resolveLlmConfig } from "./ai/llm-config.utils";
 import { buildTextCompletionLlmChain } from "./ai/llm-text-completion-chain.utils";
+import { resolveRoadmapFeatureFlags } from "./routes/roadmap-generation/feature-flags";
 
 const envString = (name: string) => z.string().min(1, `${name} is required`);
 
 const optionalEmptyString = (value: unknown): unknown =>
     typeof value === "string" && value.trim().length === 0 ? undefined : value;
+
+const booleanFlagSchema = z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true");
 
 const LlmProviderSchema = z.enum(["gemini", "openai", "custom", "ollama"]);
 
@@ -32,6 +38,13 @@ const EnvSchema = z
         EMBEDDING_MODEL: z.preprocess(optionalEmptyString, z.string().optional()),
         CUSTOM_EMBEDDING_URL: z.preprocess(optionalEmptyString, z.string().url().optional()),
         CAREER_DIRECTION_VECTOR_INDEX_NAME: z.string().default("career_direction_vector_index"),
+        ROADMAP_DETERMINISTIC_CORE_ENABLED: booleanFlagSchema,
+        ROADMAP_AI_POLISH_ENABLED: z
+            .enum(["true", "false"])
+            .default("false")
+            .transform((value) => value === "true"),
+        ROADMAP_STRUCTURED_EVIDENCE_ENABLED: booleanFlagSchema,
+        ROADMAP_MEASURABLE_COMPLETION_ENABLED: booleanFlagSchema,
     })
     .superRefine((data, ctx) => {
         const chain = buildTextCompletionLlmChain({
@@ -102,6 +115,12 @@ export const createConfigFromEnv = (env: NodeJS.ProcessEnv): ServerConfig => {
             embeddingModel: parsed.EMBEDDING_MODEL,
             customEmbeddingUrl: parsed.CUSTOM_EMBEDDING_URL,
             careerDirectionVectorIndexName: parsed.CAREER_DIRECTION_VECTOR_INDEX_NAME,
+            featureFlags: resolveRoadmapFeatureFlags({
+                ROADMAP_DETERMINISTIC_CORE_ENABLED: parsed.ROADMAP_DETERMINISTIC_CORE_ENABLED,
+                ROADMAP_AI_POLISH_ENABLED: parsed.ROADMAP_AI_POLISH_ENABLED,
+                ROADMAP_STRUCTURED_EVIDENCE_ENABLED: parsed.ROADMAP_STRUCTURED_EVIDENCE_ENABLED,
+                ROADMAP_MEASURABLE_COMPLETION_ENABLED: parsed.ROADMAP_MEASURABLE_COMPLETION_ENABLED,
+            }),
         },
     };
 };

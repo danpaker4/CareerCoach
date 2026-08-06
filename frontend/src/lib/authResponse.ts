@@ -44,6 +44,7 @@ export const normalizeUser = (value: unknown): User | null => {
     ...(parseStringArray(user.githubSkills) ? { githubSkills: parseStringArray(user.githubSkills) } : {}),
     ...(parseStringArray(user.knownSkills) ? { knownSkills: parseStringArray(user.knownSkills) } : {}),
     ...(typeof user.cv === 'string' ? { cv: user.cv } : {}),
+    ...(typeof user.cvText === 'string' ? { cvText: user.cvText } : {}),
     ...(Array.isArray(user.achievements) ? { achievements: user.achievements as User['achievements'] } : {}),
     ...(parseStringArray(user.technologies) ? { technologies: parseStringArray(user.technologies) } : {}),
     ...(parseStringArray(user.interests) ? { interests: parseStringArray(user.interests) } : {}),

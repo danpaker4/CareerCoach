@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { TextCompletionPort } from "../../ports/text-completion.types";
 import type { LlmTokenUsageContext, LlmTokenUsageRecorder } from "../../token-usage.types";
 import { readGeminiUsage, recordLlmTokenUsage, toLlmErrorMessage } from "../../token-usage.utils";
-import { withSpan } from "../../../observability/tracing";
+import { setLangfuseGenerationResult, withSpan } from "../../../observability/tracing";
 
 export class GeminiTextCompletionAdapter implements TextCompletionPort {
     private readonly model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
@@ -36,6 +36,7 @@ export class GeminiTextCompletionAdapter implements TextCompletionPort {
                     "llm.usage.completion_tokens": usage?.completionTokens ?? 0,
                     "llm.usage.total_tokens": usage?.totalTokens ?? 0,
                 });
+                setLangfuseGenerationResult(span, prompt, text, usage);
                 await recordLlmTokenUsage(this.tokenUsageRecorder, {
                     sourceService: "roadmap-service",
                     operation: context?.operation ?? "chat.text_completion",

@@ -10,6 +10,7 @@ type RoleExperienceEntry = {
 };
 
 const GITHUB_PROJECT_COUNT_SKILL_SUFFIX = " github projects";
+const SKILL_PREVIEW_COUNT = 8;
 
 export type UserStartingPoint = {
     isEntryLevel: boolean;
@@ -34,6 +35,20 @@ const readStringArray = (value: unknown): string[] =>
 const isGithubProjectCountSkill = (skill: string): boolean =>
     skill.toLowerCase().endsWith(GITHUB_PROJECT_COUNT_SKILL_SUFFIX);
 
+const isCvStoragePath = (value: string): boolean =>
+    /^s3:\/\//i.test(value) || /^uploads\/cv\//i.test(value);
+
+const formatSkillsPreview = (userSkills: readonly string[]): string => {
+    const preview = userSkills.slice(0, SKILL_PREVIEW_COUNT).join(", ");
+    const suffix = userSkills.length > SKILL_PREVIEW_COUNT ? ", …" : "";
+    return `${preview}${suffix}`;
+};
+
+const appendSkillsToSummary = (base: string, userSkills: readonly string[]): string => {
+    if (userSkills.length === 0) return base;
+    return `${base} — skills include ${formatSkillsPreview(userSkills)}`;
+};
+
 const readAchievementSkills = (profile: Record<string, unknown> | null): string[] => {
     if (!Array.isArray(profile?.achievements)) return [];
     return profile.achievements
@@ -44,9 +59,19 @@ const readAchievementSkills = (profile: Record<string, unknown> | null): string[
         .filter((name) => name.length > 0);
 };
 
-const hasCvContent = (profile: Record<string, unknown> | null): boolean => {
+/** True when we have extractable CV text (not just an S3 upload path). */
+export const hasReadableCvText = (profile: Record<string, unknown> | null): boolean => {
+    const cvText = readString(profile?.cvText);
+    if (cvText !== null && cvText.length > 50) return true;
     const cv = readString(profile?.cv);
-    return cv !== null && cv.length > 50;
+    return cv !== null && cv.length > 50 && !isCvStoragePath(cv);
+};
+
+/** True when a CV was uploaded (S3/path) or readable CV text exists. */
+export const hasUploadedCv = (profile: Record<string, unknown> | null): boolean => {
+    if (hasReadableCvText(profile)) return true;
+    const cv = readString(profile?.cv);
+    return cv !== null && isCvStoragePath(cv);
 };
 
 const hasDocumentedRoleExperience = (profile: Record<string, unknown> | null): boolean => {
@@ -75,7 +100,7 @@ export const extractUserSkills = (
 };
 
 export const hasProfessionalExperience = (profile: Record<string, unknown> | null): boolean => {
-    if (hasCvContent(profile)) return true;
+    if (hasUploadedCv(profile)) return true;
     if (readString(profile?.currentJob) !== null) return true;
     if (hasDocumentedRoleExperience(profile)) return true;
     return false;
@@ -95,10 +120,19 @@ const ENTRY_LEVEL_NO_SIGNALS_SUMMARY =
     "Recently finished high school — no professional experience, skills, or CV provided yet.";
 
 const formatSkillsOnlySummary = (userSkills: string[], hasGithubUrl: boolean): string => {
-    const preview = userSkills.slice(0, 6).join(", ");
-    const suffix = userSkills.length > 6 ? ", …" : "";
     const source = hasGithubUrl ? "GitHub and profile" : "profile";
-    return `Early-career builder with demonstrated skills from ${source} (${preview}${suffix}) — no professional work experience or CV yet.`;
+    return `Early-career builder with demonstrated skills from ${source} (${formatSkillsPreview(userSkills)}) — no professional work experience or CV yet.`;
+};
+
+const formatCvBackedSummary = (userSkills: readonly string[], hasReadableCv: boolean): string => {
+    if (userSkills.length > 0) {
+        const cvNote = hasReadableCv ? "CV and profile" : "CV on file and profile";
+        return `Professional with ${cvNote} evidence — skills include ${formatSkillsPreview(userSkills)}`;
+    }
+    if (hasReadableCv) {
+        return "Professional with detailed CV text on file (no structured skills list extracted yet)";
+    }
+    return "Professional with CV on file (no structured skills list extracted yet)";
 };
 
 export const resolveUserStartingPoint = (
@@ -109,6 +143,7 @@ export const resolveUserStartingPoint = (
     const hasWorkExperience = hasProfessionalExperience(profile);
     const isEntryLevel = !hasWorkExperience;
     const hasGithubUrl = readString(profile?.githubUrl) !== null;
+    const readableCv = hasReadableCvText(profile);
 
     if (!hasWorkExperience && userSkills.length === 0) {
         return {
@@ -145,14 +180,19 @@ export const resolveUserStartingPoint = (
     const currentJob = readString(profile?.currentJob) ?? "Not specified";
     const explicitLevel = readString(primaryExperience?.level);
     const years = typeof primaryExperience?.years === "number" ? primaryExperience.years : 0;
+    const displayLabel = readString(primaryExperience?.displayLabel);
 
-    const currentRoleSummary = currentJob !== "Not specified"
-        ? years > 0 && primaryExperience?.displayLabel
-            ? `${currentJob} (${years} years in ${primaryExperience.displayLabel})`
-            : currentJob
-        : hasCvContent(profile)
-            ? "Early-career professional with CV on file"
-            : formatSkillsOnlySummary(userSkills, hasGithubUrl);
+    const currentRoleSummary =
+        currentJob !== "Not specified"
+            ? appendSkillsToSummary(
+                  years > 0 && displayLabel
+                      ? `${currentJob} (${years} years in ${displayLabel})`
+                      : currentJob,
+                  userSkills
+              )
+            : hasUploadedCv(profile)
+              ? formatCvBackedSummary(userSkills, readableCv)
+              : formatSkillsOnlySummary(userSkills, hasGithubUrl);
 
     return {
         isEntryLevel: false,
@@ -165,34 +205,4 @@ export const resolveUserStartingPoint = (
         preferredDomains: careerProfile?.preferredDomains ?? [],
         longTermGoals: careerProfile?.longTermGoals ?? [],
     };
-};
-
-export const formatStartingPointForPrompt = (startingPoint: UserStartingPoint): string => {
-    if (startingPoint.isEntryLevel && startingPoint.userSkills.length === 0) {
-        return [
-            "STARTING POINT: User recently finished high school.",
-            "No CV, skills list, or work experience was provided.",
-            "Do NOT assume any seniority level, domain expertise, or current job title.",
-            "Treat the user as a complete beginner entering the workforce.",
-            "Early roadmap stages must focus on foundational learning before job applications.",
-        ].join("\n");
-    }
-
-    if (startingPoint.isEntryLevel) {
-        return [
-            "STARTING POINT: User has no professional work experience or CV yet.",
-            `Demonstrated skills (GitHub/profile — treat as real evidence): ${startingPoint.userSkills.join(", ")}`,
-            "Do NOT invent seniority, past job titles, or years of industry experience.",
-            "Build on existing demonstrated skills while closing leadership, business, and experience gaps for the dream role.",
-            `Summary: ${startingPoint.currentRoleSummary}`,
-        ].join("\n");
-    }
-
-    return [
-        `Current role: ${startingPoint.currentJob}`,
-        `Summary: ${startingPoint.currentRoleSummary}`,
-        `Experience: ${startingPoint.roleExperienceYears} years at ${startingPoint.roleExperienceLevel} level`,
-        `Skills on file: ${startingPoint.userSkills.join(", ") || "none listed"}`,
-        "Use ONLY the facts above for currentRoleSummary — do not invent seniority or domains.",
-    ].join("\n");
 };

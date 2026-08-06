@@ -256,6 +256,39 @@ describe("Admin Router", () => {
         expect(payload.userAverageSeries).toEqual([]);
     });
 
+    it("serializes LiteLLM token usage", async () => {
+        await server.DBClient.users.insertOne(toUserDocument(adminUser));
+        const today = new Date(Date.now() - 1000);
+
+        await server.DBClient.llmTokenUsage.insertOne({
+            createdAt: today,
+            sourceService: "chat-service",
+            operation: "chat.decision",
+            provider: "litellm",
+            model: "chat-default",
+            promptTokens: 10,
+            completionTokens: 15,
+            totalTokens: 25,
+            tokenStatus: "known",
+            requestCount: 1,
+        });
+
+        const response = await server.app.inject({
+            method: "GET",
+            url: "/api/admin/llm-token-usage",
+            headers: authHeadersForUser(adminUser),
+        });
+
+        expect(response.statusCode).toBe(StatusCodes.OK);
+        expect(response.json().series).toEqual([
+            expect.objectContaining({
+                provider: "litellm",
+                model: "chat-default",
+                totalTokens: 25,
+            }),
+        ]);
+    });
+
     it("aggregates token usage averages per user and errors per model", async () => {
         await server.DBClient.users.insertOne(toUserDocument(adminUser));
         const now = new Date();

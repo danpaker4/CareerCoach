@@ -1,7 +1,14 @@
 import type { Collection } from "mongodb";
 import type { TypedFastify } from "../../types/fastify";
 import type { UserDocument } from "./user.model";
-import { createUserSchema, getUserSchema, updateDreamJobSchema, updateUserSchema, uploadUserCvSchema } from "./users.schema";
+import {
+    createUserSchema,
+    getUserMatchingContextSchema,
+    getUserSchema,
+    updateDreamJobSchema,
+    updateUserSchema,
+    uploadUserCvSchema,
+} from "./users.schema";
 import { UsersHandler } from "./users.handler";
 import { authenticateRequest } from "../auth/auth.middleware";
 import { authenticateUserOrInternalService } from "../auth/auth.internal.middleware";
@@ -12,8 +19,13 @@ export const usersRouter = (usersCollection: Collection<UserDocument>): register
     const handler = UsersHandler(usersCollection);
 
     fastify.get("/users/:userId", { schema: getUserSchema, preHandler: authenticateUserOrInternalService }, handler.getUserHandler);
+    fastify.get(
+        "/users/:userId/job-matching-context",
+        { schema: getUserMatchingContextSchema, preHandler: authenticateUserOrInternalService },
+        handler.getUserMatchingContextHandler,
+    );
     fastify.post("/users", { schema: createUserSchema, preHandler: authenticateRequest }, handler.createUserHandler);
-    fastify.patch("/users/:userId", { schema: updateUserSchema, preHandler: authenticateRequest }, handler.updateUserHandler);
+    fastify.patch("/users/:userId", { schema: updateUserSchema, preHandler: authenticateUserOrInternalService }, handler.updateUserHandler);
     fastify.patch(
         "/users/:userId/dream-job",
         { schema: updateDreamJobSchema, preHandler: authenticateUserOrInternalService },

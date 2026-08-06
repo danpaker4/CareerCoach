@@ -6,6 +6,7 @@ import { uploadCvToS3 } from "../cv/s3-upload/s3-upload.service";
 import type { User, UserDocument } from "./user.model";
 import { toUser } from "./user.utils";
 import type { UpdateUserCvInput } from "./users-cv.types";
+import { truncateCvTextForStorage } from "./users-cv.consts";
 import { validateCvBuffer, validatePdfFile } from "./register/register-user.utils";
 
 const resolveProfileValue = (nextValue: string | undefined, currentValue: string | null | undefined): string | undefined => {
@@ -29,8 +30,10 @@ export const updateUserCv = async (
 
     const currentUser = toUser(existingUser);
     const cv = await uploadCvToS3(input.userId, cvBuffer);
-    const cvText = await extractTextFromCv(cvBuffer);
+    const extractedCvText = await extractTextFromCv(cvBuffer);
+    const cvText = truncateCvTextForStorage(extractedCvText);
     const achievements = await extractAchievementsWithGemini({
+        userId: input.userId,
         cvText,
         currentJob: resolveProfileValue(input.currentJob, currentUser.currentJob),
         linkedInUrl: resolveProfileValue(input.linkedInUrl, currentUser.linkedInUrl),
@@ -48,6 +51,7 @@ export const updateUserCv = async (
         {
             $set: {
                 cv,
+                cvText,
                 achievements: nextAchievements,
             },
         },
@@ -58,6 +62,7 @@ export const updateUserCv = async (
     return {
         ...safeUser,
         cv,
+        cvText,
         achievements: nextAchievements,
     };
 };

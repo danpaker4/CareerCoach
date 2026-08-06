@@ -54,7 +54,7 @@ export interface ChatRateLimitConfig {
 
 export type ManagementUserAction = 'promote' | 'demote' | 'delete';
 
-export type LlmProvider = 'gemini' | 'openai' | 'custom' | 'ollama';
+export type LlmProvider = 'gemini' | 'openai' | 'custom' | 'ollama' | 'litellm';
 
 export type BenchmarkCandidateId = 'ollama-llama' | 'gemini';
 
@@ -217,7 +217,7 @@ export interface EvaluationMessage {
   content: string;
 }
 
-export type EvaluationMode = 'FAST_SEARCH' | 'GUIDED' | 'DEEP_DISCOVERY' | 'DREAMJOB';
+export type EvaluationMode = 'DREAMJOB' | 'NEAR_TERM' | 'GUIDED';
 
 export interface EvaluationExpected {
   mode?: EvaluationMode;
@@ -260,4 +260,23 @@ export interface EvaluationRunResult {
   expected: EvaluationExpected;
   metadata: EvaluationRunMetadata;
   mode?: string;
+}
+
+export type PromptfooRunStatus = 'idle' | 'running' | 'completed' | 'failed';
+
+export interface PromptfooRunOptions {
+  filterFirstN?: number;
+  filterPattern?: string;
+  noCache?: boolean;
+}
+
+export interface PromptfooRunSnapshot {
+  runId: string | null;
+  status: PromptfooRunStatus;
+  startedAt: string | null;
+  finishedAt: string | null;
+  exitCode: number | null;
+  options: PromptfooRunOptions;
+  logTail: string[];
+  error: string | null;
 }

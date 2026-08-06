@@ -61,6 +61,47 @@ const serializeHeaders = (headers: Headers): string =>
     .map(([key, value]) => `${key}:${value}`)
     .join("|");
 
+const createAbortError = (): DOMException =>
+  new DOMException("The operation was aborted", "AbortError");
+
+const omitRequestSignal = (init: RequestInit): RequestInit => {
+  const { signal, ...sharedRequestInit } = init;
+  void signal;
+  return sharedRequestInit;
+};
+
+const waitForSharedResponse = (
+  requestPromise: Promise<Response>,
+  signal: AbortSignal | null | undefined,
+): Promise<Response> => {
+  if (!signal) {
+    return requestPromise.then((response) => response.clone());
+  }
+  if (signal.aborted) {
+    return Promise.reject(createAbortError());
+  }
+
+  return new Promise<Response>((resolve, reject) => {
+    const removeAbortListener = () => signal.removeEventListener("abort", rejectAsAborted);
+    const rejectAsAborted = () => {
+      removeAbortListener();
+      reject(createAbortError());
+    };
+
+    signal.addEventListener("abort", rejectAsAborted, { once: true });
+    requestPromise.then(
+      (response) => {
+        removeAbortListener();
+        resolve(response.clone());
+      },
+      (error: unknown) => {
+        removeAbortListener();
+        reject(error);
+      },
+    );
+  });
+};
+
 const getInFlightGetRequestKey = (input: string, init: RequestInit, headers: Headers): string | null => {
   const method = (init.method ?? "GET").toUpperCase();
   if (method !== "GET" || init.body) {
@@ -132,16 +173,14 @@ export const apiFetch = async (input: string, init: RequestInit = {}): Promise<R
 
   const inFlightRequest = inFlightGetRequests.get(requestKey);
   if (inFlightRequest) {
-    const response = await inFlightRequest;
-    return response.clone();
+    return waitForSharedResponse(inFlightRequest, init.signal);
   }
 
-  // React StrictMode re-runs mount effects in development, which can otherwise duplicate page-level GETs.
-  const requestPromise = performApiFetch(input, init).finally(() => {
+  // A coalesced GET outlives individual subscribers; each caller can still stop waiting with its own signal.
+  const requestPromise = performApiFetch(input, omitRequestSignal(init)).finally(() => {
     inFlightGetRequests.delete(requestKey);
   });
 
   inFlightGetRequests.set(requestKey, requestPromise);
-  const response = await requestPromise;
-  return response.clone();
+  return waitForSharedResponse(requestPromise, init.signal);
 };

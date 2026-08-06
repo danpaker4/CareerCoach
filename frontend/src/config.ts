@@ -1,4 +1,15 @@
+import { z } from "zod";
+
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+const optionalUrlSchema = z.preprocess(
+  (value: unknown): unknown => typeof value === "string" && value.trim().length === 0 ? undefined : value,
+  z.string().url().optional(),
+);
+
+const frontendEnvSchema = z.object({
+  VITE_LANGFUSE_DASHBOARD_URL: optionalUrlSchema,
+});
 
 const normalizeLocalServiceUrl = (rawUrl: string | undefined): string => {
   if (!rawUrl) {
@@ -24,6 +35,8 @@ const normalizeLocalServiceUrl = (rawUrl: string | undefined): string => {
   }
 };
 
+const frontendEnv = frontendEnvSchema.parse(import.meta.env);
+
 export const ENV = {
   GITHUB_CLIENT_ID: import.meta.env.VITE_CLIENT_ID,
   GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY as string | undefined,
@@ -32,4 +45,8 @@ export const ENV = {
   JOB_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_JOB_SERVICE_BASE_URL) || "",
   ROADMAP_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_ROADMAP_SERVICE_BASE_URL) || "",
   EVALUATION_SERVICE_BASE_URL: normalizeLocalServiceUrl(import.meta.env.VITE_EVALUATION_SERVICE_BASE_URL) || "",
+  PROMPTFOO_VIEW_URL: normalizeLocalServiceUrl(import.meta.env.VITE_PROMPTFOO_VIEW_URL) || "",
+  LANGFUSE_DASHBOARD_URL: frontendEnv.VITE_LANGFUSE_DASHBOARD_URL
+    ? normalizeLocalServiceUrl(frontendEnv.VITE_LANGFUSE_DASHBOARD_URL)
+    : "",
 };

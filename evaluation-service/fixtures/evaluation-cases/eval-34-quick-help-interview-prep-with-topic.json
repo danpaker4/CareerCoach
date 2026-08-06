@@ -1,0 +1,29 @@
+{
+    "id": "eval-34-quick-help-interview-prep-with-topic",
+    "messages": [
+        {
+            "role": "user",
+            "content": "Help me prepare for interviews"
+        },
+        {
+            "role": "assistant",
+            "content": "What subject or role do you want to practice interviewing for? (for example: React, system design, behavioral questions for a PM role)"
+        },
+        {
+            "role": "user",
+            "content": "React"
+        }
+    ],
+    "expected": {
+        "mode": "INTERVIEW_PREP",
+        "maxLines": 20,
+        "forbiddenWords": [
+            "write a function",
+            "write code",
+            "implement the following",
+            "pseudocode",
+            "here are open jobs",
+            "I found these jobs"
+        ]
+    }
+}

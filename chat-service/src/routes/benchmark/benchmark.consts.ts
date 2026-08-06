@@ -1,5 +1,4 @@
-import { DEFAULT_GEMINI_MODEL, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL } from "../../ai/llm-config.consts";
-import type { JobSearchResultItem } from "../chat/chat.types";
+import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
 import type { BenchmarkCase } from "./benchmark.types";
 
 export const BENCHMARK_ROUTE_PREFIX = "/api/chat/benchmarks";
@@ -7,9 +6,8 @@ export const BENCHMARK_DEFAULT_RUN_LIMIT = 10;
 export const BENCHMARK_MAX_RUN_LIMIT = 50;
 export const BENCHMARK_USER_ID_PREFIX = "benchmark-user";
 export const BENCHMARK_RANDOM_CASE_COUNT = 3;
-export const BENCHMARK_OLLAMA_MODEL_FALLBACK = DEFAULT_OLLAMA_MODEL;
-export const BENCHMARK_OLLAMA_BASE_URL_FALLBACK = DEFAULT_OLLAMA_BASE_URL;
-export const BENCHMARK_GEMINI_MODEL_FALLBACK = DEFAULT_GEMINI_MODEL;
+export const BENCHMARK_DEFAULT_MODEL = "chat-default";
+export const BENCHMARK_FALLBACK_MODEL = "chat-fallback";
 
 export const BENCHMARK_RUBRIC = [
     {

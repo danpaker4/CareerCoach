@@ -32,6 +32,16 @@
   font-size: var(--fz-sm);
 }
 
+.job-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary.job-upload-btn:hover {
+  box-shadow: none;
+}
+
 /* Search bar */
 .jobs-search-bar {
   margin-bottom: 20px;
@@ -256,4 +266,23 @@
   .jobs-grid {
     grid-template-columns: 1fr;
   }
+}
+.jobs-ranking-notice {
+  margin: 0 0 16px;
+  color: var(--color-text-secondary, #5f6b7a);
+}
+
+.jobs-load-more {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.jobs-load-more-button {
+  min-width: 180px;
 }

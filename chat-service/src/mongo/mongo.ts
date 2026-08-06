@@ -2,16 +2,17 @@ import { MongoClient as MongoDbClient, type Collection, type Db, type MongoClien
 import { Service } from "../types/service";
 import type { Conversation } from "../routes/conversation/conversation.model";
 import type { UserCareerProfileDocument } from "../routes/career-profile/career-profile.model";
-import type { CareerDirectionExample } from "../routes/chat/knowledge/career-knowledge.types";
-import type { LlmTokenUsageDocument } from "../ai/token-usage.types";
+import type { CareerDirectionExample } from "../chat-flow/stage-6-present-jobs/knowledge/career-knowledge.types";
+import type { LlmTokenUsageDocument } from "../ai/token-usage/token-usage.types";
 import type { BenchmarkRunDocument } from "../routes/benchmark/benchmark.types";
 import type {
     ChatActiveRequestDocument,
     ChatRateLimitConfigDocument,
     ChatRateLimitConfigHistoryDocument,
     ChatRateLimitCounterDocument,
-} from "../routes/chat/rate-limit/chat-rate-limit.types";
-import type { ChatRequestDocument, ChatSocketTicketDocument } from "../routes/chat/request/chat-request.types";
+} from "../chat-flow/stage-0-gateway/rate-limit/chat-rate-limit.types";
+import type { ChatRequestDocument, ChatSocketTicketDocument } from "../chat-flow/api/async-jobs/chat-request.types";
+import type { DatabaseConfig } from "./mongo.types";
 
 export class MongoClient implements Service {
     private readonly mongoClient: MongoDbClient;
@@ -226,8 +227,3 @@ export class MongoClient implements Service {
         return this.chatSocketTicketsCollection;
     }
 }
-
-export type DatabaseConfig = {
-    mongoConnectionString: string;
-    mongoKeyPath?: string;
-};

@@ -1,0 +1,27 @@
+{
+    "id": "eval-30-quick-help-skills-gap-with-role",
+    "messages": [
+        {
+            "role": "user",
+            "content": "What skills should I learn for my next role?"
+        },
+        {
+            "role": "assistant",
+            "content": "Which role are you aiming for next? Share the job title (for example: Frontend Engineer, QA Automation, Product Manager)."
+        },
+        {
+            "role": "user",
+            "content": "Frontend Engineer"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 20,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs",
+            "apply now",
+            "job listings"
+        ]
+    }
+}

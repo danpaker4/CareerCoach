@@ -33,10 +33,6 @@ export default defineConfig({
         target: 'http://localhost:3003',
         changeOrigin: true,
       },
-      '/skill-matcher': {
-        target: 'http://localhost:3003',
-        changeOrigin: true,
-      },
       '/career-roadmap': {
         target: 'http://localhost:3003',
         changeOrigin: true,

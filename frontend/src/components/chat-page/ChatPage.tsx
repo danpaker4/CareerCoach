@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatInterface } from '../chat-component/Chat';
 import type { User } from '../../types/user';
-import type { ChatExportSnapshot, ConversationSummary } from '../chat-component/chat.types';
+import type { ChatExportSnapshot, ChatInterfaceHandle, ConversationSummary } from '../chat-component/chat.types';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import { formatChatJsonExport } from '../chat-component/chat-export.utils';
@@ -44,7 +44,6 @@ const QUICK_PROMPTS = [
   'Review my career progress so far',
   'Suggest jobs that match my profile',
   'How can I improve my CV?',
-  'What salary should I expect?',
   'Help me prepare for interviews',
 ];
 
@@ -55,20 +54,33 @@ export const ChatPage = ({ user }: ChatPageProps) => {
   const [createError, setCreateError] = useState<string | null>(null);
   const [exportSnapshot, setExportSnapshot] = useState<ChatExportSnapshot | null>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
+  const [profileUser, setProfileUser] = useState(user);
+  const chatRef = useRef<ChatInterfaceHandle>(null);
+
+  useEffect(() => {
+    setProfileUser(user);
+  }, [user]);
 
   const userProfile = {
-    firstName: user.firstName,
-    lastName: user.lastName,
-    currentJob: user.currentJob,
-    achievements: user.achievements,
-    technologies: user.technologies,
-    interests: user.interests,
-    githubSkills: user.githubSkills,
-    knownSkills: user.knownSkills,
-    cvExcerpt:
-      typeof user.cv === 'string' && user.cv.trim().length > 0
-        ? user.cv.trim().slice(0, MAX_CV_EXCERPT_CHARS)
-        : undefined,
+    firstName: profileUser.firstName,
+    lastName: profileUser.lastName,
+    currentJob: profileUser.currentJob,
+    achievements: profileUser.achievements,
+    technologies: profileUser.technologies,
+    interests: profileUser.interests,
+    githubSkills: profileUser.githubSkills,
+    knownSkills: profileUser.knownSkills,
+    cvExcerpt: (() => {
+      const fromText = typeof profileUser.cvText === 'string' ? profileUser.cvText.trim() : '';
+      if (fromText.length > 0) {
+        return fromText.slice(0, MAX_CV_EXCERPT_CHARS);
+      }
+      const fromCv = typeof profileUser.cv === 'string' ? profileUser.cv.trim() : '';
+      if (fromCv.length === 0 || /^s3:\/\//i.test(fromCv) || /^uploads\/cv\//i.test(fromCv)) {
+        return undefined;
+      }
+      return fromCv.slice(0, MAX_CV_EXCERPT_CHARS);
+    })(),
   } as const;
 
   const activeExportSnapshot = exportSnapshot?.conversationId === activeConversationId ? exportSnapshot : null;
@@ -226,13 +238,7 @@ export const ChatPage = ({ user }: ChatPageProps) => {
                 type="button"
                 className="chat-prompt-btn"
                 onClick={() => {
-                  const textarea = document.querySelector<HTMLTextAreaElement>('.input-area textarea');
-                  if (textarea) {
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
-                    nativeInputValueSetter?.call(textarea, prompt);
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    textarea.focus();
-                  }
+                  chatRef.current?.sendPrompt(prompt);
                 }}
               >
                 {prompt}
@@ -309,10 +315,12 @@ export const ChatPage = ({ user }: ChatPageProps) => {
             <div className="chat-loading-placeholder">Loading your conversations…</div>
           ) : (
             <ChatInterface
+              ref={chatRef}
               key={activeConversationId}
               userId={user.id}
               conversationId={activeConversationId}
               onExportSnapshotChange={handleExportSnapshotChange}
+              onUserUpdated={setProfileUser}
               userProfile={userProfile}
             />
           )}
