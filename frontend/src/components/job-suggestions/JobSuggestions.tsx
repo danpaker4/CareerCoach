@@ -226,7 +226,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         <div className="jobs-header">
           <div>
             <h1 className="jobs-title">Job Suggestions</h1>
-            <p className="jobs-subtitle">Jobs matched to your profile — search filters to 20%+ fit</p>
+            <p className="jobs-subtitle">Search by role — match % reflects query relevance</p>
           </div>
           <button
             type="button"
@@ -267,13 +267,13 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
             </p>
 
             {rankingMode === 'profile_query' && searchQuery.trim().length > 0 && (
-              <p className="jobs-ranking-notice">Showing jobs with at least 20% profile match for your search.</p>
+              <p className="jobs-ranking-notice">Results ranked by your search, with match % based on query relevance.</p>
+            )}
+            {rankingMode === 'query' && (
+              <p className="jobs-ranking-notice">Results ranked by your search query.</p>
             )}
             {rankingMode === 'recent' && (
               <p className="jobs-ranking-notice">Personalized recommendations are being prepared. Showing recent jobs for now.</p>
-            )}
-            {rankingMode === 'query' && (
-              <p className="jobs-ranking-notice">Your profile match is being prepared. Results are ranked by your search for now.</p>
             )}
             {rankingMode === 'keyword' && (
               <p className="jobs-ranking-notice">Semantic search is temporarily unavailable. Showing keyword matches.</p>

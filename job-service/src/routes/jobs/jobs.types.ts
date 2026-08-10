@@ -44,4 +44,7 @@ export interface JobsPageQuery {
 export interface JobsRankingStrategy {
     readonly vector: number[] | null;
     readonly mode: JobsRankingMode;
+    /** Vector used for matchPct / fit filtering (query when searching, profile when browsing). */
+    readonly scoreVector: number[] | null;
+    readonly searchTerm: string;
 }

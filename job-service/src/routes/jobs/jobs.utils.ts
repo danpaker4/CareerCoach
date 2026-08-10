@@ -6,8 +6,8 @@ import {
     JOBS_LIST_MIN_MATCH_FIT_PCT,
     JOBS_PAGE_LOOKAHEAD,
     JOBS_PAGE_SIZE,
-    PROFILE_QUERY_WEIGHT,
-    SEARCH_QUERY_WEIGHT,
+    SEARCH_LEXICAL_MATCH_WEIGHT,
+    SEARCH_VECTOR_MATCH_WEIGHT,
 } from "./jobs.consts";
 import type {
     JobResult,
@@ -23,27 +23,6 @@ const JobsCursorSchema = z.object({
     rankingFingerprint: z.string().length(64),
 });
 
-const normalizeVector = (vector: readonly number[]): number[] => {
-    const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
-    return magnitude === 0 ? [] : vector.map((value) => value / magnitude);
-};
-
-export const blendSearchAndProfileVectors = (
-    searchVector: readonly number[],
-    profileVector: readonly number[],
-): number[] => {
-    if (searchVector.length === 0 || searchVector.length !== profileVector.length) return [];
-    const normalizedSearch = normalizeVector(searchVector);
-    const normalizedProfile = normalizeVector(profileVector);
-    if (normalizedSearch.length === 0 || normalizedProfile.length === 0) return [];
-
-    return normalizeVector(
-        normalizedSearch.map(
-            (value, index) => value * SEARCH_QUERY_WEIGHT + normalizedProfile[index] * PROFILE_QUERY_WEIGHT,
-        ),
-    );
-};
-
 export const encodeJobsCursor = (cursor: JobsCursor): string =>
     Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 
@@ -58,21 +37,80 @@ export const decodeJobsCursor = (value: string): JobsCursor | null => {
 };
 
 export const shouldApplyMinMatchFitFilter = (
-    profileContext: UserMatchingContext | null,
+    scoreVector: readonly number[] | null,
     rankingMode: JobsRankingMode,
     searchTerm = "",
 ): boolean =>
     searchTerm.trim().length > 0 &&
-    profileContext !== null &&
-    (rankingMode === "profile" || rankingMode === "profile_query");
+    scoreVector !== null &&
+    scoreVector.length > 0 &&
+    (rankingMode === "profile_query" || rankingMode === "query");
+
+const tokenizeSearchTerm = (searchTerm: string): string[] =>
+    searchTerm
+        .toLowerCase()
+        .split(/[^a-z0-9+#.]+/i)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2);
+
+/** Keyword overlap score (0–100), with heavier weight on title hits and exact phrase matches. */
+export const computeLexicalMatchPct = (job: RankedJob, searchTerm: string): number => {
+    const trimmed = searchTerm.trim().toLowerCase();
+    if (trimmed.length === 0) return 0;
+
+    const title = job.jobTitle.toLowerCase();
+    const body = `${job.description} ${(job.requirements ?? []).join(" ")}`.toLowerCase();
+    if (title.includes(trimmed)) return 100;
+    if (body.includes(trimmed)) return 85;
+
+    const tokens = tokenizeSearchTerm(trimmed);
+    if (tokens.length === 0) return 0;
+
+    const titleHits = tokens.filter((token) => title.includes(token)).length;
+    const bodyHits = tokens.filter((token) => body.includes(token)).length;
+    const titleCoverage = titleHits / tokens.length;
+    const bodyCoverage = bodyHits / tokens.length;
+    return Math.round(Math.min(1, titleCoverage * 0.8 + bodyCoverage * 0.2) * 100);
+};
+
+export const computeJobMatchPct = (
+    job: RankedJob,
+    scoreVector: readonly number[] | null,
+    searchTerm = "",
+): number | undefined => {
+    if (!scoreVector || job.searchEmbedding.length !== scoreVector.length) {
+        if (searchTerm.trim().length === 0) return undefined;
+        const lexicalOnly = computeLexicalMatchPct(job, searchTerm);
+        return lexicalOnly > 0 ? lexicalOnly : undefined;
+    }
+
+    const vectorPct = computeVectorMatchScore([...scoreVector], job.searchEmbedding);
+    if (searchTerm.trim().length === 0) return vectorPct;
+
+    const lexicalPct = computeLexicalMatchPct(job, searchTerm);
+    return Math.round(
+        vectorPct * SEARCH_VECTOR_MATCH_WEIGHT + lexicalPct * SEARCH_LEXICAL_MATCH_WEIGHT,
+    );
+};
 
 export const filterRankedJobsByMinMatchFit = (
     jobs: readonly RankedJob[],
-    profileContext: UserMatchingContext,
+    scoreVector: readonly number[],
+    searchTerm = "",
 ): RankedJob[] =>
-    jobs.filter((job) => {
-        if (job.searchEmbedding.length !== profileContext.embedding.length) return false;
-        return computeVectorMatchScore(profileContext.embedding, job.searchEmbedding) >= JOBS_LIST_MIN_MATCH_FIT_PCT;
+    jobs.filter((job) => (computeJobMatchPct(job, scoreVector, searchTerm) ?? 0) >= JOBS_LIST_MIN_MATCH_FIT_PCT);
+
+/** Re-rank vector candidates so title/keyword matches outrank weak semantic neighbors. */
+export const rankJobsByQueryRelevance = (
+    jobs: readonly RankedJob[],
+    scoreVector: readonly number[],
+    searchTerm: string,
+): RankedJob[] =>
+    [...jobs].sort((left, right) => {
+        const leftScore = computeJobMatchPct(left, scoreVector, searchTerm) ?? 0;
+        const rightScore = computeJobMatchPct(right, scoreVector, searchTerm) ?? 0;
+        if (rightScore !== leftScore) return rightScore - leftScore;
+        return left.jobTitle.localeCompare(right.jobTitle);
     });
 
 export const sliceJobsPageWindow = (jobs: readonly RankedJob[], offset: number): RankedJob[] =>
@@ -94,16 +132,19 @@ export const createRankingFingerprint = (
         profileHash,
         rankingMode,
         embeddingModel,
-        String(SEARCH_QUERY_WEIGHT),
-        String(PROFILE_QUERY_WEIGHT),
-        shouldApplyMinMatchFitFilter(profileContext, rankingMode, search)
-            ? `minMatch:${JOBS_LIST_MIN_MATCH_FIT_PCT}`
-            : "minMatch:none",
+        String(SEARCH_VECTOR_MATCH_WEIGHT),
+        String(SEARCH_LEXICAL_MATCH_WEIGHT),
+        search.trim().length > 0 ? `minMatch:${JOBS_LIST_MIN_MATCH_FIT_PCT}` : "minMatch:none",
+        "search-relevance-v2",
     ].join("|");
     return createHash("sha256").update(input).digest("hex");
 };
 
-const toJobResult = (job: RankedJob, profileContext: UserMatchingContext | null): JobResult => ({
+const toJobResult = (
+    job: RankedJob,
+    scoreVector: readonly number[] | null,
+    searchTerm: string,
+): JobResult => ({
     id: job.id,
     jobTitle: job.jobTitle,
     company: job.company,
@@ -113,20 +154,18 @@ const toJobResult = (job: RankedJob, profileContext: UserMatchingContext | null)
     salary: job.salary,
     requirements: job.requirements,
     benefits: job.benefits,
-    matchPct:
-        profileContext && job.searchEmbedding.length === profileContext.embedding.length
-            ? computeVectorMatchScore(profileContext.embedding, job.searchEmbedding)
-            : undefined,
+    matchPct: computeJobMatchPct(job, scoreVector, searchTerm),
 });
 
 export const toJobsPageResponse = (
     rankedJobs: readonly RankedJob[],
-    profileContext: UserMatchingContext | null,
+    scoreVector: readonly number[] | null,
     rankingMode: JobsRankingMode,
     cursor: JobsCursor,
+    searchTerm = "",
 ): JobsPageResponse => {
     const hasMore = rankedJobs.length > JOBS_PAGE_SIZE;
-    const jobs = rankedJobs.slice(0, JOBS_PAGE_SIZE).map((job) => toJobResult(job, profileContext));
+    const jobs = rankedJobs.slice(0, JOBS_PAGE_SIZE).map((job) => toJobResult(job, scoreVector, searchTerm));
     const nextCursor = hasMore
         ? encodeJobsCursor({ ...cursor, offset: cursor.offset + JOBS_PAGE_SIZE })
         : null;

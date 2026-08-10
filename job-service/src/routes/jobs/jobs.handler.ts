@@ -22,11 +22,11 @@ import type {
   RankedJob,
 } from "./jobs.types";
 import {
-  blendSearchAndProfileVectors,
   createRankingFingerprint,
   decodeJobsCursor,
   filterRankedJobsByMinMatchFit,
   isProfileContextCompatible,
+  rankJobsByQueryRelevance,
   shouldApplyMinMatchFitFilter,
   sliceJobsPageWindow,
   toJobsPageResponse,
@@ -77,26 +77,58 @@ const resolveRankingStrategy = async (
   request: FastifyRequest,
 ): Promise<JobsRankingStrategy> => {
   if (!vectorSearchEnabled) {
-    return { vector: null, mode: term ? "keyword" : "recent" };
+    return {
+      vector: null,
+      mode: term ? "keyword" : "recent",
+      scoreVector: profileContext?.embedding ?? null,
+      searchTerm: term,
+    };
   }
 
   if (!term) {
     return profileContext
-      ? { vector: profileContext.embedding, mode: "profile" }
-      : { vector: null, mode: "recent" };
+      ? {
+          vector: profileContext.embedding,
+          mode: "profile",
+          scoreVector: profileContext.embedding,
+          searchTerm: term,
+        }
+      : { vector: null, mode: "recent", scoreVector: null, searchTerm: term };
   }
 
   try {
     const searchVector = await generateQueryVector(term);
-    if (!searchVector) return { vector: null, mode: "keyword" };
-    if (!profileContext) return { vector: searchVector, mode: "query" };
-    const blendedVector = blendSearchAndProfileVectors(searchVector, profileContext.embedding);
-    return blendedVector.length > 0
-      ? { vector: blendedVector, mode: "profile_query" }
-      : { vector: searchVector, mode: "query" };
+    if (!searchVector) {
+      return {
+        vector: null,
+        mode: "keyword",
+        scoreVector: profileContext?.embedding ?? null,
+        searchTerm: term,
+      };
+    }
+    if (!profileContext) {
+      return {
+        vector: searchVector,
+        mode: "query",
+        scoreVector: searchVector,
+        searchTerm: term,
+      };
+    }
+    return {
+      // Rank by the query embedding so profile neighbors (e.g. security roles) do not crowd Rust hits.
+      vector: searchVector,
+      mode: "profile_query",
+      scoreVector: searchVector,
+      searchTerm: term,
+    };
   } catch (error) {
     request.log.warn({ err: error }, "Query embedding failed; falling back to keyword search");
-    return { vector: null, mode: "keyword" };
+    return {
+      vector: null,
+      mode: "keyword",
+      scoreVector: profileContext?.embedding ?? null,
+      searchTerm: term,
+    };
   }
 };
 
@@ -191,13 +223,23 @@ export const JobsHandler = ({
       };
       if (!strategy.vector) {
         const jobs = await fallbackSearch(jobsCollection, term, offset, asOf);
-        reply.code(StatusCodes.OK).send(toJobsPageResponse(jobs, profileContext, strategy.mode, cursor));
+        reply.code(StatusCodes.OK).send(toJobsPageResponse(
+          jobs,
+          strategy.scoreVector,
+          strategy.mode,
+          cursor,
+          term,
+        ));
         return;
       }
 
       try {
-        const applyMinMatchFilter = shouldApplyMinMatchFitFilter(profileContext, strategy.mode, term);
-        if (applyMinMatchFilter && profileContext) {
+        const applyMinMatchFilter = shouldApplyMinMatchFitFilter(
+          strategy.scoreVector,
+          strategy.mode,
+          term,
+        );
+        if (applyMinMatchFilter && strategy.scoreVector) {
           const candidateLimit = Math.min(
             MAX_VECTOR_CANDIDATES,
             Math.max(
@@ -213,11 +255,26 @@ export const JobsHandler = ({
             config.JOB_VECTOR_INDEX_NAME,
             { candidateLimit },
           );
-          const highMatchJobs = filterRankedJobsByMinMatchFit(candidates, profileContext);
-          // No jobs clear the match floor — fall back to the full ranked list.
-          const rankedForPage = highMatchJobs.length > 0 ? highMatchJobs : candidates;
+          const relevanceRanked = rankJobsByQueryRelevance(
+            candidates,
+            strategy.scoreVector,
+            term,
+          );
+          const highMatchJobs = filterRankedJobsByMinMatchFit(
+            relevanceRanked,
+            strategy.scoreVector,
+            term,
+          );
+          // No jobs clear the match floor — fall back to the full query-ranked list.
+          const rankedForPage = highMatchJobs.length > 0 ? highMatchJobs : relevanceRanked;
           const jobs = sliceJobsPageWindow(rankedForPage, offset);
-          reply.code(StatusCodes.OK).send(toJobsPageResponse(jobs, profileContext, strategy.mode, cursor));
+          reply.code(StatusCodes.OK).send(toJobsPageResponse(
+            jobs,
+            strategy.scoreVector,
+            strategy.mode,
+            cursor,
+            term,
+          ));
           return;
         }
 
@@ -228,7 +285,13 @@ export const JobsHandler = ({
           asOf,
           config.JOB_VECTOR_INDEX_NAME,
         );
-        reply.code(StatusCodes.OK).send(toJobsPageResponse(jobs, profileContext, strategy.mode, cursor));
+        reply.code(StatusCodes.OK).send(toJobsPageResponse(
+          jobs,
+          strategy.scoreVector,
+          strategy.mode,
+          cursor,
+          term,
+        ));
       } catch (error) {
         request.log.warn({ err: error }, "Vector search failed; using deterministic fallback");
         if (decodedCursor) {
@@ -246,9 +309,10 @@ export const JobsHandler = ({
         const jobs = await fallbackSearch(jobsCollection, term, 0, asOf);
         reply.code(StatusCodes.OK).send(toJobsPageResponse(
           jobs,
-          profileContext,
+          strategy.scoreVector,
           fallbackMode,
           { ...cursor, rankingFingerprint: fallbackFingerprint },
+          term,
         ));
       }
     } catch (error) {
