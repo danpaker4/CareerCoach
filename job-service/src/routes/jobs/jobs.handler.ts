@@ -196,7 +196,7 @@ export const JobsHandler = ({
       }
 
       try {
-        const applyMinMatchFilter = shouldApplyMinMatchFitFilter(profileContext, strategy.mode);
+        const applyMinMatchFilter = shouldApplyMinMatchFitFilter(profileContext, strategy.mode, term);
         if (applyMinMatchFilter && profileContext) {
           const candidateLimit = Math.min(
             MAX_VECTOR_CANDIDATES,
@@ -214,7 +214,9 @@ export const JobsHandler = ({
             { candidateLimit },
           );
           const highMatchJobs = filterRankedJobsByMinMatchFit(candidates, profileContext);
-          const jobs = sliceJobsPageWindow(highMatchJobs, offset);
+          // No jobs clear the match floor — fall back to the full ranked list.
+          const rankedForPage = highMatchJobs.length > 0 ? highMatchJobs : candidates;
+          const jobs = sliceJobsPageWindow(rankedForPage, offset);
           reply.code(StatusCodes.OK).send(toJobsPageResponse(jobs, profileContext, strategy.mode, cursor));
           return;
         }

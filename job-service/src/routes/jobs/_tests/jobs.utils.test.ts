@@ -8,6 +8,7 @@ import {
     encodeJobsCursor,
     filterRankedJobsByMinMatchFit,
     isProfileContextCompatible,
+    shouldApplyMinMatchFitFilter,
     sliceJobsPageWindow,
     toJobsPageResponse,
 } from "../jobs.utils";
@@ -86,6 +87,12 @@ describe("job ranking utilities", () => {
         expect(result.pagination.hasMore).toBe(true);
         expect(result.pagination.nextCursor).not.toBeNull();
         expect(decodeJobsCursor(result.pagination.nextCursor ?? "")?.offset).toBe(50);
+    });
+
+    it("applies the match filter only when a search term is present", () => {
+        expect(shouldApplyMinMatchFitFilter(PROFILE_CONTEXT, "profile", "")).toBe(false);
+        expect(shouldApplyMinMatchFitFilter(PROFILE_CONTEXT, "profile_query", "react")).toBe(true);
+        expect(shouldApplyMinMatchFitFilter(null, "profile_query", "react")).toBe(false);
     });
 
     it("filters ranked jobs below the minimum match fit percentage", () => {

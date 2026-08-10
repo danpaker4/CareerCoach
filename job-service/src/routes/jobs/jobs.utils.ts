@@ -3,9 +3,9 @@ import { z } from "zod";
 import type { UserMatchingContext } from "../../cache/user-embedding.cache";
 import { cosineSimilarity, computeVectorMatchScore } from "../jobScores/vector-score.service";
 import {
+    JOBS_LIST_MIN_MATCH_FIT_PCT,
     JOBS_PAGE_LOOKAHEAD,
     JOBS_PAGE_SIZE,
-    MIN_MATCH_FIT_PCT,
     PROFILE_QUERY_WEIGHT,
     SEARCH_QUERY_WEIGHT,
 } from "./jobs.consts";
@@ -60,7 +60,9 @@ export const decodeJobsCursor = (value: string): JobsCursor | null => {
 export const shouldApplyMinMatchFitFilter = (
     profileContext: UserMatchingContext | null,
     rankingMode: JobsRankingMode,
+    searchTerm = "",
 ): boolean =>
+    searchTerm.trim().length > 0 &&
     profileContext !== null &&
     (rankingMode === "profile" || rankingMode === "profile_query");
 
@@ -70,7 +72,7 @@ export const filterRankedJobsByMinMatchFit = (
 ): RankedJob[] =>
     jobs.filter((job) => {
         if (job.searchEmbedding.length !== profileContext.embedding.length) return false;
-        return computeVectorMatchScore(profileContext.embedding, job.searchEmbedding) >= MIN_MATCH_FIT_PCT;
+        return computeVectorMatchScore(profileContext.embedding, job.searchEmbedding) >= JOBS_LIST_MIN_MATCH_FIT_PCT;
     });
 
 export const sliceJobsPageWindow = (jobs: readonly RankedJob[], offset: number): RankedJob[] =>
@@ -94,8 +96,8 @@ export const createRankingFingerprint = (
         embeddingModel,
         String(SEARCH_QUERY_WEIGHT),
         String(PROFILE_QUERY_WEIGHT),
-        shouldApplyMinMatchFitFilter(profileContext, rankingMode)
-            ? `minMatch:${MIN_MATCH_FIT_PCT}`
+        shouldApplyMinMatchFitFilter(profileContext, rankingMode, search)
+            ? `minMatch:${JOBS_LIST_MIN_MATCH_FIT_PCT}`
             : "minMatch:none",
     ].join("|");
     return createHash("sha256").update(input).digest("hex");

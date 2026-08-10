@@ -226,7 +226,7 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
         <div className="jobs-header">
           <div>
             <h1 className="jobs-title">Job Suggestions</h1>
-            <p className="jobs-subtitle">Only strong profile matches (80%+) when personalization is ready</p>
+            <p className="jobs-subtitle">Jobs matched to your profile — search filters to 20%+ fit</p>
           </div>
           <button
             type="button"
@@ -266,8 +266,8 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
               <strong>{jobs.length}</strong> {jobs.length === 1 ? 'job' : 'jobs'} loaded
             </p>
 
-            {(rankingMode === 'profile' || rankingMode === 'profile_query') && (
-              <p className="jobs-ranking-notice">Showing jobs with at least 80% profile match.</p>
+            {rankingMode === 'profile_query' && searchQuery.trim().length > 0 && (
+              <p className="jobs-ranking-notice">Showing jobs with at least 20% profile match for your search.</p>
             )}
             {rankingMode === 'recent' && (
               <p className="jobs-ranking-notice">Personalized recommendations are being prepared. Showing recent jobs for now.</p>
@@ -282,12 +282,8 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
             {jobs.length === 0 && (
               <div className="jobs-empty surface-card">
                 <img src={iconBriefcase} alt="" className="jobs-empty-icon" aria-hidden="true" />
-                <h2>No strong matches found</h2>
-                <p>
-                  {(rankingMode === 'profile' || rankingMode === 'profile_query')
-                    ? 'Try a different search, update your CV/skills, or check back later for new high-fit roles.'
-                    : 'Try a different search term or check back later for new matches.'}
-                </p>
+                <h2>No jobs found</h2>
+                <p>Try a different search term or check back later for new matches.</p>
               </div>
             )}
 
