@@ -63,3 +63,18 @@ export const createJobSchema = {
     }),
   },
 } satisfies FastifySchema;
+
+export const deleteJobSchema = {
+  params: z.object({
+    id: z.string().min(1).max(200),
+  }),
+  response: {
+    [StatusCodes.OK]: z.object({
+      message: z.string(),
+      status: z.literal("OK"),
+    }),
+    [StatusCodes.NOT_FOUND]: z.object({
+      message: z.string(),
+    }),
+  },
+} satisfies FastifySchema;

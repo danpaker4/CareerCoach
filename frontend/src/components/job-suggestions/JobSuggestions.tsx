@@ -5,6 +5,7 @@ import iconBriefcase from '../../assets/icon-briefcase.svg';
 import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
+import iconX from '../../assets/icon-x.svg';
 import { UploadJobModal } from './UploadJobModal';
 import { JobSuggestionsSkeleton } from './JobSuggestionsSkeleton';
 import { JOB_SEARCH_DEBOUNCE_MS, JOBS_PREFETCH_ROOT_MARGIN } from './job-suggestions.consts';
@@ -36,7 +37,9 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [addingJob, setAddingJob] = useState<string | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const [pipelineJobIdToEntryId, setPipelineJobIdToEntryId] = useState(() => new Map<number, string>());
+  const isAdmin = user.role === 'admin';
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -219,6 +222,28 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
     }
   };
 
+  const handleDeleteJob = async (job: JobResult) => {
+    if (!isAdmin || deletingJobId) return;
+    const confirmed = window.confirm(`Delete “${job.jobTitle}” at ${job.company}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingJobId(job.id);
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs/${encodeURIComponent(job.id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      setJobs((current) => current.filter((item) => item.id !== job.id));
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to delete job');
+    } finally {
+      setDeletingJobId(null);
+    }
+  };
+
   return (
     <div className="jobs-page">
       <div className="jobs-container">
@@ -296,8 +321,20 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                   const isAdding = addingJob === job.id;
                   const jobHash = hashStringToNumber(job.id);
                   const alreadyInPipeline = pipelineJobIdToEntryId.has(jobHash);
+                  const isDeleting = deletingJobId === job.id;
                   return (
-                    <div key={job.id} className="job-card surface-card">
+                    <div key={job.id} className={`job-card surface-card${isDeleting ? ' job-card--deleting' : ''}`}>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className="job-admin-delete-btn"
+                          onClick={() => void handleDeleteJob(job)}
+                          disabled={isDeleting}
+                          aria-label={`Delete ${job.jobTitle}`}
+                        >
+                          <img src={iconX} alt="" aria-hidden="true" className="job-admin-delete-icon" />
+                        </button>
+                      )}
                       <div className="job-card-top">
                         <div className="job-card-info">
                           <h3 className="job-title">{job.jobTitle}</h3>

@@ -381,4 +381,25 @@ export const JobsHandler = ({
       });
     }
   },
+
+  deleteJobHandler: async (
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ) => {
+    try {
+      const { id } = request.params;
+      const result = await jobsCollection.deleteOne({ id });
+      if (result.deletedCount === 0) {
+        reply.code(StatusCodes.NOT_FOUND).send({ message: "Job not found" });
+        return;
+      }
+      reply.code(StatusCodes.OK).send({ message: `Job ${id} deleted`, status: "OK" as const });
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to delete job");
+      reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
+        message: "Failed to delete job",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  },
 });

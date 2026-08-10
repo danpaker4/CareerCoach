@@ -6,7 +6,7 @@ import type { LlmTokenUsageDocument } from "../../llm-token-usage/llm-token-usag
 import type { UserEmbeddingCache } from "../../cache/user-embedding.cache";
 import { LlmTokenUsageRepository } from "../../llm-token-usage/llm-token-usage.repository";
 import { JobsHandler } from "./jobs.handler";
-import { createJobSchema, getJobsSchema } from "./jobs.schema";
+import { createJobSchema, deleteJobSchema, getJobsSchema } from "./jobs.schema";
 import { getJobEmbeddingConfig } from "../../ai/job-embedding.config";
 
 export const jobsRouter = (
@@ -28,4 +28,5 @@ export const jobsRouter = (
 
   fastify.withTypeProvider<ZodTypeProvider>().get("/jobs", { schema: getJobsSchema }, handler.getJobsHandler);
   fastify.withTypeProvider<ZodTypeProvider>().post("/jobs", { schema: createJobSchema }, handler.createJobHandler);
+  fastify.withTypeProvider<ZodTypeProvider>().delete("/jobs/:id", { schema: deleteJobSchema }, handler.deleteJobHandler);
 };
