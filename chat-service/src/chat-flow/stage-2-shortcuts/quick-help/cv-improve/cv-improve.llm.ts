@@ -1,5 +1,5 @@
 import type { TextCompletionPort } from "../../../../litellm/text-completion/text-completion.types";
-import { parseJsonObjectFromLlm } from "../shared/quick-help.utils";
+import { parseJsonObjectFromLlm } from "../../../shared/llm/json-response.utils";
 import { buildCvImprovePrompt } from "./cv-improve.prompt.utils";
 import type { CvImproveLlmResult } from "./cv-improve.types";
 
@@ -47,6 +47,7 @@ export const generateCvImproveAdvice = async (
         {
             operation: "chat.quick_help.cv_improve",
             userId: params.userId,
+            responseFormat: "text",
         }
     );
     const reply = extractAdviceReply(raw);

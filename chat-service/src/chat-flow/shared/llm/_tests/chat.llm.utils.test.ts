@@ -40,4 +40,27 @@ describe("compact chat LLM responses", () => {
         assert.equal(decision.shouldSearchJobs, false);
         assert.deepEqual(decision.recommendedJobIds, ["job-123"]);
     });
+
+    it("parses compact JSON wrapped in a markdown fence", () => {
+        const decision = parseChatTurnDecisionFromJson(`Here is the result:\n\`\`\`json
+{"r":"Tell me about the backend work you enjoy.","m":"G","ready":false,"target":null,"advance":false,"search":false}
+\`\`\``);
+
+        assert.equal(decision.reply, "Tell me about the backend work you enjoy.");
+        assert.equal(decision.modeDetection.mode, "GUIDED");
+    });
+
+    it("accepts descriptive mode names returned by smaller models", () => {
+        const decision = parseChatTurnDecisionFromJson(JSON.stringify({
+            r: "I can search for backend roles.",
+            m: "near_term",
+            ready: true,
+            target: "Backend Engineer",
+            advance: true,
+            search: true,
+        }));
+
+        assert.equal(decision.modeDetection.mode, "NEAR_TERM");
+        assert.equal(decision.modeDetection.searchQuery, "Backend Engineer");
+    });
 });

@@ -117,6 +117,18 @@ LANGFUSE_CAPTURE_CONTENT=false
 LANGFUSE_CONTENT_MAX_CHARS=8000
 ```
 
+To see chatbot prompts and responses in a remote Langfuse project, set
+`LANGFUSE_CAPTURE_CONTENT=true` in the environment loaded by both the chat API and
+the chat worker, then recreate both processes. The setting belongs to the application
+processes, not the OpenTelemetry Collector. At startup, each process emits an
+`observability.startup` log showing whether tracing and content capture are enabled.
+
+If the chat repeatedly returns the parse fallback, check the structured
+`llm.completion` and `llm.response_parse` logs. They include the requested and actual
+model, finish reason, response length, and safe parse error without logging the prompt
+or response body. The full redacted content remains available in Langfuse when capture
+is enabled.
+
 Set `VITE_LANGFUSE_DASHBOARD_URL=https://cloud.langfuse.com` in `frontend/.env` to show the optional external Langfuse card in Management. Never place Langfuse keys in a Vite environment variable.
 
 To return to Jaeger-only telemetry, start Compose normally. To stop the Cloud collector override, run `npm run langfuse:stop`.

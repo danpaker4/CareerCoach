@@ -1,5 +1,5 @@
 import type { TextCompletionPort } from "../../../../litellm/text-completion/text-completion.types";
-import { parseJsonObjectFromLlm } from "../shared/quick-help.utils";
+import { parseJsonObjectFromLlm } from "../../../shared/llm/json-response.utils";
 import { QUICK_HELP_INTERVIEW_QUESTION_COUNT } from "./interview-prep.consts";
 import { buildInterviewGradePrompt, buildInterviewQuestionsPrompt } from "./interview-prep.prompt.utils";
 import type { InterviewGradeLlmResult, InterviewQuestionsLlmResult } from "./interview-prep.types";
@@ -11,7 +11,7 @@ export const generateInterviewQuestions = async (
 ): Promise<InterviewQuestionsLlmResult> => {
     const raw = await textCompletion.complete(
         buildInterviewQuestionsPrompt({ topic: params.topic, count: QUICK_HELP_INTERVIEW_QUESTION_COUNT }),
-        { operation: "chat.quick_help.interview_questions", userId: params.userId }
+        { operation: "chat.quick_help.interview_questions", userId: params.userId, responseFormat: "json" }
     );
     const parsed = parseJsonObjectFromLlm(raw);
     const questions = Array.isArray(parsed?.questions)
@@ -52,7 +52,7 @@ export const gradeInterviewAnswer = async (
             question: params.question,
             answer: params.answer,
         }),
-        { operation: "chat.quick_help.interview_grade", userId: params.userId }
+        { operation: "chat.quick_help.interview_grade", userId: params.userId, responseFormat: "json" }
     );
     const parsed = parseJsonObjectFromLlm(raw);
     const feedback =

@@ -87,6 +87,35 @@ describe("LiteLlmTextCompletionAdapter", () => {
         assert.equal(JSON.stringify(captured.headers).includes("Authorization"), false);
     });
 
+    it("requests JSON mode only when the completion context requires JSON", async () => {
+        const requestBodies: unknown[] = [];
+
+        globalThis.fetch = (async (_url, init) => {
+            requestBodies.push(JSON.parse(String(init?.body)) as unknown);
+            return new Response(JSON.stringify(successPayload), { status: 200 });
+        }) as typeof fetch;
+
+        const adapter = new LiteLlmTextCompletionAdapter("http://127.0.0.1:4000", "chat-default", undefined);
+        await adapter.complete("json prompt", { operation: "chat.decision", responseFormat: "json" });
+        await adapter.complete("plain prompt", { operation: "chat.quick_help.cv_improve", responseFormat: "text" });
+
+        assert.deepEqual(requestBodies, [
+            {
+                model: "chat-default",
+                messages: [{ role: "user", content: "json prompt" }],
+                temperature: 0.3,
+                max_tokens: 300,
+                response_format: { type: "json_object" },
+            },
+            {
+                model: "chat-default",
+                messages: [{ role: "user", content: "plain prompt" }],
+                temperature: 0.3,
+                max_tokens: 300,
+            },
+        ]);
+    });
+
     it("throws a descriptive error for non-2xx responses and records failure", async () => {
         const { recorder, records } = createRecorder();
 

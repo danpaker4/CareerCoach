@@ -13,6 +13,7 @@ import { ChatConversationService } from "../../../routes/conversation/conversati
 import { ConversationDal } from "../../../routes/conversation/conversation.dal";
 import { ChatExternalService } from "../../../routes/external-chat-tools/chat.external.service";
 import type { ChatServiceDependencies } from "./chat-service.types";
+import { createChatLlmObserver } from "../../../observability/chat-llm.observer";
 
 export const createChatServiceDependencies = (
     dbClient: MongoClient,
@@ -39,6 +40,7 @@ export const createChatServiceDependencies = (
         embedding,
         directionVectorIndexName: chatConfig.careerDirectionVectorIndexName,
     });
+    const llmObserver = createChatLlmObserver();
 
     return {
         conversationService,
@@ -50,6 +52,7 @@ export const createChatServiceDependencies = (
             jobServiceBaseUrl: chatConfig.jobServiceBaseUrl,
             dreamJobRoadmapCreator,
             suggestDirections,
+            llmObserver,
         }),
     };
 };
