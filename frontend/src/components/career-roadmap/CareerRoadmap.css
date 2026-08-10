@@ -39,11 +39,13 @@
   flex-shrink: 0;
   color: var(--clr-danger, #dc2626);
   border-color: rgba(220, 38, 38, 0.35);
+  background: transparent;
 }
 
 .roadmap-delete-btn:hover:not(:disabled) {
   background: rgba(220, 38, 38, 0.08);
   border-color: rgba(220, 38, 38, 0.5);
+  color: var(--clr-danger, #dc2626);
 }
 
 .roadmap-delete-btn:disabled {
@@ -55,6 +57,23 @@
   width: 14px;
   height: 14px;
   opacity: 0.85;
+  filter: none;
+}
+
+:root[data-theme='dark'] .roadmap-delete-btn {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+:root[data-theme='dark'] .roadmap-delete-btn:hover:not(:disabled) {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(248, 113, 113, 0.16);
+}
+
+:root[data-theme='dark'] .roadmap-delete-icon {
+  filter: invert(62%) sepia(48%) saturate(1800%) hue-rotate(320deg) brightness(105%);
 }
 
 .btn-icon {

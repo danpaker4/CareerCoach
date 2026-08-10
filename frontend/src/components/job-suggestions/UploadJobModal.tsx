@@ -110,8 +110,29 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
     }
   };
 
+  const isFormDirty = (): boolean =>
+    form.jobTitle.trim().length > 0 ||
+    form.company.trim().length > 0 ||
+    form.url.trim().length > 0 ||
+    form.salary.trim().length > 0 ||
+    form.description.trim().length > 0 ||
+    form.seniority !== INITIAL_FORM.seniority;
+
+  const confirmDiscard = (): boolean =>
+    window.confirm('Discard this job upload? Your entered details will be lost.');
+
+  const requestClose = () => {
+    if (submitting) return;
+    if (!isFormDirty() || confirmDiscard()) onClose();
+  };
+
+  const handleOverlayClick = () => {
+    if (submitting) return;
+    if (confirmDiscard()) onClose();
+  };
+
   return createPortal(
-    <div className="modal-overlay upload-job-overlay" onClick={onClose}>
+    <div className="modal-overlay upload-job-overlay" onClick={handleOverlayClick}>
       <div
         className="modal-card upload-job-modal"
         role="dialog"
@@ -124,7 +145,7 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
             <h2 id="upload-job-modal-title" className="modal-title">Upload a job</h2>
             <p className="upload-job-subtitle">Paste the description and we'll extract the skills.</p>
           </div>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="modal-close" onClick={requestClose} aria-label="Close" disabled={submitting}>
             <img src={iconX} alt="" aria-hidden="true" />
           </button>
         </div>
@@ -219,7 +240,7 @@ export const UploadJobModal = ({ onClose, onCreated }: UploadJobModalProps) => {
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn-outline" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button type="button" className="btn-outline" onClick={requestClose} disabled={submitting}>Cancel</button>
           <button type="button" className="btn-primary" onClick={handleSubmit} disabled={submitting}>
             {submitting ? (
               'Uploading…'

@@ -495,7 +495,7 @@ export const Pipeline = ({ user }: PipelineProps) => {
                           <p>No jobs here</p>
                         </div>
                       )}
-                    {col.id === 'wishlist' && colJobs.length === 0 && fetchState === 'success' && (
+                    {col.id === 'wishlist' && jobs.length === 0 && fetchState === 'success' && (
                       <button type="button" className="kanban-add-btn" onClick={() => setShowAddModal(true)}>
                         <img src={iconPlus} alt="" aria-hidden="true" className="kanban-add-icon" />
                         Add your first job
