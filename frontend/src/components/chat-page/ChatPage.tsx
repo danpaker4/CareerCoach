@@ -220,7 +220,6 @@ export const ChatPage = ({ user }: ChatPageProps) => {
       {/* Sidebar */}
       <aside className="chat-sidebar">
         <div className="chat-sidebar-header">
-          <div className="chat-coach-avatar">🤖</div>
           <div>
             <p className="chat-coach-name">AI Career Coach</p>
             <p className="chat-coach-status">
@@ -252,7 +251,6 @@ export const ChatPage = ({ user }: ChatPageProps) => {
       <main className="chat-main">
         <div className="chat-main-header">
           <div className="chat-main-title">
-            <span className="chat-main-icon">✨</span>
             <div>
               <h1 className="chat-main-heading">AI Career Coach</h1>
               <p className="chat-main-sub">Ask me anything about your career, skills, or job search</p>

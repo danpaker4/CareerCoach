@@ -5,6 +5,7 @@ import iconZap from '../../assets/icon-zap.svg';
 import iconKanban from '../../assets/icon-kanban.svg';
 import iconTarget from '../../assets/icon-target.svg';
 import iconSparkle from '../../assets/icon-sparkle.svg';
+import { CareerCoachLogo } from './CareerCoachLogo';
 import iconMessage from '../../assets/icon-message.svg';
 import iconUser from '../../assets/icon-user.svg';
 import iconMenu from '../../assets/icon-menu.svg';
@@ -14,8 +15,9 @@ import iconMoon from '../../assets/icon-moon.svg';
 import './Header.css';
 import type { HeaderProps } from './header.types';
 import { getInitials } from './header.utils';
+import { NotificationBell } from '../notifications/NotificationBell';
 
-export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: HeaderProps) => {
+export const Header = ({ userId, userName, isAdmin = false, theme, onToggleTheme }: HeaderProps) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -104,6 +106,7 @@ export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: Head
     <header className="navbar" ref={menuRef}>
       <div className="navbar-brand">
         <Link to={homePath} className="brand-link">
+          <CareerCoachLogo />
           <span className="brand-text">CareerCoach</span>
         </Link>
       </div>
@@ -114,6 +117,7 @@ export const Header = ({ userName, isAdmin = false, theme, onToggleTheme }: Head
         {userName ? (
           <div className="user-area">
             {renderThemeToggle()}
+            {userId && <NotificationBell userId={userId} />}
             <Link
               to="/profile"
               className={`user-profile-link${isActive('/profile') ? ' user-profile-link--active' : ''}`}

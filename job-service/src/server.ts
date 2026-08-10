@@ -13,6 +13,11 @@ import { CareerKnowledgeService } from "./routes/careerKnowledge/career-knowledg
 import { jobSearchRouter } from "./routes/jobSearch/job-search.router";
 import { startJobPollerSchedule } from "./poller/job-poller";
 import { jobsRouter } from "./routes/jobs/jobs.router";
+import { wantedJobsRouter } from "./routes/wantedJobs/wanted-job.router";
+import { notificationsRouter } from "./routes/notifications/notification.router";
+import { NotificationBroker } from "./routes/notifications/notification.broker";
+import { NotificationService } from "./routes/notifications/notification.service";
+import { dispatchWantedJobMatches } from "./routes/notifications/wanted-job-match.dispatch";
 import { startJobEmbeddingRepairSchedule } from "./routes/jobs/job-embedding-repair.service";
 import { getJobEmbeddingConfig } from "./ai/job-embedding.config";
 import type { ServerConfig } from "./server.types";
@@ -24,6 +29,7 @@ export class Server {
     private readonly config: ServerConfig;
     readonly DBClient: MongoClient;
     readonly embeddingCache = new UserEmbeddingCache();
+    readonly notificationBroker = new NotificationBroker();
 
     constructor(config: ServerConfig) {
         this.config = config;
@@ -64,11 +70,26 @@ export class Server {
                 this.DBClient.careerDirectionExamples
             ));
             await this.app.register(jobSearchRouter(this.DBClient.jobs));
+            const notificationService = new NotificationService(this.DBClient.notifications);
+            const wantedJobsCollection = this.DBClient.wantedJobs;
+            const broker = this.notificationBroker;
+            const onJobCreated = async (job: import("./poller/job-poller-api-stack/stages/enrich/types").EnrichedJob) => {
+                await dispatchWantedJobMatches({
+                    job,
+                    wantedJobsCollection,
+                    notificationService,
+                    broker,
+                });
+            };
+
             await this.app.register(jobsRouter(
                 this.DBClient.jobs,
                 this.DBClient.llmTokenUsage,
-                this.embeddingCache
+                this.embeddingCache,
+                onJobCreated
             ));
+            await this.app.register(wantedJobsRouter(this.DBClient.wantedJobs));
+            await this.app.register(notificationsRouter(this.DBClient.notifications, this.DBClient.pipelineJobs, this.notificationBroker));
 
             const address = await this.app.listen({
                 port: this.config.port,
@@ -89,6 +110,7 @@ export class Server {
     };
 
     stop = async (): Promise<void> => {
+        this.notificationBroker.shutdown();
         await this.app.close();
         await this.DBClient.stop();
     };

@@ -5,12 +5,12 @@ import { rankJobs } from "./ranking/job-ranking.service";
 import {
     applyValidatedJobsFallback,
     mapRankedJobResultToChatMatchRow,
-    withPipelineClosing,
+    withJobSelectionClosing,
 } from "./presentation/chat.job-presentation.utils";
 import { resolveSelectedJobFromRecommendations } from "./presentation/chat.job-mapping.utils";
 import { sanitizeReply, validateRecommendedJobs } from "./presentation/chat.validation.service";
 import { generateJobAwareReply } from "../shared/llm/chat.llm.service";
-import { EXHAUSTED_JOBS_REPLY } from "./present-jobs.consts";
+import { EXHAUSTED_JOBS_REPLY, MAX_PRESENTED_JOBS } from "./present-jobs.consts";
 import type { PresentRankedJobsOptions } from "./present-jobs.types";
 
 const filterEligibleRankedJobs = (userCareerProfile: UserCareerProfile, jobs: JobSearchResultItem[], conversation: Conversation) => {
@@ -55,6 +55,7 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
 
     const topRankedJobs = orderedRankedPool.map((item) => item.job);
     const focusJob = topRankedJobs[0] ?? null;
+
     const jobsForLlm = focusJob ? [focusJob] : topRankedJobs;
     const jobAwareDecision = await generateJobAwareReply(
         deps.textCompletion,
@@ -72,8 +73,10 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
         focusJob,
         directionHint
     );
-    const sanitizedReply = withPipelineClosing(fallbackPack.sanitizedReply);
     const selectedJob = resolveSelectedJobFromRecommendations(fallbackPack.validatedJobs, validJobIds) ?? focusJob;
+
+    const presentationJobs = topRankedJobs.slice(0, MAX_PRESENTED_JOBS);
+    const reply = withJobSelectionClosing(fallbackPack.sanitizedReply, presentationJobs);
 
     await deps.conversationService.setJobContextAfterSearch(
         userId,
@@ -84,21 +87,20 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
         searchIntent
     );
 
-    const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
-    const primaryJobId = presentationJobs[0]?.id;
+    const presentedIds = new Set(presentationJobs.map((jobItem) => jobItem.id));
     const jobMatches = rankedJobs
-        .filter((item) => item.jobId === primaryJobId)
+        .filter((item) => presentedIds.has(item.jobId))
         .map((item) => mapRankedJobResultToChatMatchRow(item));
 
     const recommendedDirections = includeRecommendedDirections
         ? await deps.suggestDirections(userCareerProfile, userRoleExperience)
         : undefined;
 
-    await deps.conversationService.appendAssistantMessage(userId, conversationId, sanitizedReply, presentationJobs);
+    await deps.conversationService.appendAssistantMessage(userId, conversationId, reply, presentationJobs);
 
     return {
-        reply: sanitizedReply,
-        jobs: presentationJobs.length > 0 ? presentationJobs : fallbackPack.validatedJobs,
+        reply,
+        jobs: presentationJobs,
         jobMatches,
         ...(recommendedDirections ? { recommendedDirections } : {}),
         mode,

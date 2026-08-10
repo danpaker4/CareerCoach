@@ -15,6 +15,7 @@ import type {
     PipelineRejectPresentNextSanitizedJobParams,
     PipelineRejectRunBroaderRefillParams,
 } from "./pipeline-reject.types";
+import { buildRejectChoicePrompt } from "./reject-choice.utils";
 
 const pipelineRejectPresentNextSanitizedJob = async (
     params: PipelineRejectPresentNextSanitizedJobParams
@@ -162,7 +163,7 @@ const pipelineRejectRunBroaderRefill = async (
     });
 };
 
-export const handlePipelineReject = async (params: HandlePipelineRejectParams): Promise<ChatMessageResponse> => {
+export const runPipelineRejectBroaden = async (params: HandlePipelineRejectParams): Promise<ChatMessageResponse> => {
     const { deps, ctx, jobContext } = params;
     const {
         userId,
@@ -175,14 +176,14 @@ export const handlePipelineReject = async (params: HandlePipelineRejectParams): 
         userAccountContext,
     } = ctx;
     const mode = ctx.modeDetection.mode;
-    const job = jobContext.selectedJobSnapshot;
     const rec = jobContext.jobRecommendationContext;
-    if (!job || !rec) {
-        const reply = "I do not have an active job recommendation to skip. Ask me for roles and I will suggest one.";
+    if (!rec) {
+        const reply = "I do not have an active search to widen. Ask me for roles and I will suggest some.";
         await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
         return { reply, mode, confidenceSummary };
     }
-    const rejectedIds = rec.rejectedJobIds.includes(job.id) ? rec.rejectedJobIds : [...rec.rejectedJobIds, job.id];
+
+    const rejectedIds = rec.rejectedJobIds;
     const excluded = new Set([...rejectedIds, ...rec.acceptedJobIds]);
     const nextJobId = rec.recommendedJobIds.find((id) => !excluded.has(id));
     const nextSanitized = nextJobId ? jobContext.lastReturnedJobs.find((j) => j.id === nextJobId) ?? null : null;
@@ -218,4 +219,34 @@ export const handlePipelineReject = async (params: HandlePipelineRejectParams): 
         mode,
         confidenceSummary,
     });
+};
+
+export const handlePipelineReject = async (params: HandlePipelineRejectParams): Promise<ChatMessageResponse> => {
+    const { deps, ctx, jobContext } = params;
+    const { userId, conversationId, confidenceSummary } = ctx;
+    const mode = ctx.modeDetection.mode;
+    const job = jobContext.selectedJobSnapshot;
+    const rec = jobContext.jobRecommendationContext;
+    if (!job || !rec) {
+        const reply = "I do not have an active job recommendation to skip. Ask me for roles and I will suggest one.";
+        await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
+        return { reply, mode, confidenceSummary };
+    }
+
+    const rejectedIds = rec.rejectedJobIds.includes(job.id) ? rec.rejectedJobIds : [...rec.rejectedJobIds, job.id];
+    const now = new Date();
+    await deps.conversationService.saveJobContext(userId, conversationId, {
+        ...jobContext,
+        jobRecommendationContext: {
+            ...rec,
+            rejectedJobIds: rejectedIds,
+            awaitingPipelineDecision: false,
+            lastRecommendationAt: now,
+        },
+        updatedAt: now,
+    });
+
+    const reply = buildRejectChoicePrompt(job.title.trim() || (jobContext.lastSearchQuery ?? "").trim());
+    await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
+    return { reply, mode, confidenceSummary };
 };

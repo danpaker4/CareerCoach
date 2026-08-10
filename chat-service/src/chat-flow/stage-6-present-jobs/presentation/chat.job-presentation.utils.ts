@@ -45,6 +45,22 @@ export const withPipelineClosing = (reply: string): string => {
     return `${trimmed}\n\nWould you like to move forward with this role and add it to your pipeline?`;
 };
 
+export const withJobSelectionClosing = (
+    reply: string,
+    jobs: readonly { company: string }[]
+): string => {
+    if (jobs.length <= 1) {
+        return withPipelineClosing(reply);
+    }
+    const firstCompany = jobs[0]?.company.trim() ?? "";
+    const namedExample = firstCompany.length > 0 ? ` or "add the ${firstCompany} role"` : "";
+    return (
+        `${reply.trim()}\n\nI listed ${jobs.length} matches above. Tell me which one to add to your pipeline — ` +
+        `say "add the first one"${namedExample}. If none of them fit, say "none" and I can either broaden the ` +
+        `search or save the role to your wishlist.`
+    );
+};
+
 export const applyValidatedJobsFallback = (
     validatedJobs: JobSearchResultItem[],
     sanitizedReply: string,

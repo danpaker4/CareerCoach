@@ -23,19 +23,6 @@
   gap: 12px;
 }
 
-.chat-coach-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--clr-primary) 0%, #6366f1 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
-}
-
 .chat-coach-name {
   margin: 0;
   font-weight: 700;
@@ -146,11 +133,6 @@
 
 .chat-main-title > div {
   min-width: 0;
-}
-
-.chat-main-icon {
-  font-size: 28px;
-  line-height: 1;
 }
 
 .chat-main-heading {

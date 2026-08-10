@@ -3,18 +3,16 @@ import type { ChatFlowDeps, SendMessagePreparedContext } from "../../chat-flow.t
 import { CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { buildWorkDirectionFilters } from "../../stage-5-job-search/direction-filters/chat.direction.utils";
 import { searchJobsWithBroaderFallback } from "../../stage-5-job-search/search-jobs";
-import {
-    applyValidatedJobsFallback,
-    mapRankedJobResultToChatMatchRow,
-    withPipelineClosing,
-} from "../../stage-6-present-jobs/presentation/chat.job-presentation.utils";
-import { rankJobs } from "../../stage-6-present-jobs/ranking/job-ranking.service";
+import { presentRankedJobs } from "../../stage-6-present-jobs/present-jobs";
+import { buildWishlistSavePrompt } from "../wanted-jobs/chat.wishlist.utils";
+import { buildWantedJobInputFromSearch } from "../wanted-jobs/wanted-job.service";
 
 export const runNearTermSearchFlow = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
+    ctx: SendMessagePreparedContext,
+    queryOverride?: string
 ): Promise<ChatMessageResponse> => {
-    const detectedQuery = ctx.modeDetection.searchQuery;
+    const detectedQuery = queryOverride ?? ctx.modeDetection.searchQuery;
     const query = detectedQuery !== undefined && detectedQuery.trim() !== "" ? detectedQuery : ctx.normalizedMessage;
     const searchFilters = buildWorkDirectionFilters(query);
     console.info(
@@ -30,40 +28,27 @@ export const runNearTermSearchFlow = async (
     });
 
     if (jobs.length === 0) {
-        const fallback = `I searched for ${query} roles but couldn't find any open positions matching that right now. Could you share a different role or field you'd like to explore?`;
+        const wantedJobInput = buildWantedJobInputFromSearch({
+            userId: ctx.userId,
+            normalizedMessage: ctx.normalizedMessage,
+            searchFilters,
+        });
+        const proposedTitle = wantedJobInput?.jobTitle ?? query.trim();
+        const fallback = proposedTitle.length > 0
+            ? buildWishlistSavePrompt(
+                proposedTitle,
+                `I searched for ${query} roles but couldn't find any open positions matching that right now.`
+            )
+            : `I searched for ${query} roles but couldn't find any open positions matching that right now. Could you share a different role or field you'd like to explore?`;
         await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, fallback);
         return { reply: fallback, mode: ctx.modeDetection.mode, confidenceSummary: ctx.confidenceSummary };
     }
 
-    const rankedJobs = rankJobs(ctx.userCareerProfile, jobs);
-    const topRankedJobs = rankedJobs.map((item) => item.job);
-    const focusJob = topRankedJobs[0];
-
-    const fallbackPack = applyValidatedJobsFallback(topRankedJobs.slice(0, 10), "", focusJob);
-    const sanitized = withPipelineClosing(fallbackPack.sanitizedReply);
-
-    await deps.conversationService.setJobContextAfterSearch(
-        ctx.userId,
-        ctx.conversationId,
-        topRankedJobs,
-        focusJob,
-        ctx.normalizedMessage,
-        "SEARCH_PLAN"
-    );
-
-    const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
-    const primaryJobId = presentationJobs[0]?.id;
-    const jobMatches = rankedJobs
-        .filter((item) => item.jobId === primaryJobId)
-        .map((item) => mapRankedJobResultToChatMatchRow(item));
-
-    await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, sanitized, presentationJobs);
-
-    return {
-        reply: sanitized,
-        jobs: presentationJobs,
-        jobMatches,
-        mode: ctx.modeDetection.mode,
-        confidenceSummary: ctx.confidenceSummary,
-    };
+    return await presentRankedJobs({
+        deps,
+        ctx,
+        jobs,
+        searchIntent: "SEARCH_PLAN",
+        queryLabel: ctx.normalizedMessage,
+    });
 };

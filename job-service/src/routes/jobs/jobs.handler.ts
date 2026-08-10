@@ -35,6 +35,7 @@ interface JobsHandlerDeps {
   usersServiceBaseUrl?: string;
   internalServiceApiKey?: string;
   embeddingCache?: UserEmbeddingCache;
+  onJobCreated?: (job: EnrichedJob) => Promise<void>;
 }
 
 const escapeRegex = (value: string): string =>
@@ -131,6 +132,7 @@ export const JobsHandler = ({
   usersServiceBaseUrl,
   internalServiceApiKey,
   embeddingCache,
+  onJobCreated,
 }: JobsHandlerDeps) => ({
   getJobsHandler: async (
     request: FastifyRequest<{ Querystring: JobsPageQuery }>,
@@ -235,7 +237,7 @@ export const JobsHandler = ({
     reply: FastifyReply
   ) => {
     try {
-      const { jobTitle, company, url, description, seniority, salary } = request.body;
+      const { jobTitle, company, url, description, seniority, salary, location, requirements } = request.body;
 
       const adapted: AdaptedJob = {
         id: randomUUID(),
@@ -244,16 +246,29 @@ export const JobsHandler = ({
         url: url ? url.trim() : "",
         seniority: seniority.trim(),
         description: description.trim(),
+        ...(location && location.trim().length > 0 ? { location: location.trim() } : {}),
         lon: null,
         lat: null,
       };
 
       const [enriched] = await enrichByGemini([adapted], tokenUsageRecorder);
-      const finalJob: EnrichedJob = salary !== undefined && salary > 0
-        ? { ...enriched, salary }
-        : enriched;
+      // Caller-supplied requirements take precedence over the model-inferred ones.
+      const providedRequirements = (requirements ?? [])
+        .map((req) => req.trim())
+        .filter((req) => req.length > 0);
+      const finalJob: EnrichedJob = {
+        ...enriched,
+        ...(salary !== undefined && salary > 0 ? { salary } : {}),
+        ...(providedRequirements.length > 0 ? { requirements: providedRequirements } : {}),
+      };
 
       await saveEnrichedJobs(jobsCollection, [finalJob]);
+
+      if (onJobCreated) {
+        void onJobCreated(finalJob).catch((err) => {
+          request.log.warn({ err }, "onJobCreated dispatch failed");
+        });
+      }
 
       reply.code(StatusCodes.CREATED).send({
         id: finalJob.id,

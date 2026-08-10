@@ -6,6 +6,8 @@ import { searchJobsWithBroaderFallback } from "../stage-5-job-search/search-jobs
 import { presentRankedJobs } from "../stage-6-present-jobs/present-jobs";
 import { NO_JOBS_REPLY } from "../stage-6-present-jobs/present-jobs.consts";
 import { resolveStageFlowForSendMessage } from "../stage-4-guided-stages/resolve-stage-flow";
+import { buildWantedJobInputFromSearch } from "../stage-2-shortcuts/wanted-jobs/wanted-job.service";
+import { buildWishlistSavePrompt } from "../stage-2-shortcuts/wanted-jobs/chat.wishlist.utils";
 
 const finalizeSendMessageFromLlmDecision = async (params: {
     deps: ChatFlowDeps;
@@ -36,8 +38,19 @@ const finalizeSendMessageFromLlmDecision = async (params: {
     });
 
     if (jobs.length === 0) {
-        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, NO_JOBS_REPLY);
-        return { reply: NO_JOBS_REPLY, mode: ctx.modeDetection.mode, confidenceSummary: ctx.confidenceSummary };
+        // No open roles even after broadening — offer to save it to the wishlist (the user
+        // confirms before we store anything; on a "yes" we get alerted when one is added).
+        const wantedJobInput = buildWantedJobInputFromSearch({
+            userId: ctx.userId,
+            normalizedMessage: ctx.normalizedMessage,
+            searchFilters: effectiveSearchFilters,
+        });
+        const proposedTitle = wantedJobInput?.jobTitle ?? null;
+        const noJobsReply = proposedTitle
+            ? buildWishlistSavePrompt(proposedTitle, "I do not have a matching role yet.")
+            : NO_JOBS_REPLY;
+        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, noJobsReply);
+        return { reply: noJobsReply, mode: ctx.modeDetection.mode, confidenceSummary: ctx.confidenceSummary };
     }
 
     return await presentRankedJobs({

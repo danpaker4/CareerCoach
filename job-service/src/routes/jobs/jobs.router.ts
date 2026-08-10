@@ -12,7 +12,8 @@ import { getJobEmbeddingConfig } from "../../ai/job-embedding.config";
 export const jobsRouter = (
   jobsCollection: Collection<EnrichedJob>,
   tokenUsageCollection: Collection<LlmTokenUsageDocument>,
-  embeddingCache: UserEmbeddingCache
+  embeddingCache: UserEmbeddingCache,
+  onJobCreated?: (job: EnrichedJob) => Promise<void>
 ) => async (fastify: FastifyInstance) => {
   const tokenUsageRecorder = new LlmTokenUsageRepository(tokenUsageCollection);
   const matchingConfig = getJobEmbeddingConfig();
@@ -22,6 +23,7 @@ export const jobsRouter = (
     usersServiceBaseUrl: matchingConfig.USERS_SERVICE_BASE_URL,
     internalServiceApiKey: matchingConfig.INTERNAL_SERVICE_API_KEY,
     embeddingCache,
+    onJobCreated,
   });
 
   fastify.withTypeProvider<ZodTypeProvider>().get("/jobs", { schema: getJobsSchema }, handler.getJobsHandler);

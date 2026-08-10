@@ -16,7 +16,8 @@ export const addJobToPipeline = async (
         source: "career_chat",
     };
 
-    const response = await fetch(`${jobServiceBaseUrl}/jobs-in-pipeline`, {
+    const baseUrl = jobServiceBaseUrl.replace(/\/$/, "");
+    const response = await fetch(`${baseUrl}/jobs-in-pipeline`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
