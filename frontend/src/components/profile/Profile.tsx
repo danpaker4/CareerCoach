@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import { connectGithubAccount } from '../../lib/githubAuth';
@@ -134,16 +134,14 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
     }
   };
 
-  const handleCvExtract = async () => {
-    if (!cvFile) return;
-
+  const handleCvExtract = async (file: File) => {
     setCvExtracting(true);
     setCvError('');
     setCvSuccess(false);
 
     try {
       const formData = new FormData();
-      formData.append('cv', cvFile);
+      formData.append('cv', file);
       if (form.currentJob.trim()) formData.append('currentJob', form.currentJob.trim());
       if (form.linkedInUrl.trim()) formData.append('linkedInUrl', form.linkedInUrl.trim());
       if (form.githubUrl.trim()) formData.append('githubUrl', form.githubUrl.trim());
@@ -170,6 +168,15 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
     } finally {
       setCvExtracting(false);
     }
+  };
+
+  const handleCvFileSelected = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setCvFile(file);
+    setCvSuccess(false);
+    setCvError('');
+    if (!file) return;
+    void handleCvExtract(file);
   };
 
   const initials = getInitials(form.firstName || user.firstName, form.lastName || user.lastName);
@@ -245,7 +252,7 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
                   </span>
                   <div className="profile-source-heading">
                     <h4 className="cv-card-title">Skills from CV</h4>
-                    <p className="profile-source-kicker">Upload a new CV to refresh CV skills</p>
+                    <p className="profile-source-kicker">Upload a PDF — skills extract automatically</p>
                   </div>
                 </div>
 
@@ -262,27 +269,21 @@ export const Profile = ({ user, onUserUpdated, onLogout }: ProfileProps) => {
                   accept=".pdf"
                   className="cv-file-input"
                   id="cv-upload"
-                  onChange={(e) => {
-                    setCvFile(e.target.files?.[0] ?? null);
-                    setCvSuccess(false);
-                    setCvError('');
-                  }}
+                  disabled={cvExtracting}
+                  onChange={handleCvFileSelected}
                 />
                 <div className="profile-import-actions">
-                  <label htmlFor="cv-upload" className="cv-file-label">
+                  <label
+                    htmlFor="cv-upload"
+                    className={`cv-file-label${cvExtracting ? ' cv-file-label--disabled' : ''}`}
+                    aria-disabled={cvExtracting}
+                  >
                     <span className="cv-file-label-kind">PDF</span>
-                    <span className="cv-file-label-text">{cvFile ? cvFile.name : 'Choose'}</span>
+                    <span className="cv-file-label-text">
+                      {cvExtracting ? 'Extracting…' : cvFile ? cvFile.name : 'Choose'}
+                    </span>
                   </label>
-
-                  <button
-                    type="button"
-                    className="btn-primary cv-extract-btn"
-                    onClick={handleCvExtract}
-                    disabled={!cvFile || cvExtracting}
-                >
-                  {cvExtracting ? 'Extracting...' : 'Extract'}
-                </button>
-              </div>
+                </div>
 
                 {cvError && <p className="cv-error">{cvError}</p>}
                 {cvSuccess && (
