@@ -45,10 +45,6 @@ export const withPipelineClosing = (reply: string): string => {
     return `${trimmed}\n\nWould you like to move forward with this role and add it to your pipeline?`;
 };
 
-/**
- * Closing line for a reply that carries job cards. A single match keeps the original
- * yes/no pipeline question; a list asks the user to name which card to act on.
- */
 export const withJobSelectionClosing = (
     reply: string,
     jobs: readonly { company: string }[]

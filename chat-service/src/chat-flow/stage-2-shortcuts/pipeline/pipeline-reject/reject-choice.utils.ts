@@ -1,9 +1,5 @@
 import type { ChatMessage } from "../../../api/shared/chat-message.types";
 
-/**
- * Signature embedded in the assistant's "broaden or save?" reply. Lets the next turn be
- * recognized as an answer to that question without persisting extra conversation state.
- */
 export const REJECT_CHOICE_MARKER = "Want me to broaden the search";
 
 export type RejectChoice = "BROADEN" | "WISHLIST";
@@ -22,7 +18,6 @@ export const wasRejectChoiceOfferedLast = (messages: readonly ChatMessage[]): bo
     return false;
 };
 
-/** Pulls the proposed role title back out of the most recent choice prompt. */
 export const extractRejectChoiceTitle = (messages: readonly ChatMessage[]): string | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
         const message = messages[i];
@@ -50,10 +45,6 @@ const WISHLIST_PATTERNS: readonly RegExp[] = [
     /\blater\b/,
 ];
 
-/**
- * Reads the user's answer to the broaden-or-save question. Returns null when the message is
- * neither, so a brand new request falls through to the normal flow instead of being swallowed.
- */
 export const detectRejectChoice = (message: string): RejectChoice | null => {
     const normalized = message.toLowerCase().trim();
     if (normalized.length === 0) {

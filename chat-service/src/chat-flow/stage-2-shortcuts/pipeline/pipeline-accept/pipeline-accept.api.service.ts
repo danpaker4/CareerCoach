@@ -16,7 +16,6 @@ export const addJobToPipeline = async (
         source: "career_chat",
     };
 
-    // The configured base URL may carry a trailing slash; a doubled slash 404s on the job service.
     const baseUrl = jobServiceBaseUrl.replace(/\/$/, "");
     const response = await fetch(`${baseUrl}/jobs-in-pipeline`, {
         method: "POST",

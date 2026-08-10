@@ -15,7 +15,6 @@ export const runStage2Shortcuts = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse | null> => {
-    // Sticky / new quick-help first so multi-turn flows are not stolen by mode reclassification.
     const quickHelpResponse = await tryQuickHelpShortcutResponse(deps, ctx);
     if (quickHelpResponse) {
         return quickHelpResponse;
@@ -31,7 +30,6 @@ export const runStage2Shortcuts = async (
         return wishlistResponse;
     }
 
-    // Answers the broaden-or-save question a rejection raises, before the generic intents run.
     const rejectChoiceResponse = await tryRejectChoiceResponse(deps, ctx);
     if (rejectChoiceResponse) {
         return rejectChoiceResponse;

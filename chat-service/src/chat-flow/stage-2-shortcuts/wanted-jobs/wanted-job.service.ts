@@ -93,7 +93,6 @@ export class WantedJobService {
             rawText: input.rawText,
         };
 
-        // The configured base URL may carry a trailing slash; a doubled slash 404s on the job service.
         const baseUrl = this.jobServiceBaseUrl.replace(/\/$/, "");
         let response: Response;
         try {

@@ -30,10 +30,6 @@ const extractWishlistDetails = async (
     }
 };
 
-/**
- * Parses the role details out of the user's own words and saves the wishlist entry.
- * Shared by the "yes, save it" confirmation and the broaden-or-save choice after a rejection.
- */
 export const saveWishlistFromMessage = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext,
@@ -99,15 +95,11 @@ export const tryWishlistConfirmationResponse = async (
         return { reply, mode, confidenceSummary: ctx.confidenceSummary };
     }
 
-    // Proceed when the user confirms ("yes") or explicitly asks to "save …".
-    // Anything else (a brand new request) falls through to the normal flow.
     const affirmative = isAffirmativeConfirmation(ctx.normalizedMessage);
     if (!isWishlistSaveConfirmation(ctx.normalizedMessage, affirmative)) {
         return null;
     }
 
-    // Let the LLM parse the role title, experience level, location and preferred company out
-    // of the user's reply (regex would dump everything into the title).
     const proposed = extractProposedWishlistTitle(messages) ?? "";
     return await saveWishlistFromMessage(deps, ctx, proposed);
 };

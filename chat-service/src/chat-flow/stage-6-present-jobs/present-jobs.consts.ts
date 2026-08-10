@@ -1,4 +1,3 @@
-/** How many ranked matches are shown as cards in one reply. */
 export const MAX_PRESENTED_JOBS = 5;
 
 export const EXHAUSTED_JOBS_REPLY =

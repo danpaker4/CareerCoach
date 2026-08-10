@@ -11,7 +11,6 @@ export const tryRefineSearchOfferResponse = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse | null> => {
-    // Offer once per conversation, only for under-specified job wants.
     if (wasRefineOfferedBefore(ctx.conversationAfterUserMessage.messages)) {
         return null;
     }

@@ -10,7 +10,6 @@ import { buildWantedJobInputFromSearch } from "../wanted-jobs/wanted-job.service
 export const runNearTermSearchFlow = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext,
-    /** Explicit direction to search, used when the user named one while rejecting a shortlist. */
     queryOverride?: string
 ): Promise<ChatMessageResponse> => {
     const detectedQuery = queryOverride ?? ctx.modeDetection.searchQuery;
@@ -29,7 +28,6 @@ export const runNearTermSearchFlow = async (
     });
 
     if (jobs.length === 0) {
-        // Offer to save it to the wishlist (user confirms) so they get alerted when one appears.
         const wantedJobInput = buildWantedJobInputFromSearch({
             userId: ctx.userId,
             normalizedMessage: ctx.normalizedMessage,

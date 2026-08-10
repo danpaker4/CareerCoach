@@ -163,10 +163,6 @@ const pipelineRejectRunBroaderRefill = async (
     });
 };
 
-/**
- * Runs the "keep looking" branch of a rejection: show the next role already held in the
- * shortlist, and only run a broader search once that shortlist is exhausted.
- */
 export const runPipelineRejectBroaden = async (params: HandlePipelineRejectParams): Promise<ChatMessageResponse> => {
     const { deps, ctx, jobContext } = params;
     const {
@@ -225,10 +221,6 @@ export const runPipelineRejectBroaden = async (params: HandlePipelineRejectParam
     });
 };
 
-/**
- * A rejection no longer decides for the user. We record the skip and ask whether to keep
- * searching now (broaden) or be alerted later (wishlist); the answer is handled next turn.
- */
 export const handlePipelineReject = async (params: HandlePipelineRejectParams): Promise<ChatMessageResponse> => {
     const { deps, ctx, jobContext } = params;
     const { userId, conversationId, confidenceSummary } = ctx;

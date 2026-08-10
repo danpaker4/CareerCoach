@@ -8,10 +8,6 @@ import {
     wasRejectChoiceOfferedLast,
 } from "./reject-choice.utils";
 
-/**
- * Handles the user's answer to the broaden-or-save question raised after they rejected the
- * shortlist. Anything that reads as neither falls through to the normal flow.
- */
 export const tryRejectChoiceResponse = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext

@@ -56,8 +56,6 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
     const topRankedJobs = orderedRankedPool.map((item) => item.job);
     const focusJob = topRankedJobs[0] ?? null;
 
-    // The LLM explains why the strongest match fits this user; the cards below carry the rest of
-    // the shortlist. Its reply is still validated so it can never cite a job we did not return.
     const jobsForLlm = focusJob ? [focusJob] : topRankedJobs;
     const jobAwareDecision = await generateJobAwareReply(
         deps.textCompletion,
@@ -77,8 +75,6 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
     );
     const selectedJob = resolveSelectedJobFromRecommendations(fallbackPack.validatedJobs, validJobIds) ?? focusJob;
 
-    // Cards come from the deterministic ranking, not from the LLM, so the user always sees the
-    // full shortlist even when the model only wrote about the top one.
     const presentationJobs = topRankedJobs.slice(0, MAX_PRESENTED_JOBS);
     const reply = withJobSelectionClosing(fallbackPack.sanitizedReply, presentationJobs);
 
