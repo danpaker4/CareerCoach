@@ -200,6 +200,7 @@ const extractJobCards = (data: ChatResponse): Message['jobs'] =>
         company: job.company,
         seniority: job.seniority,
         location: job.location,
+        url: job.url && job.url.trim().length > 0 ? job.url : null,
     }));
 
 const buildChatWebSocketUrl = (ticket: string): string => {
@@ -467,6 +468,7 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
                         company: job.company ?? '',
                         seniority: job.seniority ?? '',
                         location: null,
+                        url: job.url && job.url.trim().length > 0 ? job.url : null,
                     }));
                     return {
                         id: crypto.randomUUID(),
@@ -627,6 +629,16 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
                                             <div className="chat-job-card__meta">
                                                 {job.seniority && <span className="chat-job-card__chip">{job.seniority}</span>}
                                                 {job.location && <span className="chat-job-card__loc">{job.location}</span>}
+                                                {job.url && (
+                                                    <a
+                                                        className="chat-job-card__link"
+                                                        href={job.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        View job
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

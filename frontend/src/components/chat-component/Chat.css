@@ -98,6 +98,17 @@
   font-size: 12px;
 }
 
+.chat-job-card__link {
+  color: var(--clr-primary, #2563eb);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.chat-job-card__link:hover {
+  text-decoration: underline;
+}
+
 .message-wrapper.user  { justify-content: flex-end; }
 .message-wrapper.model { justify-content: flex-start; }
 

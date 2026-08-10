@@ -9,9 +9,11 @@ import { buildWantedJobInputFromSearch } from "../wanted-jobs/wanted-job.service
 
 export const runNearTermSearchFlow = async (
     deps: ChatFlowDeps,
-    ctx: SendMessagePreparedContext
+    ctx: SendMessagePreparedContext,
+    /** Explicit direction to search, used when the user named one while rejecting a shortlist. */
+    queryOverride?: string
 ): Promise<ChatMessageResponse> => {
-    const detectedQuery = ctx.modeDetection.searchQuery;
+    const detectedQuery = queryOverride ?? ctx.modeDetection.searchQuery;
     const query = detectedQuery !== undefined && detectedQuery.trim() !== "" ? detectedQuery : ctx.normalizedMessage;
     const searchFilters = buildWorkDirectionFilters(query);
     console.info(
