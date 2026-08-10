@@ -303,9 +303,6 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                           <h3 className="job-title">{job.jobTitle}</h3>
                           <p className="job-company">{job.company}</p>
                           <span className="badge badge-blue job-seniority">{job.seniority}</span>
-                          {typeof job.matchPct === 'number' && (
-                            <span className="badge badge-green job-match-pct">{job.matchPct}% match</span>
-                          )}
                         </div>
                       </div>
 

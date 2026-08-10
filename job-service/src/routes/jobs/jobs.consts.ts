@@ -3,7 +3,7 @@ export const JOBS_PAGE_LOOKAHEAD = 1;
 /** Minimum fit used by roadmap stage opportunities. */
 export const MIN_MATCH_FIT_PCT = 80;
 /** Minimum query match for Job Suggestions when a search query is present. */
-export const JOBS_LIST_MIN_MATCH_FIT_PCT = 20;
+export const JOBS_LIST_MIN_MATCH_FIT_PCT = 50;
 /** Extra vector candidates fetched before applying JOBS_LIST_MIN_MATCH_FIT_PCT, so pages stay full. */
 export const HIGH_MATCH_OVERFETCH_MULTIPLIER = 10;
 /** Blend of embedding similarity vs keyword overlap for displayed search match %. */
