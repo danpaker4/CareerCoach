@@ -17,6 +17,11 @@ export const EMBEDDED_JOBS_FILTER = {
 
 const MAX_RERANK_CANDIDATES = 10_000;
 
+export type VectorSearchPageOptions = {
+  /** Fetch this many top results from offset 0 (used before post-filtering). */
+  readonly candidateLimit?: number;
+};
+
 export const rankJobsByCosine = <T extends { searchEmbedding?: number[] }>(
   queryVector: number[],
   jobs: readonly T[],
@@ -72,17 +77,22 @@ export const vectorSearchJobsPage = async (
   offset: number,
   asOf: Date,
   indexName: string,
+  options?: VectorSearchPageOptions,
 ): Promise<RankedJob[]> => {
-  const requestedResults = Math.min(
-    MAX_VECTOR_CANDIDATES,
-    offset + JOBS_PAGE_SIZE + JOBS_PAGE_LOOKAHEAD,
-  );
-  if (queryVector.length === 0 || offset >= MAX_VECTOR_CANDIDATES) return [];
+  const candidateLimit = options?.candidateLimit;
+  const useCandidateWindow = candidateLimit !== undefined;
+  const requestedResults = useCandidateWindow
+    ? Math.min(MAX_VECTOR_CANDIDATES, Math.max(0, candidateLimit))
+    : Math.min(MAX_VECTOR_CANDIDATES, offset + JOBS_PAGE_SIZE + JOBS_PAGE_LOOKAHEAD);
+  if (queryVector.length === 0 || requestedResults === 0) return [];
+  if (!useCandidateWindow && offset >= MAX_VECTOR_CANDIDATES) return [];
 
   const numCandidates = Math.min(
     MAX_VECTOR_CANDIDATES,
     Math.max(MIN_VECTOR_CANDIDATES, requestedResults * VECTOR_CANDIDATE_MULTIPLIER),
   );
+  const skip = useCandidateWindow ? 0 : offset;
+  const limit = useCandidateWindow ? requestedResults : JOBS_PAGE_SIZE + JOBS_PAGE_LOOKAHEAD;
   const pipeline = [
     {
       $vectorSearch: {
@@ -94,8 +104,8 @@ export const vectorSearchJobsPage = async (
         filter: { createdAt: { $lte: asOf } },
       },
     },
-    { $skip: offset },
-    { $limit: JOBS_PAGE_SIZE + JOBS_PAGE_LOOKAHEAD },
+    { $skip: skip },
+    { $limit: limit },
     {
       $project: {
         _id: 0,
@@ -115,7 +125,7 @@ export const vectorSearchJobsPage = async (
     },
   ];
   return withSpan("jobs.vector_search", {
-    "jobs.pagination.offset": offset,
+    "jobs.pagination.offset": useCandidateWindow ? 0 : offset,
     "jobs.pagination.page_size": JOBS_PAGE_SIZE,
     "jobs.vector.num_candidates": numCandidates,
     "jobs.vector.index": indexName,

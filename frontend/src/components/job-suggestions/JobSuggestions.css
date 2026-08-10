@@ -133,6 +133,10 @@
   margin-top: 2px;
 }
 
+.job-match-pct {
+  margin-inline-start: 6px;
+}
+
 /* Match ring */
 .job-match-ring {
   flex-shrink: 0;

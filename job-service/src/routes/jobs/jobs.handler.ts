@@ -12,7 +12,7 @@ import { enrichByGemini } from "../../poller/job-poller-api-stack/stages/enrich/
 import { saveEnrichedJobs } from "../../poller/job-poller-api-stack/stages/save/save-enriched-jobs";
 import { fetchUserMatchingContext } from "./user-profile.client";
 import type { CreateJobBody } from "./jobs.schema";
-import { JOBS_PAGE_LOOKAHEAD, JOBS_PAGE_SIZE } from "./jobs.consts";
+import { JOBS_PAGE_LOOKAHEAD, JOBS_PAGE_SIZE, HIGH_MATCH_OVERFETCH_MULTIPLIER, MAX_VECTOR_CANDIDATES, MIN_VECTOR_CANDIDATES } from "./jobs.consts";
 import { vectorSearchJobsPage } from "./semantic-search";
 import type {
   JobsCursor,
@@ -25,7 +25,10 @@ import {
   blendSearchAndProfileVectors,
   createRankingFingerprint,
   decodeJobsCursor,
+  filterRankedJobsByMinMatchFit,
   isProfileContextCompatible,
+  shouldApplyMinMatchFitFilter,
+  sliceJobsPageWindow,
   toJobsPageResponse,
 } from "./jobs.utils";
 
@@ -193,6 +196,29 @@ export const JobsHandler = ({
       }
 
       try {
+        const applyMinMatchFilter = shouldApplyMinMatchFitFilter(profileContext, strategy.mode);
+        if (applyMinMatchFilter && profileContext) {
+          const candidateLimit = Math.min(
+            MAX_VECTOR_CANDIDATES,
+            Math.max(
+              MIN_VECTOR_CANDIDATES,
+              (offset + JOBS_PAGE_SIZE + JOBS_PAGE_LOOKAHEAD) * HIGH_MATCH_OVERFETCH_MULTIPLIER,
+            ),
+          );
+          const candidates = await vectorSearchJobsPage(
+            jobsCollection,
+            strategy.vector,
+            0,
+            asOf,
+            config.JOB_VECTOR_INDEX_NAME,
+            { candidateLimit },
+          );
+          const highMatchJobs = filterRankedJobsByMinMatchFit(candidates, profileContext);
+          const jobs = sliceJobsPageWindow(highMatchJobs, offset);
+          reply.code(StatusCodes.OK).send(toJobsPageResponse(jobs, profileContext, strategy.mode, cursor));
+          return;
+        }
+
         const jobs = await vectorSearchJobsPage(
           jobsCollection,
           strategy.vector,

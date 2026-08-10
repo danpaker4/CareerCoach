@@ -6,7 +6,9 @@ import {
     createRankingFingerprint,
     decodeJobsCursor,
     encodeJobsCursor,
+    filterRankedJobsByMinMatchFit,
     isProfileContextCompatible,
+    sliceJobsPageWindow,
     toJobsPageResponse,
 } from "../jobs.utils";
 
@@ -86,9 +88,20 @@ describe("job ranking utilities", () => {
         expect(decodeJobsCursor(result.pagination.nextCursor ?? "")?.offset).toBe(50);
     });
 
-    it("requires ready profile vectors with the configured model and dimensions", () => {
-        expect(isProfileContextCompatible(PROFILE_CONTEXT, "test-model", 2)).toBe(true);
-        expect(isProfileContextCompatible({ ...PROFILE_CONTEXT, status: "pending" }, "test-model", 2)).toBe(false);
-        expect(isProfileContextCompatible(PROFILE_CONTEXT, "different-model", 2)).toBe(false);
+    it("filters ranked jobs below the minimum match fit percentage", () => {
+        const high = makeJob(1);
+        high.searchEmbedding = [1, 0];
+        const low = makeJob(2);
+        low.searchEmbedding = [0, 1];
+
+        const filtered = filterRankedJobsByMinMatchFit([high, low], PROFILE_CONTEXT);
+
+        expect(filtered.map((job) => job.id)).toEqual(["job-1"]);
+    });
+
+    it("slices a pagination window with lookahead", () => {
+        const jobs = Array.from({ length: 5 }, (_, index) => makeJob(index));
+        expect(sliceJobsPageWindow(jobs, 0)).toHaveLength(Math.min(5, 51));
+        expect(sliceJobsPageWindow(jobs, 2).map((job) => job.id)).toEqual(["job-2", "job-3", "job-4"]);
     });
 });

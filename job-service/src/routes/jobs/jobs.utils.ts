@@ -3,7 +3,9 @@ import { z } from "zod";
 import type { UserMatchingContext } from "../../cache/user-embedding.cache";
 import { cosineSimilarity, computeVectorMatchScore } from "../jobScores/vector-score.service";
 import {
+    JOBS_PAGE_LOOKAHEAD,
     JOBS_PAGE_SIZE,
+    MIN_MATCH_FIT_PCT,
     PROFILE_QUERY_WEIGHT,
     SEARCH_QUERY_WEIGHT,
 } from "./jobs.consts";
@@ -55,6 +57,25 @@ export const decodeJobsCursor = (value: string): JobsCursor | null => {
     }
 };
 
+export const shouldApplyMinMatchFitFilter = (
+    profileContext: UserMatchingContext | null,
+    rankingMode: JobsRankingMode,
+): boolean =>
+    profileContext !== null &&
+    (rankingMode === "profile" || rankingMode === "profile_query");
+
+export const filterRankedJobsByMinMatchFit = (
+    jobs: readonly RankedJob[],
+    profileContext: UserMatchingContext,
+): RankedJob[] =>
+    jobs.filter((job) => {
+        if (job.searchEmbedding.length !== profileContext.embedding.length) return false;
+        return computeVectorMatchScore(profileContext.embedding, job.searchEmbedding) >= MIN_MATCH_FIT_PCT;
+    });
+
+export const sliceJobsPageWindow = (jobs: readonly RankedJob[], offset: number): RankedJob[] =>
+    jobs.slice(offset, offset + JOBS_PAGE_SIZE + JOBS_PAGE_LOOKAHEAD);
+
 export const createRankingFingerprint = (
     userId: string,
     search: string,
@@ -73,6 +94,9 @@ export const createRankingFingerprint = (
         embeddingModel,
         String(SEARCH_QUERY_WEIGHT),
         String(PROFILE_QUERY_WEIGHT),
+        shouldApplyMinMatchFitFilter(profileContext, rankingMode)
+            ? `minMatch:${MIN_MATCH_FIT_PCT}`
+            : "minMatch:none",
     ].join("|");
     return createHash("sha256").update(input).digest("hex");
 };
