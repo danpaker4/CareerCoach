@@ -6,6 +6,7 @@ import type {
 import { CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
 import { parseConversationModeDetectionResult } from "../../stage-1-prepare-context/mode-detection/conversation-mode.utils";
+import { parseJsonObjectFromLlm } from "./json-response.utils";
 
 const parseSearchFiltersFromUnknown = (value: unknown): JobSearchRequest => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -38,25 +39,24 @@ const parseCompactSearchFilters = (value: Record<string, unknown>): JobSearchReq
 };
 
 const parseCompactMode = (value: unknown): ConversationMode | null => {
-    if (value === "G") {
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    if (normalized === "G" || normalized === "GUIDED" || normalized === "UNCLEAR") {
         return CONVERSATION_MODE.GUIDED;
     }
-    if (value === "N") {
+    if (normalized === "N" || normalized === "NEAR_TERM" || normalized === "NEXT_JOB") {
         return CONVERSATION_MODE.NEAR_TERM;
     }
-    if (value === "D") {
+    if (normalized === "D" || normalized === "DREAMJOB" || normalized === "DREAM_JOB") {
         return CONVERSATION_MODE.DREAMJOB;
     }
     return null;
 };
 
-export const parseLlmDecisionFromJson = (rawText: string): LlmDecision => {
-    const parsed: unknown = JSON.parse(rawText);
-    if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("LLM returned non-object decision payload");
-    }
-
-    const obj = parsed as Record<string, unknown>;
+const parseLlmDecisionFromObject = (obj: Record<string, unknown>): LlmDecision => {
     const compactResponse = typeof obj.r === "string";
     return {
         reply: typeof obj.reply === "string"
@@ -76,13 +76,20 @@ export const parseLlmDecisionFromJson = (rawText: string): LlmDecision => {
     };
 };
 
-export const parseChatTurnDecisionFromJson = (rawText: string): ChatTurnDecision => {
-    const decision = parseLlmDecisionFromJson(rawText);
-    const parsed: unknown = JSON.parse(rawText);
-    if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("LLM returned non-object turn decision payload");
+const parseDecisionObject = (rawText: string): Record<string, unknown> => {
+    const parsed = parseJsonObjectFromLlm(rawText);
+    if (!parsed) {
+        throw new Error("LLM returned invalid JSON decision payload");
     }
-    const obj = parsed as Record<string, unknown>;
+    return parsed;
+};
+
+export const parseLlmDecisionFromJson = (rawText: string): LlmDecision =>
+    parseLlmDecisionFromObject(parseDecisionObject(rawText));
+
+export const parseChatTurnDecisionFromJson = (rawText: string): ChatTurnDecision => {
+    const obj = parseDecisionObject(rawText);
+    const decision = parseLlmDecisionFromObject(obj);
     const compactMode = parseCompactMode(obj.m);
     if (compactMode) {
         const target = typeof obj.target === "string" && obj.target.trim().length > 0
@@ -106,7 +113,7 @@ export const parseChatTurnDecisionFromJson = (rawText: string): ChatTurnDecision
         };
     }
 
-    const modeDetection = parseConversationModeDetectionResult(rawText);
+    const modeDetection = parseConversationModeDetectionResult(JSON.stringify(obj));
     if (!modeDetection) {
         throw new Error("LLM returned an invalid conversation mode");
     }

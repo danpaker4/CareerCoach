@@ -20,7 +20,8 @@ export const runDreamJobFlow = async (
         ctx.conversationAfterUserMessage,
         ctx.normalizedMessage,
         ctx.userAccountContext,
-        dreamJobFlow
+        dreamJobFlow,
+        deps.llmObserver
     );
 
     const detectedTitle =

@@ -1,5 +1,5 @@
 import type { TextCompletionPort } from "../../../../litellm/text-completion/text-completion.types";
-import { parseJsonObjectFromLlm } from "../shared/quick-help.utils";
+import { parseJsonObjectFromLlm } from "../../../shared/llm/json-response.utils";
 import { buildSkillsGapPrompt } from "./skills-gap.prompt.utils";
 import type { SkillsGapLlmResult } from "./skills-gap.types";
 
@@ -12,7 +12,7 @@ export const generateSkillsGapAdvice = async (
             targetRole: params.targetRole,
             userAccountContext: params.userAccountContext,
         }),
-        { operation: "chat.quick_help.skills_gap", userId: params.userId }
+        { operation: "chat.quick_help.skills_gap", userId: params.userId, responseFormat: "json" }
     );
     const parsed = parseJsonObjectFromLlm(raw);
     const reply = typeof parsed?.reply === "string" ? parsed.reply.trim() : "";

@@ -25,17 +25,9 @@ import {
 import type { DreamJobLlmDecision } from "../../stage-2-shortcuts/dream-job/chat.dream-job.types";
 import { buildRecommendationPrompt } from "./chat.recommendation.prompt.utils";
 import { buildTurnDecisionPrompt } from "./chat.turn.prompt.utils";
-import type { ChatLlmObservedOperation, ChatLlmObserver } from "./chat.llm.types";
+import type { ChatLlmObserver } from "./chat.llm.types";
 import { getCurrentStage } from "../../../routes/conversation/conversation.stage.utils";
-
-const recordParseEvent = (
-    observer: ChatLlmObserver | undefined,
-    operation: ChatLlmObservedOperation,
-    rawText: string,
-    parseStatus: "success" | "fallback"
-): void => {
-    observer?.recordParseEvent({ operation, rawText, parseStatus });
-};
+import { recordChatLlmParseEvent } from "./chat.llm.observability.utils";
 
 export const decideNextStep = async (
     deps: ChatFlowDeps,
@@ -51,15 +43,33 @@ export const decideNextStep = async (
             ctx.userAccountContext,
             currentStage
         ),
-        { operation: "chat.decision", userId: conversation.userId, sessionId: conversation._id?.toHexString(), feature: "chat" }
+        {
+            operation: "chat.decision",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+            feature: "chat",
+            responseFormat: "json",
+        }
     );
 
     try {
         const parsed = parseChatTurnDecisionFromJson(rawText);
-        recordParseEvent(deps.llmObserver, "chat.decision", rawText, "success");
+        recordChatLlmParseEvent(deps.llmObserver, {
+            operation: "chat.decision",
+            rawText,
+            parseStatus: "success",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+        });
         return parsed;
-    } catch {
-        recordParseEvent(deps.llmObserver, "chat.decision", rawText, "fallback");
+    } catch (error: unknown) {
+        recordChatLlmParseEvent(deps.llmObserver, {
+            operation: "chat.decision",
+            rawText,
+            parseStatus: "fallback",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+        }, error);
         return {
             reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
             shouldSearchJobs: false,
@@ -82,15 +92,33 @@ export const generateJobAwareReply = async (
 ): Promise<LlmDecision> => {
     const rawText = await textCompletion.complete(
         buildRecommendationPrompt(conversation, latestUserMessage, jobs, userAchievements, userAccountContext),
-        { operation: "chat.job_aware_reply", userId: conversation.userId, sessionId: conversation._id?.toHexString(), feature: "chat" }
+        {
+            operation: "chat.job_aware_reply",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+            feature: "chat",
+            responseFormat: "json",
+        }
     );
 
     try {
         const parsed = parseLlmDecisionFromJson(rawText);
-        recordParseEvent(observer, "chat.job_aware_reply", rawText, "success");
+        recordChatLlmParseEvent(observer, {
+            operation: "chat.job_aware_reply",
+            rawText,
+            parseStatus: "success",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+        });
         return parsed;
-    } catch {
-        recordParseEvent(observer, "chat.job_aware_reply", rawText, "fallback");
+    } catch (error: unknown) {
+        recordChatLlmParseEvent(observer, {
+            operation: "chat.job_aware_reply",
+            rawText,
+            parseStatus: "fallback",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+        }, error);
         return {
             reply: LLM_JOB_AWARE_PARSE_FALLBACK_REPLY,
             shouldSearchJobs: false,
@@ -105,16 +133,38 @@ export const decideDreamJobStep = async (
     conversation: Conversation,
     latestUserMessage: string,
     userAccountContext: string,
-    dreamJobFlow: DreamJobFlow | undefined
+    dreamJobFlow: DreamJobFlow | undefined,
+    observer?: ChatLlmObserver
 ): Promise<DreamJobLlmDecision> => {
     const rawText = await textCompletion.complete(
         buildDreamJobPrompt({ conversation, latestUserMessage, userAccountContext, dreamJobFlow }),
-        { operation: "chat.dream_job", userId: conversation.userId, sessionId: conversation._id?.toHexString(), feature: "chat" }
+        {
+            operation: "chat.dream_job",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+            feature: "chat",
+            responseFormat: "json",
+        }
     );
 
     try {
-        return parseDreamJobLlmDecisionFromJson(rawText);
-    } catch {
+        const parsed = parseDreamJobLlmDecisionFromJson(rawText);
+        recordChatLlmParseEvent(observer, {
+            operation: "chat.dream_job",
+            rawText,
+            parseStatus: "success",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+        });
+        return parsed;
+    } catch (error: unknown) {
+        recordChatLlmParseEvent(observer, {
+            operation: "chat.dream_job",
+            rawText,
+            parseStatus: "fallback",
+            userId: conversation.userId,
+            sessionId: conversation._id?.toHexString(),
+        }, error);
         return {
             reply: DREAM_JOB_LLM_PARSE_FALLBACK_REPLY,
             awaitingConfirmation: false,
