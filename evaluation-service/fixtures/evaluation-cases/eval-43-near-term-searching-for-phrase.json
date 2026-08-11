@@ -1,0 +1,13 @@
+{
+    "id": "eval-43-near-term-searching-for-phrase",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I'm searching for a security analyst role"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15
+    }
+}

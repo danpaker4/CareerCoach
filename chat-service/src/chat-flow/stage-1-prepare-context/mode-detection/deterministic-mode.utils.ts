@@ -31,6 +31,7 @@ const DREAM_JOB_PATTERNS: readonly RegExp[] = [
 ];
 
 const NOISE = /\b(?:please|now|today|asap|right\s+now|for\s+me|some|any)\b/gi;
+const LEADING_ARTICLE = /^(?:a|an|the)\s+/i;
 const TRAILING_FILLER = /\b(?:jobs?|roles?|positions?|openings?|vacancies)\b\s*$/i;
 
 const cleanTarget = (raw: string | undefined): string | undefined => {
@@ -40,7 +41,8 @@ const cleanTarget = (raw: string | undefined): string | undefined => {
         .replace(/[.,!?;:]+/g, " ")
         .replace(TRAILING_FILLER, " ")
         .replace(/\s+/g, " ")
-        .trim();
+        .trim()
+        .replace(LEADING_ARTICLE, "");
     return cleaned.length >= 2 && cleaned.length <= 80 ? cleaned : undefined;
 };
 

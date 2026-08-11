@@ -14,6 +14,9 @@ export const QUICK_HELP_SKILLS_INTENT_PATTERNS: readonly RegExp[] = [
     /what skills should i learn/i,
     /skills?\s+(for|to)\s+(my\s+)?(next\s+)?role/i,
     /what\s+should\s+i\s+learn\s+for\s+(my\s+)?(next\s+)?role/i,
+    /what\s+(skills?\s+)?(am\s+i|do\s+i)\s+(missing|lacking|lack|need)/i,
+    /what\s+(do|should)\s+i\s+need\s+to\s+learn/i,
+    /\bskills?\s+gap\b/i,
 ];
 
 export const QUICK_HELP_JOB_MATCH_INTENT_PATTERNS: readonly RegExp[] = [
@@ -28,6 +31,9 @@ export const QUICK_HELP_CV_INTENT_PATTERNS: readonly RegExp[] = [
     /improve\s+(my\s+)?(cv|resume)/i,
     /review\s+(my\s+)?(cv|resume)/i,
     /(cv|resume)\s+feedback/i,
+    /\b(rewrite|rework|update|fix|polish|shorten|tailor)\s+(my\s+)?(cv|resume)\b/i,
+    /\b(on|in|for)\s+my\s+(cv|resume)\b/i,
+    /\b(cv|resume)\s+(bullet|summary|wording|phrasing|section)/i,
 ];
 
 export const QUICK_HELP_INTERVIEW_INTENT_PATTERNS: readonly RegExp[] = [
@@ -35,4 +41,7 @@ export const QUICK_HELP_INTERVIEW_INTENT_PATTERNS: readonly RegExp[] = [
     /interview\s+prep/i,
     /prepare\s+for\s+(an\s+)?interview/i,
     /practice\s+interview/i,
+    /\bi\s+(have|'ve got|got)\s+an?\s+interview\b/i,
+    /\binterview\b[^.?!]*\b(round|questions?)\b/i,
+    /\bbehaviou?ral\s+questions?\b/i,
 ];

@@ -1,0 +1,16 @@
+{
+    "id": "eval-61-interview-prep-behavioural",
+    "messages": [
+        {
+            "role": "user",
+            "content": "how should I answer behavioural questions?"
+        }
+    ],
+    "expected": {
+        "mode": "INTERVIEW_PREP",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs"
+        ]
+    }
+}

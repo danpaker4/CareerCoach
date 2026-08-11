@@ -1,0 +1,16 @@
+{
+    "id": "eval-37-near-term-leading-target",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I'd like a devops position"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15,
+        "forbiddenWords": [
+            "I recommend backend"
+        ]
+    }
+}

@@ -2,7 +2,8 @@ import type { Conversation } from "../../routes/conversation/conversation.model"
 import type { UserCareerProfile } from "../../routes/career-profile/career-profile.types";
 import type { ChatMessageResponse, JobSearchResultItem } from "../api/shared/chat.types";
 import { rankJobs } from "./ranking/job-ranking.service";
-import { hasRankableProfile } from "./ranking/job-ranking.utils";
+import { extractRoleTerms, hasRankableProfile } from "./ranking/job-ranking.utils";
+import { buildWishlistSavePrompt } from "../stage-2-shortcuts/wanted-jobs/chat.wishlist.utils";
 import {
     applyValidatedJobsFallback,
     mapRankedJobResultToChatMatchRow,
@@ -20,14 +21,20 @@ import {
 } from "./present-jobs.consts";
 import type { PresentRankedJobsOptions } from "./present-jobs.types";
 
-export const filterEligibleRankedJobs = (userCareerProfile: UserCareerProfile, jobs: JobSearchResultItem[], conversation: Conversation) => {
+export const filterEligibleRankedJobs = (
+    userCareerProfile: UserCareerProfile,
+    jobs: JobSearchResultItem[],
+    conversation: Conversation,
+    targetRole?: string
+) => {
     const rejectedIds = new Set(conversation.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
     const acceptedIds = new Set(conversation.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
-    const rankedJobs = rankJobs(userCareerProfile, jobs);
+    const rankedJobs = rankJobs(userCareerProfile, jobs, targetRole);
     const eligibleRanked = rankedJobs.filter(
         (item) => !rejectedIds.has(item.job.id) && !acceptedIds.has(item.job.id)
     );
-    const wellMatched = hasRankableProfile(userCareerProfile)
+    const isScoreMeaningful = hasRankableProfile(userCareerProfile) || extractRoleTerms(targetRole).length > 0;
+    const wellMatched = isScoreMeaningful
         ? eligibleRanked.filter((item) => item.finalScore >= MIN_PRESENTED_MATCH_SCORE)
         : eligibleRanked;
     return {
@@ -60,10 +67,17 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
     } = ctx;
     const mode = ctx.modeDetection.mode;
 
-    const { rankedJobs, orderedRankedPool, filteredOutByMatch } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
+    const targetRole = options.targetRole ?? ctx.modeDetection.searchQuery;
+    const { rankedJobs, orderedRankedPool, filteredOutByMatch } =
+        filterEligibleRankedJobs(userCareerProfile, jobs, conversation, targetRole);
 
     if (orderedRankedPool.length === 0) {
-        const reply = filteredOutByMatch ? WEAK_MATCH_REPLY : EXHAUSTED_JOBS_REPLY;
+        // Nothing on offer fits what was asked for, which is exactly when an alert is worth more than
+        // a list — so the reply carries the wishlist prompt the next turn can answer with a "yes".
+        const weakMatchReply = targetRole?.trim()
+            ? buildWishlistSavePrompt(targetRole.trim(), "I found open roles, but none of them match that closely enough to be worth your time.")
+            : WEAK_MATCH_REPLY;
+        const reply = filteredOutByMatch ? weakMatchReply : EXHAUSTED_JOBS_REPLY;
         await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
         return { reply, mode, confidenceSummary };
     }

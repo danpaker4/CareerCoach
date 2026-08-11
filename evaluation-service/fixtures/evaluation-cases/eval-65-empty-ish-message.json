@@ -1,0 +1,14 @@
+{
+    "id": "eval-65-empty-ish-message",
+    "messages": [
+        {
+            "role": "user",
+            "content": "..."
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "mustAskQuestion": true
+    }
+}

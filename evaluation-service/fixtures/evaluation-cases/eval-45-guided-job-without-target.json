@@ -1,0 +1,18 @@
+{
+    "id": "eval-45-guided-job-without-target",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I need to change jobs"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs"
+        ]
+    }
+}

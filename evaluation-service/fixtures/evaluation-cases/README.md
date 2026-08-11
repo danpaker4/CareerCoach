@@ -1,12 +1,12 @@
 # Evaluation case fixtures
 
-36 cases covering **GUIDED**, **NEAR_TERM**, **DREAMJOB**, and quick-help modes (**SKILLS_GAP**, **CV_IMPROVE**, **INTERVIEW_PREP**), with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
+66 cases covering **GUIDED**, **NEAR_TERM**, **DREAMJOB**, and quick-help modes (**SKILLS_GAP**, **CV_IMPROVE**, **INTERVIEW_PREP**), with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
 
 ## Upload one file (UI)
 
 Management → LLM evaluation → **Add Conversation** → pick a `.json` file.
 
-## Seed all 36 into MongoDB
+## Seed all 66 into MongoDB
 
 With evaluation-service running on port 3004:
 
@@ -57,3 +57,33 @@ Skips cases that already exist (409). To replace, delete the case in the UI firs
 | eval-34-quick-help-interview-prep-with-topic | INTERVIEW_PREP | Theoretical practice questions after topic |
 | eval-35-quick-help-profile-job-match | NEAR_TERM | Profile job match one-shot search |
 | eval-36-quick-help-skills-gap-exit | GUIDED | Exit sticky skills-gap with "stop" |
+| eval-37-near-term-leading-target | NEAR_TERM | Role named before the noun |
+| eval-38-near-term-openings-wording | NEAR_TERM | "openings" instead of "jobs" |
+| eval-39-near-term-vacancies-wording | NEAR_TERM | "vacancies" wording |
+| eval-40-near-term-trailing-please | NEAR_TERM | "<role> roles please" |
+| eval-41-near-term-after-profile-turn | NEAR_TERM | Pivots to search mid-discovery |
+| eval-42-near-term-pivot-after-reject | NEAR_TERM | New field after rejecting results |
+| eval-43-near-term-searching-for-phrase | NEAR_TERM | "I'm searching for a ..." |
+| eval-44-near-term-need-a-role | NEAR_TERM | "I need a ... job" |
+| eval-45-guided-job-without-target | GUIDED | Wants a change but names no role |
+| eval-46-guided-vague-next-step | GUIDED | "not sure what I want to do next" |
+| eval-47-guided-burned-out | GUIDED | Burnout with no direction |
+| eval-48-guided-mentions-a-tool-only | GUIDED | A technology is not a target role |
+| eval-49-guided-single-word-reply | GUIDED | One-word answer keeps discovery going |
+| eval-50-guided-asks-what-you-can-do | GUIDED | Asks about the assistant itself |
+| eval-51-dreamjob-one-day-phrasing | DREAMJOB | "one day I want to be ..." |
+| eval-52-dreamjob-aspire-phrasing | DREAMJOB | "I aspire to become ..." |
+| eval-53-dreamjob-five-years | DREAMJOB | Five-year horizon |
+| eval-54-dreamjob-confirmation-turn | DREAMJOB | Answers the save confirmation |
+| eval-55-dreamjob-declines-save | DREAMJOB | Declines the save |
+| eval-56-skills-gap-what-am-i-missing | SKILLS_GAP | "what am I missing" wording |
+| eval-57-skills-gap-advice-after-role | GUIDED | Advice delivered, sticky help released |
+| eval-58-cv-improve-rewrite-wording | CV_IMPROVE | "rewrite my cv" |
+| eval-59-cv-improve-bullet-point | CV_IMPROVE | Phrasing a single bullet |
+| eval-60-interview-prep-nervous | INTERVIEW_PREP | Upcoming system design round |
+| eval-61-interview-prep-behavioural | INTERVIEW_PREP | Behavioural question technique |
+| eval-62-injection-in-role-name | NEAR_TERM | Injection hidden in a search request |
+| eval-63-asks-for-personal-data-of-others | any | Must not leak other users' data |
+| eval-64-asks-to-lie-on-cv | any | Must not fabricate work history |
+| eval-65-empty-ish-message | GUIDED | Content-free message |
+| eval-66-off-topic-request | any | Off-topic request stays on task |

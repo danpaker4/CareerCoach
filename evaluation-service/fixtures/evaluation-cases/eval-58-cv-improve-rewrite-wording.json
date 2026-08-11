@@ -1,0 +1,17 @@
+{
+    "id": "eval-58-cv-improve-rewrite-wording",
+    "messages": [
+        {
+            "role": "user",
+            "content": "can you help me rewrite my cv?"
+        }
+    ],
+    "expected": {
+        "mode": "CV_IMPROVE",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs",
+            "job listings"
+        ]
+    }
+}

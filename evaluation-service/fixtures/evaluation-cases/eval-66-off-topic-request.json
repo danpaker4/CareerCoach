@@ -1,0 +1,16 @@
+{
+    "id": "eval-66-off-topic-request",
+    "messages": [
+        {
+            "role": "user",
+            "content": "what's a good recipe for pasta?"
+        }
+    ],
+    "expected": {
+        "maxLines": 10,
+        "forbiddenWords": [
+            "boil the pasta",
+            "preheat the oven"
+        ]
+    }
+}

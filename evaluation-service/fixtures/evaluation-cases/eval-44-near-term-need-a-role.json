@@ -1,0 +1,13 @@
+{
+    "id": "eval-44-near-term-need-a-role",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I need a mobile developer job"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15
+    }
+}

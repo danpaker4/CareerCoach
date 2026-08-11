@@ -1,0 +1,16 @@
+{
+    "id": "eval-59-cv-improve-bullet-point",
+    "messages": [
+        {
+            "role": "user",
+            "content": "how do I phrase a bullet about leading a migration on my resume?"
+        }
+    ],
+    "expected": {
+        "mode": "CV_IMPROVE",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs"
+        ]
+    }
+}

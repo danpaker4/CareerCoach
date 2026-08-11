@@ -1,0 +1,25 @@
+{
+    "id": "eval-57-skills-gap-advice-after-role",
+    "messages": [
+        {
+            "role": "user",
+            "content": "what skills should I learn next?"
+        },
+        {
+            "role": "assistant",
+            "content": "Which role are you aiming for?"
+        },
+        {
+            "role": "user",
+            "content": "site reliability engineer"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs",
+            "job listings"
+        ]
+    }
+}

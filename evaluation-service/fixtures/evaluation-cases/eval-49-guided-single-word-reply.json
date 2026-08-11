@@ -1,0 +1,22 @@
+{
+    "id": "eval-49-guided-single-word-reply",
+    "messages": [
+        {
+            "role": "user",
+            "content": "hi"
+        },
+        {
+            "role": "assistant",
+            "content": "What kind of work have you been doing?"
+        },
+        {
+            "role": "user",
+            "content": "testing"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "mustAskQuestion": true
+    }
+}

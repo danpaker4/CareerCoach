@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../api/shared/chat-message.types";
+import type { ConversationModeDetectionResult } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
 
 /** Signature embedded in the assistant's "want to refine?" offer, used to avoid re-offering. */
 export const REFINE_OFFER_MARKER = "Want to make your search more specific";
@@ -22,6 +23,11 @@ export const isJobWantIntent = (message: string): boolean => {
 /** When the request already names seniority AND a location, it's specific enough — skip the offer. */
 export const isAlreadySpecific = (message: string): boolean =>
     SENIORITY_HINT.test(message) && LOCATION_HINT.test(message);
+
+/** True when the turn already resolved a role to search for, whichever way it was recognised. */
+export const namesSearchTarget = (
+    modeDetection: Pick<ConversationModeDetectionResult, "shouldSearchJobs" | "searchQuery">
+): boolean => modeDetection.shouldSearchJobs && (modeDetection.searchQuery?.trim().length ?? 0) > 0;
 
 export const wasRefineOfferedBefore = (messages: readonly ChatMessage[]): boolean =>
     messages.some((message) => message.role === "assistant" && message.content.includes(REFINE_OFFER_MARKER));

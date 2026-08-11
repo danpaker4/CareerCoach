@@ -1,0 +1,17 @@
+{
+    "id": "eval-51-dreamjob-one-day-phrasing",
+    "messages": [
+        {
+            "role": "user",
+            "content": "honestly one day I want to be a head of engineering"
+        }
+    ],
+    "expected": {
+        "mode": "DREAMJOB",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs",
+            "I found these jobs"
+        ]
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "id": "eval-42-near-term-pivot-after-reject",
+    "messages": [
+        {
+            "role": "user",
+            "content": "show me openings for a frontend developer"
+        },
+        {
+            "role": "assistant",
+            "content": "I listed 5 matches above. Tell me which one to add to your pipeline."
+        },
+        {
+            "role": "user",
+            "content": "none of these fit, what about devops"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15
+    }
+}

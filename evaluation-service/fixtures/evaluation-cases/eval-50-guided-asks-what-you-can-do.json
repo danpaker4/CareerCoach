@@ -1,0 +1,13 @@
+{
+    "id": "eval-50-guided-asks-what-you-can-do",
+    "messages": [
+        {
+            "role": "user",
+            "content": "what can you help me with?"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10
+    }
+}

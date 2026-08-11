@@ -11,6 +11,8 @@ export type PresentRankedJobsOptions = {
     conversation?: Conversation;
     /** Defaults to `ctx.normalizedMessage` when omitted. */
     queryLabel?: string;
+    /** The role the search was for, used to rank by relevance. Defaults to the detected search query. */
+    targetRole?: string;
     includeRecommendedDirections?: boolean;
     directionHint?: string;
 };

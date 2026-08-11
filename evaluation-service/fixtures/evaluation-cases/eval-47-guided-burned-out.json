@@ -1,0 +1,14 @@
+{
+    "id": "eval-47-guided-burned-out",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I'm burned out and thinking about a change but I don't know to what"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "mustAskQuestion": true
+    }
+}

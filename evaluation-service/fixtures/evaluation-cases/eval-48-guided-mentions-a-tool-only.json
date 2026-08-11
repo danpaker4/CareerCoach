@@ -1,0 +1,14 @@
+{
+    "id": "eval-48-guided-mentions-a-tool-only",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I've been using kubernetes a lot lately"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "mustAskQuestion": true
+    }
+}

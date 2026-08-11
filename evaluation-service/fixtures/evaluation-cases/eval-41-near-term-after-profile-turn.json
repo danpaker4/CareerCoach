@@ -1,0 +1,21 @@
+{
+    "id": "eval-41-near-term-after-profile-turn",
+    "messages": [
+        {
+            "role": "user",
+            "content": "hey, I'm a backend dev with 4 years of node and postgres"
+        },
+        {
+            "role": "assistant",
+            "content": "Are you looking for a new job within the next year, or thinking longer-term?"
+        },
+        {
+            "role": "user",
+            "content": "can you get me openings for a data engineer"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15
+    }
+}

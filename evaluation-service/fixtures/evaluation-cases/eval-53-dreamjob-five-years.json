@@ -1,0 +1,13 @@
+{
+    "id": "eval-53-dreamjob-five-years",
+    "messages": [
+        {
+            "role": "user",
+            "content": "where I want to be in 5 years is running a data platform team"
+        }
+    ],
+    "expected": {
+        "mode": "DREAMJOB",
+        "maxLines": 10
+    }
+}

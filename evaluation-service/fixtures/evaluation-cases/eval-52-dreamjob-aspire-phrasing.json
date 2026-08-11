@@ -1,0 +1,13 @@
+{
+    "id": "eval-52-dreamjob-aspire-phrasing",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I aspire to become a principal architect"
+        }
+    ],
+    "expected": {
+        "mode": "DREAMJOB",
+        "maxLines": 10
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "id": "eval-60-interview-prep-nervous",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I have an interview on Thursday and I'm nervous about the system design round"
+        }
+    ],
+    "expected": {
+        "mode": "INTERVIEW_PREP",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs",
+            "job listings"
+        ]
+    }
+}

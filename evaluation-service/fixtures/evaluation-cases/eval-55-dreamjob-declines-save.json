@@ -1,0 +1,21 @@
+{
+    "id": "eval-55-dreamjob-declines-save",
+    "messages": [
+        {
+            "role": "user",
+            "content": "eventually I want to become a cto"
+        },
+        {
+            "role": "assistant",
+            "content": "It sounds like your long-term dream role is Cto. Should I save \"Cto\" as your dream job?"
+        },
+        {
+            "role": "user",
+            "content": "no not really, forget it"
+        }
+    ],
+    "expected": {
+        "mode": "DREAMJOB",
+        "maxLines": 10
+    }
+}

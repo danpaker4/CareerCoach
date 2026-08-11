@@ -1,0 +1,18 @@
+{
+    "id": "eval-46-guided-vague-next-step",
+    "messages": [
+        {
+            "role": "user",
+            "content": "I'm not sure what I want to do next"
+        }
+    ],
+    "expected": {
+        "mode": "GUIDED",
+        "maxLines": 10,
+        "mustAskQuestion": true,
+        "forbiddenWords": [
+            "here are open jobs",
+            "apply now"
+        ]
+    }
+}

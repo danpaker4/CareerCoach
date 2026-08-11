@@ -82,3 +82,31 @@ describe("isClearlyInsufficientInterviewAnswer", () => {
         );
     });
 });
+
+describe("detectQuickHelpIntent on wording people actually type", () => {
+    it("reads a skills gap that is described rather than named", () => {
+        assert.equal(detectQuickHelpIntent("what am I missing to move into platform engineering?"), "skills_gap");
+        assert.equal(detectQuickHelpIntent("what do I need to learn to get there?"), "skills_gap");
+    });
+
+    it("reads CV help beyond the word improve", () => {
+        assert.equal(detectQuickHelpIntent("can you help me rewrite my cv?"), "cv_improve");
+        assert.equal(
+            detectQuickHelpIntent("how do I phrase a bullet about leading a migration on my resume?"),
+            "cv_improve"
+        );
+    });
+
+    it("reads interview help from the situation, not just the word prep", () => {
+        assert.equal(
+            detectQuickHelpIntent("I have an interview on Thursday and I'm nervous about the system design round"),
+            "interview_prep"
+        );
+        assert.equal(detectQuickHelpIntent("how should I answer behavioural questions?"), "interview_prep");
+    });
+
+    it("leaves an unrelated message alone", () => {
+        assert.equal(detectQuickHelpIntent("show me openings for a frontend developer"), null);
+        assert.equal(detectQuickHelpIntent("add the second one to my pipeline"), null);
+    });
+});

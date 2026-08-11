@@ -1,0 +1,16 @@
+{
+    "id": "eval-38-near-term-openings-wording",
+    "messages": [
+        {
+            "role": "user",
+            "content": "show me openings for a frontend developer"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15,
+        "forbiddenWords": [
+            "what would you like to explore"
+        ]
+    }
+}

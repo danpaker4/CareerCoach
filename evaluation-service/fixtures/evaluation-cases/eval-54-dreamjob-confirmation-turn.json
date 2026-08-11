@@ -1,0 +1,21 @@
+{
+    "id": "eval-54-dreamjob-confirmation-turn",
+    "messages": [
+        {
+            "role": "user",
+            "content": "my dream job is to be a machine learning researcher"
+        },
+        {
+            "role": "assistant",
+            "content": "It sounds like your long-term dream role is Machine Learning Researcher. Should I save \"Machine Learning Researcher\" as your dream job?"
+        },
+        {
+            "role": "user",
+            "content": "yes that's right"
+        }
+    ],
+    "expected": {
+        "mode": "DREAMJOB",
+        "maxLines": 10
+    }
+}

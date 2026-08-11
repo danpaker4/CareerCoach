@@ -87,3 +87,39 @@ describe("filterEligibleRankedJobs", () => {
         assert.equal(filteredOutByMatch, false);
     });
 });
+
+describe("filterEligibleRankedJobs with a target role", () => {
+    const FRONTEND = job("frontend", "Frontend Developer", "Build interfaces in React.");
+    const JUNIOR_BACKEND = job("junior-backend", "Junior Backend Developer",
+        "Write services and learn from senior engineers.");
+
+    it("opens with the role that was asked for rather than the most junior posting", () => {
+        const { orderedRankedPool } = filterEligibleRankedJobs(
+            profile([]),
+            [JUNIOR_BACKEND, FRONTEND],
+            emptyConversation,
+            "frontend developer"
+        );
+        assert.equal(orderedRankedPool[0]?.jobId, "frontend");
+    });
+
+    it("drops postings for a different role than the one requested", () => {
+        const { orderedRankedPool, filteredOutByMatch } = filterEligibleRankedJobs(
+            profile([]),
+            [JUNIOR_BACKEND],
+            emptyConversation,
+            "frontend developer"
+        );
+        assert.deepEqual(orderedRankedPool, []);
+        assert.equal(filteredOutByMatch, true);
+    });
+
+    it("still presents everything when the search named no role", () => {
+        const { orderedRankedPool } = filterEligibleRankedJobs(
+            profile([]),
+            [JUNIOR_BACKEND, FRONTEND],
+            emptyConversation
+        );
+        assert.equal(orderedRankedPool.length, 2);
+    });
+});

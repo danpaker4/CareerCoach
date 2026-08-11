@@ -1,0 +1,13 @@
+{
+    "id": "eval-39-near-term-vacancies-wording",
+    "messages": [
+        {
+            "role": "user",
+            "content": "list vacancies for a data engineer"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "id": "eval-56-skills-gap-what-am-i-missing",
+    "messages": [
+        {
+            "role": "user",
+            "content": "what am I missing to move into platform engineering?"
+        }
+    ],
+    "expected": {
+        "mode": "SKILLS_GAP",
+        "maxLines": 10,
+        "forbiddenWords": [
+            "here are open jobs",
+            "apply now",
+            "job listings"
+        ]
+    }
+}

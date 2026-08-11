@@ -50,5 +50,6 @@ export const runNearTermSearchFlow = async (
         jobs,
         searchIntent: "SEARCH_PLAN",
         queryLabel: ctx.normalizedMessage,
+        targetRole: query,
     });
 };

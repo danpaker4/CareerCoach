@@ -1,0 +1,13 @@
+{
+    "id": "eval-40-near-term-trailing-please",
+    "messages": [
+        {
+            "role": "user",
+            "content": "product designer roles please"
+        }
+    ],
+    "expected": {
+        "mode": "NEAR_TERM",
+        "maxLines": 15
+    }
+}
