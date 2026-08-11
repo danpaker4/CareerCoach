@@ -10,6 +10,8 @@ import {
 import { resolveOnboardingDirectionMode } from "./onboarding.direction.utils";
 import {
     applyChatStatedFactsToBackground,
+    buildChatStatedBackgroundReply,
+    doesReplyMatchChatStatedFacts,
     extractChatStatedBackgroundFacts,
 } from "./onboarding.chat-facts.utils";
 
@@ -75,6 +77,7 @@ export const applyOnboardingDecision = (
 
     if (!current.backgroundResolved) {
         if (decision.background.status === "FOUND" || decision.background.status === "NONE") {
+            const chatFacts = extractChatStatedBackgroundFacts(latestUserMessage);
             const withBackground: OnboardingFlow = {
                 ...withStoredBackground(current, decision, latestUserMessage),
                 backgroundResolved: true,
@@ -95,8 +98,12 @@ export const applyOnboardingDecision = (
                     completedThisTurn: true,
                 };
             }
+            const fallbackReply = buildChatStatedBackgroundReply(chatFacts);
+            const reply = fallbackReply && !doesReplyMatchChatStatedFacts(decision.response, chatFacts)
+                ? fallbackReply
+                : decision.response;
             return {
-                reply: decision.response,
+                reply,
                 onboardingFlow: withBackground,
                 completedThisTurn: false,
             };

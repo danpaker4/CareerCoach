@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
     applyChatStatedFactsToBackground,
+    doesReplyMatchChatStatedFacts,
     extractChatStatedBackgroundFacts,
     extractClaimedYearsOfExperience,
     formatChatStatedFactsForPrompt,
@@ -40,5 +41,22 @@ describe("onboarding chat facts", () => {
         assert.equal(merged.yearsOfExperience, 5);
         assert.deepEqual(merged.companies, ["IDF"]);
         assert.equal(merged.summary, "qa for about 5 years at IDF");
+    });
+
+    it("accepts model replies only when all mentioned role and tenure facts match chat", () => {
+        const facts = { role: "software developer", yearsOfExperience: 5 };
+
+        assert.equal(
+            doesReplyMatchChatStatedFacts("Nice — software developer for about 5 years. What are you looking for?", facts),
+            true,
+        );
+        assert.equal(
+            doesReplyMatchChatStatedFacts("Nice — QA engineer for about 2 years. What are you looking for?", facts),
+            false,
+        );
+        assert.equal(
+            doesReplyMatchChatStatedFacts("Software developer for 5 years, after 2 years in QA.", facts),
+            false,
+        );
     });
 });

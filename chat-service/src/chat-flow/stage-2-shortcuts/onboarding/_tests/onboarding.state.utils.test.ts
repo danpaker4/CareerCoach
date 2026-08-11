@@ -73,7 +73,8 @@ describe("buildOnboardingPrompt", () => {
 
         assert.match(prompt, /CHAT_STATED_FACTS \(authoritative for role\/years\): role=qa, yearsOfExperience=5/);
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative for role and yearsOfExperience/);
-        assert.match(prompt, /Never replace chat-stated role wording or years with a CV title\/tenure variant/);
+        assert.match(prompt, /use only the latest explicit chat value/i);
+        assert.match(prompt, /Never replace chat-stated wording/i);
     });
 });
 
@@ -122,7 +123,7 @@ describe("applyOnboardingDecision", () => {
         assert.match(step.reply, /automation qa engineer/i);
     });
 
-    it("prefers chat role and years over CV-shaped LLM background", () => {
+    it("prefers chat role and years over CV-shaped LLM background in state and reply", () => {
         const step = applyOnboardingDecision(
             defaultOnboardingFlow(),
             {
@@ -137,14 +138,40 @@ describe("applyOnboardingDecision", () => {
                 mode: null,
                 advance: true,
             },
-            "hi my name is gal kosover and in the last 5 years im qa",
+            "hi my name is gal kosover and in the last 5 years im software developer",
         );
 
         assert.equal(step.onboardingFlow.backgroundResolved, true);
-        assert.equal(step.onboardingFlow.background?.role, "qa");
+        assert.equal(step.onboardingFlow.background?.role, "software developer");
         assert.equal(step.onboardingFlow.background?.yearsOfExperience, 5);
         assert.deepEqual(step.onboardingFlow.background?.companies, ["IDF"]);
-        assert.equal(step.onboardingFlow.background?.summary, "qa for about 5 years at IDF");
+        assert.equal(step.onboardingFlow.background?.summary, "software developer for about 5 years at IDF");
+        assert.equal(
+            step.reply,
+            "Nice — software developer for about 5 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+        );
+    });
+
+    it("keeps a natural model reply when it matches the authoritative chat facts", () => {
+        const modelReply = "Great — you have worked as a software developer for 5 years. What kind of role would you like next?";
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            {
+                response: modelReply,
+                background: {
+                    status: "FOUND",
+                    role: "QA Automation Engineer",
+                    yearsOfExperience: 2,
+                },
+                mode: null,
+                advance: true,
+            },
+            "in the last 5 years im software developer",
+        );
+
+        assert.equal(step.reply, modelReply);
+        assert.equal(step.onboardingFlow.background?.role, "software developer");
+        assert.equal(step.onboardingFlow.background?.yearsOfExperience, 5);
     });
 
     it("resolves NONE background and skips re-ask", () => {

@@ -71,4 +71,43 @@ describe("buildTurnDecisionPrompt", () => {
         assert.match(prompt, /choosing, adding, rejecting, or clarifying among jobs already listed/i);
         assert.match(prompt, /set search=false/i);
     });
+
+    it("makes the latest explicit chat value authoritative over stored profile data", () => {
+        const conversation: Conversation = {
+            userId: "prompt-test-user",
+            messages: [],
+            onboardingFlow: {
+                started: true,
+                backgroundResolved: true,
+                backgroundAskCount: 0,
+                directionResolved: true,
+                directionAskCount: 0,
+                completed: true,
+                background: {
+                    status: "FOUND",
+                    role: "software developer",
+                    yearsOfExperience: 5,
+                },
+            },
+            stageProgress: {
+                currentStageIndex: 0,
+                awaitingConfirmation: false,
+                stageNotes: {},
+            },
+            createdAt: new Date(2026, 0, 1),
+            updatedAt: new Date(2026, 0, 1),
+        };
+        const prompt = buildTurnDecisionPrompt(
+            conversation,
+            "I have been a software developer for five years",
+            [],
+            "Current role / headline: QA Automation Engineer",
+        );
+
+        assert.match(prompt, /User chat is the source of truth/i);
+        assert.match(prompt, /use only the latest chat value/i);
+        assert.match(prompt, /do not ask the user to choose between sources/i);
+        assert.match(prompt, /Resolved conversation background \(authoritative over conflicting Account\/CV values\)/i);
+        assert.match(prompt, /"role":"software developer","yearsOfExperience":5/);
+    });
 });

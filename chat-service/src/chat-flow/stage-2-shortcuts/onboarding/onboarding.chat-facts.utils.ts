@@ -1,5 +1,6 @@
 import type { OnboardingBackground } from "../../../routes/conversation/conversation.types";
 import { extractClaimedCurrentRole } from "../role-conflict/role-conflict.utils";
+import { ONBOARDING_DIRECTION_REASK_REPLY } from "./onboarding.types";
 
 export type ChatStatedBackgroundFacts = {
     readonly role?: string;
@@ -50,6 +51,35 @@ export const formatChatStatedFactsForPrompt = (facts: ChatStatedBackgroundFacts)
         return "none";
     }
     return lines.join(", ");
+};
+
+export const buildChatStatedBackgroundReply = (facts: ChatStatedBackgroundFacts): string | null => {
+    if (facts.role && facts.yearsOfExperience !== undefined) {
+        return `Nice — ${facts.role} for about ${facts.yearsOfExperience} years. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+    }
+    if (facts.role) {
+        return `Nice — ${facts.role}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+    }
+    if (facts.yearsOfExperience !== undefined) {
+        return `Nice — about ${facts.yearsOfExperience} years of experience. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+    }
+    return null;
+};
+
+const normalizeFactText = (value: string): string =>
+    value.toLowerCase().replace(/[^a-z0-9+#.]+/g, " ").trim();
+
+export const doesReplyMatchChatStatedFacts = (reply: string, facts: ChatStatedBackgroundFacts): boolean => {
+    const normalizedReply = ` ${normalizeFactText(reply)} `;
+    const normalizedRole = facts.role ? normalizeFactText(facts.role) : null;
+    const includesRole = normalizedRole === null || normalizedReply.includes(` ${normalizedRole} `);
+    const mentionedYears = [...reply.matchAll(/\b(\d{1,2})\s+years?\b/gi)]
+        .map((match) => Number.parseInt(match[1], 10));
+    const includesOnlyAuthoritativeYears = facts.yearsOfExperience === undefined
+        || (mentionedYears.includes(facts.yearsOfExperience)
+            && mentionedYears.every((years) => years === facts.yearsOfExperience));
+
+    return includesRole && includesOnlyAuthoritativeYears;
 };
 
 export const applyChatStatedFactsToBackground = (

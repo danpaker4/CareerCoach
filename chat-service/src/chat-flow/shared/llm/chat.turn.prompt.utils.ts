@@ -36,6 +36,17 @@ const buildAchievements = (achievements: readonly UserAchievement[]): string =>
         ? "none"
         : achievements.slice(0, MAX_ACHIEVEMENTS).map((achievement) => achievement.name).join("; ");
 
+const buildResolvedBackground = (conversation: Conversation): string => {
+    const background = conversation.onboardingFlow?.background;
+    if (!background) {
+        return "none";
+    }
+    return JSON.stringify({
+        role: background.role ?? null,
+        yearsOfExperience: background.yearsOfExperience ?? null,
+    });
+};
+
 export const buildTurnDecisionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
@@ -60,10 +71,12 @@ For GUIDED discovery, ask about what they enjoy, constraints, or skills to grow 
 Never ask "why do you like X", "what's driving your interest", or "explore what you enjoy" after a decisive now/future answer.
 advance=true when the conversation satisfies that objective; otherwise ask one high-impact question that matches the objective.
 r must use the user's language and be one short sentence or question. Use known context without asking for repetition.
-If Account current role conflicts with what the user just claimed about their current job, ask one clarifying which is correct — do not keep interviewing them as the CV role.
+User chat is the source of truth. If a latest explicit user statement conflicts with Account/profile/CV/skills, use only the latest chat value for that fact. Do not mention the conflicting stored value and do not ask the user to choose between sources.
 Never expose internal scores/IDs, ask workplace-location preferences, or invent job facts. Use JOBS only for company/salary facts.
 
 Achievements: ${buildAchievements(userAchievements)}
+Resolved conversation background (authoritative over conflicting Account/CV values):
+${buildResolvedBackground(conversation)}
 Account:
 ${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}
 Recent conversation:
