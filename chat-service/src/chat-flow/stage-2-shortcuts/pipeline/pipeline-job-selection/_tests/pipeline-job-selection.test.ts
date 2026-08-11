@@ -5,6 +5,7 @@ import {
     parsePipelineJobSelectionFromJson,
     resolveSelectionFromParsedPick,
 } from "../pipeline-job-selection.llm.utils";
+import { resolvePipelineJobSelectionDeterministically } from "../pipeline-job-selection.match.utils";
 import { resolvePipelineJobSelection } from "../pipeline-job-selection.service";
 
 const job = (id: string, title: string, company: string): SanitizedJob => ({
@@ -78,6 +79,39 @@ describe("resolveSelectionFromParsedPick", () => {
     });
 });
 
+describe("resolvePipelineJobSelectionDeterministically", () => {
+    const candidates = [
+        job("synergy-1", "Lead Full-Stack Developer (Node.js/React)", "Synergy Tech"),
+        job("mobile-1", "Mobile Developer (iOS)", "AppCreators Inc."),
+        job("job_001_telaviv", "Senior Full-Stack Developer (React/Node.js)", "Innovate Solutions Ltd."),
+        job("quantum-1", "Mid-Level Frontend Developer (React)", "Quantum Leap Tech"),
+    ];
+
+    it("resolves Innovate Solutions from an exact title+company add request", () => {
+        const resolution = resolvePipelineJobSelectionDeterministically(
+            "add to my pipeline the Senior Full-Stack Developer (React/Node.js) at Innovate Solutions Ltd..",
+            candidates,
+            "synergy-1",
+        );
+        assert.equal(resolution.status, "resolved");
+        if (resolution.status === "resolved") {
+            assert.equal(resolution.job.id, "job_001_telaviv");
+        }
+    });
+
+    it("resolves by unique company even with typos in the title wording", () => {
+        const resolution = resolvePipelineJobSelectionDeterministically(
+            "add to my pipe line a the job of senior full stacj in innovate solutions ltd",
+            candidates,
+            "synergy-1",
+        );
+        assert.equal(resolution.status, "resolved");
+        if (resolution.status === "resolved") {
+            assert.equal(resolution.job.id, "job_001_telaviv");
+        }
+    });
+});
+
 describe("resolvePipelineJobSelection", () => {
     it("returns the only candidate without calling the LLM", async () => {
         let completeCalls = 0;
@@ -98,6 +132,31 @@ describe("resolvePipelineJobSelection", () => {
         assert.equal(resolution.status, "resolved");
         if (resolution.status === "resolved") {
             assert.equal(resolution.job.id, "solo-1");
+        }
+    });
+
+    it("resolves Innovate Solutions deterministically without calling the LLM", async () => {
+        let completeCalls = 0;
+        const candidates = [
+            job("synergy-1", "Lead Full-Stack Developer (Node.js/React)", "Synergy Tech"),
+            job("job_001_telaviv", "Senior Full-Stack Developer (React/Node.js)", "Innovate Solutions Ltd."),
+        ];
+        const resolution = await resolvePipelineJobSelection({
+            textCompletion: {
+                complete: async () => {
+                    completeCalls += 1;
+                    return '{"jobId":"5e6f7g8h9i0j","confidence":"high"}';
+                },
+            },
+            userMessage: "add to my pipeline the Senior Full-Stack Developer (React/Node.js) at Innovate Solutions Ltd..",
+            candidates,
+            focusJobId: "synergy-1",
+            userId: "u1",
+        });
+        assert.equal(completeCalls, 0);
+        assert.equal(resolution.status, "resolved");
+        if (resolution.status === "resolved") {
+            assert.equal(resolution.job.id, "job_001_telaviv");
         }
     });
 

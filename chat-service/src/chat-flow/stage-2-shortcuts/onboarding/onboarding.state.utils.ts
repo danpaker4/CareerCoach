@@ -8,18 +8,31 @@ import {
     ONBOARDING_DIRECTION_REASK_REPLY,
 } from "./onboarding.types";
 import { resolveOnboardingDirectionMode } from "./onboarding.direction.utils";
+import {
+    applyChatStatedFactsToBackground,
+    extractChatStatedBackgroundFacts,
+} from "./onboarding.chat-facts.utils";
 
-const withStoredBackground = (flow: OnboardingFlow, decision: OnboardingLlmDecision): OnboardingFlow => ({
-    ...flow,
-    background: decision.background.status === "UNKNOWN" && flow.background
+const withStoredBackground = (
+    flow: OnboardingFlow,
+    decision: OnboardingLlmDecision,
+    latestUserMessage = "",
+): OnboardingFlow => {
+    const baseBackground = decision.background.status === "UNKNOWN" && flow.background
         ? flow.background
         : {
             ...decision.background,
             // Once background is stored, prefer keeping the first resolved role unless the model sends a clearer one.
             role: decision.background.role ?? flow.background?.role ?? null,
             summary: decision.background.summary ?? flow.background?.summary ?? null,
-        },
-});
+        };
+
+    const chatFacts = extractChatStatedBackgroundFacts(latestUserMessage);
+    return {
+        ...flow,
+        background: applyChatStatedFactsToBackground(baseBackground, chatFacts),
+    };
+};
 
 const nearTermCompletionReply = (role: string | null | undefined): string => {
     if (role && role.trim().length > 0) {
@@ -50,7 +63,7 @@ export const applyOnboardingDecision = (
     if (!current.backgroundResolved) {
         if (decision.background.status === "FOUND" || decision.background.status === "NONE") {
             const next: OnboardingFlow = {
-                ...withStoredBackground(current, decision),
+                ...withStoredBackground(current, decision, latestUserMessage),
                 backgroundResolved: true,
                 backgroundAskCount: current.backgroundAskCount,
             };
@@ -73,13 +86,14 @@ export const applyOnboardingDecision = (
             };
         }
 
+        const stored = withStoredBackground(current, decision, latestUserMessage);
         return {
             reply: ONBOARDING_DIRECTION_REASK_REPLY,
             onboardingFlow: {
-                ...withStoredBackground(current, decision),
+                ...stored,
                 backgroundResolved: true,
                 background: {
-                    ...decision.background,
+                    ...(stored.background ?? decision.background),
                     status: "UNKNOWN",
                 },
             },

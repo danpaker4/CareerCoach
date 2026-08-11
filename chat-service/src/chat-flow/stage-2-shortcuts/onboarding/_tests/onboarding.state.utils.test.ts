@@ -4,7 +4,22 @@ import { defaultOnboardingFlow } from "../../../../routes/conversation/conversat
 import { parseOnboardingLlmDecisionFromJson } from "../onboarding.llm.utils";
 import { applyOnboardingDecision } from "../onboarding.state.utils";
 import { resolveOnboardingDirectionMode } from "../onboarding.direction.utils";
+import { buildOnboardingPrompt } from "../onboarding.prompt.utils";
 import { ONBOARDING_DIRECTION_REASK_REPLY } from "../onboarding.types";
+import type { Conversation } from "../../../../routes/conversation/conversation.model";
+
+const emptyConversation = (): Conversation => ({
+    userId: "user-1",
+    messages: [],
+    stageProgress: {
+        currentStageIndex: 0,
+        awaitingConfirmation: false,
+        stageNotes: {},
+    },
+    onboardingFlow: defaultOnboardingFlow(),
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+});
 
 describe("parseOnboardingLlmDecisionFromJson", () => {
     it("parses structured onboarding payloads", () => {
@@ -47,6 +62,21 @@ describe("parseOnboardingLlmDecisionFromJson", () => {
     });
 });
 
+describe("buildOnboardingPrompt", () => {
+    it("injects CHAT_STATED_FACTS and prefer-chat rules when the user states role/years", () => {
+        const prompt = buildOnboardingPrompt(
+            emptyConversation(),
+            "hi my name is gal kosover and in the last 5 years im qa",
+            "Current role / headline: QA Automation & Performance Engineer\nCompany: IDF",
+            defaultOnboardingFlow(),
+        );
+
+        assert.match(prompt, /CHAT_STATED_FACTS \(authoritative for role\/years\): role=qa, yearsOfExperience=5/);
+        assert.match(prompt, /CHAT_STATED_FACTS are authoritative for role and yearsOfExperience/);
+        assert.match(prompt, /Never replace chat-stated role wording or years with a CV title\/tenure variant/);
+    });
+});
+
 describe("resolveOnboardingDirectionMode", () => {
     it("detects near-term answers used during onboarding", () => {
         assert.equal(resolveOnboardingDirectionMode("im looking for something now"), "NEAR_TERM");
@@ -67,6 +97,31 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.completed, false);
         assert.equal(step.completedThisTurn, false);
         assert.equal(step.onboardingFlow.background?.role, "software developer");
+    });
+
+    it("prefers chat role and years over CV-shaped LLM background", () => {
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            {
+                response: "Nice — QA Automation & Performance Engineer for about 2 years at IDF. Looking for a job now?",
+                background: {
+                    status: "FOUND",
+                    role: "QA Automation & Performance Engineer",
+                    yearsOfExperience: 2,
+                    companies: ["IDF"],
+                    summary: "QA Automation & Performance Engineer for about 2 years at IDF",
+                },
+                mode: null,
+                advance: true,
+            },
+            "hi my name is gal kosover and in the last 5 years im qa",
+        );
+
+        assert.equal(step.onboardingFlow.backgroundResolved, true);
+        assert.equal(step.onboardingFlow.background?.role, "qa");
+        assert.equal(step.onboardingFlow.background?.yearsOfExperience, 5);
+        assert.deepEqual(step.onboardingFlow.background?.companies, ["IDF"]);
+        assert.equal(step.onboardingFlow.background?.summary, "qa for about 5 years at IDF");
     });
 
     it("resolves NONE background and skips re-ask", () => {

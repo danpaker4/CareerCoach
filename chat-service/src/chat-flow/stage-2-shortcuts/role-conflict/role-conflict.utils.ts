@@ -19,16 +19,21 @@ const cleanExtractedRole = (captured: string): string =>
         .replace(/\s+and\s+(?:i|my|in)\b.*$/i, "")
         .trim();
 
+const isAcceptableExtractedRole = (role: string): boolean => {
+    if (role.length >= 3) return true;
+    return containsAnyMarker(role, [...QA_ROLE_MARKERS, ...SOFTWARE_ROLE_MARKERS]);
+};
+
 export const extractClaimedCurrentRole = (message: string): string | undefined => {
     const trimmed = message.trim();
     if (trimmed.length === 0) return undefined;
 
     const patterns: readonly RegExp[] = [
-        /\bin\s+the\s+last\s+\d+\s+years?\s+i(?:'?m| am)\s+(?:(?:a|an)\s+)?([^.,!?\n]{3,80})/i,
-        /\bi(?:'?m| am)\s+(?:(?:a|an)\s+)?([^.,!?\n]{3,80})/i,
-        /\bi(?:'?ve| have)\s+been\s+(?:(?:a|an)\s+)?([^.,!?\n]{3,80})/i,
-        /\bi\s+work\s+as\s+(?:(?:a|an)\s+)?([^.,!?\n]{3,80})/i,
-        /\bmy\s+(?:current\s+)?(?:job|role|title)\s+is\s+([^.,!?\n]{3,80})/i,
+        /\bin\s+the\s+last\s+\d+\s+years?\s+i(?:'?m| am)\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
+        /\bi(?:'?m| am)\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
+        /\bi(?:'?ve| have)\s+been\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
+        /\bi\s+work\s+as\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
+        /\bmy\s+(?:current\s+)?(?:job|role|title)\s+is\s+([^.,!?\n]{2,80})/i,
     ];
 
     for (const pattern of patterns) {
@@ -36,7 +41,7 @@ export const extractClaimedCurrentRole = (message: string): string | undefined =
         const captured = match?.[1]?.trim();
         if (!captured) continue;
         const withoutTenure = cleanExtractedRole(captured);
-        if (withoutTenure.length >= 3) {
+        if (isAcceptableExtractedRole(withoutTenure)) {
             return withoutTenure;
         }
     }

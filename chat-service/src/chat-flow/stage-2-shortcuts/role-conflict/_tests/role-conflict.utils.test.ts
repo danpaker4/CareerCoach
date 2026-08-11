@@ -18,6 +18,10 @@ describe("role conflict utils", () => {
             extractClaimedCurrentRole("hi my name is gal kosocer and in the last 5 years im software developer"),
             "software developer",
         );
+        assert.equal(
+            extractClaimedCurrentRole("hi my name is gal kosover and in the last 5 years im qa"),
+            "qa",
+        );
     });
 
     it("detects QA CV vs software engineer chat conflict", () => {

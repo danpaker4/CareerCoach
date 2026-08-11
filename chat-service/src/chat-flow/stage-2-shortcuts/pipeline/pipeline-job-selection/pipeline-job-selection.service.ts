@@ -6,6 +6,7 @@ import {
     parsePipelineJobSelectionFromJson,
     resolveSelectionFromParsedPick,
 } from "./pipeline-job-selection.llm.utils";
+import { resolvePipelineJobSelectionDeterministically } from "./pipeline-job-selection.match.utils";
 
 export const resolvePipelineJobSelection = async (params: {
     readonly textCompletion: TextCompletionPort;
@@ -25,6 +26,15 @@ export const resolvePipelineJobSelection = async (params: {
             return { status: "missing" };
         }
         return { status: "resolved", job: onlyJob };
+    }
+
+    const deterministic = resolvePipelineJobSelectionDeterministically(
+        userMessage,
+        candidates,
+        focusJobId,
+    );
+    if (deterministic.status === "resolved") {
+        return deterministic;
     }
 
     const rawText = await textCompletion.complete(
