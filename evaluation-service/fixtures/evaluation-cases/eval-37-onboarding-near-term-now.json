@@ -1,0 +1,14 @@
+{
+  "id": "eval-37-onboarding-near-term-now",
+  "messages": [
+    { "role": "user", "content": "hi my name is gal kosover and in the last 5 years im qa" },
+    { "role": "assistant", "content": "Nice — QA for about 5 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?" },
+    { "role": "user", "content": "looking for a job now" }
+  ],
+  "expected": {
+    "mode": "NEAR_TERM",
+    "maxLines": 20,
+    "mustAskQuestion": true,
+    "forbiddenWords": ["you must become", "dream job title only"]
+  }
+}

@@ -32,8 +32,10 @@ export const extractClaimedCurrentRole = (message: string): string | undefined =
         /\bin\s+the\s+last\s+\d+\s+years?\s+i(?:'?m| am)\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
         /\bi(?:'?m| am)\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
         /\bi(?:'?ve| have)\s+been\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
+        /\bi\s+did\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
         /\bi\s+work\s+as\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
         /\bmy\s+(?:current\s+)?(?:job|role|title)\s+is\s+([^.,!?\n]{2,80})/i,
+        /\b(?:jobs?|roles?|positions?)\s+for\s+(?:(?:a|an)\s+)?([^.,!?\n]{2,80})/i,
     ];
 
     for (const pattern of patterns) {

@@ -1,0 +1,18 @@
+{
+  "id": "eval-38-onboarding-guided-figuring-it-out",
+  "messages": [
+    { "role": "user", "content": "hi my name is gal and in the last 5 years im software developer" },
+    { "role": "assistant", "content": "Nice — software developer for about 5 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?" },
+    { "role": "user", "content": "still figuring it out" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 12,
+    "mustAskQuestion": true,
+    "forbiddenWords": [
+      "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+      "you must become",
+      "the only career path is"
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 import type { ChatMessageResponse } from "../../api/shared/chat.types";
 import type { ChatFlowDeps, SendMessageBaseContext, SendMessagePreparedContext } from "../../chat-flow.types";
+import { extractNearTermSearchQuery } from "../../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
 import {
     CONVERSATION_MODE,
     DEFAULT_MODE_DETECTION_RESULT,
@@ -25,17 +26,19 @@ const completeBackgroundAndTimelineStages = (completedStageIds: readonly string[
 
 const buildModeDetectionForHandoff = (
     onboardingFlow: OnboardingFlow,
+    latestUserMessage: string,
 ): ConversationModeDetectionResult => {
     const mode = onboardingFlow.initialMode ?? "GUIDED";
     if (mode === "NEAR_TERM") {
         const searchQuery = onboardingFlow.background?.role?.trim()
+            || extractNearTermSearchQuery(latestUserMessage)
             || undefined;
         return {
             ...DEFAULT_MODE_DETECTION_RESULT,
             mode: CONVERSATION_MODE.NEAR_TERM,
             isReady: true,
             readinessScore: 100,
-            shouldSearchJobs: true,
+            shouldSearchJobs: Boolean(searchQuery),
             searchQuery,
             missingInformation: searchQuery ? [] : ["target role"],
         };
@@ -138,7 +141,7 @@ export const runOnboardingFlow = async (
     await persistOnboardingProgress(deps, ctx, step.onboardingFlow);
 
     const modeDetection = step.onboardingFlow.completed
-        ? buildModeDetectionForHandoff(step.onboardingFlow)
+        ? buildModeDetectionForHandoff(step.onboardingFlow, ctx.normalizedMessage)
         : DEFAULT_MODE_DETECTION_RESULT;
 
     const preparedCtx: SendMessagePreparedContext = {

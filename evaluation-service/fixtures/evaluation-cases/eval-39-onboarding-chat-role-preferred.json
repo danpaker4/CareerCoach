@@ -1,0 +1,17 @@
+{
+  "id": "eval-39-onboarding-chat-role-preferred",
+  "messages": [
+    { "role": "user", "content": "hi my name is gal kosover and in the last 5 years im qa" }
+  ],
+  "expected": {
+    "mode": "GUIDED",
+    "maxLines": 8,
+    "mustAskQuestion": true,
+    "forbiddenWords": [
+      "QA Automation & Performance Engineer for about 2 years",
+      "for about 2 years at IDF",
+      "you must become",
+      "I recommend backend developer"
+    ]
+  }
+}

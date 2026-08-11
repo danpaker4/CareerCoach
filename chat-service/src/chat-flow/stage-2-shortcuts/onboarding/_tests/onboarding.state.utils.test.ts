@@ -81,7 +81,13 @@ describe("resolveOnboardingDirectionMode", () => {
     it("detects near-term answers used during onboarding", () => {
         assert.equal(resolveOnboardingDirectionMode("im looking for something now"), "NEAR_TERM");
         assert.equal(resolveOnboardingDirectionMode("now"), "NEAR_TERM");
+        assert.equal(resolveOnboardingDirectionMode("looking for a job now"), "NEAR_TERM");
+        assert.equal(
+            resolveOnboardingDirectionMode("i need to change jobs soon, maybe in the next 2 months"),
+            "NEAR_TERM",
+        );
         assert.equal(resolveOnboardingDirectionMode("I don't know"), "GUIDED");
+        assert.equal(resolveOnboardingDirectionMode("still figuring it out"), "GUIDED");
     });
 });
 
@@ -97,6 +103,23 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.completed, false);
         assert.equal(step.completedThisTurn, false);
         assert.equal(step.onboardingFlow.background?.role, "software developer");
+    });
+
+    it("completes onboarding in one turn when background and near-term intent arrive together", () => {
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            {
+                response: "Looking for automation QA roles now.",
+                background: { status: "FOUND", role: "automation qa engineer" },
+                mode: null,
+                advance: true,
+            },
+            "show me jobs for automation qa engineer",
+        );
+        assert.equal(step.onboardingFlow.completed, true);
+        assert.equal(step.onboardingFlow.initialMode, "NEAR_TERM");
+        assert.equal(step.completedThisTurn, true);
+        assert.match(step.reply, /automation qa engineer/i);
     });
 
     it("prefers chat role and years over CV-shaped LLM background", () => {

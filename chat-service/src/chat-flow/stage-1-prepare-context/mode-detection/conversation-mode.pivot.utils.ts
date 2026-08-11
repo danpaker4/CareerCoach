@@ -52,6 +52,13 @@ export const extractNearTermSearchQuery = (message: string): string | undefined 
         return forRole[1].trim().replace(/\s+now\b/i, "").trim();
     }
 
+    const showOrFindForRole = trimmed.match(
+        /\b(?:show|find)\s+(?:me\s+)?(?:a\s+)?(?:job|role|position)s?\s+for\s+(?:(?:a|an)\s+)?([^.,!?\n]{3,80})/i,
+    );
+    if (showOrFindForRole?.[1]) {
+        return showOrFindForRole[1].trim().replace(/\s+now\b/i, "").trim();
+    }
+
     return undefined;
 };
 

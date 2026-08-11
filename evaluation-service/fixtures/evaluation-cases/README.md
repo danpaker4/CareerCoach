@@ -1,12 +1,12 @@
 # Evaluation case fixtures
 
-36 cases covering **GUIDED**, **NEAR_TERM**, **DREAMJOB**, and quick-help modes (**SKILLS_GAP**, **CV_IMPROVE**, **INTERVIEW_PREP**), with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
+39 cases covering **GUIDED**, **NEAR_TERM**, **DREAMJOB**, and quick-help modes (**SKILLS_GAP**, **CV_IMPROVE**, **INTERVIEW_PREP**), with checks for `mode`, `maxLines`, `mustAskQuestion`, and `forbiddenWords`.
 
 ## Upload one file (UI)
 
 Management → LLM evaluation → **Add Conversation** → pick a `.json` file.
 
-## Seed all 36 into MongoDB
+## Seed all fixtures into MongoDB
 
 With evaluation-service running on port 3004:
 
@@ -15,7 +15,7 @@ cd evaluation-service
 ./scripts/seed-evaluation-cases.sh
 ```
 
-Skips cases that already exist (409). To replace, delete the case in the UI first, then re-run the script.
+Creates new cases and **replaces** existing ones (POST then PUT on 409) so fixture edits stay in sync.
 
 ## Case index
 
@@ -23,7 +23,7 @@ Skips cases that already exist (409). To replace, delete the case in the UI firs
 |----|---------------|--------|
 | eval-01-guided-qa-intro | GUIDED | QA + Cypress intro |
 | eval-02-guided-career-change | GUIDED | Switching from teaching |
-| eval-03-guided-timeline-asap | GUIDED | Wants to move soon |
+| eval-03-guided-timeline-asap | NEAR_TERM | ASAP / next months → near-term search after onboarding |
 | eval-04-guided-role-preference | GUIDED | Frontend interest |
 | eval-05-guided-short-reply | GUIDED | Strict maxLines |
 | eval-06-guided-two-user-turns | GUIDED | Two user messages |
@@ -57,3 +57,6 @@ Skips cases that already exist (409). To replace, delete the case in the UI firs
 | eval-34-quick-help-interview-prep-with-topic | INTERVIEW_PREP | Theoretical practice questions after topic |
 | eval-35-quick-help-profile-job-match | NEAR_TERM | Profile job match one-shot search |
 | eval-36-quick-help-skills-gap-exit | GUIDED | Exit sticky skills-gap with "stop" |
+| eval-37-onboarding-near-term-now | NEAR_TERM | Onboarding background then "looking for a job now" |
+| eval-38-onboarding-guided-figuring-it-out | GUIDED | Onboarding background then "still figuring it out" |
+| eval-39-onboarding-chat-role-preferred | GUIDED | Chat-stated QA/5 years must not echo CV-only tenure wording |

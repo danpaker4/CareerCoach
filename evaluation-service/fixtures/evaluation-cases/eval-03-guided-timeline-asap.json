@@ -6,9 +6,9 @@
     { "role": "user", "content": "i need to change jobs soon, maybe in the next 2 months" }
   ],
   "expected": {
-    "mode": "GUIDED",
-    "maxLines": 10,
+    "mode": "NEAR_TERM",
+    "maxLines": 20,
     "mustAskQuestion": true,
-    "forbiddenWords": ["apply only to"]
+    "forbiddenWords": ["apply only to", "you must become"]
   }
 }

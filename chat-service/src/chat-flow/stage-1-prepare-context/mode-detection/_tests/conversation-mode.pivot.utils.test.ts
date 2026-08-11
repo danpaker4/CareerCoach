@@ -35,6 +35,10 @@ describe("near-term pivot detection", () => {
         assert.equal(isNearTermPivotMessage("im looking for a job now as a software developer"), true);
         assert.equal(isNearTermPivotMessage("I need a job soon"), true);
         assert.equal(isNearTermPivotMessage("something for now"), true);
+        assert.equal(isNearTermPivotMessage("i need to change jobs soon, maybe in the next 2 months"), true);
+        assert.equal(isNearTermPivotMessage("show me jobs for automation qa engineer"), true);
+        assert.equal(isNearTermPivotMessage("find jobs now for junior frontend developer remote"), true);
+        assert.equal(isNearTermPivotMessage("skip to jobs"), true);
         assert.equal(isNearTermPivotMessage("i prefer to talk about my dream job"), false);
     });
 
@@ -70,6 +74,7 @@ describe("undecided direction detection", () => {
         assert.equal(isUndecidedDirectionMessage("i don't know"), true);
         assert.equal(isUndecidedDirectionMessage("I'm not sure"), true);
         assert.equal(isUndecidedDirectionMessage("still figuring out"), true);
+        assert.equal(isUndecidedDirectionMessage("still figuring it out"), true);
         assert.equal(isUndecidedDirectionMessage("looking for a job now"), false);
     });
 

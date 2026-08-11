@@ -47,6 +47,19 @@ const dreamJobCompletionReply = (): string =>
 const guidedCompletionReply = (): string =>
     "No problem — we can figure out the best direction together. What kind of work have you enjoyed so far?";
 
+const completionReplyForMode = (
+    mode: OnboardingInitialMode,
+    role: string | null | undefined,
+): string => {
+    if (mode === "NEAR_TERM") {
+        return nearTermCompletionReply(role);
+    }
+    if (mode === "DREAMJOB") {
+        return dreamJobCompletionReply();
+    }
+    return guidedCompletionReply();
+};
+
 export const applyOnboardingDecision = (
     current: OnboardingFlow,
     decision: OnboardingLlmDecision,
@@ -62,14 +75,29 @@ export const applyOnboardingDecision = (
 
     if (!current.backgroundResolved) {
         if (decision.background.status === "FOUND" || decision.background.status === "NONE") {
-            const next: OnboardingFlow = {
+            const withBackground: OnboardingFlow = {
                 ...withStoredBackground(current, decision, latestUserMessage),
                 backgroundResolved: true,
                 backgroundAskCount: current.backgroundAskCount,
             };
+            const resolvedMode: OnboardingInitialMode | null =
+                decision.mode ?? resolveOnboardingDirectionMode(latestUserMessage);
+            if (resolvedMode) {
+                const next: OnboardingFlow = {
+                    ...withBackground,
+                    directionResolved: true,
+                    completed: true,
+                    initialMode: resolvedMode,
+                };
+                return {
+                    reply: completionReplyForMode(resolvedMode, next.background?.role),
+                    onboardingFlow: next,
+                    completedThisTurn: true,
+                };
+            }
             return {
                 reply: decision.response,
-                onboardingFlow: next,
+                onboardingFlow: withBackground,
                 completedThisTurn: false,
             };
         }
@@ -113,13 +141,8 @@ export const applyOnboardingDecision = (
                 completed: true,
                 initialMode: resolvedMode,
             };
-            const reply = resolvedMode === "NEAR_TERM"
-                ? nearTermCompletionReply(next.background?.role)
-                : resolvedMode === "DREAMJOB"
-                    ? dreamJobCompletionReply()
-                    : guidedCompletionReply();
             return {
-                reply,
+                reply: completionReplyForMode(resolvedMode, next.background?.role),
                 onboardingFlow: next,
                 completedThisTurn: true,
             };
