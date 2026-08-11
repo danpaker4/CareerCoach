@@ -2,6 +2,7 @@ import type { Conversation } from "../../routes/conversation/conversation.model"
 import type { UserCareerProfile } from "../../routes/career-profile/career-profile.types";
 import type { ChatMessageResponse, JobSearchResultItem } from "../api/shared/chat.types";
 import { rankJobs } from "./ranking/job-ranking.service";
+import { hasRankableProfile } from "./ranking/job-ranking.utils";
 import {
     applyValidatedJobsFallback,
     mapRankedJobResultToChatMatchRow,
@@ -10,17 +11,30 @@ import {
 import { resolveSelectedJobFromRecommendations } from "./presentation/chat.job-mapping.utils";
 import { sanitizeReply, validateRecommendedJobs } from "./presentation/chat.validation.service";
 import { generateJobAwareReply } from "../shared/llm/chat.llm.service";
-import { EXHAUSTED_JOBS_REPLY, MAX_PRESENTED_JOBS } from "./present-jobs.consts";
+import {
+    EXHAUSTED_JOBS_REPLY,
+    MAX_PRESENTED_JOBS,
+    MAX_RANKED_POOL,
+    MIN_PRESENTED_MATCH_SCORE,
+    WEAK_MATCH_REPLY,
+} from "./present-jobs.consts";
 import type { PresentRankedJobsOptions } from "./present-jobs.types";
 
-const filterEligibleRankedJobs = (userCareerProfile: UserCareerProfile, jobs: JobSearchResultItem[], conversation: Conversation) => {
+export const filterEligibleRankedJobs = (userCareerProfile: UserCareerProfile, jobs: JobSearchResultItem[], conversation: Conversation) => {
     const rejectedIds = new Set(conversation.jobContext?.jobRecommendationContext?.rejectedJobIds ?? []);
     const acceptedIds = new Set(conversation.jobContext?.jobRecommendationContext?.acceptedJobIds ?? []);
     const rankedJobs = rankJobs(userCareerProfile, jobs);
     const eligibleRanked = rankedJobs.filter(
         (item) => !rejectedIds.has(item.job.id) && !acceptedIds.has(item.job.id)
     );
-    return { rankedJobs, orderedRankedPool: eligibleRanked.slice(0, 15) };
+    const wellMatched = hasRankableProfile(userCareerProfile)
+        ? eligibleRanked.filter((item) => item.finalScore >= MIN_PRESENTED_MATCH_SCORE)
+        : eligibleRanked;
+    return {
+        rankedJobs,
+        orderedRankedPool: wellMatched.slice(0, MAX_RANKED_POOL),
+        filteredOutByMatch: eligibleRanked.length > 0 && wellMatched.length === 0,
+    };
 };
 
 export const presentRankedJobs = async (options: PresentRankedJobsOptions): Promise<ChatMessageResponse> => {
@@ -46,11 +60,12 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
     } = ctx;
     const mode = ctx.modeDetection.mode;
 
-    const { rankedJobs, orderedRankedPool } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
+    const { rankedJobs, orderedRankedPool, filteredOutByMatch } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
 
     if (orderedRankedPool.length === 0) {
-        await deps.conversationService.appendAssistantMessage(userId, conversationId, EXHAUSTED_JOBS_REPLY);
-        return { reply: EXHAUSTED_JOBS_REPLY, mode, confidenceSummary };
+        const reply = filteredOutByMatch ? WEAK_MATCH_REPLY : EXHAUSTED_JOBS_REPLY;
+        await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
+        return { reply, mode, confidenceSummary };
     }
 
     const topRankedJobs = orderedRankedPool.map((item) => item.job);

@@ -1,6 +1,7 @@
 import type { UserCareerProfile } from "../../../routes/career-profile/career-profile.types";
 import type { JobSearchResultItem } from "../../api/shared/chat.types";
 import type { RankedJobResult } from "./job-ranking.types";
+import { buildRankingCorpus } from "./job-ranking.utils";
 
 const toLowerSet = (items: readonly string[]): Set<string> => new Set(items.map((item) => item.toLowerCase()));
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
@@ -10,7 +11,7 @@ export const rankJobs = (profile: UserCareerProfile, jobs: readonly JobSearchRes
     const preferences = toLowerSet(profile.interests.map((item) => item.value));
 
     const scored = jobs.map((job) => {
-        const corpus = `${job.title} ${job.description}`.toLowerCase();
+        const corpus = buildRankingCorpus(job);
         const skillHits = [...skills].filter((skill) => corpus.includes(skill)).length;
         const prefHits = [...preferences].filter((pref) => corpus.includes(pref)).length;
         const skillMatchScore = clamp(skillHits * 20);

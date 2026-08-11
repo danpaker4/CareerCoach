@@ -76,7 +76,7 @@ export const createEmptyProfileSignals = (): Record<CareerProfileSignalBucketKey
 export const mergeProfileSignals = (existingProfile: UserCareerProfile, updates: CareerProfileSignalUpdate): UserCareerProfile => {
     const mergedSignals = createEmptyProfileSignals();
     for (const bucket of CAREER_PROFILE_SIGNAL_BUCKETS) {
-        mergedSignals[bucket] = mergeSignalsForBucket(existingProfile[bucket], updates[bucket] ?? []);
+        mergedSignals[bucket] = mergeSignalsForBucket(existingProfile[bucket] ?? [], updates[bucket] ?? []);
     }
 
     return {
