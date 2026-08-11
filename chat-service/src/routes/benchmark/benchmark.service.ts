@@ -13,17 +13,15 @@ import type { DreamJobRoadmapCreator } from "../../chat-flow/stage-2-shortcuts/d
 import { BenchmarkFixtureExternalService } from "./benchmark-fixture.external-service";
 import { BenchmarkNoopEmbeddingPort, createBenchmarkNoopSuggestDirections } from "./benchmark-noop.services";
 import { BenchmarkRunDal } from "./benchmark.dal";
+import { resolveCandidateConfig, toBenchmarkCandidate } from "./benchmark-candidate.utils";
 import { createLangfuseObservationAttributes, withSpan } from "../../observability/tracing";
 import {
     BENCHMARK_CASES,
-    BENCHMARK_DEFAULT_MODEL,
-    BENCHMARK_FALLBACK_MODEL,
     BENCHMARK_RANDOM_CASE_COUNT,
     BENCHMARK_RUBRIC,
     BENCHMARK_USER_ID_PREFIX,
 } from "./benchmark.consts";
 import type {
-    BenchmarkCandidate,
     BenchmarkCandidateId,
     BenchmarkCandidateRunResult,
     BenchmarkCase,
@@ -46,37 +44,6 @@ const average = (values: readonly number[]): number =>
     values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
 
 const toErrorMessage = (error: unknown): string => error instanceof Error ? error.message : String(error);
-
-const resolveCandidateConfig = (candidateId: BenchmarkCandidateId, chatConfig: ServerConfig["chatConfig"]): ResolvedLlmConfig => {
-    const model = candidateId === "ollama-llama" ? BENCHMARK_DEFAULT_MODEL : BENCHMARK_FALLBACK_MODEL;
-    return {
-        provider: "litellm",
-        endpointUrl: chatConfig.llm.endpointUrl,
-        model,
-        ...(chatConfig.llm.apiKey ? { apiKey: chatConfig.llm.apiKey } : {}),
-    };
-};
-
-const toCandidate = (candidateId: BenchmarkCandidateId, chatConfig: ServerConfig["chatConfig"]): BenchmarkCandidate => {
-    const config = resolveCandidateConfig(candidateId, chatConfig);
-    if (candidateId === "ollama-llama") {
-        return {
-            id: candidateId,
-            label: "Llama via LiteLLM",
-            provider: "litellm",
-            model: config.model,
-            available: true,
-        };
-    }
-
-    return {
-        id: candidateId,
-        label: "Gemini via LiteLLM",
-        provider: "litellm",
-        model: config.model,
-        available: true,
-    };
-};
 
 const selectCases = (caseIds: readonly string[] | undefined): readonly BenchmarkCase[] => {
     if (!caseIds || caseIds.length === 0) {
@@ -125,7 +92,7 @@ export class BenchmarkService {
     ) { }
 
     getConfig = (): BenchmarkConfigResponse => ({
-        candidates: BENCHMARK_CANDIDATE_IDS.map((candidateId) => toCandidate(candidateId, this.chatConfig)),
+        candidates: BENCHMARK_CANDIDATE_IDS.map((candidateId) => toBenchmarkCandidate(candidateId, this.chatConfig)),
         cases: BENCHMARK_CASES.map((benchmarkCase) => ({
             id: benchmarkCase.id,
             title: benchmarkCase.title,
@@ -175,7 +142,7 @@ export class BenchmarkService {
         candidateId: BenchmarkCandidateId,
         benchmarkCases: readonly BenchmarkCase[]
     ): Promise<BenchmarkCandidateRunResult> => {
-        const candidate = toCandidate(candidateId, this.chatConfig);
+        const candidate = toBenchmarkCandidate(candidateId, this.chatConfig);
         const config = resolveCandidateConfig(candidateId, this.chatConfig);
         if (!candidate.available || !config) {
             return {

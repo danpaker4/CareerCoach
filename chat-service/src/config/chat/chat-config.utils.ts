@@ -10,4 +10,8 @@ export const createChatConfig = (env: ChatConfigEnv, llm: ResolvedLlmConfig): Ch
     customEmbeddingUrl: env.CUSTOM_EMBEDDING_URL,
     careerDirectionVectorIndexName: env.CAREER_DIRECTION_VECTOR_INDEX_NAME,
     internalServiceApiKey: env.INTERNAL_SERVICE_API_KEY,
+    benchmarkModels: {
+        ollamaLlama: env.BENCHMARK_OLLAMA_MODEL,
+        gemini: env.BENCHMARK_GEMINI_MODEL,
+    },
 });

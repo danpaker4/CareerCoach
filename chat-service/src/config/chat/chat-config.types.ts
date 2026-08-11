@@ -8,4 +8,8 @@ export type ChatConfig = {
     readonly customEmbeddingUrl?: string;
     readonly careerDirectionVectorIndexName: string;
     readonly internalServiceApiKey?: string;
+    readonly benchmarkModels: {
+        readonly ollamaLlama: string;
+        readonly gemini: string;
+    };
 };
