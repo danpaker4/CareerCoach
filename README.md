@@ -87,6 +87,13 @@ LITELLM_MODEL=chat-default
 
 Change `LITELLM_MODEL` to a `model_name` from `litellm-config.yaml` (for example `chat-default` or `chat-fallback`), or edit the YAML to add/change upstream models. Restart LiteLLM after YAML changes; restart chat-service after `.env` changes.
 
+The benchmark candidates default to those local aliases. If a remote LiteLLM-compatible gateway exposes different names, set both values to model IDs returned by its `/v1/models` endpoint:
+
+```env
+BENCHMARK_OLLAMA_MODEL=your-remote-llama-model
+BENCHMARK_GEMINI_MODEL=your-remote-gemini-model
+```
+
 ### Start the chatbot with LiteLLM
 
 1. Start Ollama (default upstream) and `docker compose up -d litellm`.

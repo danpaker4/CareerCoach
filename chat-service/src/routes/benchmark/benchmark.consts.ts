@@ -6,8 +6,6 @@ export const BENCHMARK_DEFAULT_RUN_LIMIT = 10;
 export const BENCHMARK_MAX_RUN_LIMIT = 50;
 export const BENCHMARK_USER_ID_PREFIX = "benchmark-user";
 export const BENCHMARK_RANDOM_CASE_COUNT = 3;
-export const BENCHMARK_DEFAULT_MODEL = "chat-default";
-export const BENCHMARK_FALLBACK_MODEL = "chat-fallback";
 
 export const BENCHMARK_RUBRIC = [
     {
