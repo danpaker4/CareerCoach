@@ -1,3 +1,8 @@
+import {
+    DREAM_JOB_TARGET_YEARS_MAX,
+    DREAM_JOB_TARGET_YEARS_MIN,
+} from "./chat.dream-job-roadmap.consts";
+
 const AFFIRMATIVE_PATTERNS: readonly RegExp[] = [
     /^yes\b/i,
     /^yeah\b/i,
@@ -64,4 +69,33 @@ export const normalizeDreamJobTitle = (title: string): string => {
         .split(/\s+/)
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(" ");
+};
+
+const clampTargetYears = (years: number): number | undefined => {
+    if (!Number.isFinite(years)) return undefined;
+    const rounded = Math.round(years);
+    if (rounded < DREAM_JOB_TARGET_YEARS_MIN || rounded > DREAM_JOB_TARGET_YEARS_MAX) {
+        return undefined;
+    }
+    return rounded;
+};
+
+/** Parse "5", "in 5 years", "within 3 years", "about 10 yrs". */
+export const parseTargetYearsFromMessage = (message: string): number | undefined => {
+    const trimmed = message.trim().toLowerCase();
+    if (trimmed.length === 0) return undefined;
+
+    const patterns: readonly RegExp[] = [
+        /(?:in|within|after|about|around|roughly)\s+(\d{1,2})\s*(?:years?|yrs?)\b/,
+        /^(\d{1,2})\s*(?:years?|yrs?)?\s*$/,
+        /\b(\d{1,2})\s*(?:years?|yrs?)\b/,
+    ];
+
+    for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (!match?.[1]) continue;
+        const years = clampTargetYears(Number(match[1]));
+        if (years !== undefined) return years;
+    }
+    return undefined;
 };

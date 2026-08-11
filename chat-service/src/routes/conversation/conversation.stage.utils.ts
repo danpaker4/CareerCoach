@@ -3,11 +3,24 @@ import type { ConversationStage } from "./conversation.types";
 import { CONVERSATION_STAGES, STAGE_SIGNALS } from "./conversation.stage.consts";
 import { appendStageNote, defaultStageProgress } from "./conversation.utils";
 
-export const getInitialAssistantMessage = (): string =>
-    "Hey! Great to meet you. Tell me a bit about your background—or what you're interested in lately if you're still figuring out the next step.";
+export const getInitialAssistantMessage = (firstName?: string): string => {
+    const trimmedName = firstName?.trim();
+    if (trimmedName && trimmedName.length > 0) {
+        return `Hi ${trimmedName}, tell me a little about your professional background.`;
+    }
+    return "Hi! Tell me a little about your professional background.";
+};
 
 const getCompletedStageIds = (stageProgress: ConversationStageProgress): string[] =>
     stageProgress.completedStageIds ?? [];
+
+const arePriorStagesCompleted = (stageId: string, completedStageIds: readonly string[]): boolean => {
+    const stageIndex = CONVERSATION_STAGES.findIndex((stage) => stage.id === stageId);
+    if (stageIndex <= 0) {
+        return true;
+    }
+    return CONVERSATION_STAGES.slice(0, stageIndex).every((stage) => completedStageIds.includes(stage.id));
+};
 
 const inferStageFromMessage = (userMessage: string, completedStageIds: readonly string[]): string | null => {
     const normalizedMessage = userMessage.trim().toLowerCase();
@@ -17,6 +30,9 @@ const inferStageFromMessage = (userMessage: string, completedStageIds: readonly 
 
     for (const stage of CONVERSATION_STAGES) {
         if (completedStageIds.includes(stage.id)) {
+            continue;
+        }
+        if (!arePriorStagesCompleted(stage.id, completedStageIds)) {
             continue;
         }
         const hints = STAGE_SIGNALS[stage.id] ?? [];
@@ -50,6 +66,16 @@ export const recordStageMessage = (
 export const getCurrentStage = (conversation: Conversation, latestUserMessage?: string): ConversationStage | null => {
     const stageProgress = conversation.stageProgress ?? defaultStageProgress();
     const completedStageIds = getCompletedStageIds(stageProgress);
+
+    // During incomplete onboarding, do not jump stages via message keyword signals.
+    if (conversation.onboardingFlow && conversation.onboardingFlow.completed !== true) {
+        const selectedStageId = (stageProgress.currentStageId && !completedStageIds.includes(stageProgress.currentStageId)
+            ? stageProgress.currentStageId
+            : null)
+            ?? getFirstIncompleteStageId(completedStageIds);
+        return CONVERSATION_STAGES.find((stage) => stage.id === selectedStageId) ?? null;
+    }
+
     const inferredStageId = latestUserMessage
         ? inferStageFromMessage(latestUserMessage, completedStageIds)
         : null;

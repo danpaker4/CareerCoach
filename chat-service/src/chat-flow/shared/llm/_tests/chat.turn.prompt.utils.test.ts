@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Conversation } from "../../../../routes/conversation/conversation.model";
+import { CONVERSATION_STAGES } from "../../../../routes/conversation/conversation.stage.consts";
 import { buildTurnDecisionPrompt } from "../chat.turn.prompt.utils";
 
 describe("buildTurnDecisionPrompt", () => {
@@ -41,5 +42,33 @@ describe("buildTurnDecisionPrompt", () => {
         assert.doesNotMatch(recentHistory ?? "", /prior-message-1/);
         assert.match(recentHistory ?? "", /prior-message-2/);
         assert.match(prompt, new RegExp(`Latest: ${latestUserMessage}`));
+    });
+
+    it("tells the model onboarding already handled background and direction", () => {
+        const conversation: Conversation = {
+            userId: "prompt-test-user",
+            messages: [],
+            stageProgress: {
+                currentStageIndex: 0,
+                awaitingConfirmation: false,
+                stageNotes: {},
+            },
+            createdAt: new Date(2026, 0, 1),
+            updatedAt: new Date(2026, 0, 1),
+        };
+        const preferencesStage = CONVERSATION_STAGES.find((stage) => stage.id === "preferences");
+        const prompt = buildTurnDecisionPrompt(
+            conversation,
+            "i love to solve problem and think",
+            [],
+            "Current role: software developer",
+            preferencesStage,
+        );
+
+        assert.match(prompt, /onboarding already ran/i);
+        assert.match(prompt, /Do not re-ask for professional background/i);
+        assert.match(prompt, /Guided objective: ".*Only when the user is undecided/i);
+        assert.match(prompt, /choosing, adding, rejecting, or clarifying among jobs already listed/i);
+        assert.match(prompt, /set search=false/i);
     });
 });

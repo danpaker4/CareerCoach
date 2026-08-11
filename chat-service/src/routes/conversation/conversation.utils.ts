@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import type { AttachedJobSnapshot, UserAchievement } from "../../chat-flow/api/shared/chat.model";
 import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
-import type { Conversation, ConversationStageProgress } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, OnboardingFlow } from "./conversation.model";
 import { CONVERSATION_STAGES } from "./conversation.stage.consts";
 import type { ConversationResponse } from "./conversation.types";
 
@@ -46,6 +46,24 @@ export const defaultStageProgress = (): ConversationStageProgress => ({
     stageNotes: {},
     surfacedAchievementIds: [],
 });
+
+export const defaultOnboardingFlow = (): OnboardingFlow => ({
+    started: true,
+    backgroundResolved: false,
+    backgroundAskCount: 0,
+    directionResolved: false,
+    directionAskCount: 0,
+    completed: false,
+});
+
+/** Legacy conversations without onboardingFlow skip onboarding; new chats seed an incomplete flow. */
+export const needsOnboarding = (conversation: Conversation): boolean => {
+    const flow = conversation.onboardingFlow;
+    if (!flow) {
+        return false;
+    }
+    return flow.completed !== true;
+};
 
 export const appendStageNote = (
     stageProgress: ConversationStageProgress,

@@ -20,6 +20,10 @@ const HTTP_ACCEPTED = 202;
 const CHAT_REQUEST_POLL_INTERVAL_MS = 2_000;
 const CHAT_REQUEST_POLL_ATTEMPTS = 45;
 const CHAT_REQUEST_WEBSOCKET_TIMEOUT_MS = 25_000;
+const TYPING_DOTS_INTERVAL_MS = 500;
+const TYPING_DOTS_MAX = 3;
+
+const stripTrailingDots = (label: string): string => label.replace(/\.+$/, '');
 
 type PendingRequestHandler = {
     readonly resolve: (response: ChatResponse) => void;
@@ -246,6 +250,7 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [loadingLabel, setLoadingLabel] = useState('Typing...');
+    const [typingDotCount, setTypingDotCount] = useState(1);
     const [cvUploading, setCvUploading] = useState(false);
     const [cvUploadMessage, setCvUploadMessage] = useState<string | null>(null);
 
@@ -265,6 +270,21 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    useEffect(() => {
+        if (!isLoading) {
+            setTypingDotCount(1);
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            setTypingDotCount((prev) => (prev % TYPING_DOTS_MAX) + 1);
+        }, TYPING_DOTS_INTERVAL_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [isLoading]);
 
     useEffect(() => {
         onExportSnapshotChange?.({ conversationId, messages });
@@ -647,7 +667,14 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
                         )}
                     </div>
                 ))}
-                {isLoading && <div className="message-wrapper assistant"><div className="message-bubble">{loadingLabel}</div></div>}
+                {isLoading && (
+                    <div className="message-wrapper assistant">
+                        <div className="message-bubble typing-indicator" aria-live="polite">
+                            {stripTrailingDots(loadingLabel)}
+                            <span className="typing-dots" aria-hidden="true">{'.'.repeat(typingDotCount)}</span>
+                        </div>
+                    </div>
+                )}
                 <div ref={messagesEndRef} />
             </div>
 

@@ -1,7 +1,7 @@
 import type { Collection } from "mongodb";
 import { ObjectId } from "mongodb";
 import type { ChatMessage } from "../../chat-flow/api/shared/chat.model";
-import type { Conversation, ConversationStageProgress, DreamJobFlow, QuickHelpFlow } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, DreamJobFlow, OnboardingFlow, QuickHelpFlow, RoleConflictFlow } from "./conversation.model";
 import type { ConversationListRow } from "./conversation.types";
 import { conversationFilter } from "./conversation.utils";
 import type { ConversationJobContext } from "./job-in-conversation.types";
@@ -37,13 +37,15 @@ export class ConversationDal {
     createConversation = async (
         userId: string,
         firstAssistantMessage: string,
-        stageProgress: ConversationStageProgress
+        stageProgress: ConversationStageProgress,
+        onboardingFlow: OnboardingFlow
     ): Promise<Conversation> => {
         const now = new Date();
         const conversation: Conversation = {
             userId,
             messages: [{ role: "assistant", content: firstAssistantMessage, timestamp: now }],
             stageProgress,
+            onboardingFlow,
             createdAt: now,
             updatedAt: now,
         };
@@ -89,6 +91,48 @@ export class ConversationDal {
         await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
             $set: {
                 dreamJobFlow,
+                updatedAt: new Date(),
+            },
+        });
+    };
+
+    updateRoleConflictFlow = async (
+        userId: string,
+        conversationId: ObjectId,
+        roleConflictFlow: RoleConflictFlow | undefined,
+    ): Promise<void> => {
+        if (roleConflictFlow === undefined) {
+            await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+                $unset: { roleConflictFlow: "" },
+                $set: { updatedAt: new Date() },
+            });
+            return;
+        }
+
+        await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+            $set: {
+                roleConflictFlow,
+                updatedAt: new Date(),
+            },
+        });
+    };
+
+    updateOnboardingFlow = async (
+        userId: string,
+        conversationId: ObjectId,
+        onboardingFlow: OnboardingFlow | undefined,
+    ): Promise<void> => {
+        if (onboardingFlow === undefined) {
+            await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+                $unset: { onboardingFlow: "" },
+                $set: { updatedAt: new Date() },
+            });
+            return;
+        }
+
+        await this.conversationsCollection.updateOne(conversationFilter(userId, conversationId), {
+            $set: {
+                onboardingFlow,
                 updatedAt: new Date(),
             },
         });

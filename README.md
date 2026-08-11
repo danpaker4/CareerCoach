@@ -71,7 +71,7 @@ docker compose up -d litellm
 
 This mounts `litellm-config.yaml`, which defines:
 
-- `chat-default` → `ollama/llama3` at `host.docker.internal:9009`
+- `chat-default` → `ollama/llama3` at `host.docker.internal:11434`
 - `chat-fallback` → `gemini/gemini-2.5-flash` (uses `GEMINI_API_KEY` if set)
 - router fallback from `chat-default` to `chat-fallback`
 

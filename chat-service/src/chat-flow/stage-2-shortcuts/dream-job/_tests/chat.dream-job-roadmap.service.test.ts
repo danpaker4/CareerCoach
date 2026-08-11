@@ -98,6 +98,15 @@ describe("createDreamJobRoadmapCreator", () => {
         );
     });
 
+    it("forwards an explicit targetYears value to the generator", async () => {
+        const { creator, generatorCalls } = createCreator();
+        const result = await creator.create("user-1", "Chief Executive Officer", 7);
+        assert.deepEqual(result, { created: true });
+        assert.deepEqual(generatorCalls, [
+            { userId: "user-1", dreamJob: "Chief Executive Officer", targetYears: 7 },
+        ]);
+    });
+
     it("does not persist when generation throws", async () => {
         const { creator, persistedRoadmaps } = createCreator({ generateError: true });
 

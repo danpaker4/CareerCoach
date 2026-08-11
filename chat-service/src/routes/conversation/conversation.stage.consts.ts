@@ -1,8 +1,42 @@
 import type { ConversationStage } from "./conversation.types";
 
 export const STAGE_SIGNALS: Readonly<Record<string, readonly string[]>> = {
-    achievements: ["experience", "project", "built", "developed", "worked", "achievement", "skill", "stack"],
-    timeline: ["immediately", "asap", "soon", "timeline", "months", "years", "long-term", "long term", "future", "now"],
+    achievements: [
+        "experience",
+        "project",
+        "built",
+        "developed",
+        "worked",
+        "achievement",
+        "skill",
+        "stack",
+        "developer",
+        "engineer",
+        "years",
+    ],
+    timeline: [
+        "immediately",
+        "asap",
+        "soon",
+        "now",
+        "looking for",
+        "next job",
+        "next role",
+        "timeline",
+        "months",
+        "long-term",
+        "long term",
+        "future",
+        "dream",
+        "don't know",
+        "do not know",
+        "dont know",
+        "not sure",
+        "no idea",
+        "unsure",
+        "exploring",
+        "figuring out",
+    ],
     preferences: [
         "role",
         "position",
@@ -18,13 +52,6 @@ export const STAGE_SIGNALS: Readonly<Record<string, readonly string[]>> = {
         "passion",
         "interested in",
         "care about",
-        "don't know",
-        "do not know",
-        "not sure",
-        "no idea",
-        "exploring",
-        "figuring out",
-        "unsure",
     ],
 };
 
@@ -32,16 +59,16 @@ export const CONVERSATION_STAGES: readonly ConversationStage[] = [
     {
         id: "achievements",
         objective:
-            "Understand the user's background, experience, and concrete achievements. If they sound unsure about their direction, still gather what they have done—and note what parts of it they liked.",
+            "Background collection is handled by onboarding. If still on this stage after onboarding, advance without re-asking for background.",
     },
     {
         id: "timeline",
         objective:
-            "Understand whether they want to move soon or are thinking longer-term, and whether they already picture a specific next role or are still discovering what fits.",
+            "Initial career-direction selection is handled by onboarding. If still on this stage after onboarding, advance without re-asking the direction fork.",
     },
     {
         id: "preferences",
         objective:
-            "When they can name a target role or field: capture role type, domain, and career constraints the product supports. When they still cannot name a specific job: draw out what they love doing, care about, and want more of in the future—without asking them to label or choose a 'career path type'; use their answers as signals for job discovery.",
+            "Only when the user is undecided (GUIDED after onboarding): dig into what they have done, what they enjoy, and useful constraints to help them choose near-term vs longer-term. Do not use this stage when they already chose a job now or a future/dream path.",
     },
 ];

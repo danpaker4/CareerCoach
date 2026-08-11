@@ -14,3 +14,14 @@ export const CYBER_KEYWORDS_FOR_WORK_DIRECTION_FILTERS = [
     "Ethical Hacking",
     "Application Security",
 ] as const;
+
+export const QA_KEYWORDS_FOR_WORK_DIRECTION_FILTERS = [
+    "QA",
+    "Quality Assurance",
+    "QA Engineer",
+    "QA Automation",
+    "Test Automation",
+    "Software Tester",
+    "SDET",
+    "Quality Engineer",
+] as const;

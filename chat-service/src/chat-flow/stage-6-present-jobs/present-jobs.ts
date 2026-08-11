@@ -2,14 +2,7 @@ import type { Conversation } from "../../routes/conversation/conversation.model"
 import type { UserCareerProfile } from "../../routes/career-profile/career-profile.types";
 import type { ChatMessageResponse, JobSearchResultItem } from "../api/shared/chat.types";
 import { rankJobs } from "./ranking/job-ranking.service";
-import {
-    applyValidatedJobsFallback,
-    mapRankedJobResultToChatMatchRow,
-    withJobSelectionClosing,
-} from "./presentation/chat.job-presentation.utils";
-import { resolveSelectedJobFromRecommendations } from "./presentation/chat.job-mapping.utils";
-import { sanitizeReply, validateRecommendedJobs } from "./presentation/chat.validation.service";
-import { generateJobAwareReply } from "../shared/llm/chat.llm.service";
+import { mapRankedJobResultToChatMatchRow } from "./presentation/chat.job-presentation.utils";
 import { EXHAUSTED_JOBS_REPLY, MAX_PRESENTED_JOBS } from "./present-jobs.consts";
 import type { PresentRankedJobsOptions } from "./present-jobs.types";
 
@@ -32,21 +25,17 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
         conversation = ctx.conversationAfterUserMessage,
         queryLabel = ctx.normalizedMessage,
         includeRecommendedDirections = false,
-        directionHint,
     } = options;
     const {
         userId,
         conversationId,
-        normalizedMessage,
         userCareerProfile,
         userRoleExperience,
-        userAccountContext,
-        userAchievements,
         confidenceSummary,
     } = ctx;
     const mode = ctx.modeDetection.mode;
 
-    const { rankedJobs, orderedRankedPool } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
+    const { orderedRankedPool } = filterEligibleRankedJobs(userCareerProfile, jobs, conversation);
 
     if (orderedRankedPool.length === 0) {
         await deps.conversationService.appendAssistantMessage(userId, conversationId, EXHAUSTED_JOBS_REPLY);
@@ -55,41 +44,24 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
 
     const topRankedJobs = orderedRankedPool.map((item) => item.job);
     const focusJob = topRankedJobs[0] ?? null;
-
-    const jobsForLlm = focusJob ? [focusJob] : topRankedJobs;
-    const jobAwareDecision = await generateJobAwareReply(
-        deps.textCompletion,
-        conversation,
-        normalizedMessage,
-        jobsForLlm.length > 0 ? jobsForLlm : topRankedJobs,
-        userAchievements,
-        userAccountContext,
-        deps.llmObserver
-    );
-    const validJobIds = validateRecommendedJobs(jobAwareDecision.reply, jobAwareDecision.recommendedJobIds, jobs);
-    const fallbackPack = applyValidatedJobsFallback(
-        topRankedJobs.filter((jobItem) => validJobIds.includes(jobItem.id)).slice(0, 10),
-        sanitizeReply(jobAwareDecision.reply),
-        focusJob,
-        directionHint
-    );
-    const selectedJob = resolveSelectedJobFromRecommendations(fallbackPack.validatedJobs, validJobIds) ?? focusJob;
-
     const presentationJobs = topRankedJobs.slice(0, MAX_PRESENTED_JOBS);
-    const reply = withJobSelectionClosing(fallbackPack.sanitizedReply, presentationJobs);
 
     await deps.conversationService.setJobContextAfterSearch(
         userId,
         conversationId,
         topRankedJobs,
-        selectedJob,
+        focusJob,
         queryLabel,
         searchIntent
     );
 
-    const presentedIds = new Set(presentationJobs.map((jobItem) => jobItem.id));
-    const jobMatches = rankedJobs
-        .filter((item) => presentedIds.has(item.jobId))
+    const reply =
+        `Here are the roles I found that could fit — do any of these work for you? ` +
+        `Tell me which one to add to your pipeline ` +
+        `(e.g. "add the first one" or "add the ${presentationJobs[0]?.company ?? "first"} role"). ` +
+        `If none fit, just say "none" and I can save a role to your wishlist so you're alerted when a better match appears.`;
+    const jobMatches = orderedRankedPool
+        .slice(0, MAX_PRESENTED_JOBS)
         .map((item) => mapRankedJobResultToChatMatchRow(item));
 
     const recommendedDirections = includeRecommendedDirections

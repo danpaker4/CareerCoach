@@ -13,6 +13,10 @@ import type {
 } from "./chat.external.types";
 import type { RoleExperienceEntry } from "./role-experience.types";
 import { readUserRoleExperienceField } from "./role-experience.utils";
+import {
+    filterOutQaLinkedAchievements,
+    filterOutQaLinkedSkills,
+} from "../../chat-flow/stage-2-shortcuts/role-conflict/role-conflict.utils";
 
 export class ChatExternalService {
     constructor(
@@ -249,6 +253,39 @@ export class ChatExternalService {
         });
 
         return response.ok;
+    };
+
+    applyChatRoleOverride = async (
+        userId: string,
+        params: { currentJob: string; removeQaLinkedSkills: boolean },
+    ): Promise<boolean> => {
+        const profile = await this.readUserPublicProfile(userId);
+        if (!profile) {
+            return false;
+        }
+
+        const patchBody: {
+            currentJob: string;
+            technologies?: string[];
+            knownSkills?: string[];
+            achievements?: UserAchievementResponse[];
+        } = {
+            currentJob: params.currentJob.trim(),
+        };
+
+        if (params.removeQaLinkedSkills) {
+            patchBody.technologies = filterOutQaLinkedSkills(readUserStringArrayField(profile, "technologies"));
+            patchBody.knownSkills = filterOutQaLinkedSkills(readUserStringArrayField(profile, "knownSkills"));
+            patchBody.achievements = filterOutQaLinkedAchievements(readUserAchievementsField(profile));
+        }
+
+        const response = await fetch(`${this.usersServiceBaseUrl}/users/${userId}`, {
+            method: "PATCH",
+            headers: this.buildUsersServiceHeaders(userId),
+            body: JSON.stringify(patchBody),
+        }).catch(() => null);
+
+        return response?.ok === true;
     };
 
     createCareerRoadmap = async (params: CreateCareerRoadmapParams): Promise<boolean> => {

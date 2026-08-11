@@ -8,6 +8,7 @@ import type {
 } from "../../api/shared/chat.types";
 import type { ChatFlowDeps, SendMessageBaseContext } from "../../chat-flow.types";
 import { DEFAULT_MODE_DETECTION_RESULT } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
+import { applyModePivotOverrides } from "../../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
 import {
     EMPTY_LLM_SEARCH_FILTERS,
     LLM_DECISION_PARSE_FALLBACK_REPLY,
@@ -27,6 +28,7 @@ import { buildRecommendationPrompt } from "./chat.recommendation.prompt.utils";
 import { buildTurnDecisionPrompt } from "./chat.turn.prompt.utils";
 import type { ChatLlmObserver } from "./chat.llm.types";
 import { getCurrentStage } from "../../../routes/conversation/conversation.stage.utils";
+import { applyBackgroundRoleForkOverride } from "../../stage-4-guided-stages/background-role-fork.utils";
 import { recordChatLlmParseEvent } from "./chat.llm.observability.utils";
 
 export const decideNextStep = async (
@@ -61,7 +63,16 @@ export const decideNextStep = async (
             userId: conversation.userId,
             sessionId: conversation._id?.toHexString(),
         });
-        return parsed;
+        const modeDetection = applyModePivotOverrides(parsed.modeDetection, ctx.normalizedMessage);
+        return applyBackgroundRoleForkOverride(
+            {
+                ...parsed,
+                shouldSearchJobs: modeDetection.shouldSearchJobs || parsed.shouldSearchJobs,
+                modeDetection,
+            },
+            ctx.normalizedMessage,
+            currentStage?.id,
+        );
     } catch (error: unknown) {
         recordChatLlmParseEvent(deps.llmObserver, {
             operation: "chat.decision",
@@ -70,17 +81,21 @@ export const decideNextStep = async (
             userId: conversation.userId,
             sessionId: conversation._id?.toHexString(),
         }, error);
-        return {
-            reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
-            shouldSearchJobs: false,
-            recommendedJobIds: [],
-            searchFilters: EMPTY_LLM_SEARCH_FILTERS,
-            modeDetection: DEFAULT_MODE_DETECTION_RESULT,
-            shouldAdvanceStage: false,
-        };
+        const modeDetection = applyModePivotOverrides(DEFAULT_MODE_DETECTION_RESULT, ctx.normalizedMessage);
+        return applyBackgroundRoleForkOverride(
+            {
+                reply: LLM_DECISION_PARSE_FALLBACK_REPLY,
+                shouldSearchJobs: modeDetection.shouldSearchJobs,
+                recommendedJobIds: [],
+                searchFilters: EMPTY_LLM_SEARCH_FILTERS,
+                modeDetection,
+                shouldAdvanceStage: false,
+            },
+            ctx.normalizedMessage,
+            currentStage?.id,
+        );
     }
 };
-
 export const generateJobAwareReply = async (
     textCompletion: TextCompletionPort,
     conversation: Conversation,

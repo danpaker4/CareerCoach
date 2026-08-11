@@ -1,14 +1,16 @@
 import type { ChatMessageResponse } from "../api/shared/chat.types";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../chat-flow.types";
 import { CONVERSATION_MODE } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
+import { isNearTermPivotMessage } from "../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
 import { runDreamJobFlow } from "./dream-job/dream-job-flow";
 import { tryFollowUpShortcutResponse } from "./follow-up/follow-up-shortcut";
 import { runNearTermSearchFlow } from "./near-term/near-term-search-flow";
 import { tryOfferJobShortcutResponse } from "./offer-job/offer-job-shortcut";
 import { tryRejectChoiceResponse } from "./pipeline/pipeline-reject/reject-choice-shortcut";
-import { checkIfNeededAddToPipeline } from "./pipeline/pipeline-shortcuts";
+import { checkIfNeededAddToPipeline, shouldPrioritizePipelineShortcut } from "./pipeline/pipeline-shortcuts";
 import { tryQuickHelpShortcutResponse } from "./quick-help/run-quick-help";
 import { tryRefineSearchOfferResponse } from "./refine-search/refine-search-shortcut";
+import { tryRoleConflictShortcutResponse } from "./role-conflict/role-conflict-shortcut";
 import { tryWishlistConfirmationResponse } from "./wanted-jobs/wishlist-shortcut";
 
 export const runStage2Shortcuts = async (
@@ -20,7 +22,30 @@ export const runStage2Shortcuts = async (
         return quickHelpResponse;
     }
 
-    if (ctx.modeDetection.mode === CONVERSATION_MODE.DREAMJOB) {
+    const roleConflictResponse = await tryRoleConflictShortcutResponse(deps, ctx);
+    if (roleConflictResponse) {
+        return roleConflictResponse;
+    }
+
+    if (shouldPrioritizePipelineShortcut(ctx)) {
+        const pipelineWhileAwaiting = await checkIfNeededAddToPipeline(deps, ctx);
+        if (pipelineWhileAwaiting) {
+            return pipelineWhileAwaiting;
+        }
+    }
+
+    const nearTermPivot = isNearTermPivotMessage(ctx.normalizedMessage);
+    if (nearTermPivot || (ctx.modeDetection.mode === CONVERSATION_MODE.NEAR_TERM && ctx.modeDetection.shouldSearchJobs)) {
+        if (nearTermPivot && ctx.conversationAfterUserMessage.dreamJobFlow) {
+            await deps.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, undefined);
+        }
+        console.info(`[CHAT][NEAR_TERM] userId=${ctx.userId} routing to near-term job search`);
+        return await runNearTermSearchFlow(deps, ctx);
+    }
+
+    if (ctx.modeDetection.mode === CONVERSATION_MODE.DREAMJOB
+        || ctx.conversationAfterUserMessage.dreamJobFlow?.awaitingConfirmation === true
+        || ctx.conversationAfterUserMessage.dreamJobFlow?.awaitingTargetYears === true) {
         console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow`);
         return await runDreamJobFlow(deps, ctx);
     }
@@ -53,11 +78,6 @@ export const runStage2Shortcuts = async (
     const refineOfferResponse = await tryRefineSearchOfferResponse(deps, ctx);
     if (refineOfferResponse) {
         return refineOfferResponse;
-    }
-
-    if (ctx.modeDetection.mode === CONVERSATION_MODE.NEAR_TERM && ctx.modeDetection.shouldSearchJobs) {
-        console.info(`[CHAT][NEAR_TERM] userId=${ctx.userId} mode is ready, routing to near-term job search`);
-        return await runNearTermSearchFlow(deps, ctx);
     }
 
     return null;
