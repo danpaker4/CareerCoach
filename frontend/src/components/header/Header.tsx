@@ -5,13 +5,13 @@ import iconZap from '../../assets/icon-zap.svg';
 import iconKanban from '../../assets/icon-kanban.svg';
 import iconTarget from '../../assets/icon-target.svg';
 import iconSparkle from '../../assets/icon-sparkle.svg';
-import { CareerCoachLogo } from './CareerCoachLogo';
 import iconMessage from '../../assets/icon-message.svg';
 import iconUser from '../../assets/icon-user.svg';
 import iconMenu from '../../assets/icon-menu.svg';
 import iconX from '../../assets/icon-x.svg';
 import iconSun from '../../assets/icon-sun.svg';
 import iconMoon from '../../assets/icon-moon.svg';
+import logo from '../../assets/logo.png';
 import './Header.css';
 import type { HeaderProps } from './header.types';
 import { getInitials } from './header.utils';
@@ -106,7 +106,7 @@ export const Header = ({ userId, userName, isAdmin = false, theme, onToggleTheme
     <header className="navbar" ref={menuRef}>
       <div className="navbar-brand">
         <Link to={homePath} className="brand-link">
-          <CareerCoachLogo />
+          <img className="brand-logo" src={logo} alt="" aria-hidden="true" />
           <span className="brand-text">CareerCoach</span>
         </Link>
       </div>
