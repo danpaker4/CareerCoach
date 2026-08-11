@@ -6,6 +6,28 @@ import type { JobSearchPlan } from "./job-search-plan.types";
 const pickTopValues = (values: readonly { value: string }[], limit: number): string[] =>
     values.slice(0, limit).map((item) => item.value);
 
+/** Near-term / explicit direction search: only the requested role, no profile-tech dilution. */
+export const buildStrictDirectionSearchPlan = (directionFilters: JobSearchRequest): JobSearchPlan => {
+    const queryTerms = [...directionFilters.keywords, ...directionFilters.skills, ...directionFilters.interests]
+        .map((term) => term.trim())
+        .filter((term) => term.length > 0);
+    const query = [...new Set(queryTerms)].join(" ").trim();
+    return {
+        searches: [
+            {
+                type: "STRICT_MATCH",
+                query: query.length > 0 ? query : "open roles",
+                filters: {
+                    skills: [],
+                    interests: directionFilters.interests,
+                    experienceLevel: directionFilters.experienceLevel,
+                    keywords: directionFilters.keywords,
+                },
+            },
+        ],
+    };
+};
+
 export const buildJobSearchPlan = (
     profile: UserCareerProfile,
     baseFilters: JobSearchRequest,

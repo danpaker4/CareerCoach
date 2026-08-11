@@ -10,6 +10,40 @@ export type ConversationStage = {
 export type DreamJobFlow = {
     proposedTitle?: string;
     awaitingConfirmation: boolean;
+    awaitingTargetYears?: boolean;
+    targetYears?: number;
+};
+
+export type RoleConflictFlow = {
+    awaitingResolution: boolean;
+    chatClaimedRole: string;
+    cvRole: string;
+    resolved?: "chat" | "cv";
+};
+
+export type OnboardingBackgroundStatus = "FOUND" | "NONE" | "UNKNOWN";
+
+export type OnboardingBackground = {
+    status: OnboardingBackgroundStatus;
+    role?: string | null;
+    yearsOfExperience?: number | null;
+    companies?: string[];
+    technologies?: string[];
+    education?: string[];
+    summary?: string | null;
+};
+
+export type OnboardingInitialMode = "NEAR_TERM" | "DREAMJOB" | "GUIDED";
+
+export type OnboardingFlow = {
+    started: true;
+    backgroundResolved: boolean;
+    backgroundAskCount: number;
+    directionResolved: boolean;
+    directionAskCount: number;
+    completed: boolean;
+    background?: OnboardingBackground;
+    initialMode?: OnboardingInitialMode;
 };
 
 export type SkillsGapQuickHelpFlow = {
@@ -47,6 +81,8 @@ export type Conversation = {
     messages: ChatMessage[];
     jobContext?: ConversationJobContext;
     dreamJobFlow?: DreamJobFlow;
+    roleConflictFlow?: RoleConflictFlow;
+    onboardingFlow?: OnboardingFlow;
     quickHelpFlow?: QuickHelpFlow;
     stageProgress: ConversationStageProgress;
     createdAt: Date;

@@ -15,7 +15,7 @@ const ACCEPT_PHRASES = [
     "i want to apply",
     "i want it",
     "put it in my pipeline",
-];
+] as const;
 
 const REJECT_PHRASES = [
     "no thanks",
@@ -46,7 +46,7 @@ const REJECT_PHRASES = [
     "skip",
     "next",
     "pass",
-];
+] as const;
 
 const isStandaloneNone = (normalized: string): boolean =>
     normalized === "none" || /^none[,.!]?$/i.test(normalized);
@@ -72,6 +72,18 @@ const startsWithYes = (normalized: string): boolean => /^yes\b/i.test(normalized
 
 const startsWithSure = (normalized: string): boolean => /^sure\b/i.test(normalized) || /^ok\b/i.test(normalized) || /^okay\b/i.test(normalized);
 
+/** Explicit add/select phrasing — safe to handle even after awaitingPipelineDecision is cleared. */
+export const isExplicitPipelineAddIntent = (message: string): boolean => {
+    const normalized = normalize(message);
+    if (normalized.length === 0) {
+        return false;
+    }
+    if (ACCEPT_PHRASES.some((phrase) => normalized.includes(phrase))) {
+        return true;
+    }
+    return isPipelineSelection(normalized);
+};
+
 export const detectPipelineIntent = (message: string): PipelineIntent | null => {
     const normalized = normalize(message);
     if (normalized.length === 0) {
@@ -90,11 +102,7 @@ export const detectPipelineIntent = (message: string): PipelineIntent | null => 
         return PIPELINE_INTENT.REJECT;
     }
 
-    if (ACCEPT_PHRASES.some((phrase) => normalized.includes(phrase))) {
-        return PIPELINE_INTENT.ACCEPT;
-    }
-
-    if (isPipelineSelection(normalized)) {
+    if (isExplicitPipelineAddIntent(message)) {
         return PIPELINE_INTENT.ACCEPT;
     }
 

@@ -70,5 +70,5 @@ export type DreamJobRoadmapPersistence = {
 };
 
 export type DreamJobRoadmapCreator = {
-    create: (userId: string, dreamJob: string) => Promise<DreamJobRoadmapCreationResult>;
+    create: (userId: string, dreamJob: string, targetYears?: number) => Promise<DreamJobRoadmapCreationResult>;
 };

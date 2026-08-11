@@ -7,6 +7,7 @@ import { ChatExternalService } from "../external-chat-tools/chat.external.servic
 import { ConversationDal } from "./conversation.dal";
 import {
     ConversationNotFoundError,
+    defaultOnboardingFlow,
     defaultStageProgress,
     InvalidConversationIdError,
     toAttachedJobSnapshots,
@@ -15,7 +16,7 @@ import {
     tryParseConversationObjectId,
 } from "./conversation.utils";
 import { getCurrentStage, getInitialAssistantMessage } from "./conversation.stage.utils";
-import type { Conversation, ConversationStageProgress, DreamJobFlow, QuickHelpFlow } from "./conversation.model";
+import type { Conversation, ConversationStageProgress, DreamJobFlow, OnboardingFlow, QuickHelpFlow, RoleConflictFlow } from "./conversation.model";
 import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types";
 import type { ConversationJobContext, JobRecommendationContextState, SanitizedJob } from "./job-in-conversation.types";
 
@@ -35,8 +36,15 @@ export class ChatConversationService {
     };
 
     createAdditionalConversation = async (userId: string): Promise<ConversationResponse> => {
-        const firstAssistantMessage = getInitialAssistantMessage();
-        const created = await this.dal.createConversation(userId, firstAssistantMessage, defaultStageProgress());
+        const profile = await this.chatExternalService.readUserPublicProfile(userId).catch(() => null);
+        const firstName = typeof profile?.firstName === "string" ? profile.firstName : undefined;
+        const firstAssistantMessage = getInitialAssistantMessage(firstName);
+        const created = await this.dal.createConversation(
+            userId,
+            firstAssistantMessage,
+            defaultStageProgress(),
+            defaultOnboardingFlow(),
+        );
         const achievements = await this.chatExternalService.readUserAchievements(userId);
         const currentStage = getCurrentStage(created);
         return toConversationResponse(created, achievements, currentStage?.id ?? null);
@@ -69,8 +77,15 @@ export class ChatConversationService {
             };
         }
 
-        const firstAssistantMessage = getInitialAssistantMessage();
-        const created = await this.dal.createConversation(userId, firstAssistantMessage, defaultStageProgress());
+        const profile = await this.chatExternalService.readUserPublicProfile(userId).catch(() => null);
+        const firstName = typeof profile?.firstName === "string" ? profile.firstName : undefined;
+        const firstAssistantMessage = getInitialAssistantMessage(firstName);
+        const created = await this.dal.createConversation(
+            userId,
+            firstAssistantMessage,
+            defaultStageProgress(),
+            defaultOnboardingFlow(),
+        );
         return {
             conversationId: created._id!.toHexString(),
             conversation: created,
@@ -156,6 +171,22 @@ export class ChatConversationService {
 
     updateDreamJobFlow = async (userId: string, conversationId: string, dreamJobFlow: DreamJobFlow | undefined): Promise<void> => {
         await this.dal.updateDreamJobFlow(userId, parseConversationObjectIdOrThrow(conversationId), dreamJobFlow);
+    };
+
+    updateRoleConflictFlow = async (
+        userId: string,
+        conversationId: string,
+        roleConflictFlow: RoleConflictFlow | undefined,
+    ): Promise<void> => {
+        await this.dal.updateRoleConflictFlow(userId, parseConversationObjectIdOrThrow(conversationId), roleConflictFlow);
+    };
+
+    updateOnboardingFlow = async (
+        userId: string,
+        conversationId: string,
+        onboardingFlow: OnboardingFlow | undefined,
+    ): Promise<void> => {
+        await this.dal.updateOnboardingFlow(userId, parseConversationObjectIdOrThrow(conversationId), onboardingFlow);
     };
 
     updateQuickHelpFlow = async (userId: string, conversationId: string, quickHelpFlow: QuickHelpFlow | undefined): Promise<void> => {

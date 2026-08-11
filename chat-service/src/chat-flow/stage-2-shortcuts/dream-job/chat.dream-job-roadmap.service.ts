@@ -60,6 +60,6 @@ export const createDreamJobRoadmapCreator = (
     persistence: DreamJobRoadmapPersistence,
     createGeneratedAt?: () => Date
 ) => ({
-    create: (userId: string, dreamJob: string) =>
-        createDreamJobRoadmap({ generator, persistence, userId, dreamJob, createGeneratedAt }),
+    create: (userId: string, dreamJob: string, targetYears?: number) =>
+        createDreamJobRoadmap({ generator, persistence, userId, dreamJob, targetYears, createGeneratedAt }),
 });

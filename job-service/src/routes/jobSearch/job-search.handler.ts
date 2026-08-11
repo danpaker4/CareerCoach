@@ -46,13 +46,14 @@ type EmbeddingFetchError = {
     statusText?: string;
 };
 
-const buildQueryText = (request: JobSearchRequest): string => {
+const buildQueryText = (request: JobSearchRequest, planQuery = ""): string => {
     const sections = [
+        planQuery.trim().length > 0 ? `Query: ${planQuery.trim()}` : "",
         `Skills: ${request.skills.join(", ")}`,
         `Interests: ${request.interests.join(", ")}`,
         `Experience level: ${request.experienceLevel}`,
         `Keywords: ${request.keywords.join(", ")}`,
-    ];
+    ].filter((section) => section.length > 0);
     return sections.join("\n");
 };
 
@@ -169,9 +170,13 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
     const searchJobs = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
         const payload: unknown = request.body;
         const normalizedSearches = isJobSearchPlanRequest(payload)
-            ? payload.searches.map((search) => search.filters)
+            ? payload.searches.map((search) => ({
+                type: search.type,
+                query: search.query,
+                filters: search.filters,
+            }))
             : isJobSearchRequest(payload)
-                ? [payload]
+                ? [{ type: "STRICT_MATCH", query: "", filters: payload }]
                 : null;
         if (!normalizedSearches) {
             reply.status(StatusCodes.BAD_REQUEST).send({ error: "Invalid search payload" });
@@ -180,8 +185,18 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
 
         try {
             const allResults: JobSearchResponseItem[] = [];
-            for (const searchRequest of normalizedSearches) {
-                const queryText = buildQueryText(searchRequest);
+            for (const search of normalizedSearches) {
+                const searchRequest = search.filters;
+                // Strict direction searches should prefer title matches over loose semantic nearest-neighbors.
+                if (search.type === "STRICT_MATCH") {
+                    const titleMatches = await searchByJobTitleFallback(searchRequest);
+                    if (titleMatches.length > 0) {
+                        allResults.push(...titleMatches);
+                        continue;
+                    }
+                }
+
+                const queryText = buildQueryText(searchRequest, search.query);
                 const queryVector = await generateQueryVector(queryText);
                 if (!queryVector) {
                     const fallbackResults = await searchByJobTitleFallback(searchRequest);
@@ -204,8 +219,10 @@ export const JobSearchHandler = (jobsCollection: Collection<EnrichedJob>) => {
         } catch (error) {
             const embeddingError = error as EmbeddingFetchError;
             if (embeddingError.status === 429) {
-                const fallbackRequest = normalizedSearches[0];
-                const fallbackResults = await searchByJobTitleFallback(fallbackRequest);
+                const fallbackRequest = normalizedSearches[0]?.filters;
+                const fallbackResults = fallbackRequest
+                    ? await searchByJobTitleFallback(fallbackRequest)
+                    : [];
                 reply.status(StatusCodes.OK).send(fallbackResults);
                 return;
             }

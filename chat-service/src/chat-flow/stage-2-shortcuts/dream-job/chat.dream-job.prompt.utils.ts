@@ -12,7 +12,9 @@ export const buildDreamJobPrompt = (params: {
 }): string => {
     const { conversation, latestUserMessage, userAccountContext, dreamJobFlow } = params;
     const flowState =
-        dreamJobFlow?.awaitingConfirmation && dreamJobFlow.proposedTitle
+        dreamJobFlow?.awaitingTargetYears && dreamJobFlow.proposedTitle
+            ? `Awaiting target years for confirmed dream job title: "${dreamJobFlow.proposedTitle}".`
+            : dreamJobFlow?.awaitingConfirmation && dreamJobFlow.proposedTitle
             ? `Awaiting user confirmation for proposed dream job title: "${dreamJobFlow.proposedTitle}".`
             : dreamJobFlow?.proposedTitle
               ? `Previously proposed title (not yet confirmed): "${dreamJobFlow.proposedTitle}".`

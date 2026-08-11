@@ -8,6 +8,7 @@ import {
     isAffirmativeConfirmation,
     isNegativeConfirmation,
     normalizeDreamJobTitle,
+    parseTargetYearsFromMessage,
 } from "./chat.dream-job.utils";
 
 export const runDreamJobFlow = async (
@@ -15,6 +16,27 @@ export const runDreamJobFlow = async (
     ctx: SendMessagePreparedContext
 ): Promise<ChatMessageResponse> => {
     const dreamJobFlow = ctx.conversationAfterUserMessage.dreamJobFlow;
+
+    if (dreamJobFlow?.awaitingTargetYears === true && dreamJobFlow.proposedTitle) {
+        const pendingTitle = dreamJobFlow.proposedTitle;
+        const parsedYears = parseTargetYearsFromMessage(ctx.normalizedMessage);
+        if (parsedYears === undefined) {
+            const retryReply = `How many years from now do you want to reach ${pendingTitle}? Reply with a number (for example, 5).`;
+            await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, retryReply);
+            return { reply: retryReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
+        }
+
+        await deps.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, undefined);
+        const roadmapResult = await deps.dreamJobRoadmapCreator
+            .create(ctx.userId, pendingTitle, parsedYears)
+            .catch(() => ({ created: false as const, reason: "generation_failed" as const }));
+        const successReply = roadmapResult.created
+            ? `Saved ${pendingTitle} as your dream job and created a 4-stage roadmap toward it (~${parsedYears} years). You can review it on My Roadmap.`
+            : `Saved ${pendingTitle} as your dream job, but I couldn't create the roadmap right now. You can create it from My Roadmap.`;
+        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, successReply);
+        return { reply: successReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
+    }
+
     const decision = await decideDreamJobStep(
         deps.textCompletion,
         ctx.conversationAfterUserMessage,
@@ -57,15 +79,14 @@ export const runDreamJobFlow = async (
             return { reply: failureReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
         }
 
-        await deps.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, undefined);
-        const roadmapResult = await deps.dreamJobRoadmapCreator
-            .create(ctx.userId, pendingTitle)
-            .catch(() => ({ created: false as const, reason: "generation_failed" as const }));
-        const successReply = roadmapResult.created
-            ? `Saved ${pendingTitle} as your dream job and created a 4-stage roadmap toward it. You can review it on My Roadmap.`
-            : `Saved ${pendingTitle} as your dream job, but I couldn't create the roadmap right now. You can create it from My Roadmap.`;
-        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, successReply);
-        return { reply: successReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
+        await deps.conversationService.updateDreamJobFlow(ctx.userId, ctx.conversationId, {
+            proposedTitle: pendingTitle,
+            awaitingConfirmation: false,
+            awaitingTargetYears: true,
+        });
+        const yearsReply = `Saved ${pendingTitle} as your dream job. In how many years do you want to be ${pendingTitle}?`;
+        await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, yearsReply);
+        return { reply: yearsReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
     }
 
     if (isNegativeConfirmation(ctx.normalizedMessage) && dreamJobFlow?.awaitingConfirmation === true) {
