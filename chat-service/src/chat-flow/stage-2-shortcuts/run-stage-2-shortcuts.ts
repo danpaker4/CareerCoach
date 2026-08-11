@@ -20,7 +20,12 @@ export const runStage2Shortcuts = async (
         return quickHelpResponse;
     }
 
-    if (ctx.modeDetection.mode === CONVERSATION_MODE.DREAMJOB) {
+    // A dream-job confirmation spans turns, and the answer to it ("yes, that's the one") carries no
+    // signal of its own, so mode detection reads it as guided. Routing on mode alone strands the
+    // pending question and the conversation asks it again.
+    const isAwaitingDreamJobAnswer =
+        ctx.conversationAfterUserMessage.dreamJobFlow?.awaitingConfirmation === true;
+    if (ctx.modeDetection.mode === CONVERSATION_MODE.DREAMJOB || isAwaitingDreamJobAnswer) {
         console.info(`[CHAT][DREAMJOB] userId=${ctx.userId} routing to dream job flow`);
         return await runDreamJobFlow(deps, ctx);
     }

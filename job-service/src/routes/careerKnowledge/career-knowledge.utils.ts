@@ -107,3 +107,34 @@ export const toCounterObject = (values: readonly string[]): Record<string, numbe
         acc[key] = (acc[key] ?? 0) + 1;
         return acc;
     }, {});
+
+const MAX_SKILL_WORDS = 4;
+const MAX_SKILL_LENGTH = 40;
+const MIN_SKILL_LENGTH = 2;
+
+/** Text the enrichment step emits when a posting lists no real requirements. */
+const PLACEHOLDER_REQUIREMENT = /\blevel experience relevant to\b/i;
+const CONTAINS_URL = /https?:\/\/|www\./i;
+
+/** Words the public boards use as tags that carry no signal about what a role needs. */
+const NON_SKILL_TAGS = new Set([
+    "chat", "other", "various", "misc", "general", "etc",
+    "remote", "hybrid", "onsite", "full time", "part time", "contract",
+    "english", "team", "work", "job", "role",
+]);
+
+/**
+ * Requirement lists arrive from several sources — LLM enrichment, provider tags, and free text —
+ * and only some of them describe a skill. A sentence or a URL that reaches this list becomes a
+ * roadmap stage telling the user to "build https://… foundations", so it is filtered here rather
+ * than at each call site.
+ */
+export const isUsableSkill = (raw: string): boolean => {
+    const skill = raw.trim();
+    if (skill.length < MIN_SKILL_LENGTH || skill.length > MAX_SKILL_LENGTH) return false;
+    if (CONTAINS_URL.test(skill)) return false;
+    if (PLACEHOLDER_REQUIREMENT.test(skill)) return false;
+    if (skill.split(/\s+/).length > MAX_SKILL_WORDS) return false;
+    if (NON_SKILL_TAGS.has(skill.toLowerCase())) return false;
+    return /[a-z]/i.test(skill);
+};

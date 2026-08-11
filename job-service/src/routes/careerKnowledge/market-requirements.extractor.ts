@@ -1,3 +1,5 @@
+import { isUsableSkill } from "./career-knowledge.utils";
+
 const RESPONSIBILITY_KEYWORDS = [
     "lead",
     "own",
@@ -143,7 +145,7 @@ export const aggregateMarketRequirements = (
     const skillCounts = new Map<string, number>();
     for (const skill of allSkills) {
         const key = skill.trim();
-        if (!key) continue;
+        if (!key || !isUsableSkill(key)) continue;
         skillCounts.set(key, (skillCounts.get(key) ?? 0) + 1);
     }
     const commonSkills = [...skillCounts.entries()]

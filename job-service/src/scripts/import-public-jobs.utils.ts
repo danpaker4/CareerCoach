@@ -1,3 +1,4 @@
+import { isUsableSkill } from "../routes/careerKnowledge/career-knowledge.utils";
 import type { NormalizedPublicJob, PublicJobSource } from "./import-public-jobs.types";
 
 const SENIORITY_PATTERNS: ReadonlyArray<{ readonly seniority: string; readonly pattern: RegExp }> = [
@@ -57,7 +58,7 @@ export const requirementsFromTags = (tags: readonly unknown[] | undefined): stri
     const cleaned = tags
         .filter((tag): tag is string => typeof tag === "string")
         .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0 && tag.length <= 100)
+        .filter(isUsableSkill)
         .slice(0, MAX_REQUIREMENTS);
     return cleaned.length > 0 ? cleaned : undefined;
 };

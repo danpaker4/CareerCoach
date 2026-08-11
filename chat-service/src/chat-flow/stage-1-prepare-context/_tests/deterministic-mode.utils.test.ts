@@ -56,11 +56,37 @@ describe("deterministic mode detection", () => {
         );
     });
 
+    it("generalises past the phrasings the evaluation fixtures happen to use", () => {
+        for (const message of [
+            "can you get me openings for a data engineer",
+            "I'd like a devops position",
+            "list the current openings for security analyst",
+        ]) {
+            assert.equal(
+                detectModeDeterministically(message)?.mode,
+                CONVERSATION_MODE.NEAR_TERM,
+                `expected NEAR_TERM for "${message}"`
+            );
+        }
+        for (const message of [
+            "one day I want to be a principal architect",
+            "I aspire to become a head of data",
+        ]) {
+            assert.equal(
+                detectModeDeterministically(message)?.mode,
+                CONVERSATION_MODE.DREAMJOB,
+                `expected DREAMJOB for "${message}"`
+            );
+        }
+    });
+
     it("leaves an ambiguous message to the model", () => {
         for (const message of [
             "I feel stuck in my career",
             "what should I learn next?",
             "i need to change jobs",
+            "what certifications matter for cloud work?",
+            "is my CV any good?",
             "hello",
             "",
         ]) {

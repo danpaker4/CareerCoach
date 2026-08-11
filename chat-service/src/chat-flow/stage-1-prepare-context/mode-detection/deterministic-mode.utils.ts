@@ -16,7 +16,7 @@ const NEAR_TERM_TRAILING_TARGET: readonly RegExp[] = [
 /** The role is named before the noun: "senior product manager roles please". */
 const NEAR_TERM_LEADING_TARGET: readonly RegExp[] = [
     /\b(?:find|show|get|send)\s+me\s+(?:some\s+)?(.+?)\s+(?:jobs?|roles?|positions?|openings?)\b/i,
-    /\bi\s+(?:want|need)\s+(?:a|an)\s+(.+?)\s+(?:job|role|position)\b/i,
+    /\bi(?:'d| would)?\s+(?:want|need|like)\s+(?:a|an)\s+(.+?)\s+(?:job|role|position)\b/i,
     /\b(?:looking|searching)\s+for\s+(?:a|an)?\s*(.+?)\s+(?:job|role|position)\b/i,
     /^(.+?)\s+(?:jobs?|roles?|positions?)\s+(?:please|now)\b/i,
 ];
