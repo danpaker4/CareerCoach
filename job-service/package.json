@@ -11,6 +11,8 @@
         "test:run": "vitest run",
         "backfill:job-embeddings": "tsx src/scripts/backfill-job-embeddings.ts",
         "copy:mongodb-data": "tsx src/scripts/copy-mongodb-data.ts",
+        "export:job-seed": "tsx src/scripts/export-job-seed.ts",
+        "import:job-seed": "node dist/scripts/import-job-seed.js",
         "verify:job-vector-search": "tsx src/scripts/verify-job-vector-search.ts"
     },
     "keywords": [],
