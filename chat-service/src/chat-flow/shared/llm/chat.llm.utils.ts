@@ -5,6 +5,7 @@ import type {
 } from "../../api/shared/chat.types";
 import { CONVERSATION_MODE } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import type { ConversationMode } from "../../stage-1-prepare-context/mode-detection/conversation-mode.types";
+import { DEFAULT_MODE_DETECTION_RESULT } from "../../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 import { parseConversationModeDetectionResult } from "../../stage-1-prepare-context/mode-detection/conversation-mode.utils";
 import { parseJsonObjectFromLlm } from "./json-response.utils";
 
@@ -37,6 +38,14 @@ const parseCompactSearchFilters = (value: Record<string, unknown>): JobSearchReq
         keywords: readStringArray("keywords"),
     };
 };
+
+/**
+ * A decision that carries a usable reply is worth keeping even when the model omitted the mode.
+ * Discarding the whole object would also discard the reply and the extracted search filters.
+ */
+const hasUsableDecision = (obj: Record<string, unknown>): boolean =>
+    (typeof obj.r === "string" && obj.r.trim().length > 0)
+    || (typeof obj.reply === "string" && obj.reply.trim().length > 0);
 
 const parseCompactMode = (value: unknown): ConversationMode | null => {
     if (typeof value !== "string") {
@@ -113,7 +122,8 @@ export const parseChatTurnDecisionFromJson = (rawText: string): ChatTurnDecision
         };
     }
 
-    const modeDetection = parseConversationModeDetectionResult(JSON.stringify(obj));
+    const modeDetection = parseConversationModeDetectionResult(JSON.stringify(obj))
+        ?? (hasUsableDecision(obj) ? DEFAULT_MODE_DETECTION_RESULT : null);
     if (!modeDetection) {
         throw new Error("LLM returned an invalid conversation mode");
     }

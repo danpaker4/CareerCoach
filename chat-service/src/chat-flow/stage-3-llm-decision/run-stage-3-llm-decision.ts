@@ -8,6 +8,7 @@ import { NO_JOBS_REPLY } from "../stage-6-present-jobs/present-jobs.consts";
 import { resolveStageFlowForSendMessage } from "../stage-4-guided-stages/resolve-stage-flow";
 import { buildWantedJobInputFromSearch } from "../stage-2-shortcuts/wanted-jobs/wanted-job.service";
 import { buildWishlistSavePrompt } from "../stage-2-shortcuts/wanted-jobs/chat.wishlist.utils";
+import { CONVERSATION_MODE } from "../stage-1-prepare-context/mode-detection/conversation-mode.consts";
 
 const finalizeSendMessageFromLlmDecision = async (params: {
     deps: ChatFlowDeps;
@@ -17,7 +18,11 @@ const finalizeSendMessageFromLlmDecision = async (params: {
 }): Promise<ChatMessageResponse> => {
     const { deps, ctx, conversationForDecision, llmDecision } = params;
     const effectiveSearchFilters = llmDecision.searchFilters;
-    const shouldSearchJobs = llmDecision.shouldSearchJobs;
+    // Guided mode is still working out what the user wants, so it answers rather than recommends.
+    // The model sets search=true readily, and presenting jobs mid-discovery pre-empts the question
+    // the stage was about to ask.
+    const shouldSearchJobs = llmDecision.shouldSearchJobs
+        && ctx.modeDetection.mode !== CONVERSATION_MODE.GUIDED;
     console.info(
         `[CHAT][SEARCH] userId=${ctx.userId} trigger=LLM_OR_RULE shouldSearchJobs=${shouldSearchJobs} mode=${ctx.modeDetection.mode} filters=${JSON.stringify(effectiveSearchFilters)}`
     );

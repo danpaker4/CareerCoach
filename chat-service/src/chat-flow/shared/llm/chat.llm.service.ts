@@ -25,6 +25,7 @@ import {
 import type { DreamJobLlmDecision } from "../../stage-2-shortcuts/dream-job/chat.dream-job.types";
 import { buildRecommendationPrompt } from "./chat.recommendation.prompt.utils";
 import { buildTurnDecisionPrompt } from "./chat.turn.prompt.utils";
+import { applyDeterministicMode } from "./chat.decision-mode.utils";
 import type { ChatLlmObserver } from "./chat.llm.types";
 import { getCurrentStage } from "../../../routes/conversation/conversation.stage.utils";
 import { recordChatLlmParseEvent } from "./chat.llm.observability.utils";
@@ -61,7 +62,7 @@ export const decideNextStep = async (
             userId: conversation.userId,
             sessionId: conversation._id?.toHexString(),
         });
-        return parsed;
+        return applyDeterministicMode(parsed, ctx.normalizedMessage, conversation);
     } catch (error: unknown) {
         recordChatLlmParseEvent(deps.llmObserver, {
             operation: "chat.decision",
