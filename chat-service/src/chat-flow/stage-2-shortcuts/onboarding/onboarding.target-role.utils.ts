@@ -99,6 +99,14 @@ export const buildDifferentRoleDiscoveryReply = (modelReply: string): string => 
     return ONBOARDING_DIFFERENT_ROLE_REPLY;
 };
 
+export const buildTargetRoleFallbackReply = (previousAssistantMessage: string | undefined): string => {
+    const previousQuestion = previousAssistantMessage?.trim().toLowerCase();
+    if (previousQuestion === ONBOARDING_DIFFERENT_ROLE_REPLY.toLowerCase()) {
+        return "Could you name a specific job title, or would you like me to suggest a few roles?";
+    }
+    return ONBOARDING_DIFFERENT_ROLE_REPLY;
+};
+
 export const formatTargetRoleOptionsReply = (summary: string, roles: readonly TargetRoleOption[]): string => {
     const roleLines = roles.map((role, index) => `${index + 1}. ${role.title} — ${role.reason}`);
     return [
@@ -258,7 +266,7 @@ export const continueNearTermTargetSelection = (
                 clarificationCount: decision.targetDiscoverySubject
                     ? (targetFlow.clarificationCount ?? 0) + 1
                     : targetFlow.clarificationCount,
-                suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles,
+                suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles ?? [],
                 discoveryFacts,
                 coveredSubjects,
             },

@@ -1,17 +1,19 @@
 import { recordChatLlmParseEvent } from "../../shared/llm/chat.llm.observability.utils";
 import type { ChatLlmObservedOperation } from "../../shared/llm/chat.llm.types";
-import { ONBOARDING_DIFFERENT_ROLE_REPLY } from "./onboarding.types";
 import { MAX_OPEN_TARGET_ROLE_QUESTIONS } from "./onboarding.target-role.consts";
 import {
     parseTargetRoleDecision,
     parseTargetRoleGroundingDecision,
+    parseTargetRoleOptionsReviewDecision,
 } from "./onboarding.target-role.llm.utils";
 import {
     buildTargetRoleCorrectionPrompt,
     buildTargetRoleDecisionPrompt,
+    buildTargetRoleGroundingCorrectionPrompt,
     buildTargetRoleGroundingPrompt,
     buildTargetRoleOptionsReviewPrompt,
 } from "./onboarding.target-role.prompt.utils";
+import { buildTargetRoleFallbackReply } from "./onboarding.target-role.utils";
 import type {
     ResolveTargetRoleDecisionParams,
     TargetRoleDecision,
@@ -57,6 +59,10 @@ export const resolveTargetRoleDecision = async (
     params: ResolveTargetRoleDecisionParams,
 ): Promise<TargetRoleDecision> => {
     const targetState = params.conversation.onboardingFlow?.nearTermTarget;
+    const previousAssistantMessage = [...params.conversation.messages]
+        .reverse()
+        .find((message) => message.role === "assistant")?.content;
+    const fallbackQuestion = buildTargetRoleFallbackReply(previousAssistantMessage);
     const prompt = buildTargetRoleDecisionPrompt(
         params.conversation,
         params.latestUserMessage,
@@ -65,7 +71,7 @@ export const resolveTargetRoleDecision = async (
     const clarificationCount = targetState?.clarificationCount ?? 0;
     const mustOfferChoices = clarificationCount >= MAX_OPEN_TARGET_ROLE_QUESTIONS;
     const parseDecision = (rawText: string): TargetRoleDecision | null => {
-        const decision = parseTargetRoleDecision(rawText);
+        const decision = parseTargetRoleDecision(rawText, params.latestUserMessage);
         return mustOfferChoices && decision?.status === "NEEDS_CLARIFICATION" ? null : decision;
     };
     const first = await completeJsonAttempt(
@@ -86,7 +92,7 @@ export const resolveTargetRoleDecision = async (
     if (!initialResolved || initialResolved.status === "NEEDS_CLARIFICATION") {
         return initialResolved ?? {
             status: "NEEDS_CLARIFICATION",
-            question: ONBOARDING_DIFFERENT_ROLE_REPLY,
+            question: fallbackQuestion,
             subject: "target_direction",
             discoveryFacts: {},
         };
@@ -94,19 +100,25 @@ export const resolveTargetRoleDecision = async (
     const optionsReview = initialResolved.status === "ROLE_OPTIONS"
         ? await completeJsonAttempt(
             params,
-            buildTargetRoleOptionsReviewPrompt(prompt, JSON.stringify(initialResolved)),
+            buildTargetRoleOptionsReviewPrompt(
+                params.conversation,
+                params.latestUserMessage,
+                JSON.stringify(initialResolved),
+            ),
             "chat.onboarding.target_role.review",
-            (rawText): TargetRoleDecision | null => {
-                const decision = parseTargetRoleDecision(rawText);
-                return decision?.status === "READY" || decision?.status === "ROLE_OPTIONS" ? decision : null;
-            },
+            (rawText) => parseTargetRoleOptionsReviewDecision(rawText, params.latestUserMessage),
         )
         : null;
-    const resolved = optionsReview?.decision ?? initialResolved;
+    const reviewedReady = optionsReview?.decision?.verdict === "READY"
+        ? {
+            status: "READY" as const,
+            targetRole: optionsReview.decision.targetRole,
+            discoveryFacts: initialResolved.discoveryFacts,
+        }
+        : null;
+    const resolved = reviewedReady ?? initialResolved;
+    const optionsFallback = initialResolved.status === "ROLE_OPTIONS" ? initialResolved : null;
     if (resolved.status === "ROLE_OPTIONS") {
-        return resolved;
-    }
-    if (resolved.status === "NEEDS_CLARIFICATION") {
         return resolved;
     }
 
@@ -115,9 +127,6 @@ export const resolveTargetRoleDecision = async (
         params.latestUserMessage,
         resolved.targetRole,
     );
-    const previousAssistantMessage = [...params.conversation.messages]
-        .reverse()
-        .find((message) => message.role === "assistant")?.content;
     const parseGrounding = (rawText: string): TargetRoleGroundingDecision | null =>
         parseTargetRoleGroundingDecision(
             rawText,
@@ -142,6 +151,9 @@ export const resolveTargetRoleDecision = async (
         return resolved;
     }
     if (grounding.decision?.kind === "NEEDS_CLARIFICATION") {
+        if (optionsFallback) {
+            return optionsFallback;
+        }
         return {
             status: "NEEDS_CLARIFICATION",
             question: grounding.decision.question,
@@ -152,7 +164,7 @@ export const resolveTargetRoleDecision = async (
 
     const groundingRetry = await completeJsonAttempt(
         params,
-        buildTargetRoleCorrectionPrompt(groundingPrompt, grounding.rawText),
+        buildTargetRoleGroundingCorrectionPrompt(groundingPrompt, grounding.rawText),
         "chat.onboarding.target_role.verify.retry",
         parseGrounding,
     );
@@ -166,6 +178,9 @@ export const resolveTargetRoleDecision = async (
         return resolved;
     }
     if (groundingRetry.decision?.kind === "NEEDS_CLARIFICATION") {
+        if (optionsFallback) {
+            return optionsFallback;
+        }
         return {
             status: "NEEDS_CLARIFICATION",
             question: groundingRetry.decision.question,
@@ -173,9 +188,12 @@ export const resolveTargetRoleDecision = async (
             discoveryFacts: resolved.discoveryFacts,
         };
     }
+    if (optionsFallback) {
+        return optionsFallback;
+    }
     return {
         status: "NEEDS_CLARIFICATION",
-        question: ONBOARDING_DIFFERENT_ROLE_REPLY,
+        question: fallbackQuestion,
         subject: "target_direction",
         discoveryFacts: resolved.discoveryFacts,
     };

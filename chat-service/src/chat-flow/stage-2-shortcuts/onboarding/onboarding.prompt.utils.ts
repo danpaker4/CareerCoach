@@ -34,7 +34,7 @@ const buildBackgroundPrompt = (
 ): string => {
     const chatFacts = extractChatStatedBackgroundFacts(latestUserMessage);
     const chatFactsLine = formatChatStatedFactsForPrompt(chatFacts);
-    const hasChatFacts = chatFacts.role !== undefined || chatFacts.yearsOfExperience !== undefined;
+    const hasChatFacts = chatFacts.name !== undefined || chatFacts.role !== undefined || chatFacts.yearsOfExperience !== undefined;
     const accountSection = hasChatFacts || userAccountContext.trim().length === 0
         ? ""
         : `\nSecondary account context (use only explicit facts; never mention missing sources):\n${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}\n`;
@@ -50,7 +50,7 @@ Rules:${COMMON_RULES}
 - A request for a new job or desired role is career intent, not evidence of the user's current or past professional role.
 - Understand role descriptions from the latest message yourself. Do not treat phrases such as looking for, seeking, or wanting a role as current background.
 - When FOUND or NONE, respond with one short summary followed by: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
-- CHAT_STATED_FACTS are authoritative in meaning. Do not replace or contradict the role and years, but correct spelling and rewrite them as natural professional language instead of copying the user's wording.
+- CHAT_STATED_FACTS are authoritative in meaning. Do not replace or contradict the name, role, or years, but correct spelling and rewrite them as natural professional language instead of copying the user's wording.
 - Do not invent history or include account/CV details in the response when CHAT_STATED_FACTS are present.
 - Always set mode=null. Direction routing is validated separately from the user's explicit wording.
 

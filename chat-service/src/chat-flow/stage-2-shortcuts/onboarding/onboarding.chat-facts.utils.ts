@@ -3,16 +3,69 @@ import { ONBOARDING_DIRECTION_REASK_REPLY } from "./onboarding.types";
 import { resolveNormalizedChatRole } from "./onboarding.role-normalization.utils";
 
 export type ChatStatedBackgroundFacts = {
+    readonly name?: string;
     readonly role?: string;
     readonly yearsOfExperience?: number;
 };
 
+const NAME_PATTERN = /\b(?:my\s+name\s+is|call\s+me)\s+([a-z][a-z'’-]*(?:\s+[a-z][a-z'’-]*){0,3})/i;
+const ROLE_PATTERNS: readonly RegExp[] = [
+    /\b(?:i\s+am|i['’]?m|im)\s+(?:an?\s+)?([a-z][a-z0-9+#./&\-\s]{0,80})/i,
+    /\b(?:i\s+work(?:ed)?\s+(?:as|in)|i(?:'ve|\s+have)\s+been\s+(?:working\s+)?as)\s+(?:an?\s+)?([a-z][a-z0-9+#./&\-\s]{0,80})/i,
+    /\b\d{1,2}\s+years?\s+(?:as|in)\s+(?:an?\s+)?([a-z][a-z0-9+#./&\-\s]{0,80})/i,
+];
 const YEAR_PATTERNS: readonly RegExp[] = [
     /\bin\s+the\s+last\s+(\d{1,2})\s+years?\b/i,
     /\bfor\s+(?:the\s+)?(?:last\s+)?(\d{1,2})\s+years?\b/i,
     /\b(\d{1,2})\s+years?\s+(?:of\s+)?(?:experience|exp)\b/i,
     /\b(\d{1,2})\s+years?\s+(?:as|in|doing)\b/i,
 ];
+
+const CHAT_ROLE_INTENT_PATTERN = /^(?:looking|searching|seeking|wanting|hoping|trying|interested|applying|planning|going|not)\b/i;
+const CHAT_ROLE_TRAILING_INTENT_PATTERN = /\s+(?:and\s+)?(?:i\s+am\s+)?(?:looking|searching|seeking|wanting|hoping|trying|interested|applying|planning)\b.*$/i;
+const CHAT_ROLE_TRAILING_TENURE_PATTERN = /\s+(?:for|since)\s+\d{1,2}\s+years?.*$/i;
+
+const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, " ").trim();
+
+const extractClaimedName = (message: string): string | undefined => {
+    const candidate = NAME_PATTERN.exec(message)?.[1];
+    if (!candidate) {
+        return undefined;
+    }
+
+    const name = normalizeWhitespace(candidate)
+        .replace(/\s+(?:and|but|i|in|for|with|as|at)\b.*$/i, "")
+        .trim();
+    return name.length > 0 ? name : undefined;
+};
+
+const normalizeClaimedRole = (value: string): string | undefined => {
+    const role = normalizeWhitespace(value)
+        .split(/[,.!?;]/, 1)[0]
+        .replace(CHAT_ROLE_TRAILING_INTENT_PATTERN, "")
+        .replace(CHAT_ROLE_TRAILING_TENURE_PATTERN, "")
+        .trim();
+
+    if (role.length === 0 || CHAT_ROLE_INTENT_PATTERN.test(role)) {
+        return undefined;
+    }
+    return role;
+};
+
+export const extractClaimedRole = (message: string): string | undefined => {
+    for (const pattern of ROLE_PATTERNS) {
+        const candidate = pattern.exec(message)?.[1];
+        if (!candidate) {
+            continue;
+        }
+
+        const role = normalizeClaimedRole(candidate);
+        if (role) {
+            return role;
+        }
+    }
+    return undefined;
+};
 
 export const extractClaimedYearsOfExperience = (message: string): number | undefined => {
     const trimmed = message.trim();
@@ -31,14 +84,21 @@ export const extractClaimedYearsOfExperience = (message: string): number | undef
 };
 
 export const extractChatStatedBackgroundFacts = (message: string): ChatStatedBackgroundFacts => {
+    const name = extractClaimedName(message);
+    const role = extractClaimedRole(message);
     const yearsOfExperience = extractClaimedYearsOfExperience(message);
     return {
+        ...(name ? { name } : {}),
+        ...(role ? { role } : {}),
         ...(yearsOfExperience !== undefined ? { yearsOfExperience } : {}),
     };
 };
 
 export const formatChatStatedFactsForPrompt = (facts: ChatStatedBackgroundFacts): string => {
     const lines: string[] = [];
+    if (facts.name) {
+        lines.push(`name=${facts.name}`);
+    }
     if (facts.role) {
         lines.push(`role=${facts.role}`);
     }
@@ -52,6 +112,15 @@ export const formatChatStatedFactsForPrompt = (facts: ChatStatedBackgroundFacts)
 };
 
 export const buildChatStatedBackgroundReply = (facts: ChatStatedBackgroundFacts): string | null => {
+    if (facts.name && facts.role && facts.yearsOfExperience !== undefined) {
+        return `Thanks, ${facts.name}. You have about ${facts.yearsOfExperience} years of experience as a ${facts.role}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+    }
+    if (facts.name && facts.role) {
+        return `Thanks, ${facts.name}. You are a ${facts.role}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+    }
+    if (facts.name && facts.yearsOfExperience !== undefined) {
+        return `Thanks, ${facts.name}. You have about ${facts.yearsOfExperience} years of experience. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+    }
     if (facts.role && facts.yearsOfExperience !== undefined) {
         return `Nice — you have about ${facts.yearsOfExperience} years of experience as a ${facts.role}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
     }

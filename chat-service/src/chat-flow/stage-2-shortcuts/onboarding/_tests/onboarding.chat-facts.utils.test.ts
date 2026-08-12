@@ -9,13 +9,14 @@ import {
 } from "../onboarding.chat-facts.utils";
 
 describe("onboarding chat facts", () => {
-    it("leaves role understanding to the model while extracting objective tenure", () => {
-        const message = "hi my name is gal kosover and in the last 5 years im qa";
+    it("extracts a name, role, and tenure stated in chat", () => {
+        const message = "hi my name is gal kosover and in the last 5 years im software developer";
         const facts = extractChatStatedBackgroundFacts(message);
 
-        assert.equal(facts.role, undefined);
+        assert.equal(facts.name, "gal kosover");
+        assert.equal(facts.role, "software developer");
         assert.equal(facts.yearsOfExperience, 5);
-        assert.equal(formatChatStatedFactsForPrompt(facts), "yearsOfExperience=5");
+        assert.equal(formatChatStatedFactsForPrompt(facts), "name=gal kosover, role=software developer, yearsOfExperience=5");
     });
 
     it("does not reinterpret a job-search request as the user's current profession", () => {

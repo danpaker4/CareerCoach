@@ -77,7 +77,7 @@ describe("buildOnboardingPrompt", () => {
             defaultOnboardingFlow(),
         );
 
-        assert.match(prompt, /CHAT_STATED_FACTS: yearsOfExperience=5/);
+        assert.match(prompt, /CHAT_STATED_FACTS: name=gal kosover, role=qa, yearsOfExperience=5/);
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
         assert.match(prompt, /correct spelling.*natural professional language/i);
         assert.match(prompt, /do not replace or contradict/i);
@@ -114,7 +114,7 @@ describe("buildOnboardingPrompt", () => {
 
         assert.doesNotMatch(prompt, /CV title|CV contents/);
         assert.doesNotMatch(prompt, /nearTermTarget\.step|discovering_target/);
-        assert.match(prompt, /CHAT_STATED_FACTS: yearsOfExperience=5/);
+        assert.match(prompt, /CHAT_STATED_FACTS: name=gal, role=software developer, yearsOfExperience=5/);
         assert.match(prompt, /Understand role descriptions.*yourself/i);
         assert.ok(prompt.length < 3_000);
     });
@@ -274,8 +274,34 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.background?.summary, "software developer for about 5 years at IDF");
         assert.equal(
             step.reply,
-            "Nice — you have about 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+            "Thanks, gal kosover. You have about 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
         );
+    });
+
+    it("uses a chat-stated role and tenure instead of conflicting CV-derived details", () => {
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            {
+                response: "Nice — you have about 2 years of experience as a QA Automation & Performance Engineer.",
+                background: {
+                    status: "FOUND",
+                    role: "QA Automation & Performance Engineer",
+                    yearsOfExperience: 2,
+                    technologies: ["Selenium"],
+                    summary: "QA Automation & Performance Engineer for about 2 years",
+                },
+                mode: null,
+                advance: true,
+            },
+            "my name is gal kosover and in the last 5 years im software developer",
+        );
+
+        assert.equal(step.onboardingFlow.background?.role, "software developer");
+        assert.equal(step.onboardingFlow.background?.yearsOfExperience, 5);
+        assert.equal(step.onboardingFlow.background?.summary, "software developer for about 5 years");
+        assert.match(step.reply, /gal kosover/i);
+        assert.match(step.reply, /software developer/i);
+        assert.doesNotMatch(step.reply, /QA Automation|2 years/i);
     });
 
     it("uses a normalized acknowledgement instead of echoing the model reply", () => {

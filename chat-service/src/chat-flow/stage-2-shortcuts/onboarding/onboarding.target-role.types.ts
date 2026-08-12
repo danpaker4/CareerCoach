@@ -17,6 +17,10 @@ export type TargetRoleDecision = TargetRoleDecisionBase & (
     | { readonly status: "ROLE_OPTIONS"; readonly summary: string; readonly roles: readonly TargetRoleOption[] }
 );
 
+export type TargetRoleOptionsReviewDecision =
+    | { readonly verdict: "KEEP_OPTIONS" }
+    | { readonly verdict: "READY"; readonly targetRole: string; readonly evidenceQuote: string };
+
 export type TargetRoleGroundingDecision =
     | { readonly kind: "GROUNDED_ROLE"; readonly evidenceQuote: string; readonly normalizedTargetRole: string }
     | { readonly kind: "GROUNDED_SUGGESTION"; readonly evidenceQuote: string }

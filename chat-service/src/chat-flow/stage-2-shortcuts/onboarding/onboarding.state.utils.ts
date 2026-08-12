@@ -105,13 +105,14 @@ export const applyOnboardingDecision = (
                 };
             }
             const normalizedFacts = {
+                ...(chatFacts.name ? { name: chatFacts.name } : {}),
                 ...(withBackground.background?.role ? { role: withBackground.background.role } : {}),
                 ...(withBackground.background?.yearsOfExperience !== null
                     && withBackground.background?.yearsOfExperience !== undefined
                     ? { yearsOfExperience: withBackground.background.yearsOfExperience }
                     : {}),
             };
-            const hasChatFacts = chatFacts.role !== undefined || chatFacts.yearsOfExperience !== undefined;
+            const hasChatFacts = chatFacts.name !== undefined || chatFacts.role !== undefined || chatFacts.yearsOfExperience !== undefined;
             const fallbackReply = hasChatFacts ? buildChatStatedBackgroundReply(normalizedFacts) : null;
             return {
                 reply: fallbackReply ?? decision.response,
