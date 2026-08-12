@@ -78,6 +78,21 @@ Preserve a correct intent status and repair only its missing or invalid fields. 
 Previous invalid output: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
 `;
 
+export const buildTargetRoleOptionsReviewPrompt = (originalPrompt: string, priorOutput: string): string => `
+${originalPrompt}
+
+Review the prior role decision specifically for a false ROLE_OPTIONS result.
+The latest user message is authoritative:
+- Return READY if the user explicitly names or proposes a concrete searchable role or established job domain, including when phrased informally, as a question, or as an alternative.
+- For READY, use the shortest searchable role or domain phrase supported directly by the latest user message. Correct obvious spelling mistakes, but do not expand it into a more specific title the user did not say.
+- A broad activity, responsibility, or interest without a concrete role or established job domain is not READY.
+- Keep ROLE_OPTIONS only when the latest message does not establish a concrete search target.
+- Do not replace an explicitly proposed target with adjacent recommendations.
+
+Return only READY or ROLE_OPTIONS using the JSON shapes from the original instructions.
+Prior decision: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
+`;
+
 export const buildTargetRoleGroundingPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
@@ -86,25 +101,32 @@ export const buildTargetRoleGroundingPrompt = (
 You are the final grounding check before a career-coaching app searches for jobs.
 Another model proposed this candidate phrase: ${candidateRole}
 
-Classify whether it is both a concrete searchable occupational title and explicitly chosen by the user.
+Classify whether it is a concrete searchable role or established job domain explicitly chosen by the user.
 Return ONLY one compact JSON object:
-{"kind":"GROUNDED_ROLE","evidenceQuote":"exact words from the latest user message that name ${candidateRole}"}
+{"kind":"GROUNDED_ROLE","evidenceQuote":"exact words from the latest user message that name the target","normalizedTargetRole":"canonical searchable role or job domain"}
 {"kind":"GROUNDED_SUGGESTION","evidenceQuote":"exact words from the latest user message that select ${candidateRole} from prior suggestions"}
+{"kind":"GROUNDED_CONFIRMATION","evidenceQuote":"exact words from the latest user message that confirm ${candidateRole}","normalizedTargetRole":"canonical searchable role or job domain"}
 {"kind":"NEEDS_CLARIFICATION","question":"one concise question that identifies or confirms a concrete target role"}
 
 Rules:
-- GROUNDED_ROLE requires both conditions: the candidate is a real searchable role/title, and the latest user message explicitly names it.
-- The evidenceQuote must be copied verbatim from the latest user message and must contain the candidate role itself.
+- GROUNDED_ROLE requires both conditions: the candidate is a real searchable role or established job domain, and the latest user message explicitly names it.
+- The evidenceQuote must be copied verbatim from the latest user message, including any typo or informal spelling.
+- normalizedTargetRole must correct obvious spelling mistakes and capitalization so it is suitable for job search, while preserving the user's intended role or domain.
+- Do not add a specialization, seniority, or adjacent title that the user did not choose.
 - GROUNDED_SUGGESTION requires the candidate to appear in previouslySuggestedRoles and the latest message to clearly select that suggestion by name, position, or unambiguous reference.
 - When the latest user message selects by position or reference and does not contain the candidate title, use GROUNDED_SUGGESTION, never GROUNDED_ROLE.
+- GROUNDED_CONFIRMATION requires the immediately previous assistant message to ask the user to confirm this candidate, and the latest user message to unambiguously confirm it.
+- A generic acknowledgement is not confirmation unless it directly answers that immediately preceding candidate-role confirmation question.
 - If either condition is missing, return NEEDS_CLARIFICATION.
-- A role is ready when it is concrete enough to use as a job-search query. If the user explicitly says "product manager", "engineering manager", or another searchable title, return GROUNDED_ROLE immediately.
+- A target is ready when it is concrete enough to use as a job-search query. Explicitly named job domains are valid without inventing a more specific title.
 - Do not demand a subtype, specialization, seniority, industry, or responsibilities after the user has explicitly named a searchable role.
 - Preferences, skills, responsibilities, and activities do not establish a role by themselves.
 - Candidate "product manager" with latest message "leading teams" is NEEDS_CLARIFICATION because the title was inferred.
 - Candidate "leading teams" with latest message "leading teams" is also NEEDS_CLARIFICATION because it is an activity, not a job title.
 - Generic labels such as "leading role", "important role", or "management position" without a function or domain are NEEDS_CLARIFICATION.
-- Candidate "product manager" with latest message "product manager" is GROUNDED_ROLE with evidenceQuote "product manager".
+- Candidate "Data Analystt" with latest message "Data Analystt" is GROUNDED_ROLE with evidenceQuote "Data Analystt" and normalizedTargetRole "Data Analyst".
+- Candidate "product manager" with latest message "product manager" is GROUNDED_ROLE with evidenceQuote "product manager" and normalizedTargetRole "Product Manager".
+- If the assistant just asked "So, you're looking for a data analyst role?" and the user replies "yes yes", candidate "Data Analyst" is GROUNDED_CONFIRMATION with evidenceQuote "yes yes" and normalizedTargetRole "Data Analyst".
 - If Product Manager was the third suggested role and the latest message is "the third one", return GROUNDED_SUGGESTION with evidenceQuote "the third one".
 - When clarification is needed, generate one useful question that distinguishes the plausible directions raised by the user's words.
 - Do not ask about job timing or whether the user wants the same versus a different role; those are already resolved.
@@ -113,5 +135,6 @@ Rules:
 Relevant conversation:
 ${buildDiscoveryHistory(conversation, latestUserMessage)}
 Latest user message: ${latestUserMessage}
+Immediately previous assistant message: ${[...conversation.messages].reverse().find((message) => message.role === "assistant")?.content ?? "none"}
 Previously suggested roles: ${JSON.stringify(conversation.onboardingFlow?.nearTermTarget?.suggestedRoles ?? [])}
 `;

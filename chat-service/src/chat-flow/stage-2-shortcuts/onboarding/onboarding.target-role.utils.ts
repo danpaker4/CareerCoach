@@ -115,14 +115,6 @@ export const normalizeTargetRole = (value: string | null | undefined): string | 
     return trimmed;
 };
 
-export const matchSuggestedRoleTitle = (
-    latestUserMessage: string,
-    suggestedRoles: readonly string[],
-): string | null => {
-    const normalizedMessage = latestUserMessage.trim().toLocaleLowerCase();
-    return suggestedRoles.find((role) => role.trim().toLocaleLowerCase() === normalizedMessage) ?? null;
-};
-
 const completeNearTermTarget = (
     current: OnboardingFlow,
     targetRole: string,

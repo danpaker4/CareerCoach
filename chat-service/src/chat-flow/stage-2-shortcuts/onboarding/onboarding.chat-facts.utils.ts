@@ -1,5 +1,4 @@
 import type { OnboardingBackground } from "../../../routes/conversation/conversation.types";
-import { extractClaimedCurrentRole } from "../role-conflict/role-conflict.utils";
 import { ONBOARDING_DIRECTION_REASK_REPLY } from "./onboarding.types";
 
 export type ChatStatedBackgroundFacts = {
@@ -31,10 +30,8 @@ export const extractClaimedYearsOfExperience = (message: string): number | undef
 };
 
 export const extractChatStatedBackgroundFacts = (message: string): ChatStatedBackgroundFacts => {
-    const role = extractClaimedCurrentRole(message);
     const yearsOfExperience = extractClaimedYearsOfExperience(message);
     return {
-        ...(role ? { role } : {}),
         ...(yearsOfExperience !== undefined ? { yearsOfExperience } : {}),
     };
 };

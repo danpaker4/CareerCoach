@@ -10,8 +10,8 @@ import {
     buildTargetRoleCorrectionPrompt,
     buildTargetRoleDecisionPrompt,
     buildTargetRoleGroundingPrompt,
+    buildTargetRoleOptionsReviewPrompt,
 } from "./onboarding.target-role.prompt.utils";
-import { matchSuggestedRoleTitle } from "./onboarding.target-role.utils";
 import type {
     ResolveTargetRoleDecisionParams,
     TargetRoleDecision,
@@ -57,14 +57,6 @@ export const resolveTargetRoleDecision = async (
     params: ResolveTargetRoleDecisionParams,
 ): Promise<TargetRoleDecision> => {
     const targetState = params.conversation.onboardingFlow?.nearTermTarget;
-    const selectedSuggestedRole = matchSuggestedRoleTitle(
-        params.latestUserMessage,
-        targetState?.suggestedRoles ?? [],
-    );
-    if (selectedSuggestedRole) {
-        return { status: "READY", targetRole: selectedSuggestedRole, discoveryFacts: {} };
-    }
-
     const prompt = buildTargetRoleDecisionPrompt(
         params.conversation,
         params.latestUserMessage,
@@ -90,16 +82,31 @@ export const resolveTargetRoleDecision = async (
             "chat.onboarding.target_role.retry",
             parseDecision,
         );
-    const resolved = retry.decision;
-    if (!resolved || resolved.status === "NEEDS_CLARIFICATION") {
-        return resolved ?? {
+    const initialResolved = retry.decision;
+    if (!initialResolved || initialResolved.status === "NEEDS_CLARIFICATION") {
+        return initialResolved ?? {
             status: "NEEDS_CLARIFICATION",
             question: ONBOARDING_DIFFERENT_ROLE_REPLY,
             subject: "target_direction",
             discoveryFacts: {},
         };
     }
+    const optionsReview = initialResolved.status === "ROLE_OPTIONS"
+        ? await completeJsonAttempt(
+            params,
+            buildTargetRoleOptionsReviewPrompt(prompt, JSON.stringify(initialResolved)),
+            "chat.onboarding.target_role.review",
+            (rawText): TargetRoleDecision | null => {
+                const decision = parseTargetRoleDecision(rawText);
+                return decision?.status === "READY" || decision?.status === "ROLE_OPTIONS" ? decision : null;
+            },
+        )
+        : null;
+    const resolved = optionsReview?.decision ?? initialResolved;
     if (resolved.status === "ROLE_OPTIONS") {
+        return resolved;
+    }
+    if (resolved.status === "NEEDS_CLARIFICATION") {
         return resolved;
     }
 
@@ -108,12 +115,16 @@ export const resolveTargetRoleDecision = async (
         params.latestUserMessage,
         resolved.targetRole,
     );
+    const previousAssistantMessage = [...params.conversation.messages]
+        .reverse()
+        .find((message) => message.role === "assistant")?.content;
     const parseGrounding = (rawText: string): TargetRoleGroundingDecision | null =>
         parseTargetRoleGroundingDecision(
             rawText,
             resolved.targetRole,
             params.latestUserMessage,
             params.conversation.onboardingFlow?.nearTermTarget?.suggestedRoles,
+            previousAssistantMessage,
         );
     const grounding = await completeJsonAttempt(
         params,
@@ -121,7 +132,13 @@ export const resolveTargetRoleDecision = async (
         "chat.onboarding.target_role.verify",
         parseGrounding,
     );
-    if (grounding.decision?.kind === "GROUNDED_ROLE" || grounding.decision?.kind === "GROUNDED_SUGGESTION") {
+    if (grounding.decision?.kind === "GROUNDED_ROLE") {
+        return { ...resolved, targetRole: grounding.decision.normalizedTargetRole };
+    }
+    if (grounding.decision?.kind === "GROUNDED_CONFIRMATION") {
+        return { ...resolved, targetRole: grounding.decision.normalizedTargetRole };
+    }
+    if (grounding.decision?.kind === "GROUNDED_SUGGESTION") {
         return resolved;
     }
     if (grounding.decision?.kind === "NEEDS_CLARIFICATION") {
@@ -139,10 +156,13 @@ export const resolveTargetRoleDecision = async (
         "chat.onboarding.target_role.verify.retry",
         parseGrounding,
     );
-    if (
-        groundingRetry.decision?.kind === "GROUNDED_ROLE"
-        || groundingRetry.decision?.kind === "GROUNDED_SUGGESTION"
-    ) {
+    if (groundingRetry.decision?.kind === "GROUNDED_ROLE") {
+        return { ...resolved, targetRole: groundingRetry.decision.normalizedTargetRole };
+    }
+    if (groundingRetry.decision?.kind === "GROUNDED_CONFIRMATION") {
+        return { ...resolved, targetRole: groundingRetry.decision.normalizedTargetRole };
+    }
+    if (groundingRetry.decision?.kind === "GROUNDED_SUGGESTION") {
         return resolved;
     }
     if (groundingRetry.decision?.kind === "NEEDS_CLARIFICATION") {

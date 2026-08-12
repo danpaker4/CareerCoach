@@ -4,7 +4,7 @@ import { defaultOnboardingFlow } from "../../../../routes/conversation/conversat
 import { parseOnboardingLlmDecisionFromJson } from "../onboarding.llm.utils";
 import { applyOnboardingDecision } from "../onboarding.state.utils";
 import { resolveOnboardingDirectionMode } from "../onboarding.direction.utils";
-import { buildOnboardingPrompt } from "../onboarding.prompt.utils";
+import { buildBackgroundReviewPrompt, buildOnboardingPrompt } from "../onboarding.prompt.utils";
 import { ONBOARDING_DIRECTION_REASK_REPLY } from "../onboarding.types";
 import type { Conversation } from "../../../../routes/conversation/conversation.model";
 
@@ -77,7 +77,7 @@ describe("buildOnboardingPrompt", () => {
             defaultOnboardingFlow(),
         );
 
-        assert.match(prompt, /CHAT_STATED_FACTS: role=qa, yearsOfExperience=5/);
+        assert.match(prompt, /CHAT_STATED_FACTS: yearsOfExperience=5/);
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
         assert.match(prompt, /exact role and years/i);
         assert.match(prompt, /do not replace or contradict/i);
@@ -114,8 +114,23 @@ describe("buildOnboardingPrompt", () => {
 
         assert.doesNotMatch(prompt, /CV title|CV contents/);
         assert.doesNotMatch(prompt, /nearTermTarget\.step|discovering_target/);
-        assert.match(prompt, /role=software developer, yearsOfExperience=5/);
+        assert.match(prompt, /CHAT_STATED_FACTS: yearsOfExperience=5/);
+        assert.match(prompt, /Understand role descriptions.*yourself/i);
         assert.ok(prompt.length < 3_000);
+    });
+
+    it("asks the model to reject job-search intent misclassified as background", () => {
+        const prompt = buildBackgroundReviewPrompt("i am looking for a new role", {
+            response: "Are you looking for the same role?",
+            background: { status: "FOUND", role: "looking for a new role" },
+            mode: null,
+            advance: true,
+        }, "Current role / headline: QA Automation & Performance Engineer");
+
+        assert.match(prompt, /career intent, not professional background/i);
+        assert.match(prompt, /looking for, seeking, wanting/i);
+        assert.match(prompt, /i am looking for a new role/i);
+        assert.match(prompt, /QA Automation & Performance Engineer/i);
     });
 
     it("sends only role-choice context while awaiting the near-term role choice", () => {
@@ -234,17 +249,17 @@ describe("applyOnboardingDecision", () => {
         assert.match(step.reply, /automation qa engineer/i);
     });
 
-    it("prefers chat role and years over CV-shaped LLM background in state and reply", () => {
+    it("uses the reviewed model role while preserving objective chat tenure", () => {
         const step = applyOnboardingDecision(
             defaultOnboardingFlow(),
             {
-                response: "Nice — QA Automation & Performance Engineer for about 2 years at IDF. Looking for a job now?",
+                response: "Nice — software developer for about 5 years. Are you looking for a job now?",
                 background: {
                     status: "FOUND",
-                    role: "QA Automation & Performance Engineer",
-                    yearsOfExperience: 2,
+                    role: "software developer",
+                    yearsOfExperience: 5,
                     companies: ["IDF"],
-                    summary: "QA Automation & Performance Engineer for about 2 years at IDF",
+                    summary: "software developer for about 5 years at IDF",
                 },
                 mode: null,
                 advance: true,
@@ -259,11 +274,11 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.background?.summary, "software developer for about 5 years at IDF");
         assert.equal(
             step.reply,
-            "Nice — software developer for about 5 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+            "Nice — software developer for about 5 years. Are you looking for a job now?",
         );
     });
 
-    it("keeps a natural model reply when it matches the authoritative chat facts", () => {
+    it("keeps a natural reviewed model reply", () => {
         const modelReply = "Great — you have worked as a software developer for 5 years. What kind of role would you like next?";
         const step = applyOnboardingDecision(
             defaultOnboardingFlow(),
@@ -271,8 +286,8 @@ describe("applyOnboardingDecision", () => {
                 response: modelReply,
                 background: {
                     status: "FOUND",
-                    role: "QA Automation Engineer",
-                    yearsOfExperience: 2,
+                    role: "software developer",
+                    yearsOfExperience: 5,
                 },
                 mode: null,
                 advance: true,

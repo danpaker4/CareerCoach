@@ -11,7 +11,7 @@ import { defaultOnboardingFlow } from "../../../routes/conversation/conversation
 import type { OnboardingFlow } from "../../../routes/conversation/conversation.model";
 import { runDreamJobFlow } from "../dream-job/dream-job-flow";
 import { runNearTermSearchFlow } from "../near-term/near-term-search-flow";
-import { buildOnboardingPrompt } from "./onboarding.prompt.utils";
+import { buildBackgroundReviewPrompt, buildOnboardingPrompt } from "./onboarding.prompt.utils";
 import { parseOnboardingLlmDecisionFromJson } from "./onboarding.llm.utils";
 import { applyOnboardingDecision } from "./onboarding.state.utils";
 import { ONBOARDING_PARSE_FALLBACK_REPLY } from "./onboarding.types";
@@ -124,6 +124,27 @@ const resolveGeneralOnboardingDecision = async (
             userId: ctx.userId,
             sessionId: ctx.conversationId,
         });
+        if (!currentFlow.backgroundResolved && decision.background.status === "FOUND") {
+            const reviewRawText = await deps.textCompletion.complete(
+                buildBackgroundReviewPrompt(ctx.normalizedMessage, decision, ctx.userAccountContext),
+                {
+                    operation: "chat.onboarding.background_review",
+                    userId: ctx.userId,
+                    sessionId: ctx.conversationId,
+                    feature: "chat",
+                    responseFormat: "json",
+                },
+            );
+            const reviewedDecision = parseOnboardingLlmDecisionFromJson(reviewRawText);
+            recordChatLlmParseEvent(deps.llmObserver, {
+                operation: "chat.onboarding.background_review",
+                rawText: reviewRawText,
+                parseStatus: "success",
+                userId: ctx.userId,
+                sessionId: ctx.conversationId,
+            });
+            return reviewedDecision;
+        }
         return decision;
     } catch (error: unknown) {
         recordChatLlmParseEvent(deps.llmObserver, {

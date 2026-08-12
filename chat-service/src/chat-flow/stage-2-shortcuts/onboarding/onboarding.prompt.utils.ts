@@ -1,4 +1,5 @@
 import type { Conversation, OnboardingFlow } from "../../../routes/conversation/conversation.model";
+import type { OnboardingLlmDecision } from "./onboarding.types";
 import {
     extractChatStatedBackgroundFacts,
     formatChatStatedFactsForPrompt,
@@ -46,6 +47,8 @@ Rules:${COMMON_RULES}
 - FOUND means the latest message or supplied account context contains usable work, study, project, or technical experience. Set advance=true.
 - NONE means the user explicitly has no experience or is seeking a first job. Set advance=true.
 - UNKNOWN means there is no usable background. Set advance=false and ask once for relevant background.
+- A request for a new job or desired role is career intent, not evidence of the user's current or past professional role.
+- Understand role descriptions from the latest message yourself. Do not treat phrases such as looking for, seeking, or wanting a role as current background.
 - When FOUND or NONE, respond with one short summary followed by: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
 - CHAT_STATED_FACTS are authoritative. Use their exact role and years in background and response; do not replace or contradict them.
 - Do not invent history or include account/CV details in the response when CHAT_STATED_FACTS are present.
@@ -55,6 +58,26 @@ CHAT_STATED_FACTS: ${chatFactsLine}
 backgroundAskCount=${onboardingFlow.backgroundAskCount}
 ${accountSection}Latest user message: ${latestUserMessage}`;
 };
+
+export const buildBackgroundReviewPrompt = (
+    latestUserMessage: string,
+    priorDecision: OnboardingLlmDecision,
+    userAccountContext: string,
+): string => `Review a proposed professional-background classification before it is saved.
+Return ONLY compact JSON, no markdown:
+{"response":"message","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false}
+
+Rules:${COMMON_RULES}
+- FOUND requires actual current or past work, study, project, or technical experience stated by the user.
+- Supplied account context may establish real background when the latest message only states career intent.
+- A desired job, target role, job-search request, or statement that the user wants something new is career intent, not professional background.
+- Do not reinterpret the object of phrases such as looking for, seeking, wanting, applying for, or moving into as the user's current role.
+- Preserve FOUND only when the message contains genuine background evidence. Otherwise return UNKNOWN and ask briefly for professional background.
+- Always set mode=null. Direction routing happens separately.
+
+Latest user message: ${latestUserMessage}
+Account context: ${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS) || "none"}
+Prior decision: ${JSON.stringify(priorDecision)}`;
 
 const buildDirectionPrompt = (latestUserMessage: string): string => `You classify a career-coaching user's timing preference.
 Return ONLY compact JSON, no markdown:
@@ -83,6 +106,7 @@ Rules:
 - Do not repeat the same-role/different-role question because of spelling mistakes.
 - Set roleChoice=SAME_ROLE or DIFFERENT_ROLE; use null only if genuinely unclear.
 - A concrete named target sets targetRole and targetRoleReady=true. Use SAME_ROLE only if it matches the current role.
+- When the user names a concrete target role, do not ask them to confirm it; mark it ready and proceed.
 - A bare SAME_ROLE keeps targetRole=null and targetRoleReady=false.
 - For DIFFERENT_ROLE without a target, ask one personalized, high-value discovery question and describe it in targetDiscoverySubject.
 - Choose from full context; enjoyed work, responsibilities, strengths, work style, domain, constraints, and setting are examples rather than a fixed sequence.

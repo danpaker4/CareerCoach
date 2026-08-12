@@ -18,8 +18,9 @@ export type TargetRoleDecision = TargetRoleDecisionBase & (
 );
 
 export type TargetRoleGroundingDecision =
-    | { readonly kind: "GROUNDED_ROLE"; readonly evidenceQuote: string }
+    | { readonly kind: "GROUNDED_ROLE"; readonly evidenceQuote: string; readonly normalizedTargetRole: string }
     | { readonly kind: "GROUNDED_SUGGESTION"; readonly evidenceQuote: string }
+    | { readonly kind: "GROUNDED_CONFIRMATION"; readonly evidenceQuote: string; readonly normalizedTargetRole: string }
     | { readonly kind: "NEEDS_CLARIFICATION"; readonly question: string };
 
 export type ResolveTargetRoleDecisionParams = {

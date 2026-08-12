@@ -90,6 +90,7 @@ export const parseTargetRoleGroundingDecision = (
     candidateRole: string,
     latestUserMessage: string,
     suggestedRoles: readonly string[] = [],
+    previousAssistantMessage?: string,
 ): TargetRoleGroundingDecision | null => {
     const object = parseJsonObjectFromLlm(rawText);
     if (!object || typeof object.kind !== "string") {
@@ -97,15 +98,22 @@ export const parseTargetRoleGroundingDecision = (
     }
 
     const kind = object.kind.trim().toUpperCase().replace(/[\s-]+/g, "_");
-    if (kind === "GROUNDED_ROLE" && typeof object.evidenceQuote === "string") {
+    if (
+        kind === "GROUNDED_ROLE"
+        && typeof object.evidenceQuote === "string"
+        && typeof object.normalizedTargetRole === "string"
+    ) {
         const evidenceQuote = object.evidenceQuote.trim();
         const normalizedEvidence = normalizeEvidence(evidenceQuote);
         const normalizedCandidate = normalizeEvidence(candidateRole);
         const normalizedMessage = normalizeEvidence(latestUserMessage);
+        const normalizedTargetRole = normalizeTargetRole(object.normalizedTargetRole);
         const isExactUserEvidence = normalizedEvidence.length > 0
             && normalizedMessage.includes(normalizedEvidence)
             && normalizedEvidence.includes(normalizedCandidate);
-        return isExactUserEvidence ? { kind: "GROUNDED_ROLE", evidenceQuote } : null;
+        return isExactUserEvidence && normalizedTargetRole
+            ? { kind: "GROUNDED_ROLE", evidenceQuote, normalizedTargetRole }
+            : null;
     }
 
     if (kind === "GROUNDED_SUGGESTION" && typeof object.evidenceQuote === "string") {
@@ -119,6 +127,26 @@ export const parseTargetRoleGroundingDecision = (
             && normalizedMessage.includes(normalizedEvidence);
         return candidateWasSuggested && isExactUserEvidence
             ? { kind: "GROUNDED_SUGGESTION", evidenceQuote }
+            : null;
+    }
+
+    if (
+        kind === "GROUNDED_CONFIRMATION"
+        && typeof object.evidenceQuote === "string"
+        && typeof object.normalizedTargetRole === "string"
+    ) {
+        const evidenceQuote = object.evidenceQuote.trim();
+        const normalizedEvidence = normalizeEvidence(evidenceQuote);
+        const normalizedMessage = normalizeEvidence(latestUserMessage);
+        const normalizedCandidate = normalizeEvidence(candidateRole);
+        const normalizedPreviousAssistantMessage = normalizeEvidence(previousAssistantMessage ?? "");
+        const normalizedTargetRole = normalizeTargetRole(object.normalizedTargetRole);
+        const isExactUserEvidence = normalizedEvidence.length > 0
+            && normalizedMessage.includes(normalizedEvidence);
+        const candidateWasAskedForConfirmation = normalizedCandidate.length > 0
+            && normalizedPreviousAssistantMessage.includes(normalizedCandidate);
+        return isExactUserEvidence && candidateWasAskedForConfirmation && normalizedTargetRole
+            ? { kind: "GROUNDED_CONFIRMATION", evidenceQuote, normalizedTargetRole }
             : null;
     }
 

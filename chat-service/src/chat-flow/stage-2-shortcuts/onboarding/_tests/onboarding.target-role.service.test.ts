@@ -113,18 +113,193 @@ describe("parseTargetRoleGroundingDecision", () => {
         const grounded = parseTargetRoleGroundingDecision(JSON.stringify({
             kind: "GROUNDED_ROLE",
             evidenceQuote: "product manager",
+            normalizedTargetRole: "Product Manager",
         }), "product manager", "I want to be a product manager");
         const inferred = parseTargetRoleGroundingDecision(JSON.stringify({
             kind: "GROUNDED_ROLE",
             evidenceQuote: "leading teams",
+            normalizedTargetRole: "Product Manager",
         }), "product manager", "leading teams");
 
-        assert.deepEqual(grounded, { kind: "GROUNDED_ROLE", evidenceQuote: "product manager" });
+        assert.deepEqual(grounded, {
+            kind: "GROUNDED_ROLE",
+            evidenceQuote: "product manager",
+            normalizedTargetRole: "Product Manager",
+        });
         assert.equal(inferred, null);
+    });
+
+    it("accepts contextual confirmation only when the previous assistant message names the candidate", () => {
+        const rawText = JSON.stringify({
+            kind: "GROUNDED_CONFIRMATION",
+            evidenceQuote: "yes yes",
+            normalizedTargetRole: "Data Analyst",
+        });
+        const grounded = parseTargetRoleGroundingDecision(
+            rawText,
+            "Data Analyst",
+            "yes yes",
+            [],
+            "So, you're looking for a Data Analyst role?",
+        );
+        const ungrounded = parseTargetRoleGroundingDecision(
+            rawText,
+            "Data Analyst",
+            "yes yes",
+            [],
+            "What role would you like?",
+        );
+
+        assert.deepEqual(grounded, {
+            kind: "GROUNDED_CONFIRMATION",
+            evidenceQuote: "yes yes",
+            normalizedTargetRole: "Data Analyst",
+        });
+        assert.equal(ungrounded, null);
     });
 });
 
 describe("resolveTargetRoleDecision", () => {
+    it("understands confirmation of the concrete role in the previous assistant question", async () => {
+        const conversation = createDifferentRoleConversation("yes yes");
+        conversation.messages.splice(-1, 0, {
+            role: "assistant",
+            content: "So, you're looking for a data analyst role?",
+            timestamp: new Date(3.5),
+        });
+        const outputs = [
+            JSON.stringify({ status: "READY", targetRole: "Data Analyst", discoveryFacts: {} }),
+            JSON.stringify({
+                kind: "GROUNDED_CONFIRMATION",
+                evidenceQuote: "yes yes",
+                normalizedTargetRole: "Data Analyst",
+            }),
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "yes yes",
+            userAccountContext: "Current role / headline: QA Automation & Performance Engineer",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "Data Analyst", discoveryFacts: {} });
+    });
+
+    it("normalizes an obvious target-role typo before handing the query to job search", async () => {
+        const outputs = [
+            JSON.stringify({ status: "READY", targetRole: "Data Analystt", discoveryFacts: {} }),
+            JSON.stringify({
+                kind: "GROUNDED_ROLE",
+                evidenceQuote: "Data Analystt",
+                normalizedTargetRole: "Data Analyst",
+            }),
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation: createDifferentRoleConversation("Data Analystt"),
+            latestUserMessage: "Data Analystt",
+            userAccountContext: "Current role / headline: software developer",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "Data Analyst", discoveryFacts: {} });
+    });
+
+    it("accepts a newly proposed concrete role after earlier role options", async () => {
+        const conversation = createDifferentRoleConversation("what about data analyst?");
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.suggestedRoles = [
+                "Data Scientist",
+                "Business Intelligence Developer",
+                "Product Manager (Data-Driven)",
+            ];
+        }
+        const outputs = [
+            JSON.stringify({
+                status: "ROLE_OPTIONS",
+                summary: "Your technical background and desire to work with data point to these paths.",
+                roles: [
+                    { title: "Product Manager", reason: "Combines technical context with product ownership." },
+                    { title: "Solutions Engineer", reason: "Uses technical knowledge in customer-facing work." },
+                    { title: "Technical Program Manager", reason: "Focuses on coordination and delivery." },
+                ],
+            }),
+            JSON.stringify({ status: "READY", targetRole: "data analyst", discoveryFacts: {} }),
+            JSON.stringify({
+                kind: "GROUNDED_ROLE",
+                evidenceQuote: "data analyst",
+                normalizedTargetRole: "data analyst",
+            }),
+        ];
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return outputs[prompts.length - 1] ?? "";
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "what about data analyst?",
+            userAccountContext: "Current role / headline: software developer",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "data analyst", discoveryFacts: {} });
+        assert.equal(prompts.length, 3);
+        assert.match(prompts[1] ?? "", /review the prior role decision/i);
+        assert.match(prompts[1] ?? "", /what about data analyst\?/i);
+    });
+
+    it("treats an explicitly named DevOps target as ready instead of offering adjacent roles", async () => {
+        const outputs = [
+            JSON.stringify({
+                status: "ROLE_OPTIONS",
+                summary: "Your experience as a software developer and interest in DevOps point to these paths.",
+                roles: [
+                    { title: "DevOps Engineer", reason: "Combines technical knowledge with infrastructure management." },
+                    { title: "Solutions Architect", reason: "Focuses on designing systems that meet business needs." },
+                    { title: "Cloud Engineer", reason: "Uses technical expertise to manage cloud-based infrastructure." },
+                ],
+            }),
+            JSON.stringify({ status: "READY", targetRole: "devops", discoveryFacts: {} }),
+            JSON.stringify({ kind: "GROUNDED_ROLE", evidenceQuote: "devops", normalizedTargetRole: "devops" }),
+        ];
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return outputs[prompts.length - 1] ?? "";
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation: createDifferentRoleConversation("i would like to do more devops"),
+            latestUserMessage: "i would like to do more devops",
+            userAccountContext: "Current role / headline: software developer",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "devops", discoveryFacts: {} });
+        assert.equal(prompts.length, 3);
+    });
+
     it("switches from open questions to model-generated role choices after the limit", async () => {
         const conversation = createDifferentRoleConversation("i really don't know");
         if (conversation.onboardingFlow?.nearTermTarget) {
@@ -139,6 +314,15 @@ describe("resolveTargetRoleDecision", () => {
                 status: "NEEDS_CLARIFICATION",
                 question: "What kind of work sounds appealing?",
                 subject: "desired_work",
+            }),
+            JSON.stringify({
+                status: "ROLE_OPTIONS",
+                summary: "You value strategy, collaboration, and leadership.",
+                roles: [
+                    { title: "Product Manager", reason: "Connects strategy with cross-functional product ownership." },
+                    { title: "Program Manager", reason: "Uses collaboration to coordinate complex initiatives." },
+                    { title: "Operations Manager", reason: "Applies leadership to improve teams and processes." },
+                ],
             }),
             JSON.stringify({
                 status: "ROLE_OPTIONS",
@@ -168,11 +352,12 @@ describe("resolveTargetRoleDecision", () => {
         });
 
         assert.equal(decision.status, "ROLE_OPTIONS");
-        assert.equal(prompts.length, 2);
+        assert.equal(prompts.length, 3);
         assert.match(prompts[0] ?? "", /mustOfferChoices=true/);
         assert.match(prompts[0] ?? "", /solving technical problems/);
         assert.match(prompts[0] ?? "", /coveredSubjects=\["enjoyed_work"\]/);
         assert.match(prompts[0] ?? "", /Current role \/ headline: software developer/);
+        assert.match(prompts[2] ?? "", /review the prior role decision/i);
     });
 
     it("understands selection of a previously generated role suggestion", async () => {
@@ -213,19 +398,19 @@ describe("resolveTargetRoleDecision", () => {
                 "Financial Analyst",
             ];
         }
+        const outputs = [
+            JSON.stringify({ status: "READY", targetRole: "Financial Analyst", discoveryFacts: {} }),
+            JSON.stringify({
+                kind: "GROUNDED_ROLE",
+                evidenceQuote: "Financial Analyst",
+                normalizedTargetRole: "Financial Analyst",
+            }),
+        ];
         const prompts: string[] = [];
         const textCompletion: TextCompletionPort = {
             complete: async (prompt) => {
                 prompts.push(prompt);
-                return JSON.stringify({
-                    status: "ROLE_OPTIONS",
-                    summary: "These paths fit your background and interest in finance.",
-                    roles: [
-                        { title: "Product Manager", reason: "Combines technical context with product ownership." },
-                        { title: "Solutions Engineer", reason: "Uses technical knowledge in customer-facing work." },
-                        { title: "Financial Analyst", reason: "Applies analytical skills to financial decisions." },
-                    ],
-                });
+                return outputs[prompts.length - 1] ?? "";
             },
         };
 
@@ -239,7 +424,7 @@ describe("resolveTargetRoleDecision", () => {
         });
 
         assert.deepEqual(decision, { status: "READY", targetRole: "Financial Analyst", discoveryFacts: {} });
-        assert.equal(prompts.length, 0);
+        assert.equal(prompts.length, 2);
     });
 
     it("offers roles instead of searching when the user has not selected a target", async () => {
@@ -303,7 +488,7 @@ describe("resolveTargetRoleDecision", () => {
             discoveryFacts: {},
         });
         assert.equal(prompts.length, 2);
-        assert.match(prompts[1] ?? "", /concrete searchable occupational title/i);
+        assert.match(prompts[1] ?? "", /concrete searchable role or established job domain/i);
     });
 
     it("retries a wrong-stage response and understands the target role from the chat", async () => {
@@ -314,7 +499,11 @@ describe("resolveTargetRoleDecision", () => {
                 subject: "timeline",
             }),
             JSON.stringify({ status: "READY", targetRole: "product manager" }),
-            JSON.stringify({ kind: "GROUNDED_ROLE", evidenceQuote: "product manager" }),
+            JSON.stringify({
+                kind: "GROUNDED_ROLE",
+                evidenceQuote: "product manager",
+                normalizedTargetRole: "product manager",
+            }),
         ];
         const prompts: string[] = [];
         const textCompletion: TextCompletionPort = {
@@ -337,7 +526,7 @@ describe("resolveTargetRoleDecision", () => {
         assert.equal(prompts.length, 3);
         assert.match(prompts[0] ?? "", /Latest user message: product manager/);
         assert.match(prompts[1] ?? "", /previous output was invalid/i);
-        assert.match(prompts[2] ?? "", /concrete searchable occupational title/i);
+        assert.match(prompts[2] ?? "", /concrete searchable role or established job domain/i);
         assert.match(prompts[2] ?? "", /Do not demand a subtype, specialization, seniority/i);
     });
 
