@@ -48,6 +48,8 @@ const EvaluationRunResultSchema = z.object({
         mode: z.string().optional(),
         maxLines: z.number().optional(),
         mustAskQuestion: z.boolean().optional(),
+        mustEndConversation: z.boolean().optional(),
+        mustReturnNoJobs: z.boolean().optional(),
         forbiddenWords: z.array(z.string()).optional(),
     }),
     metadata: z.object({

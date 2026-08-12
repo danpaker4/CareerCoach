@@ -529,3 +529,41 @@
   color: #7c3aed;
   text-transform: capitalize;
 }
+.roadmap-preferences-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.roadmap-preferences-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.roadmap-preferences-grid input,
+.roadmap-preferences-grid select {
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.roadmap-preference-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+@media (max-width: 560px) {
+  .roadmap-preferences-grid { grid-template-columns: 1fr; }
+}

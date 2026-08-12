@@ -30,6 +30,7 @@ const ASSERTIONS = [
     { type: "javascript", value: "file://assertions/roadmap-assertions.ts:assertNoFluffCapabilities" },
     { type: "javascript", value: "file://assertions/roadmap-assertions.ts:assertDegreeTimelineYears" },
     { type: "javascript", value: "file://assertions/roadmap-assertions.ts:assertNoiseRemoved" },
+    { type: "javascript", value: "file://assertions/roadmap-assertions.ts:assertActionPlans" },
 ] as const;
 
 const loadFixtures = async (): Promise<Fixture[]> => {

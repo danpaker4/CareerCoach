@@ -200,7 +200,8 @@ export class ChatConversationService {
         jobs: readonly JobSearchResultItem[],
         selection: JobSearchResultItem | null,
         lastSearchQuery: string | null,
-        lastSearchIntent: string | null
+        lastSearchIntent: string | null,
+        recommendedJobs: readonly JobSearchResultItem[] = jobs,
     ): Promise<void> => {
         const now = new Date();
         const conversation = await this.getConversationByConversationIdAndUserId(userId, conversationId);
@@ -231,7 +232,7 @@ export class ChatConversationService {
                 ? {
                       selectedJobId,
                       selectedJob: selectedJobSnapshot,
-                      recommendedJobIds: poolToUse.map((job) => job.id),
+                      recommendedJobIds: recommendedJobs.map((job) => job.id),
                       rejectedJobIds: mergedRejected,
                       acceptedJobIds: mergedAccepted,
                       lastRecommendationAt: now,

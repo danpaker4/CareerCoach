@@ -11,7 +11,6 @@ import { resolveOnboardingDirectionMode } from "./onboarding.direction.utils";
 import {
     applyChatStatedFactsToBackground,
     buildChatStatedBackgroundReply,
-    doesReplyMatchChatStatedFacts,
     extractChatStatedBackgroundFacts,
 } from "./onboarding.chat-facts.utils";
 import {
@@ -105,12 +104,17 @@ export const applyOnboardingDecision = (
                     completedThisTurn: true,
                 };
             }
-            const fallbackReply = buildChatStatedBackgroundReply(chatFacts);
-            const reply = fallbackReply && !doesReplyMatchChatStatedFacts(decision.response, chatFacts)
-                ? fallbackReply
-                : decision.response;
+            const normalizedFacts = {
+                ...(withBackground.background?.role ? { role: withBackground.background.role } : {}),
+                ...(withBackground.background?.yearsOfExperience !== null
+                    && withBackground.background?.yearsOfExperience !== undefined
+                    ? { yearsOfExperience: withBackground.background.yearsOfExperience }
+                    : {}),
+            };
+            const hasChatFacts = chatFacts.role !== undefined || chatFacts.yearsOfExperience !== undefined;
+            const fallbackReply = hasChatFacts ? buildChatStatedBackgroundReply(normalizedFacts) : null;
             return {
-                reply,
+                reply: fallbackReply ?? decision.response,
                 onboardingFlow: withBackground,
                 completedThisTurn: false,
             };

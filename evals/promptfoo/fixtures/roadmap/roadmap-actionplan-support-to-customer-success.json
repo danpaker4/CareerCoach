@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-support-to-customer-success",
+  "description": "A support agent gets internal customer-success experience routes and intermediate projects",
+  "tags": ["roadmap", "action-plan", "employed", "customer-success"],
+  "request": {
+    "dreamJob": "Customer Success Manager",
+    "targetYears": 3,
+    "startingPoint": { "currentJob": "Support Agent", "userSkills": ["Troubleshooting", "Customer communication"], "isEntryLevel": false, "roleExperienceYears": 1, "roleExperienceLevel": "junior" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

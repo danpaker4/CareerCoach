@@ -7,6 +7,7 @@ export const resolveRoleArchetype = (dreamJob: string): RoleArchetypeId => {
     const isExecutive = /\b(ceo|chief|founder|co-founder|executive|vp|vice president|ciso|cto|coo)\b/.test(text);
     const isCyber = /\b(cybersecurity|cyber|infosec|information security|security)\b/.test(text);
     if (isExecutive && isCyber) return "executive_cyber";
+    if (isExecutive) return "executive";
     if (/\b(architect|architecture|principal|staff engineer|staff)\b/.test(text)) {
         return "architecture_ic";
     }
@@ -82,6 +83,15 @@ export const EXECUTIVE_CYBER_LADDER: readonly RoleArchetypeCapability[] = [
         transitionRelevance: 1.45,
         reasonCode: "archetype_executive_cyber",
     },
+] as const;
+
+export const EXECUTIVE_LADDER: readonly RoleArchetypeCapability[] = [
+    { capabilityId: "cap.professional.experience", label: "Credible industry experience", category: "experience", requiredLevel: 3, transitionRelevance: 1.35, reasonCode: "archetype_executive" },
+    { capabilityId: "cap.product.sense", label: "Customer and product judgment", category: "domain", requiredLevel: 3, transitionRelevance: 1.25, reasonCode: "archetype_executive" },
+    { capabilityId: "cap.project.ownership", label: "Business-critical ownership", category: "responsibility", requiredLevel: 3, transitionRelevance: 1.3, reasonCode: "archetype_executive" },
+    { capabilityId: "cap.leadership", label: "People and team leadership", category: "leadership", requiredLevel: 3, transitionRelevance: 1.4, reasonCode: "archetype_executive" },
+    { capabilityId: "cap.business.finance", label: "Finance and P&L fluency", category: "domain", requiredLevel: 3, transitionRelevance: 1.4, reasonCode: "archetype_executive" },
+    { capabilityId: "cap.executive.leadership", label: "Executive leadership readiness", category: "leadership", requiredLevel: 3, transitionRelevance: 1.5, reasonCode: "archetype_executive" },
 ] as const;
 
 export const isCredentialLikeText = (text: string): boolean => {

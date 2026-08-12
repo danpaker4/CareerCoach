@@ -61,6 +61,21 @@ export const resolveSelectedCareerPath = (params: {
     const archetype = resolveRoleArchetype(params.dreamJob);
     const zeroKnowledge = params.isEntryLevel === true || params.hasNoSkills === true;
 
+    if (archetype === "executive") {
+        const executivePath = [
+            "Domain specialist / product contributor",
+            "Senior contributor / project lead",
+            "Team Lead / Manager",
+            "Director / VP",
+            "General Manager / Founder track",
+            params.dreamJob,
+        ];
+        return {
+            steps: trimPathToTargetYears(executivePath, params.targetYears),
+            reasonCodes: ["path_executive", "jobs_projects_learning", "intermediate_roles_required", "exact_target_preserved"],
+        };
+    }
+
     if (archetype === "executive_cyber") {
         const base = zeroKnowledge ? EXECUTIVE_CYBER_PATH_BEGINNER : EXECUTIVE_CYBER_PATH;
         const steps = trimPathToTargetYears(base, params.targetYears);

@@ -29,6 +29,8 @@ const ProviderMetadataSchema = z.object({
             mode: z.string().optional(),
             maxLines: z.number().optional(),
             mustAskQuestion: z.boolean().optional(),
+            mustEndConversation: z.boolean().optional(),
+            mustReturnNoJobs: z.boolean().optional(),
             forbiddenWords: z.array(z.string()).optional(),
         })
         .optional(),
@@ -185,6 +187,34 @@ export const assertNoJobsWhenModeDisallows = (_output: unknown, context: Asserti
     return pass(`Mode "${mode}" correctly returned no job recommendations`);
 };
 
+/** Assert an explicitly terminal turn closes without immediately prompting for more work. */
+export const assertConversationEndedWhenExpected = (output: unknown, context: AssertionContext): GradingResult => {
+    const metadata = readMetadata(context);
+    if (metadata.expected?.mustEndConversation !== true) {
+        return pass("Conversation ending is not required for this case");
+    }
+
+    const reply = asText(output);
+    const lowerReply = reply.toLowerCase();
+    const ended = lowerReply.includes("available") && lowerReply.includes("whenever") && !reply.includes("?");
+    return ended
+        ? pass("Reply closes the current chat and keeps future help available")
+        : fail("Reply did not close the current chat with future availability");
+};
+
+/** Assert a terminal turn does not fall through to another job search. */
+export const assertNoJobsWhenExpected = (_output: unknown, context: AssertionContext): GradingResult => {
+    const metadata = readMetadata(context);
+    if (metadata.expected?.mustReturnNoJobs !== true) {
+        return pass("No explicit zero-job expectation configured");
+    }
+
+    const jobCount = metadata.jobCount ?? 0;
+    return jobCount === 0
+        ? pass("Closing turn returned no job recommendations")
+        : fail(`Closing turn returned ${jobCount} job recommendation(s)`);
+};
+
 /** Assert required fields from expected vars are present in metadata.expected. */
 export const assertRequiredExpectedFields = (_output: unknown, context: AssertionContext): GradingResult => {
     const metadata = readMetadata(context);
@@ -197,10 +227,12 @@ export const assertRequiredExpectedFields = (_output: unknown, context: Assertio
         expected.mode !== undefined ||
         expected.maxLines !== undefined ||
         expected.mustAskQuestion === true ||
+        expected.mustEndConversation === true ||
+        expected.mustReturnNoJobs === true ||
         (expected.forbiddenWords?.length ?? 0) > 0;
 
     if (!hasCheckable) {
-        return fail("Expected must include at least one of: mode, maxLines, mustAskQuestion, forbiddenWords");
+        return fail("Expected must include at least one supported check");
     }
 
     return pass("Required expected fields are present");

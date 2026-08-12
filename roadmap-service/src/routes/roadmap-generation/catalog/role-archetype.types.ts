@@ -1,4 +1,4 @@
-export type RoleArchetypeId = "executive_cyber" | "architecture_ic" | "engineering_ic" | "generic";
+export type RoleArchetypeId = "executive" | "executive_cyber" | "architecture_ic" | "engineering_ic" | "generic";
 
 export type RoleArchetypeCapability = {
     readonly capabilityId: string;

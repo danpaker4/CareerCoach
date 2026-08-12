@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-devops-to-cto",
+  "description": "A highly experienced DevOps lead receives advanced projects and executive-path internal missions",
+  "tags": ["roadmap", "action-plan", "senior", "executive"],
+  "request": {
+    "dreamJob": "CTO of a SaaS company",
+    "targetYears": 8,
+    "startingPoint": { "currentJob": "DevOps Lead", "userSkills": ["Cloud architecture", "Team leadership"], "isEntryLevel": false, "roleExperienceYears": 8, "roleExperienceLevel": "lead" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "advanced",
+    "expectedProjectHours": 50,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

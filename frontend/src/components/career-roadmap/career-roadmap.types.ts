@@ -4,11 +4,43 @@ export type ResourceType = 'course' | 'video' | 'practice' | 'article' | 'docs' 
 
 export type ProgressionType = 'learning' | 'experience' | 'hybrid';
 
+export type RecommendationSource = 'profile-match' | 'job-market' | 'employer-signal' | 'reviewed-template' | 'ai-personalized';
+
+export interface RecommendedRole {
+  id: string; title: string; fit: 'pursue-now' | 'prepare-first'; whyItFits: string; experienceGained: string;
+  missingRequirements: string[]; internalMoveSuitable: boolean; source: RecommendationSource;
+}
+
+export interface RecommendedMission {
+  id: string; title: string; requestToManager: string; responsibilities: string[]; outcomes: string[]; fallback: string; source: RecommendationSource;
+}
+
+export interface RecommendedProject {
+  id: string; title: string; objective: string; tasks: string[]; deliverables: string[]; estimatedHours: number;
+  completionChecklist: string[]; toolsAndSkills: string[]; roleRelevance: string; optionalGuidance: string[];
+  level: 'beginner' | 'intermediate' | 'advanced'; source: RecommendationSource;
+}
+
+export interface ActionableRoute {
+  id: string; type: 'job' | 'internal' | 'project' | 'combined'; title: string; summary: string; whyRecommended: string;
+  completionRule: string; isRecommended: boolean; source: RecommendationSource; confidence: 'high' | 'medium' | 'low';
+  roleOptions: RecommendedRole[]; missionOptions: RecommendedMission[]; projectOptions: RecommendedProject[]; supportingResourceUrls: string[];
+}
+
+export interface StageActionPlan { outcome: string; recommendedRouteId: string; routes: ActionableRoute[]; }
+
 export interface StageResource {
   title: string;
   platform: string;
   url: string;
   type?: ResourceType;
+  costType?: 'free' | 'paid' | 'free-audit';
+  priceLabel?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  estimatedHours?: number;
+  skills?: string[];
+  reason?: string;
+  lastVerifiedAt?: string;
 }
 
 export interface GapAnalysisSnapshot {
@@ -39,13 +71,38 @@ export interface CareerProgressionMeta {
   currentRoleSummary?: string;
   dreamRoleCategory: string;
   estimatedYearsToGoal?: string;
+  targetYears?: number;
   progressionReasoning?: string;
   gapAnalysis?: GapAnalysisSnapshot;
   generationVersion?: string;
   generationMode?: string;
+  alternativePaths?: CareerPathOption[];
+  preferences?: RoadmapPreferences;
+  feasibility?: {
+    status: 'on-track' | 'ambitious' | 'conflict';
+    message: string;
+    reasons: string[];
+  };
+}
+
+export interface RoadmapPreferences {
+  courseBudget?: 'free' | 'mixed' | 'paid';
+  locationPreference?: string;
+  workPreference?: 'onsite' | 'hybrid' | 'remote' | 'flexible';
+  willingToManagePeople?: boolean;
+  willingToChangeCompanies?: boolean;
+}
+
+export interface CareerPathOption {
+  id: string;
+  label: string;
+  summary: string;
+  roles: string[];
+  isRecommended: boolean;
 }
 
 export interface StageContent {
+  stageId?: string;
   label: string;
   description: string;
   actions: string[];
@@ -67,6 +124,19 @@ export interface StageContent {
   completionCriteria?: CompletionCriterion[];
   timelineMeta?: TimelineMeta;
   reasonCodes?: string[];
+  prerequisiteStageIds?: string[];
+  parallelStageIds?: string[];
+  orderingReason?: string;
+  actionPlan?: StageActionPlan;
+}
+
+export interface ProgressEvidence {
+  id: string;
+  type: 'project' | 'promotion' | 'responsibility' | 'note';
+  title: string;
+  url?: string;
+  details?: string;
+  createdAt: string;
 }
 
 export interface RoadmapStage {
@@ -75,6 +145,12 @@ export interface RoadmapStage {
   content?: StageContent;
   completedActions?: string[];
   completedCriterionIds?: string[];
+  completedResourceUrls?: string[];
+  progressEvidence?: ProgressEvidence[];
+  selectedRouteId?: string;
+  selectedProjectId?: string;
+  completedProjectIds?: string[];
+  dismissedRecommendationIds?: string[];
 }
 
 export interface CareerRoadmapData {
@@ -105,10 +181,21 @@ export interface StageOpportunity {
   seniority: string;
   url: string;
   relevanceReason: string;
+  description: string;
+  requirements: string[];
+  missingRequirements: string[];
+  matchPct: number;
+  fit: 'apply-now' | 'target';
 }
 
 export interface StageOpportunitiesResponse {
   opportunities: StageOpportunity[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export type FetchState = 'idle' | 'loading' | 'success' | 'error';

@@ -1,4 +1,5 @@
 import type { Conversation } from "../../../../routes/conversation/conversation.model";
+import type { SanitizedJob } from "../../../../routes/conversation/job-in-conversation.types";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../../../chat-flow.types";
 
 export type AddJobToPipelineResult =
@@ -10,4 +11,8 @@ export type HandlePipelineAcceptParams = {
     deps: ChatFlowDeps;
     ctx: SendMessagePreparedContext;
     jobContext: NonNullable<Conversation["jobContext"]>;
+};
+
+export type HandlePipelineAcceptManyParams = HandlePipelineAcceptParams & {
+    jobs: readonly SanitizedJob[];
 };

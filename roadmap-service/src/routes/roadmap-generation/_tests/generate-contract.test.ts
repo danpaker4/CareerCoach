@@ -12,7 +12,9 @@ describe("roadmap generate contract", () => {
             "utf8"
         );
         assert.match(source, /targetYears/);
-        assert.match(source, /JSON\.stringify\(\{\s*userId,\s*dreamJob: dreamJob\.trim\(\),\s*targetYears\s*\}\)/);
+        assert.match(source, /JSON\.stringify\(\{\s*userId,\s*dreamJob: dreamJob\.trim\(\),\s*targetYears,/);
+        assert.match(source, /availableHoursPerWeek/);
+        assert.match(source, /preferences:/);
         assert.doesNotMatch(source, /stageCount/);
     });
 

@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-frontend-to-manager",
+  "description": "A mid-level frontend developer gets internal missions and intermediate projects toward management",
+  "tags": ["roadmap", "action-plan", "employed", "management"],
+  "request": {
+    "dreamJob": "Engineering Manager",
+    "targetYears": 5,
+    "startingPoint": { "currentJob": "Frontend Developer", "userSkills": ["TypeScript", "React"], "isEntryLevel": false, "roleExperienceYears": 3, "roleExperienceLevel": "mid" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

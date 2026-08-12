@@ -1,0 +1,20 @@
+{
+  "id": "roadmap-actionplan-unemployed-ux-designer",
+  "description": "An unemployed career starter receives safe, finishable UX proof projects and no internal mission",
+  "tags": ["roadmap", "action-plan", "unemployed", "ux"],
+  "request": {
+    "dreamJob": "UX Designer",
+    "targetYears": 4,
+    "availableHoursPerWeek": 6,
+    "startingPoint": { "currentJob": "Not yet employed", "userSkills": ["Figma"], "isEntryLevel": true, "roleExperienceYears": 0, "roleExperienceLevel": "entry" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "project"],
+    "expectedProjectLevel": "beginner",
+    "expectedProjectHours": 20,
+    "forbidInternalMission": true,
+    "expectedFirstRoleFit": "prepare-first",
+    "expectedInternalMoveSuitable": false
+  }
+}

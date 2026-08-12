@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-junior-qa-low-experience",
+  "description": "A recently employed QA analyst receives beginner-sized projects despite being employed",
+  "tags": ["roadmap", "action-plan", "employed", "low-experience"],
+  "request": {
+    "dreamJob": "Security Engineer",
+    "targetYears": 4,
+    "startingPoint": { "currentJob": "Junior QA Analyst", "userSkills": ["Testing"], "isEntryLevel": false, "roleExperienceYears": 0.5, "roleExperienceLevel": "junior" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "beginner",
+    "expectedProjectHours": 20,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

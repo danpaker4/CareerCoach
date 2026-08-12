@@ -38,6 +38,8 @@ type EvaluationCaseLeanDocument = {
         mode?: string;
         maxLines?: number;
         mustAskQuestion?: boolean;
+        mustEndConversation?: boolean;
+        mustReturnNoJobs?: boolean;
         forbiddenWords?: string[];
     };
     createdAt: Date;
@@ -50,6 +52,8 @@ const normalizeExpected = (expected: EvaluationCaseLeanDocument["expected"]): Ev
         ...(mode !== undefined ? { mode } : {}),
         ...(typeof expected.maxLines === "number" ? { maxLines: expected.maxLines } : {}),
         ...(typeof expected.mustAskQuestion === "boolean" ? { mustAskQuestion: expected.mustAskQuestion } : {}),
+        ...(typeof expected.mustEndConversation === "boolean" ? { mustEndConversation: expected.mustEndConversation } : {}),
+        ...(typeof expected.mustReturnNoJobs === "boolean" ? { mustReturnNoJobs: expected.mustReturnNoJobs } : {}),
         ...(Array.isArray(expected.forbiddenWords) ? { forbiddenWords: expected.forbiddenWords } : {}),
     };
 };

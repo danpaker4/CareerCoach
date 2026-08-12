@@ -52,7 +52,8 @@ export const presentRankedJobs = async (options: PresentRankedJobsOptions): Prom
         topRankedJobs,
         focusJob,
         queryLabel,
-        searchIntent
+        searchIntent,
+        presentationJobs,
     );
 
     const reply =

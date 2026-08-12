@@ -260,6 +260,81 @@ describe("checkIfNeededAddToPipeline", () => {
         assert.equal(searchCalled.value, false);
     });
 
+    it("adds every shortlisted job when the user asks to add all five to their wishlist", async () => {
+        const displayedJobs = [
+            job("job-1", "Frontend Developer", "Alpha"),
+            job("job-2", "Backend Developer", "Beta"),
+            job("job-3", "Full-Stack Developer", "Gamma"),
+            job("job-4", "Software Engineer", "Delta"),
+            job("job-5", "Lead Full-Stack Developer", "Synergy Tech"),
+        ];
+        const undisplayedJobs = [
+            job("job-6", "Mobile Developer", "Zeta"),
+            job("job-7", "Platform Engineer", "Eta"),
+            job("job-8", "DevOps Engineer", "Theta"),
+            job("job-9", "Data Engineer", "Iota"),
+            job("job-10", "Security Engineer", "Kappa"),
+        ];
+        const jobs = [...displayedJobs, ...undisplayedJobs];
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"jobId":"job-5","confidence":"high"}',
+            appended,
+            searchCalled,
+        });
+        const pipelineRequests: unknown[] = [];
+        const alertRequests: unknown[] = [];
+        globalThis.fetch = (async (input, init) => {
+            const requestBody = JSON.parse(String(init?.body)) as unknown;
+            const url = String(input);
+            if (url.endsWith("/wanted-jobs")) {
+                alertRequests.push(requestBody);
+                return Response.json({ createdAt: new Date().toISOString() }, { status: 201 });
+            }
+            pipelineRequests.push(requestBody);
+            return new Response(null, { status: 201 });
+        }) as typeof fetch;
+        const conversation = buildConversation({
+            awaitingPipelineDecision: true,
+            jobs,
+            focus: displayedJobs[0] ?? cellebrite,
+        });
+        conversation.messages = [{
+            role: "assistant",
+            content: "Here are five roles",
+            timestamp: new Date(),
+            attachedJobs: displayedJobs.map((displayedJob) => ({
+                jobId: displayedJob.id,
+                jobTitle: displayedJob.title,
+                url: displayedJob.url,
+                seniority: displayedJob.seniority,
+                description: displayedJob.description,
+                company: displayedJob.company,
+                salary: displayedJob.salary ?? 0,
+            })),
+        }];
+
+        const response = await checkIfNeededAddToPipeline(
+            deps,
+            buildCtx("add to my wishlist all the five", conversation),
+        );
+
+        assert.equal(pipelineRequests.length, 5);
+        assert.deepEqual(
+            pipelineRequests.map((request) => (request as { description: string }).description),
+            displayedJobs.map(({ title, company }) => `${title} at ${company}`),
+        );
+        assert.equal(alertRequests.length, 5);
+        assert.deepEqual(
+            alertRequests.map((request) => (request as { jobTitle: string }).jobTitle),
+            displayedJobs.map(({ title }) => title),
+        );
+        assert.match(response?.reply ?? "", /added all 5 roles to your pipeline wishlist/i);
+        assert.match(response?.reply ?? "", /alerts? (?:are|is) active/i);
+        assert.doesNotMatch(response?.reply ?? "", /added the Lead Full-Stack Developer role/i);
+    });
+
     it("does not treat a bare yes as an add once awaitingPipelineDecision is cleared", async () => {
         const appended: string[] = [];
         const searchCalled = { value: false };
@@ -273,6 +348,9 @@ describe("checkIfNeededAddToPipeline", () => {
             jobs: [cellebrite, checkPoint],
             focus: cellebrite,
         });
+        const recommendation = conversation.jobContext?.jobRecommendationContext;
+        assert.ok(recommendation);
+        recommendation.acceptedJobIds = [cellebrite.id];
         const response = await checkIfNeededAddToPipeline(
             deps,
             buildCtx("yes", conversation),
@@ -283,6 +361,40 @@ describe("checkIfNeededAddToPipeline", () => {
 });
 
 describe("runStage2Shortcuts pipeline ordering", () => {
+    it("ends the current chat instead of searching again when the user declines further help", async () => {
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"shouldEndConversation":true}',
+            appended,
+            searchCalled,
+        });
+        const conversation = buildConversation({
+            awaitingPipelineDecision: false,
+            jobs: [cellebrite, checkPoint],
+            focus: cellebrite,
+        });
+        const recommendation = conversation.jobContext?.jobRecommendationContext;
+        assert.ok(recommendation);
+        recommendation.acceptedJobIds = [cellebrite.id];
+        conversation.messages = [{
+            role: "assistant",
+            content: "Rust Software Developer is already in your pipeline. Want to explore another opportunity or prepare for interviews?",
+            timestamp: new Date(),
+        }];
+
+        const response = await runStage2Shortcuts(
+            deps,
+            buildCtx("no thanks", conversation),
+        );
+
+        assert.ok(response);
+        assert.equal(searchCalled.value, false);
+        assert.match(response.reply, /you're all set/i);
+        assert.match(response.reply, /available.*whenever|whenever.*available/i);
+        assert.equal(appended.at(-1), response.reply);
+    });
+
     it("handles add-to-pipeline before near-term search when awaiting a pipeline decision", async () => {
         const appended: string[] = [];
         const searchCalled = { value: false };

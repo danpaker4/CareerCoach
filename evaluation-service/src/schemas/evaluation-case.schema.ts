@@ -16,6 +16,8 @@ const evaluationExpectedShape = {
     mode: EvaluationModeSchema.optional(),
     maxLines: z.number().optional(),
     mustAskQuestion: z.boolean().optional(),
+    mustEndConversation: z.boolean().optional(),
+    mustReturnNoJobs: z.boolean().optional(),
     forbiddenWords: z.array(z.string()).optional(),
 } as const;
 
@@ -23,18 +25,22 @@ const hasAtLeastOneExpectedCheck = (expected: {
     mode?: unknown;
     maxLines?: unknown;
     mustAskQuestion?: unknown;
+    mustEndConversation?: unknown;
+    mustReturnNoJobs?: unknown;
     forbiddenWords?: unknown;
 }): boolean =>
     expected.mode !== undefined ||
     expected.maxLines !== undefined ||
     expected.mustAskQuestion !== undefined ||
+    expected.mustEndConversation !== undefined ||
+    expected.mustReturnNoJobs !== undefined ||
     (Array.isArray(expected.forbiddenWords) && expected.forbiddenWords.length > 0);
 
 /** Strict validation for create/upload requests. */
 export const EvaluationExpectedInputSchema = z
     .object(evaluationExpectedShape)
     .refine(hasAtLeastOneExpectedCheck, {
-        message: "expected must include at least one of: mode, maxLines, mustAskQuestion, forbiddenWords",
+        message: "expected must include at least one supported check",
     });
 
 /** Lenient shape for documents already stored. */

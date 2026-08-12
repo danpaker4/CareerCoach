@@ -15,6 +15,9 @@ export type CatalogResource = {
     readonly type: "course" | "video" | "practice" | "article" | "docs" | "repository" | "certification";
     readonly capabilityIds: readonly string[];
     readonly effortHours: number;
+    readonly costType?: "free" | "paid" | "free-audit";
+    readonly difficulty?: "beginner" | "intermediate" | "advanced";
+    readonly lastVerifiedAt?: string;
 };
 
 export type StageTemplate = {

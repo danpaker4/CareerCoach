@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-unemployed-cyber-analyst",
+  "description": "An unemployed cybersecurity learner gets project evidence routes without employer-dependent tasks",
+  "tags": ["roadmap", "action-plan", "unemployed", "cyber"],
+  "request": {
+    "dreamJob": "Cybersecurity Analyst",
+    "targetYears": 3,
+    "startingPoint": { "currentJob": "Not yet employed", "userSkills": ["Networking"], "isEntryLevel": true, "roleExperienceYears": 0, "roleExperienceLevel": "entry" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "project"],
+    "expectedProjectLevel": "beginner",
+    "expectedProjectHours": 20,
+    "forbidInternalMission": true,
+    "expectedFirstRoleFit": "prepare-first",
+    "expectedInternalMoveSuitable": false
+  }
+}

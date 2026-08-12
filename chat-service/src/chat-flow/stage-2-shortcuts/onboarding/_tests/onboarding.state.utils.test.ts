@@ -79,7 +79,7 @@ describe("buildOnboardingPrompt", () => {
 
         assert.match(prompt, /CHAT_STATED_FACTS: yearsOfExperience=5/);
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
-        assert.match(prompt, /exact role and years/i);
+        assert.match(prompt, /correct spelling.*natural professional language/i);
         assert.match(prompt, /do not replace or contradict/i);
     });
 
@@ -274,11 +274,11 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.background?.summary, "software developer for about 5 years at IDF");
         assert.equal(
             step.reply,
-            "Nice — software developer for about 5 years. Are you looking for a job now?",
+            "Nice — you have about 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
         );
     });
 
-    it("keeps a natural reviewed model reply", () => {
+    it("uses a normalized acknowledgement instead of echoing the model reply", () => {
         const modelReply = "Great — you have worked as a software developer for 5 years. What kind of role would you like next?";
         const step = applyOnboardingDecision(
             defaultOnboardingFlow(),
@@ -295,7 +295,10 @@ describe("applyOnboardingDecision", () => {
             "in the last 5 years im software developer",
         );
 
-        assert.equal(step.reply, modelReply);
+        assert.equal(
+            step.reply,
+            "Nice — you have about 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+        );
         assert.equal(step.onboardingFlow.background?.role, "software developer");
         assert.equal(step.onboardingFlow.background?.yearsOfExperience, 5);
     });

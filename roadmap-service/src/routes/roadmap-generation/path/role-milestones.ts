@@ -449,6 +449,97 @@ const trimMilestones = (milestones: readonly RoleMilestone[], targetYears: numbe
     return [...milestones];
 };
 
+const buildExecutiveMilestones = (dreamJob: string): readonly RoleMilestone[] => [
+    {
+        id: "ms.executive.domain",
+        label: `Build credible domain experience for ${dreamJob}`,
+        howToGetThere: "Work close to customers and the core product in the target industry. Use focused courses to close domain gaps, then apply them in a substantial workplace or side project.",
+        whatYouGain: "Evidence that you understand the market, customers, product economics, and operating constraints—not only the destination title.",
+        whyItMatters: `A credible path to ${dreamJob} starts with sustained industry and customer understanding.`,
+        targetRole: "Domain specialist / product contributor",
+        progressionType: "hybrid",
+        capabilityIds: ["cap.professional.experience", "cap.product.sense", "cap.project.ownership"],
+        actions: [
+            "Complete focused domain and product coursework",
+            "Ship a customer-facing workplace project or a validated side project",
+            "Interview customers or stakeholders and document the business problem and measurable outcome",
+        ],
+        completionCriteria: ["One substantial shipped project", "Documented customer evidence and measurable outcome"],
+        minMonths: 6,
+        maxMonths: 18,
+    },
+    {
+        id: "ms.executive.lead-project",
+        label: "Lead a business-critical project",
+        howToGetThere: "Ask for ownership of a larger cross-functional initiative inside your company. If that opportunity is unavailable, lead a serious side project with real users, deadlines, collaborators, and measurable results.",
+        whatYouGain: "Proof that you can align people, make trade-offs, and deliver an outcome beyond your individual tasks.",
+        whyItMatters: "Promotion and management readiness require visible ownership, not course completion alone.",
+        targetRole: "Senior contributor / project lead",
+        progressionType: "experience",
+        capabilityIds: ["cap.project.ownership", "cap.communication", "cap.collaboration"],
+        actions: ["Own scope, milestones, risks, and stakeholder updates", "Lead a cross-functional delivery review", "Record results and a retrospective"],
+        completionCriteria: ["One cross-functional project delivered", "Outcome and leadership evidence reviewed by a manager or collaborator"],
+        minMonths: 6,
+        maxMonths: 18,
+    },
+    {
+        id: "ms.executive.manage",
+        label: "Earn a people-management promotion",
+        howToGetThere: "Seek an internal team-lead or manager promotion first when your company can provide real reports and accountability. Otherwise, move to a role where coaching, hiring, prioritization, and team outcomes are explicit responsibilities.",
+        whatYouGain: "Real experience managing people, performance, hiring, priorities, and team delivery.",
+        whyItMatters: "Company leadership cannot be learned only through individual work or side projects.",
+        targetRole: "Team Lead / Manager",
+        progressionType: "experience",
+        capabilityIds: ["cap.leadership", "cap.project.ownership", "cap.communication"],
+        actions: ["Lead recurring planning and feedback cycles", "Coach team members and participate in hiring", "Deliver team-level outcomes for at least two planning cycles"],
+        completionCriteria: ["Sustained formal or equivalent people leadership", "Documented team outcomes and coaching evidence"],
+        minMonths: 12,
+        maxMonths: 30,
+    },
+    {
+        id: "ms.executive.finance",
+        label: "Learn finance and own a budget",
+        howToGetThere: "Study corporate finance and operating metrics, then ask to own a budget, forecast, vendor decision, pricing analysis, or business case with financial consequences.",
+        whatYouGain: "Working fluency in cash flow, unit economics, budgeting, forecasting, and return on investment.",
+        whyItMatters: "A chief executive allocates scarce capital and is accountable for company economics.",
+        targetRole: "Manager / Director with budget ownership",
+        progressionType: "hybrid",
+        capabilityIds: ["cap.business.finance", "cap.project.ownership"],
+        actions: ["Complete one finance course", "Build a forecast or business case", "Own or shadow a real budget and review variance against plan"],
+        completionCriteria: ["Finance course checked complete", "Reviewed financial model or budget outcome"],
+        minMonths: 4,
+        maxMonths: 12,
+    },
+    {
+        id: "ms.executive.gm",
+        label: "Lead multiple teams or a business function",
+        howToGetThere: "Progress to director, VP, head-of-function, or general-manager scope. Own leaders, strategy, operating cadence, customers, and a meaningful budget or revenue target.",
+        whatYouGain: "Executive-scale proof across organization design, strategy, finance, hiring, and cross-functional delivery.",
+        whyItMatters: `This is the closest operating rehearsal for ${dreamJob}.`,
+        targetRole: "Director / VP / General Manager",
+        progressionType: "experience",
+        capabilityIds: ["cap.executive.leadership", "cap.leadership", "cap.business.finance"],
+        actions: ["Own a multi-team strategy and operating plan", "Manage managers or several workstreams", "Present results and trade-offs to executive stakeholders"],
+        completionCriteria: ["Multi-team or function-level tenure", "Evidence of budget, strategy, and organization-level outcomes"],
+        minMonths: 18,
+        maxMonths: 48,
+    },
+    {
+        id: "ms.executive.destination",
+        label: `Prepare for and pursue ${dreamJob}`,
+        howToGetThere: "Package a track record of domain insight, customer outcomes, team building, financial ownership, and strategy. Pursue founder, succession, or external executive opportunities that fit that evidence.",
+        whatYouGain: "A coherent executive narrative and evidence portfolio for the exact target role.",
+        whyItMatters: "The final move depends on demonstrated company-building scope, not title aspiration alone.",
+        targetRole: dreamJob,
+        progressionType: "experience",
+        capabilityIds: ["cap.executive.leadership", "cap.business.finance", "cap.communication"],
+        actions: ["Build an executive evidence portfolio", `Network with leaders and investors relevant to ${dreamJob}`, "Apply to or create opportunities matching the target context"],
+        completionCriteria: ["Executive evidence portfolio reviewed", "Active qualified conversations for the exact target role"],
+        minMonths: 6,
+        maxMonths: 24,
+    },
+];
+
 export const resolveRoleMilestonePlan = (params: {
     readonly dreamJob: string;
     readonly targetYears: number;
@@ -457,6 +548,13 @@ export const resolveRoleMilestonePlan = (params: {
 }): RoleMilestonePlan | null => {
     const archetype = resolveRoleArchetype(params.dreamJob);
     const zeroKnowledge = params.isEntryLevel || params.hasNoSkills;
+
+    if (archetype === "executive") {
+        return {
+            milestones: trimMilestones(buildExecutiveMilestones(params.dreamJob), params.targetYears),
+            reasonCodes: ["role_milestones", "executive", "jobs_projects_learning", "exact_target_preserved"],
+        };
+    }
 
     if (archetype === "executive_cyber" && zeroKnowledge) {
         return {

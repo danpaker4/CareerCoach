@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-operations-to-supply-chain",
+  "description": "An operations specialist gets a practical internal route toward supply-chain management",
+  "tags": ["roadmap", "action-plan", "employed", "operations"],
+  "request": {
+    "dreamJob": "Supply Chain Manager",
+    "targetYears": 4,
+    "startingPoint": { "currentJob": "Operations Specialist", "userSkills": ["Process mapping", "Vendor coordination"], "isEntryLevel": false, "roleExperienceYears": 2, "roleExperienceLevel": "mid" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

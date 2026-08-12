@@ -44,9 +44,16 @@ export const isNegativeConfirmation = (message: string): boolean => {
 };
 
 export const inferDreamJobTitleFromMessage = (message: string): string | undefined => {
-    const normalized = message.toLowerCase();
+    const trimmed = message.trim();
+    const normalized = trimmed.toLowerCase();
+    const detailedGoalMatch = trimmed.match(
+        /\b(?:be(?:come)?|as|to)\s+(?:an?\s+)?((?:chief executive officer|ceo|chief technology officer|cto|founder|co-founder)\b[^.!?]*)/i
+    );
+    if (detailedGoalMatch?.[1] && detailedGoalMatch[1].trim().split(/\s+/).length > 1) {
+        return normalizeDreamJobTitle(detailedGoalMatch[1]);
+    }
     if (/\bfounder\b/.test(normalized) && (/\bstartup\b/.test(normalized) || /\bcompany\b/.test(normalized))) {
-        return "Founder";
+        return normalizeDreamJobTitle(trimmed);
     }
     if (/\bchief technology officer\b|\bcto\b/.test(normalized)) {
         return "Chief Technology Officer";
@@ -65,11 +72,26 @@ export const normalizeDreamJobTitle = (title: string): string => {
     if (trimmed.length === 0) {
         return "";
     }
-    return trimmed
+    const normalized = trimmed
         .split(/\s+/)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .map((word, index) => {
+            const lower = word.toLowerCase();
+            if (index > 0 && ["a", "an", "at", "in", "of", "the"].includes(lower)) return lower;
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
         .join(" ");
+    return normalized
+        .replace(/\bCeo\b/g, "CEO")
+        .replace(/\bCto\b/g, "CTO")
+        .replace(/\bCiso\b/g, "CISO")
+        .replace(/\bCoo\b/g, "COO");
 };
+
+export const chooseMostSpecificDreamJobTitle = (...titles: readonly (string | undefined)[]): string | undefined =>
+    titles
+        .filter((title): title is string => title !== undefined && title.trim().length > 0)
+        .map(normalizeDreamJobTitle)
+        .sort((left, right) => right.split(/\s+/).length - left.split(/\s+/).length)[0];
 
 const clampTargetYears = (years: number): number | undefined => {
     if (!Number.isFinite(years)) return undefined;

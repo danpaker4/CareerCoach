@@ -12,6 +12,7 @@ import { tryQuickHelpShortcutResponse } from "./quick-help/run-quick-help";
 import { tryRefineSearchOfferResponse } from "./refine-search/refine-search-shortcut";
 import { tryRoleConflictShortcutResponse } from "./role-conflict/role-conflict-shortcut";
 import { tryWishlistConfirmationResponse } from "./wanted-jobs/wishlist-shortcut";
+import { tryConversationEndResponse } from "./conversation-ending/conversation-ending-shortcut";
 
 const hasShortlistJobs = (ctx: SendMessagePreparedContext): boolean =>
     ((ctx.conversationAfterUserMessage.jobContext?.allReturnedJobs
@@ -49,6 +50,11 @@ export const runStage2Shortcuts = async (
         if (followUpResponse) {
             return followUpResponse;
         }
+    }
+
+    const conversationEndResponse = await tryConversationEndResponse(deps, ctx);
+    if (conversationEndResponse) {
+        return conversationEndResponse;
     }
 
     const nearTermPivot = isNearTermPivotMessage(ctx.normalizedMessage);

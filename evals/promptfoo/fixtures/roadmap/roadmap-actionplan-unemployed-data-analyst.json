@@ -1,0 +1,20 @@
+{
+  "id": "roadmap-actionplan-unemployed-data-analyst",
+  "description": "An unemployed beginner receives project-first or combined routes with beginner project briefs",
+  "tags": ["roadmap", "action-plan", "unemployed", "beginner"],
+  "request": {
+    "dreamJob": "Data Analyst",
+    "targetYears": 3,
+    "startingPoint": { "currentJob": "Not yet employed", "userSkills": ["Excel"], "isEntryLevel": true, "roleExperienceYears": 0, "roleExperienceLevel": "entry" }
+  },
+  "expected": {
+    "minStages": 1,
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "project"],
+    "expectedProjectLevel": "beginner",
+    "expectedProjectHours": 20,
+    "forbidInternalMission": true,
+    "expectedFirstRoleFit": "prepare-first",
+    "expectedInternalMoveSuitable": false
+  }
+}
