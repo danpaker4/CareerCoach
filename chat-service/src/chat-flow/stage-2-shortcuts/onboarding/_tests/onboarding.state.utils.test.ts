@@ -191,13 +191,39 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.background?.role, "software developer");
     });
 
+    it("ignores a spurious near-term mode when the background message has no job-search intent", () => {
+        const expectedReply =
+            "You have 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?";
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            {
+                response: expectedReply,
+                background: {
+                    status: "FOUND",
+                    role: "software developer",
+                    yearsOfExperience: 5,
+                },
+                mode: "NEAR_TERM",
+                advance: true,
+            },
+            "my name is gal kosover and in the last 5 years im software developer",
+        );
+
+        assert.match(step.reply, /Are you looking for a job now/i);
+        assert.doesNotMatch(step.reply, /same role|different role/i);
+        assert.equal(step.onboardingFlow.backgroundResolved, true);
+        assert.equal(step.onboardingFlow.directionResolved, false);
+        assert.equal(step.onboardingFlow.completed, false);
+        assert.equal(step.onboardingFlow.initialMode, undefined);
+    });
+
     it("completes onboarding in one turn when background and near-term intent arrive together", () => {
         const step = applyOnboardingDecision(
             defaultOnboardingFlow(),
             {
                 response: "Looking for automation QA roles now.",
                 background: { status: "FOUND", role: "automation qa engineer" },
-                mode: null,
+                mode: "NEAR_TERM",
                 advance: true,
             },
             "show me jobs for automation qa engineer",
