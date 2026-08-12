@@ -9,3 +9,6 @@ export const QUICK_HELP_INTERVIEW_PLAN_ATTEMPTS = 2;
 
 export const QUICK_HELP_INTERVIEW_ASK_TOPIC =
     "Absolutely — what role or subject are you preparing for? For example: React, system design, or behavioral questions for a PM role.";
+
+export const QUICK_HELP_INTERVIEW_ASK_EXPERIENCE = (topic: string): string =>
+    `How many years of experience do you have with ${topic}?`;

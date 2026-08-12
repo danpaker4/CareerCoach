@@ -1,9 +1,13 @@
 export const buildInterviewQuestionsPrompt = (params: {
     topic: string;
     count: number;
+    difficulty: string;
 }): string => `Create ${params.count} interview practice questions about: ${params.topic}
 
+Difficulty: ${params.difficulty}
+
 Rules:
+- Treat the requested topic as a hard content boundary. Do not introduce roles, technologies, skills, or adjacent subjects outside it.
 - Questions must be theoretical / conceptual (definitions, tradeoffs, when to use X, how concepts relate).
 - Sound like a friendly interviewer speaking naturally, not a test generator.
 - Do NOT ask the candidate to write code, functions, algorithms, SQL queries, or step-by-step implementations.
@@ -20,27 +24,25 @@ No spoilers or answer keys in the questions.`;
 
 export const buildInterviewTopicPlanPrompt = (params: {
     request: string;
-    profileContext: string;
 }): string => `Plan the start of a spoken interview-practice session.
 
-Candidate request: ${params.request}
-Known candidate context: ${params.profileContext}
+Chosen interview topic: ${params.request}
 
 Decide whether the request is broad or already specific:
 - Use "offer_options" for a broad role, profession, or large subject where choosing a focus would improve practice.
 - Use "start_practice" when the request already names a focused skill, concept, or interview area.
 
 For "offer_options":
-- Generate exactly two best-fit options tailored to the request and candidate context.
+- Generate exactly two direct subtopics of the chosen interview topic.
+- Treat the chosen topic as a hard boundary. Do not introduce profile details, roles, technologies, skills, or adjacent subjects.
 - Each option needs a short title and one short sentence explaining what that area tests and the kind of spoken practice it includes.
 - The two options must be distinct and useful.
 - Do not request code, pseudocode, drawings, diagrams, or whiteboarding.
-- Do not use a predefined or generic fixed menu; choose what best fits this candidate and request.
+- Do not use a predefined or generic fixed menu; choose what best fits the chosen topic.
 
 Return ONLY JSON in one of these forms:
 {
   "action": "offer_options",
-  "introduction": "One short sentence explaining why these focuses fit.",
   "options": [
     { "title": "First focus", "description": "What it tests and what spoken questions it includes." },
     { "title": "Second focus", "description": "What it tests and what spoken questions it includes." }
@@ -50,6 +52,22 @@ Return ONLY JSON in one of these forms:
 or:
 {
   "action": "start_practice"
+}`;
+
+export const buildInterviewOptionsValidationPrompt = (params: {
+    topic: string;
+    options: readonly { title: string; description: string }[];
+}): string => `Validate interview-practice focus options against the user's chosen topic.
+
+Chosen topic: ${params.topic}
+Options:
+${params.options.map((option) => `- ${option.title}: ${option.description}`).join("\n")}
+
+Return withinTopic=true only when every option is a direct subtopic of the chosen topic. Return false if an option adds an adjacent profession, technology, skill, or subject that the user did not request.
+
+Return ONLY JSON:
+{
+  "withinTopic": true
 }`;
 
 export const buildInterviewFocusSelectionPrompt = (params: {

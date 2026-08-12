@@ -2,6 +2,8 @@ export type InterviewQuestionsLlmResult = {
     questions: string[];
 };
 
+export type InterviewDifficulty = "easy" | "medium" | "hard";
+
 export type InterviewFocusOption = {
     id: string;
     title: string;

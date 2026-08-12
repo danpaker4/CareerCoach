@@ -1,4 +1,5 @@
 import type {
+    InterviewDifficulty,
     InterviewFocusOption,
     InterviewFocusSelectionLlmResult,
     InterviewGradeLlmResult,
@@ -7,7 +8,6 @@ import type {
     InterviewTeachingStatus,
     InterviewTopicPlanLlmResult,
 } from "./interview-prep.types";
-import type { UserCareerProfile } from "../../../../routes/career-profile/career-profile.types";
 import type { RoleExperienceEntry } from "../../../../routes/external-chat-tools/role-experience.types";
 import {
     QUICK_HELP_INTERVIEW_FEEDBACK_MAX_CHARS,
@@ -47,25 +47,66 @@ export const isInterviewFeedbackChallenge = (message: string): boolean =>
 export const isLegacyInterviewAcknowledgement = (message: string): boolean =>
     /^(got it|i understand|makes sense|okay|ok|clear|thanks)[.!]?$/i.test(message.trim());
 
-export const buildInterviewProfileContext = (
-    profile: UserCareerProfile,
-    roleExperience: readonly RoleExperienceEntry[]
-): string => {
-    const technologies = profile.technologies.map((signal) => signal.value).slice(0, 8);
-    const preferredRoles = profile.preferredRoles.map((signal) => signal.value).slice(0, 4);
-    const strengths = profile.strengths.map((signal) => signal.value).slice(0, 5);
-    const roles = roleExperience.slice(0, 4).map((role) =>
-        `${role.displayLabel}: ${role.years} years (${role.level})`
+export const extractInterviewTopicCorrection = (message: string): string | undefined => {
+    const correction = message.match(/\bi\s+(?:said|asked\s+for)\s+(.+?)(?:[,.;]?\s+(?:not|instead\s+of)\b|$)/i)?.[1]
+        ?? message.match(/\bi\s+want(?:ed)?\s+(.+?)\s+(?:not|instead\s+of)\b/i)?.[1];
+    const trimmedCorrection = correction?.trim();
+    return trimmedCorrection && trimmedCorrection.length > 0 ? trimmedCorrection : undefined;
+};
+
+const INTERVIEW_TOPIC_STOP_WORDS = new Set([
+    "a", "an", "about", "for", "help", "i", "interview", "interviews", "me", "prepare", "preparing", "should",
+    "study", "the", "to", "what", "with",
+]);
+
+const normalizeInterviewWords = (value: string): string[] =>
+    value.toLowerCase().replace(/[^a-z0-9+#.]+/g, " ").trim().split(/\s+/).filter(Boolean);
+
+const getInterviewTopicKeywords = (topic: string): string[] =>
+    normalizeInterviewWords(topic).filter((word) => !INTERVIEW_TOPIC_STOP_WORDS.has(word));
+
+export const parseInterviewDifficulty = (message: string): InterviewDifficulty | undefined => {
+    if (/\b(easy|beginner)\b/i.test(message)) return "easy";
+    if (/\b(medium|intermediate)\b/i.test(message)) return "medium";
+    if (/\b(hard|advanced|expert)\b/i.test(message)) return "hard";
+    return undefined;
+};
+
+export const mapInterviewYearsToDifficulty = (years: number): InterviewDifficulty => {
+    if (years < 2) return "easy";
+    if (years > 10) return "hard";
+    return "medium";
+};
+
+export const parseInterviewExperienceYears = (message: string): number | undefined => {
+    const qualifiedMatch = message.match(
+        /\b(?:(less\s+than|under|more\s+than|over)\s+)?(\d{1,2}(?:\.\d+)?)\s*(\+)?\s*(?:years?|yrs?)\b/i
     );
-    const parts = [
-        profile.senioritySignal ? `Seniority: ${profile.senioritySignal}` : "",
-        profile.profileSummaryText ? `Summary: ${profile.profileSummaryText}` : "",
-        technologies.length > 0 ? `Technologies: ${technologies.join(", ")}` : "",
-        preferredRoles.length > 0 ? `Preferred roles: ${preferredRoles.join(", ")}` : "",
-        strengths.length > 0 ? `Strengths: ${strengths.join(", ")}` : "",
-        roles.length > 0 ? `Role experience: ${roles.join("; ")}` : "",
-    ].filter(Boolean);
-    return parts.length > 0 ? parts.join("\n") : "No profile details are available; infer sensible options from the request.";
+    const plainMatch = message.trim().match(/^(\d{1,2}(?:\.\d+)?)$/);
+    const rawYears = qualifiedMatch?.[2] ?? plainMatch?.[1];
+    if (!rawYears) return undefined;
+    const years = Number.parseFloat(rawYears);
+    if (!Number.isFinite(years) || years < 0 || years > 60) return undefined;
+    const qualifier = qualifiedMatch?.[1]?.toLowerCase();
+    if (qualifier === "less than" || qualifier === "under") return Math.max(0, years - 0.01);
+    if (qualifier === "more than" || qualifier === "over" || qualifiedMatch?.[3] === "+") return years + 0.01;
+    return years;
+};
+
+export const resolveInterviewDifficulty = (
+    topic: string,
+    roleExperience: readonly RoleExperienceEntry[]
+): InterviewDifficulty | undefined => {
+    const explicitDifficulty = parseInterviewDifficulty(topic);
+    if (explicitDifficulty) return explicitDifficulty;
+
+    const topicKeywords = getInterviewTopicKeywords(topic);
+    if (topicKeywords.length === 0) return undefined;
+    const relevantRole = roleExperience.find((role) => {
+        const roleWords = new Set(normalizeInterviewWords(role.displayLabel));
+        return topicKeywords.every((keyword) => roleWords.has(keyword));
+    });
+    return relevantRole ? mapInterviewYearsToDifficulty(relevantRole.years) : undefined;
 };
 
 export const parseInterviewTopicPlan = (parsed: Record<string, unknown> | null): InterviewTopicPlanLlmResult => {
@@ -96,9 +137,7 @@ export const parseInterviewTopicPlan = (parsed: Record<string, unknown> | null):
     if (!first || !second || first.title.toLowerCase() === second.title.toLowerCase()) {
         return { action: "invalid" };
     }
-    const introduction = typeof parsed.introduction === "string" && parsed.introduction.trim().length > 0
-        ? compactInterviewText(parsed.introduction, 240, 1)
-        : "Here are the two strongest areas to begin with.";
+    const introduction = "Here are two focused areas within the topic you chose.";
     return { action: "offer_options", introduction, options: [first, second] };
 };
 

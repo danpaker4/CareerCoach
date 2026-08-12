@@ -8,6 +8,7 @@ import {
 import {
     buildInterviewGradePrompt,
     buildInterviewFocusSelectionPrompt,
+    buildInterviewOptionsValidationPrompt,
     buildInterviewQuestionsPrompt,
     buildInterviewReconsiderationPrompt,
     buildInterviewTeachingPrompt,
@@ -32,23 +33,36 @@ import {
 
 const requestInterviewTopicPlan = async (
     textCompletion: TextCompletionPort,
-    params: { request: string; profileContext: string; userId: string },
+    params: { request: string; userId: string },
     attempt: number
 ): Promise<InterviewTopicPlanLlmResult> => {
     const raw = await textCompletion.complete(
-        buildInterviewTopicPlanPrompt({ request: params.request, profileContext: params.profileContext }),
+        buildInterviewTopicPlanPrompt({ request: params.request }),
         { operation: "chat.quick_help.interview_plan", userId: params.userId, responseFormat: "json" }
     );
     const plan = parseInterviewTopicPlan(parseJsonObjectFromLlm(raw));
-    if (plan.action !== "invalid" || attempt >= QUICK_HELP_INTERVIEW_PLAN_ATTEMPTS) {
+    if (plan.action === "start_practice") {
         return plan;
+    }
+    if (plan.action === "offer_options") {
+        const validationRaw = await textCompletion.complete(
+            buildInterviewOptionsValidationPrompt({ topic: params.request, options: plan.options }),
+            { operation: "chat.quick_help.interview_options_validation", userId: params.userId, responseFormat: "json" }
+        );
+        const validation = parseJsonObjectFromLlm(validationRaw);
+        if (validation?.withinTopic === true) {
+            return plan;
+        }
+    }
+    if (attempt >= QUICK_HELP_INTERVIEW_PLAN_ATTEMPTS) {
+        return { action: "invalid" };
     }
     return requestInterviewTopicPlan(textCompletion, params, attempt + 1);
 };
 
 export const planInterviewTopic = async (
     textCompletion: TextCompletionPort,
-    params: { request: string; profileContext: string; userId: string }
+    params: { request: string; userId: string }
 ): Promise<InterviewTopicPlanLlmResult> => requestInterviewTopicPlan(textCompletion, params, 1);
 
 export const selectInterviewFocus = async (
@@ -69,10 +83,14 @@ export const selectInterviewFocus = async (
 
 export const generateInterviewQuestions = async (
     textCompletion: TextCompletionPort,
-    params: { topic: string; userId: string }
+    params: { topic: string; difficulty: string; userId: string }
 ): Promise<InterviewQuestionsLlmResult> => {
     const raw = await textCompletion.complete(
-        buildInterviewQuestionsPrompt({ topic: params.topic, count: QUICK_HELP_INTERVIEW_QUESTION_COUNT }),
+        buildInterviewQuestionsPrompt({
+            topic: params.topic,
+            count: QUICK_HELP_INTERVIEW_QUESTION_COUNT,
+            difficulty: params.difficulty,
+        }),
         { operation: "chat.quick_help.interview_questions", userId: params.userId, responseFormat: "json" }
     );
     const parsed = parseJsonObjectFromLlm(raw);

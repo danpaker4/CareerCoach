@@ -183,20 +183,23 @@ describe("runInterviewPrepFlow", () => {
             completionPrompts,
             replies,
             flowUpdates,
-            completionResponses: [JSON.stringify({
-                action: "offer_options",
-                introduction: "These are the two strongest areas for your background.",
-                options: [
-                    {
-                        title: "Architecture tradeoffs",
-                        description: "Practice explaining design choices, scaling, and operational tradeoffs.",
-                    },
-                    {
-                        title: "Engineering collaboration",
-                        description: "Practice discussing reviews, incidents, and decisions with teammates.",
-                    },
-                ],
-            })],
+            completionResponses: [
+                JSON.stringify({
+                    action: "offer_options",
+                    introduction: "These are the two strongest areas for your background.",
+                    options: [
+                        {
+                            title: "Architecture tradeoffs",
+                            description: "Practice explaining design choices, scaling, and operational tradeoffs.",
+                        },
+                        {
+                            title: "Engineering collaboration",
+                            description: "Practice discussing reviews, incidents, and decisions with teammates.",
+                        },
+                    ],
+                }),
+                JSON.stringify({ withinTopic: true }),
+            ],
         });
 
         const response = await runInterviewPrepFlow(
@@ -222,15 +225,178 @@ describe("runInterviewPrepFlow", () => {
             false
         );
 
-        assert.equal(completionPrompts.length, 1);
+        assert.equal(completionPrompts.length, 2);
         assert.match(completionPrompts[0] ?? "", /decide whether/i);
-        assert.match(completionPrompts[0] ?? "", /TypeScript/i);
-        assert.match(completionPrompts[0] ?? "", /Software Engineer: 5 years/i);
+        assert.doesNotMatch(completionPrompts[0] ?? "", /TypeScript|Software Engineer: 5 years/i);
+        assert.match(completionPrompts[1] ?? "", /Validate interview-practice focus options/i);
         assert.match(response.reply, /Architecture tradeoffs/i);
         assert.match(response.reply, /Practice explaining design choices/i);
         assert.match(response.reply, /Engineering collaboration/i);
         assert.doesNotMatch(response.reply, /technical fundamentals/i);
         assert.equal(flowUpdates.at(-1)?.step, "awaiting_focus");
+    });
+
+    it("keeps profile-only subjects out of the chosen interview topic", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [
+                JSON.stringify({
+                    action: "offer_options",
+                    introduction: "These focuses fit your QA Automation & Performance Engineer background.",
+                    options: [
+                        { title: "Automation strategies", description: "Practice automation planning and coverage." },
+                        { title: "Performance engineering", description: "Practice finding and measuring bottlenecks." },
+                    ],
+                }),
+                JSON.stringify({ withinTopic: false }),
+                JSON.stringify({
+                    action: "offer_options",
+                    options: [
+                        { title: "Automation strategies", description: "Practice automation planning and coverage." },
+                        { title: "Framework reliability", description: "Practice maintainable suites and flaky-test control." },
+                    ],
+                }),
+                JSON.stringify({ withinTopic: true }),
+            ],
+        });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext(
+                "QA automation",
+                { kind: "interview_prep", step: "awaiting_topic" },
+                [],
+                {
+                    technologies: ["JMeter"],
+                    roleExperience: [{
+                        roleKey: "qa-automation-performance-engineer",
+                        displayLabel: "QA Automation & Performance Engineer",
+                        years: 2,
+                        level: "mid",
+                        evidence: ["test"],
+                        source: "chat",
+                        updatedAt: new Date(),
+                    }],
+                }
+            ),
+            false
+        );
+
+        assert.doesNotMatch(completionPrompts[0] ?? "", /Performance Engineer|JMeter/i);
+        assert.doesNotMatch(response.reply, /performance engineering|Performance Engineer|JMeter/i);
+        assert.match(response.reply, /Automation strategies/i);
+        assert.match(response.reply, /Framework reliability/i);
+        assert.equal(flowUpdates.at(-1)?.step, "awaiting_focus");
+    });
+
+    it("asks for relevant experience when difficulty cannot be determined", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({ completionPrompts, replies, flowUpdates });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext("QA automation", { kind: "interview_prep", step: "awaiting_topic" }),
+            false
+        );
+
+        assert.equal(completionPrompts.length, 0);
+        assert.match(response.reply, /how many years of experience.*QA automation/i);
+        assert.equal(flowUpdates.at(-1)?.step, "awaiting_experience");
+        assert.equal(flowUpdates.at(-1)?.baseTopic, "QA automation");
+    });
+
+    it("uses stated years only for question difficulty", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [
+                JSON.stringify({ action: "start_practice" }),
+                JSON.stringify({ questions: ["What makes an automated test reliable?"] }),
+            ],
+        });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext("1.5 years", {
+                kind: "interview_prep",
+                step: "awaiting_experience",
+                topic: "QA automation",
+                baseTopic: "QA automation",
+            }),
+            false
+        );
+
+        assert.match(completionPrompts[0] ?? "", /Chosen interview topic: QA automation/i);
+        assert.doesNotMatch(completionPrompts[0] ?? "", /1\.5 years/i);
+        assert.match(completionPrompts[1] ?? "", /Difficulty: easy/i);
+        assert.match(response.reply, /What makes an automated test reliable/i);
+        assert.equal(flowUpdates.at(-1)?.difficulty, "easy");
+    });
+
+    it("discards existing options when the user corrects the topic", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [
+                JSON.stringify({
+                    action: "offer_options",
+                    options: [
+                        { title: "Automation strategy", description: "Practice choosing valuable automated coverage." },
+                        { title: "Framework reliability", description: "Practice stable and maintainable test suites." },
+                    ],
+                }),
+                JSON.stringify({ withinTopic: true }),
+            ],
+        });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext(
+                "I said QA automation, not performance engineering",
+                {
+                    kind: "interview_prep",
+                    step: "awaiting_focus",
+                    topic: "QA Automation & Performance Engineer",
+                    baseTopic: "QA Automation & Performance Engineer",
+                    focusOptions: [
+                        { id: "option-1", title: "Automation strategy", description: "Practice automation planning." },
+                        { id: "option-2", title: "Performance engineering", description: "Practice bottleneck analysis." },
+                    ],
+                },
+                [],
+                {
+                    roleExperience: [{
+                        roleKey: "qa-automation-performance-engineer",
+                        displayLabel: "QA Automation & Performance Engineer",
+                        years: 2,
+                        level: "mid",
+                        evidence: ["test"],
+                        source: "chat",
+                        updatedAt: new Date(),
+                    }],
+                }
+            ),
+            false
+        );
+
+        assert.match(completionPrompts[0] ?? "", /Chosen interview topic: QA automation/i);
+        assert.doesNotMatch(response.reply, /performance engineering/i);
+        assert.equal(flowUpdates.at(-1)?.baseTopic, "QA automation");
     });
 
     it("chooses a useful focus when the candidate delegates the choice", async () => {
@@ -292,7 +458,22 @@ describe("runInterviewPrepFlow", () => {
 
         const response = await runInterviewPrepFlow(
             deps,
-            buildContext("React useMemo", { kind: "interview_prep", step: "awaiting_topic" }),
+            buildContext(
+                "React useMemo",
+                { kind: "interview_prep", step: "awaiting_topic" },
+                [],
+                {
+                    roleExperience: [{
+                        roleKey: "react-use-memo",
+                        displayLabel: "React useMemo",
+                        years: 5,
+                        level: "mid",
+                        evidence: ["test"],
+                        source: "chat",
+                        updatedAt: new Date(),
+                    }],
+                }
+            ),
             false
         );
 
@@ -320,16 +501,32 @@ describe("runInterviewPrepFlow", () => {
                         { title: "Automation strategy", description: "Practice choosing coverage and tools for product risks." },
                     ],
                 }),
+                JSON.stringify({ withinTopic: true }),
             ],
         });
 
         const response = await runInterviewPrepFlow(
             deps,
-            buildContext("QA automation", { kind: "interview_prep", step: "awaiting_topic" }),
+            buildContext(
+                "QA automation",
+                { kind: "interview_prep", step: "awaiting_topic" },
+                [],
+                {
+                    roleExperience: [{
+                        roleKey: "qa-automation",
+                        displayLabel: "QA Automation Engineer",
+                        years: 2,
+                        level: "mid",
+                        evidence: ["test"],
+                        source: "chat",
+                        updatedAt: new Date(),
+                    }],
+                }
+            ),
             false
         );
 
-        assert.equal(completionPrompts.length, 2);
+        assert.equal(completionPrompts.length, 3);
         assert.match(response.reply, /Reliable automation/i);
         assert.match(response.reply, /Automation strategy/i);
     });
@@ -347,12 +544,27 @@ describe("runInterviewPrepFlow", () => {
 
         const response = await runInterviewPrepFlow(
             deps,
-            buildContext("data engineer", { kind: "interview_prep", step: "awaiting_topic" }),
+            buildContext(
+                "data engineer",
+                { kind: "interview_prep", step: "awaiting_topic" },
+                [],
+                {
+                    roleExperience: [{
+                        roleKey: "data-engineer",
+                        displayLabel: "Data Engineer",
+                        years: 5,
+                        level: "mid",
+                        evidence: ["test"],
+                        source: "chat",
+                        updatedAt: new Date(),
+                    }],
+                }
+            ),
             false
         );
 
         assert.equal(completionPrompts.length, 2);
-        assert.match(response.reply, /which specific interview area/i);
+        assert.match(response.reply, /which specific area within that topic/i);
         assert.doesNotMatch(response.reply, /system design|technical fundamentals|behavioral/i);
     });
 

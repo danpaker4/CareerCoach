@@ -6,6 +6,7 @@ import type { InterviewPrepQuickHelpFlow } from "../../../../routes/conversation
 import { QUICK_HELP_EXIT_REPLY } from "../shared/quick-help.consts";
 import { detectQuickHelpExitIntent } from "../shared/quick-help.utils";
 import {
+    QUICK_HELP_INTERVIEW_ASK_EXPERIENCE,
     QUICK_HELP_INTERVIEW_ASK_TOPIC,
     QUICK_HELP_INTERVIEW_MAX_FOLLOW_UPS,
     QUICK_HELP_INTERVIEW_MAX_TEACHING_ATTEMPTS,
@@ -18,11 +19,15 @@ import {
     reconsiderInterviewAnswer,
     selectInterviewFocus,
 } from "./interview-prep.llm";
-import type { InterviewFocusOption, InterviewGradeLlmResult } from "./interview-prep.types";
+import type { InterviewDifficulty, InterviewFocusOption, InterviewGradeLlmResult } from "./interview-prep.types";
 import {
-    buildInterviewProfileContext,
+    extractInterviewTopicCorrection,
     isInterviewFeedbackChallenge,
     isLegacyInterviewAcknowledgement,
+    mapInterviewYearsToDifficulty,
+    parseInterviewDifficulty,
+    parseInterviewExperienceYears,
+    resolveInterviewDifficulty,
 } from "./interview-prep.utils";
 
 const formatQuestionPrompt = (index: number, total: number, question: string): string =>
@@ -74,6 +79,7 @@ const finishInterview = async (
                 topic: activeFlow.topic,
                 baseTopic: activeFlow.baseTopic,
                 deferredFocus: activeFlow.deferredFocus,
+                difficulty: activeFlow.difficulty,
             });
             return appendReply(
                 deps,
@@ -106,6 +112,7 @@ const moveToNextMainQuestion = async (
         index: nextIndex,
         baseTopic: flow.baseTopic,
         deferredFocus: flow.deferredFocus,
+        difficulty: flow.difficulty,
     });
     return appendReply(deps, ctx, `${feedback}\n\n${formatQuestionPrompt(nextIndex, questions.length, nextQuestion)}`);
 };
@@ -135,6 +142,7 @@ const enterTeachingMode = async (
         teachingAttemptCount: 1,
         baseTopic: flow.baseTopic,
         deferredFocus: flow.deferredFocus,
+        difficulty: flow.difficulty,
     });
     return appendReply(
         deps,
@@ -184,6 +192,7 @@ const respondToGrade = async (
             followUpCount: followUpCount + 1,
             baseTopic: flow.baseTopic,
             deferredFocus: flow.deferredFocus,
+            difficulty: flow.difficulty,
         });
         return appendReply(deps, ctx, `${grade.feedback}\n\n${nextFollowUp}`);
     }
@@ -200,10 +209,12 @@ const startQuestionSet = async (
         questionContext?: string;
         baseTopic?: string;
         deferredFocus?: InterviewFocusOption;
+        difficulty: InterviewDifficulty;
     }
 ): Promise<ChatMessageResponse> => {
     const generated = await generateInterviewQuestions(deps.textCompletion, {
         topic: params.questionContext ?? params.topic,
+        difficulty: params.difficulty,
         userId: ctx.userId,
     });
     const questions = generated.questions;
@@ -216,11 +227,44 @@ const startQuestionSet = async (
         index: 0,
         baseTopic: params.baseTopic,
         deferredFocus: params.deferredFocus,
+        difficulty: params.difficulty,
     });
     return appendReply(
         deps,
         ctx,
         `Great — we'll practice ${params.topic}.\n\n${formatQuestionPrompt(0, questions.length, firstQuestion)}`
+    );
+};
+
+const prepareInterviewTopic = async (
+    deps: ChatFlowDeps,
+    ctx: SendMessagePreparedContext,
+    request: string,
+    difficulty: InterviewDifficulty
+): Promise<ChatMessageResponse> => {
+    const plan = await planInterviewTopic(deps.textCompletion, { request, userId: ctx.userId });
+    if (plan.action === "offer_options") {
+        await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
+            kind: "interview_prep",
+            step: "awaiting_focus",
+            topic: request,
+            baseTopic: request,
+            focusOptions: plan.options,
+            difficulty,
+        });
+        return appendReply(
+            deps,
+            ctx,
+            `${plan.introduction}\n\n${formatFocusOptions(plan.options)}\n\nWhich option should we start with?`
+        );
+    }
+    if (plan.action === "start_practice") {
+        return startQuestionSet(deps, ctx, { topic: request, baseTopic: request, difficulty });
+    }
+    return appendReply(
+        deps,
+        ctx,
+        `I couldn't create two reliable choices within ${request}. Which specific area within that topic would you like to practice?`
     );
 };
 
@@ -261,36 +305,50 @@ export const runInterviewPrepFlow = async (
     const activeFlow: InterviewPrepQuickHelpFlow = flow;
     if (activeFlow.step === "awaiting_topic") {
         const request = ctx.normalizedMessage.trim();
-        const plan = await planInterviewTopic(deps.textCompletion, {
-            request,
-            profileContext: buildInterviewProfileContext(ctx.userCareerProfile, ctx.userRoleExperience),
-            userId: ctx.userId,
-        });
-        if (plan.action === "offer_options") {
+        const difficulty = resolveInterviewDifficulty(request, ctx.userRoleExperience);
+        if (!difficulty) {
             await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
                 kind: "interview_prep",
-                step: "awaiting_focus",
+                step: "awaiting_experience",
                 topic: request,
                 baseTopic: request,
-                focusOptions: plan.options,
             });
-            return appendReply(
-                deps,
-                ctx,
-                `${plan.introduction}\n\n${formatFocusOptions(plan.options)}\n\nWhich option should we start with?`
-            );
+            return appendReply(deps, ctx, QUICK_HELP_INTERVIEW_ASK_EXPERIENCE(request));
         }
-        if (plan.action === "start_practice") {
-            return startQuestionSet(deps, ctx, { topic: request, baseTopic: request });
+        return prepareInterviewTopic(deps, ctx, request, difficulty);
+    }
+
+    if (activeFlow.step === "awaiting_experience") {
+        const request = activeFlow.baseTopic ?? activeFlow.topic;
+        if (!request) {
+            return appendReply(deps, ctx, QUICK_HELP_INTERVIEW_ASK_TOPIC);
         }
-        return appendReply(
-            deps,
-            ctx,
-            `I couldn't create two reliable choices for ${request}. Which specific interview area would you like to practice?`
-        );
+        const statedDifficulty = parseInterviewDifficulty(ctx.normalizedMessage);
+        const statedYears = parseInterviewExperienceYears(ctx.normalizedMessage);
+        const difficulty = statedDifficulty ?? (statedYears === undefined
+            ? undefined
+            : mapInterviewYearsToDifficulty(statedYears));
+        if (!difficulty) {
+            return appendReply(deps, ctx, QUICK_HELP_INTERVIEW_ASK_EXPERIENCE(request));
+        }
+        return prepareInterviewTopic(deps, ctx, request, difficulty);
     }
 
     if (activeFlow.step === "awaiting_focus" || activeFlow.step === "awaiting_first_focus") {
+        const correctedTopic = extractInterviewTopicCorrection(ctx.normalizedMessage);
+        if (correctedTopic) {
+            const correctedDifficulty = resolveInterviewDifficulty(correctedTopic, ctx.userRoleExperience);
+            if (!correctedDifficulty) {
+                await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
+                    kind: "interview_prep",
+                    step: "awaiting_experience",
+                    topic: correctedTopic,
+                    baseTopic: correctedTopic,
+                });
+                return appendReply(deps, ctx, QUICK_HELP_INTERVIEW_ASK_EXPERIENCE(correctedTopic));
+            }
+            return prepareInterviewTopic(deps, ctx, correctedTopic, correctedDifficulty);
+        }
         const options = activeFlow.focusOptions;
         if (!options) {
             await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
@@ -339,6 +397,7 @@ export const runInterviewPrepFlow = async (
             questionContext: `${selectedOption.title} for ${baseTopic}. Focus: ${selectedOption.description}`,
             baseTopic,
             deferredFocus,
+            difficulty: activeFlow.difficulty ?? "medium",
         });
     }
 
@@ -368,6 +427,7 @@ export const runInterviewPrepFlow = async (
             topic: `${savedFocus.title} for ${baseTopic}`,
             questionContext: `${savedFocus.title} for ${baseTopic}. Focus: ${savedFocus.description}`,
             baseTopic,
+            difficulty: activeFlow.difficulty ?? "medium",
         });
     }
 
@@ -398,6 +458,7 @@ export const runInterviewPrepFlow = async (
                 index,
                 baseTopic: activeFlow.baseTopic,
                 deferredFocus: activeFlow.deferredFocus,
+                difficulty: activeFlow.difficulty,
             });
             return appendReply(
                 deps,
