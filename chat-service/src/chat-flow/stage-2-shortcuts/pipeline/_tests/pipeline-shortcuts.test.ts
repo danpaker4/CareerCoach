@@ -335,6 +335,56 @@ describe("checkIfNeededAddToPipeline", () => {
         assert.doesNotMatch(response?.reply ?? "", /added the Lead Full-Stack Developer role/i);
     });
 
+    it("adds both displayed jobs when the user asks to add this two to their pipeline", async () => {
+        const displayedJobs = [
+            job("job-1", "Software Developer", "CyberArk"),
+            job("job-2", "Rust Software Developer", "YO IT Consulting"),
+        ];
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"jobId":"job-1","confidence":"high"}',
+            appended,
+            searchCalled,
+        });
+        const pipelineRequests: unknown[] = [];
+        globalThis.fetch = (async (_input, init) => {
+            pipelineRequests.push(JSON.parse(String(init?.body)) as unknown);
+            return new Response(null, { status: 201 });
+        }) as typeof fetch;
+        const conversation = buildConversation({
+            awaitingPipelineDecision: true,
+            jobs: displayedJobs,
+            focus: displayedJobs[0] ?? cellebrite,
+        });
+        conversation.messages = [{
+            role: "assistant",
+            content: "Here are the two roles I found",
+            timestamp: new Date(),
+            attachedJobs: displayedJobs.map((displayedJob) => ({
+                jobId: displayedJob.id,
+                jobTitle: displayedJob.title,
+                url: displayedJob.url,
+                seniority: displayedJob.seniority,
+                description: displayedJob.description,
+                company: displayedJob.company,
+                salary: displayedJob.salary ?? 0,
+            })),
+        }];
+
+        const response = await checkIfNeededAddToPipeline(
+            deps,
+            buildCtx("great add this two to my pipeline", conversation),
+        );
+
+        assert.equal(pipelineRequests.length, 2);
+        assert.deepEqual(
+            pipelineRequests.map((request) => (request as { description: string }).description),
+            displayedJobs.map(({ title, company }) => `${title} at ${company}`),
+        );
+        assert.match(response?.reply ?? "", /added (?:both|all 2) roles/i);
+    });
+
     it("does not treat a bare yes as an add once awaitingPipelineDecision is cleared", async () => {
         const appended: string[] = [];
         const searchCalled = { value: false };
