@@ -82,7 +82,7 @@ export const resolveNearTermRoleChoice = (message: string): OnboardingNearTermRo
 };
 
 export const buildNearTermRoleChoiceReply = (currentRole: string | null | undefined): string => {
-    const role = normalizeTargetRole(currentRole);
+    const role = currentRole?.trim();
     if (!role) {
         return ONBOARDING_ROLE_CHOICE_REPLY;
     }
@@ -95,6 +95,14 @@ export const buildDifferentRoleDiscoveryReply = (modelReply: string): string => 
         || /\bsame role\b.*\bdifferent role\b/i.test(trimmed);
     if (trimmed.endsWith("?") && !isWrongStageQuestion) {
         return trimmed;
+    }
+    return ONBOARDING_DIFFERENT_ROLE_REPLY;
+};
+
+export const buildTargetRoleFallbackReply = (previousAssistantMessage: string | undefined): string => {
+    const previousQuestion = previousAssistantMessage?.trim().toLowerCase();
+    if (previousQuestion === ONBOARDING_DIFFERENT_ROLE_REPLY.toLowerCase()) {
+        return "Could you name a specific job title, or would you like me to suggest a few roles?";
     }
     return ONBOARDING_DIFFERENT_ROLE_REPLY;
 };
@@ -114,14 +122,6 @@ export const normalizeTargetRole = (value: string | null | undefined): string | 
         return null;
     }
     return trimmed;
-};
-
-export const matchSuggestedRoleTitle = (
-    latestUserMessage: string,
-    suggestedRoles: readonly string[],
-): string | null => {
-    const normalizedMessage = latestUserMessage.trim().toLocaleLowerCase();
-    return suggestedRoles.find((role) => role.trim().toLocaleLowerCase() === normalizedMessage) ?? null;
 };
 
 const buildNormalizedSameRoleBackground = (current: OnboardingFlow, targetRole: string): OnboardingFlow["background"] => {
@@ -266,7 +266,7 @@ export const continueNearTermTargetSelection = (
                 clarificationCount: decision.targetDiscoverySubject
                     ? (targetFlow.clarificationCount ?? 0) + 1
                     : targetFlow.clarificationCount,
-                suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles,
+                suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles ?? [],
                 discoveryFacts,
                 coveredSubjects,
             },

@@ -9,21 +9,20 @@ import {
 } from "../onboarding.chat-facts.utils";
 
 describe("onboarding chat facts", () => {
-    it("separates a role from structurally recognizable tenure text despite surrounding typos", () => {
-        const message = "hi my name gal kosover and im software engineer in teh lasst 4 years in paragon";
+    it("extracts a name, role, and tenure stated in chat", () => {
+        const message = "hi my name is gal kosover and in the last 5 years im software developer";
         const facts = extractChatStatedBackgroundFacts(message);
 
-        assert.equal(facts.role, "software engineer");
-        assert.equal(facts.yearsOfExperience, 4);
+        assert.equal(facts.name, "gal kosover");
+        assert.equal(facts.role, "software developer");
+        assert.equal(facts.yearsOfExperience, 5);
+        assert.equal(formatChatStatedFactsForPrompt(facts), "name=gal kosover, role=software developer, yearsOfExperience=5");
     });
 
-    it("extracts role and years from the user's QA onboarding message", () => {
-        const message = "hi my name is gal kosover and in the last 5 years im qa";
-        const facts = extractChatStatedBackgroundFacts(message);
+    it("does not reinterpret a job-search request as the user's current profession", () => {
+        const facts = extractChatStatedBackgroundFacts("i am looking for a new role");
 
-        assert.equal(facts.role, "qa");
-        assert.equal(facts.yearsOfExperience, 5);
-        assert.equal(formatChatStatedFactsForPrompt(facts), "role=qa, yearsOfExperience=5");
+        assert.equal(facts.role, undefined);
     });
 
     it("extracts years from common tenure phrasings", () => {

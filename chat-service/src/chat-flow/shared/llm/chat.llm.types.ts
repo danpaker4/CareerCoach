@@ -3,8 +3,10 @@ export type ChatLlmObservedOperation =
     | "chat.job_aware_reply"
     | "chat.dream_job"
     | "chat.onboarding"
+    | "chat.onboarding.background_review"
     | "chat.onboarding.target_role"
     | "chat.onboarding.target_role.retry"
+    | "chat.onboarding.target_role.review"
     | "chat.onboarding.target_role.verify"
     | "chat.onboarding.target_role.verify.retry"
     | "chat.conversation_end";
