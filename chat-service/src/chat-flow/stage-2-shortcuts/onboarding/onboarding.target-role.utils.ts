@@ -22,12 +22,39 @@ const DIFFERENT_ROLE_PATTERNS: readonly RegExp[] = [
     /\b(?:change|switch|move|transition|pivot)\s+(?:my\s+)?(?:role|career|field|into|to)\b/i,
 ];
 
+const getEditDistance = (source: string, target: string): number => {
+    const initialRow = Array.from({ length: target.length + 1 }, (_, index) => index);
+    const finalRow = [...source].reduce<readonly number[]>((previousRow, sourceCharacter, sourceIndex) =>
+        [...target].reduce<readonly number[]>((currentRow, targetCharacter, targetIndex) => {
+            const insertionCost = (currentRow[targetIndex] ?? 0) + 1;
+            const deletionCost = (previousRow[targetIndex + 1] ?? 0) + 1;
+            const substitutionCost = (previousRow[targetIndex] ?? 0)
+                + (sourceCharacter === targetCharacter ? 0 : 1);
+            return [...currentRow, Math.min(insertionCost, deletionCost, substitutionCost)];
+        }, [sourceIndex + 1]), initialRow);
+
+    return finalRow[target.length] ?? target.length;
+};
+
+const containsApproximateWord = (message: string, expectedWord: string, maxEditDistance: number): boolean => {
+    const words = message.toLowerCase().match(/[a-z]+/g) ?? [];
+    return words.some((word) =>
+        Math.abs(word.length - expectedWord.length) <= maxEditDistance
+        && getEditDistance(word, expectedWord) <= maxEditDistance);
+};
+
 export const resolveNearTermRoleChoice = (message: string): OnboardingNearTermRoleChoice | null => {
     const trimmed = message.trim();
     if (SAME_ROLE_PATTERNS.some((pattern) => pattern.test(trimmed))) {
         return "SAME_ROLE";
     }
     if (DIFFERENT_ROLE_PATTERNS.some((pattern) => pattern.test(trimmed))) {
+        return "DIFFERENT_ROLE";
+    }
+    if (containsApproximateWord(trimmed, "same", 1)) {
+        return "SAME_ROLE";
+    }
+    if (containsApproximateWord(trimmed, "different", 2)) {
         return "DIFFERENT_ROLE";
     }
     return null;

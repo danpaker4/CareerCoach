@@ -6,20 +6,6 @@ import { applyOnboardingDecision } from "../onboarding.state.utils";
 import { resolveOnboardingDirectionMode } from "../onboarding.direction.utils";
 import { buildOnboardingPrompt } from "../onboarding.prompt.utils";
 import { ONBOARDING_DIRECTION_REASK_REPLY } from "../onboarding.types";
-import type { Conversation } from "../../../../routes/conversation/conversation.model";
-
-const emptyConversation = (): Conversation => ({
-    userId: "user-1",
-    messages: [],
-    stageProgress: {
-        currentStageIndex: 0,
-        awaitingConfirmation: false,
-        stageNotes: {},
-    },
-    onboardingFlow: defaultOnboardingFlow(),
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-});
 
 describe("parseOnboardingLlmDecisionFromJson", () => {
     it("parses structured onboarding payloads", () => {
@@ -71,16 +57,15 @@ describe("parseOnboardingLlmDecisionFromJson", () => {
 describe("buildOnboardingPrompt", () => {
     it("injects CHAT_STATED_FACTS and prefer-chat rules when the user states role/years", () => {
         const prompt = buildOnboardingPrompt(
-            emptyConversation(),
             "hi my name is gal kosover and in the last 5 years im qa",
             "Current role / headline: QA Automation & Performance Engineer\nCompany: IDF",
             defaultOnboardingFlow(),
         );
 
-        assert.match(prompt, /CHAT_STATED_FACTS \(authoritative for role\/years\): role=qa, yearsOfExperience=5/);
-        assert.match(prompt, /CHAT_STATED_FACTS are authoritative for role and yearsOfExperience/);
-        assert.match(prompt, /use only the latest explicit chat value/i);
-        assert.match(prompt, /Never replace chat-stated wording/i);
+        assert.match(prompt, /CHAT_STATED_FACTS: role=qa, yearsOfExperience=5/);
+        assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
+        assert.match(prompt, /exact role and years/i);
+        assert.match(prompt, /do not replace or contradict/i);
     });
 
     it("tells the model to resolve obvious misspellings from conversation context", () => {
@@ -93,15 +78,48 @@ describe("buildOnboardingPrompt", () => {
             nearTermTarget: { step: "awaiting_role_choice" as const },
         };
         const prompt = buildOnboardingPrompt(
-            emptyConversation(),
             "i am thinking about somehting diifererent",
             "",
             flow,
         );
 
         assert.match(prompt, /obvious spelling mistakes/i);
-        assert.match(prompt, /somehting diifererent.*DIFFERENT_ROLE/i);
+        assert.match(prompt, /diifererent.*DIFFERENT_ROLE/i);
         assert.match(prompt, /Do not repeat the same-role\/different-role question/i);
+    });
+
+    it("omits secondary account data and inactive-stage instructions when chat facts resolve background", () => {
+        const prompt = buildOnboardingPrompt(
+            "my name is gal and in the last 5 years im software developer",
+            "CV title: QA engineer\nCV contents that should not be sent",
+            defaultOnboardingFlow(),
+        );
+
+        assert.doesNotMatch(prompt, /CV title|CV contents/);
+        assert.doesNotMatch(prompt, /nearTermTarget\.step|discovering_target/);
+        assert.match(prompt, /role=software developer, yearsOfExperience=5/);
+        assert.ok(prompt.length < 3_000);
+    });
+
+    it("sends only role-choice context while awaiting the near-term role choice", () => {
+        const flow = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const prompt = buildOnboardingPrompt(
+            "differennnt role",
+            "Large account and CV context that is irrelevant here",
+            flow,
+        );
+
+        assert.match(prompt, /roleChoice/);
+        assert.match(prompt, /obvious spelling mistakes/i);
+        assert.doesNotMatch(prompt, /Large account|Classify background\.status|discovering_target/);
+        assert.ok(prompt.length < 1_500);
     });
 });
 
@@ -282,6 +300,33 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.nearTermTarget?.roleChoice, "SAME_ROLE");
         assert.equal(step.onboardingFlow.nearTermTarget?.targetRole, "software developer");
         assert.equal(step.completedThisTurn, true);
+    });
+
+    it("recognizes a misspelled different-role choice when the model is uncertain", () => {
+        const awaitingChoice = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const step = applyOnboardingDecision(
+            awaitingChoice,
+            {
+                response: "Are you looking for the same role or a different role?",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: false,
+                roleChoice: null,
+            },
+            "differennnt role",
+        );
+
+        assert.equal(step.onboardingFlow.completed, false);
+        assert.equal(step.onboardingFlow.nearTermTarget?.step, "discovering_target");
+        assert.equal(step.onboardingFlow.nearTermTarget?.roleChoice, "DIFFERENT_ROLE");
+        assert.match(step.reply, /what role or kind of work/i);
     });
 
     it("keeps asking about a different role until a concrete target is understood", () => {

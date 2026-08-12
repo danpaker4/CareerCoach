@@ -102,7 +102,6 @@ const resolveGeneralOnboardingDecision = async (
     currentFlow: OnboardingFlow,
 ): Promise<OnboardingLlmDecision> => {
     const prompt = buildOnboardingPrompt(
-        ctx.conversationAfterUserMessage,
         ctx.normalizedMessage,
         ctx.userAccountContext,
         currentFlow,
