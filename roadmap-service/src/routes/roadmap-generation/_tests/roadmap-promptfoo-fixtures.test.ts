@@ -20,6 +20,14 @@ type FixtureExpected = {
     forbidCapabilityPatterns?: string[];
     degreeTimelineMustMentionYears?: boolean;
     mustRemoveNoise?: boolean;
+    requireActionPlans?: boolean;
+    allowedRecommendedRouteTypes?: Array<"job" | "internal" | "project" | "combined">;
+    expectedProjectLevel?: "beginner" | "intermediate" | "advanced";
+    expectedProjectHours?: number;
+    requireInternalMission?: boolean;
+    forbidInternalMission?: boolean;
+    expectedFirstRoleFit?: "pursue-now" | "prepare-first";
+    expectedInternalMoveSuitable?: boolean;
 };
 
 type FixtureFile = {
@@ -90,7 +98,7 @@ describe("roadmap promptfoo fixtures (offline)", () => {
             const result = runFixture(fixture);
             const expected = fixture.expected;
 
-            assert.ok(result.stages.length >= (expected.minStages ?? 2));
+            assert.ok(result.stages.length >= (expected.minStages ?? (expected.requireActionPlans === true ? 1 : 2)));
 
             const first = result.stages[0];
             assert.ok(first);
@@ -147,6 +155,52 @@ describe("roadmap promptfoo fixtures (offline)", () => {
                         reasons.has(reason as RemovedInputExample["reason"])
                     )
                 );
+            }
+
+            if (expected.requireActionPlans === true) {
+                for (const stage of result.stages) {
+                    const plan = stage.actionPlan;
+                    assert.ok(plan);
+                    assert.ok(plan.outcome.trim().length > 0);
+                    assert.ok(plan.routes.length >= 3);
+                    const recommendedRoutes = plan.routes.filter((route) => route.isRecommended);
+                    assert.equal(recommendedRoutes.length, 1);
+                    const recommendedRoute = recommendedRoutes[0];
+                    assert.ok(recommendedRoute);
+                    assert.equal(recommendedRoute.id, plan.recommendedRouteId);
+                    assert.ok(recommendedRoute.completionRule.trim().length >= 20);
+                    if (expected.allowedRecommendedRouteTypes) {
+                        assert.ok(expected.allowedRecommendedRouteTypes.includes(recommendedRoute.type));
+                    }
+                    if (expected.requireInternalMission === true) assert.ok(recommendedRoute.missionOptions.length > 0);
+                    if (expected.forbidInternalMission === true) assert.equal(recommendedRoute.missionOptions.length, 0);
+                    assert.ok(recommendedRoute.roleOptions.length >= 3);
+                    assert.ok(recommendedRoute.projectOptions.length >= 3);
+                    const firstRole = recommendedRoute.roleOptions[0];
+                    assert.ok(firstRole);
+                    if (expected.expectedFirstRoleFit) assert.equal(firstRole.fit, expected.expectedFirstRoleFit);
+                    if (expected.expectedInternalMoveSuitable !== undefined) {
+                        assert.equal(firstRole.internalMoveSuitable, expected.expectedInternalMoveSuitable);
+                    }
+                    for (const project of recommendedRoute.projectOptions) {
+                        if (expected.expectedProjectLevel) assert.equal(project.level, expected.expectedProjectLevel);
+                        if (expected.expectedProjectHours) assert.equal(project.estimatedHours, expected.expectedProjectHours);
+                        assert.ok(project.tasks.length >= 3);
+                        assert.ok(project.deliverables.length >= 3);
+                        assert.ok(project.completionChecklist.length >= 3);
+                        assert.ok(project.optionalGuidance.some((item) => /confidential|public|synthetic/i.test(item)));
+                    }
+                    const routeIds = plan.routes.map((route) => route.id);
+                    assert.equal(new Set(routeIds).size, routeIds.length);
+                    for (const route of plan.routes) {
+                        const recommendationIds = [
+                            ...route.roleOptions.map((role) => role.id),
+                            ...route.missionOptions.map((mission) => mission.id),
+                            ...route.projectOptions.map((project) => project.id),
+                        ];
+                        assert.equal(new Set(recommendationIds).size, recommendationIds.length);
+                    }
+                }
             }
         });
     }

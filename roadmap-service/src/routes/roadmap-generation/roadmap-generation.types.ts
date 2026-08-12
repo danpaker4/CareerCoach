@@ -28,6 +28,7 @@ export type GeneratedResource = {
     difficulty?: "beginner" | "intermediate" | "advanced";
     estimatedHours?: number;
     skills?: string[];
+    reason?: string;
     lastVerifiedAt?: string;
 };
 
@@ -173,7 +174,10 @@ export type GeneratedStageContent = {
     prerequisiteStageIds?: string[];
     parallelStageIds?: string[];
     orderingReason?: string;
+    actionPlan?: StageActionPlan;
 };
+
+export type { ActionableRoute, RecommendedMission, RecommendedProject, RecommendedRole, RecommendationSource, StageActionPlan } from "./actionable-routes/actionable-routes.types";
 
 export type RoadmapGenerationResponse = {
     stages: GeneratedStageContent[];
@@ -186,3 +190,4 @@ export type RoadmapGenerationResponse = {
     selectedCareerPath?: string[];
     removedInputExamples?: RemovedInputExample[];
 };
+import type { StageActionPlan } from "./actionable-routes/actionable-routes.types";

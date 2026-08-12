@@ -4,6 +4,31 @@ export type ResourceType = 'course' | 'video' | 'practice' | 'article' | 'docs' 
 
 export type ProgressionType = 'learning' | 'experience' | 'hybrid';
 
+export type RecommendationSource = 'profile-match' | 'job-market' | 'employer-signal' | 'reviewed-template' | 'ai-personalized';
+
+export interface RecommendedRole {
+  id: string; title: string; fit: 'pursue-now' | 'prepare-first'; whyItFits: string; experienceGained: string;
+  missingRequirements: string[]; internalMoveSuitable: boolean; source: RecommendationSource;
+}
+
+export interface RecommendedMission {
+  id: string; title: string; requestToManager: string; responsibilities: string[]; outcomes: string[]; fallback: string; source: RecommendationSource;
+}
+
+export interface RecommendedProject {
+  id: string; title: string; objective: string; tasks: string[]; deliverables: string[]; estimatedHours: number;
+  completionChecklist: string[]; toolsAndSkills: string[]; roleRelevance: string; optionalGuidance: string[];
+  level: 'beginner' | 'intermediate' | 'advanced'; source: RecommendationSource;
+}
+
+export interface ActionableRoute {
+  id: string; type: 'job' | 'internal' | 'project' | 'combined'; title: string; summary: string; whyRecommended: string;
+  completionRule: string; isRecommended: boolean; source: RecommendationSource; confidence: 'high' | 'medium' | 'low';
+  roleOptions: RecommendedRole[]; missionOptions: RecommendedMission[]; projectOptions: RecommendedProject[]; supportingResourceUrls: string[];
+}
+
+export interface StageActionPlan { outcome: string; recommendedRouteId: string; routes: ActionableRoute[]; }
+
 export interface StageResource {
   title: string;
   platform: string;
@@ -14,6 +39,7 @@ export interface StageResource {
   difficulty?: 'beginner' | 'intermediate' | 'advanced';
   estimatedHours?: number;
   skills?: string[];
+  reason?: string;
   lastVerifiedAt?: string;
 }
 
@@ -101,6 +127,7 @@ export interface StageContent {
   prerequisiteStageIds?: string[];
   parallelStageIds?: string[];
   orderingReason?: string;
+  actionPlan?: StageActionPlan;
 }
 
 export interface ProgressEvidence {
@@ -120,6 +147,10 @@ export interface RoadmapStage {
   completedCriterionIds?: string[];
   completedResourceUrls?: string[];
   progressEvidence?: ProgressEvidence[];
+  selectedRouteId?: string;
+  selectedProjectId?: string;
+  completedProjectIds?: string[];
+  dismissedRecommendationIds?: string[];
 }
 
 export interface CareerRoadmapData {

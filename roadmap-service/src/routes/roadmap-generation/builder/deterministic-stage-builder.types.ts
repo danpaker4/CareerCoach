@@ -45,6 +45,7 @@ export type DeterministicStage = {
         readonly difficulty: "beginner" | "intermediate" | "advanced";
         readonly estimatedHours: number;
         readonly skills: readonly string[];
+        readonly reason?: string;
         readonly lastVerifiedAt?: string;
     }[];
     readonly resourceIds: readonly string[];
@@ -64,4 +65,6 @@ export type DeterministicStage = {
     readonly prerequisiteStageIds: readonly string[];
     readonly parallelStageIds: readonly string[];
     readonly orderingReason: string;
+    readonly actionPlan?: StageActionPlan;
 };
+import type { StageActionPlan } from "../actionable-routes/actionable-routes.types";

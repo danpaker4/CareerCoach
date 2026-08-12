@@ -227,11 +227,34 @@ describe("role milestone stages", () => {
             hoursPerWeek: 8,
             assumedAvailability: false,
             courseBudget: "mixed",
+            userContext: {
+                currentJob: "Software Product Manager",
+                currentRoleSummary: "Owns product delivery",
+                userSkills: ["Product management", "Analytics"],
+                demonstratedResponsibilities: ["Project ownership"],
+                roleExperienceYears: 4,
+                roleExperienceLevel: "mid",
+                preferredDomains: ["fintech"],
+                senioritySignal: "mid",
+                longTermGoals: [dreamJob],
+                isEntryLevel: false,
+            },
         });
         assert.ok(stages.length > 4);
         assert.ok(stages.slice(1).every((stage) => stage.prerequisiteStageIds.length > 0));
         assert.ok(stages.some((stage) => stage.resources.some((resource) => resource.url.includes("coursera.org/learn/wharton-finance"))));
         assert.ok(stages.flatMap((stage) => stage.resources).every((resource) => !resource.url.includes("google.com/search")));
+        assert.ok(stages.every((stage) => stage.actionPlan));
+        const firstPlan = stages[0]?.actionPlan;
+        assert.ok(firstPlan);
+        assert.ok(firstPlan.routes.length >= 3);
+        const recommendedRoute = firstPlan.routes.find((route) => route.id === firstPlan.recommendedRouteId);
+        assert.ok(recommendedRoute);
+        assert.equal(recommendedRoute.type, "internal");
+        assert.equal(recommendedRoute.roleOptions.length, 6);
+        assert.equal(recommendedRoute.projectOptions.length, 6);
+        assert.ok(recommendedRoute.roleOptions.every((role) => !/^ceo$/i.test(role.title)));
+        assert.ok(recommendedRoute.projectOptions.every((project) => project.tasks.length >= 5));
     });
 
     it("explains degree then cyber job then team lead for zero-knowledge CEO path", () => {
@@ -341,6 +364,8 @@ describe("deterministic stage builder", () => {
         assert.ok(stages.every((stage) => stage.completionCriteria.length > 0));
         assert.ok(stages.every((stage) => stage.requiredCapabilities.length <= 3));
         assert.ok(stages.every((stage) => !stage.resources.some((resource) => resource.url.length === 0)));
+        assert.ok(stages.every((stage) => stage.actionPlan?.routes.length === 3));
+        assert.ok(stages.every((stage) => stage.actionPlan?.routes[0]?.projectOptions.length === 6));
     });
 
     it("splits unrelated technical skills into focused stages instead of one Python mega-stage", () => {

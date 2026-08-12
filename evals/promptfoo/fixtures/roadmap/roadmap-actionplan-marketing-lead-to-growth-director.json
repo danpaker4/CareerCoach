@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-marketing-lead-to-growth-director",
+  "description": "An experienced marketing lead receives advanced growth projects and internal ownership missions",
+  "tags": ["roadmap", "action-plan", "senior", "marketing"],
+  "request": {
+    "dreamJob": "Growth Director",
+    "targetYears": 4,
+    "startingPoint": { "currentJob": "Marketing Lead", "userSkills": ["Campaign strategy", "Analytics"], "isEntryLevel": false, "roleExperienceYears": 6, "roleExperienceLevel": "lead" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "advanced",
+    "expectedProjectHours": 50,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

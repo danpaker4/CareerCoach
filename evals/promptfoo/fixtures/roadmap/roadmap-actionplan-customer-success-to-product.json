@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-customer-success-to-product",
+  "description": "Customer success experience produces internal product missions and adjacent role alternatives",
+  "tags": ["roadmap", "action-plan", "employed", "product"],
+  "request": {
+    "dreamJob": "Product Manager",
+    "targetYears": 4,
+    "startingPoint": { "currentJob": "Customer Success Specialist", "userSkills": ["Customer interviews", "CRM"], "isEntryLevel": false, "roleExperienceYears": 2, "roleExperienceLevel": "mid" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

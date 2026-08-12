@@ -48,4 +48,5 @@ export const mapDeterministicStageToGeneratedContent = (
     prerequisiteStageIds: [...stage.prerequisiteStageIds],
     parallelStageIds: [...stage.parallelStageIds],
     orderingReason: stage.orderingReason,
+    ...(stage.actionPlan ? { actionPlan: stage.actionPlan } : {}),
 });

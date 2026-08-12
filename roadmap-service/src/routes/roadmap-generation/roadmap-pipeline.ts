@@ -152,6 +152,7 @@ export const buildRoadmapPipeline = (input: RoadmapPipelineInput): RoadmapPipeli
         measurableCompletionEnabled: input.featureFlags.measurableCompletionEnabled,
         structuredEvidenceEnabled: input.featureFlags.structuredEvidenceEnabled,
         courseBudget: input.preferences?.courseBudget ?? "mixed",
+        userContext: input.userContext,
     });
 
     const generationMode = "deterministic";

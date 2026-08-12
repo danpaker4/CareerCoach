@@ -10,6 +10,8 @@ import type { RoleMilestonePlan } from "../path/role-milestones.types";
 import { MAX_STAGE_COUNT } from "../roadmap-generation.consts";
 import type { CapabilityGap } from "../structured/structured-gap.types";
 import { computeBaseWeeks, formatMonthRangeAsTimeframe } from "../scoring/roadmap-scoring";
+import { buildStageActionPlan } from "../actionable-routes/actionable-routes";
+import type { UserCareerContext } from "../gap-analysis.types";
 import type { CompletionCriterion, DeterministicStage } from "./deterministic-stage-builder.types";
 
 const fillPattern = (pattern: string, focus: string, dreamJob: string): string =>
@@ -382,6 +384,7 @@ const pickResourcesForCapabilityIds = (capabilityIds: readonly string[]): Catalo
             (resource) => resource.capabilityIds.includes(capabilityId) && !used.has(resource.id)
         );
         if (!match) continue;
+        if (match.id === "res.coursera.google.project.management" && capabilityIds.includes("cap.product.sense")) continue;
         used.add(match.id);
         selected.push(match);
     }
@@ -395,7 +398,7 @@ const filterResourcesByBudget = (
     ? resources.filter((resource) => (resource.costType ?? "free") !== "paid")
     : [...resources];
 
-const mapCatalogResource = (resource: CatalogResource, skills: readonly string[]) => ({
+const mapCatalogResource = (resource: CatalogResource, skills: readonly string[], stageOutcome?: string) => ({
     title: resource.title,
     platform: resource.platform,
     url: resource.url,
@@ -404,6 +407,7 @@ const mapCatalogResource = (resource: CatalogResource, skills: readonly string[]
     difficulty: resource.difficulty ?? "beginner" as const,
     estimatedHours: resource.effortHours,
     skills: [...skills],
+    ...(stageOutcome ? { reason: `Take this when you need structured learning for ${skills.slice(0, 2).join(" and ")}; apply it to ${stageOutcome.toLowerCase()}` } : {}),
     ...(resource.lastVerifiedAt ? { lastVerifiedAt: resource.lastVerifiedAt } : {}),
 });
 
@@ -415,6 +419,7 @@ const buildStagesFromRoleMilestones = (params: {
     readonly measurableCompletionEnabled: boolean;
     readonly structuredEvidenceEnabled: boolean;
     readonly courseBudget: "free" | "mixed" | "paid";
+    readonly userContext: UserCareerContext;
 }): DeterministicStage[] =>
     params.milestonePlan.milestones.map((milestone, index) => {
         const stageId = `stage.${index + 1}.${milestone.id}`;
@@ -457,7 +462,7 @@ const buildStagesFromRoleMilestones = (params: {
             progressionType: milestone.progressionType,
             actions: [...milestone.actions],
             actionIds: milestone.actions.map((_, actionIndex) => `${milestone.id}.action.${actionIndex + 1}`),
-            resources: resources.map((resource) => mapCatalogResource(resource, labels)),
+            resources: resources.map((resource) => mapCatalogResource(resource, labels, milestone.whatYouGain)),
             resourceIds: resources.map((resource) => resource.id),
             capabilityIds: [...milestone.capabilityIds],
             gapIds: milestone.capabilityIds.map((id) => `gap.${id}`),
@@ -518,6 +523,12 @@ const buildStagesFromRoleMilestones = (params: {
                     : milestone.progressionType === "learning"
                       ? "Complete the prerequisite stage first. This learning can overlap with preparation for the next milestone."
                       : "The previous milestone provides the experience or proof required before pursuing this role.",
+            actionPlan: buildStageActionPlan({
+                milestone,
+                user: params.userContext,
+                dreamJob: params.dreamJob,
+                resourceUrls: resources.map((resource) => resource.url),
+            }),
         };
     });
 
@@ -532,12 +543,25 @@ export const buildDeterministicStages = (params: {
     readonly measurableCompletionEnabled?: boolean;
     readonly structuredEvidenceEnabled?: boolean;
     readonly courseBudget?: "free" | "mixed" | "paid";
+    readonly userContext?: UserCareerContext;
 }): DeterministicStage[] => {
     const hoursPerWeek = params.hoursPerWeek ?? DEFAULT_AVAILABLE_HOURS_PER_WEEK;
     const assumedAvailability = params.assumedAvailability ?? params.hoursPerWeek === undefined;
     const measurableCompletionEnabled = params.measurableCompletionEnabled ?? true;
     const structuredEvidenceEnabled = params.structuredEvidenceEnabled ?? true;
     const courseBudget = params.courseBudget ?? "mixed";
+    const userContext: UserCareerContext = params.userContext ?? {
+        currentJob: "Not specified",
+        currentRoleSummary: "Profile context unavailable",
+        userSkills: [],
+        demonstratedResponsibilities: [],
+        roleExperienceYears: 0,
+        roleExperienceLevel: "entry",
+        preferredDomains: [],
+        senioritySignal: null,
+        longTermGoals: [],
+        isEntryLevel: true,
+    };
 
     if (params.milestonePlan && params.milestonePlan.milestones.length > 0) {
         return buildStagesFromRoleMilestones({
@@ -548,6 +572,7 @@ export const buildDeterministicStages = (params: {
             measurableCompletionEnabled,
             structuredEvidenceEnabled,
             courseBudget,
+            userContext,
         });
     }
 
@@ -621,6 +646,8 @@ export const buildDeterministicStages = (params: {
         const roleForStage =
             preparedForRoles[Math.min(index, preparedForRoles.length - 1)] ?? params.dreamJob;
         const isLearningStage = template.progressionType === "learning";
+        const stageLabel = buildUniqueStageLabel(template, focus, params.dreamJob, index, usedLabels);
+        const stageOutcome = buildExperienceTarget(primaryGaps);
 
         const assumptions = [
             ...(assumedAvailability ? [`Assumes ~${hoursPerWeek} hours/week available`] : []),
@@ -631,13 +658,13 @@ export const buildDeterministicStages = (params: {
         return {
             stageId,
             templateId: template.id,
-            label: buildUniqueStageLabel(template, focus, params.dreamJob, index, usedLabels),
+            label: stageLabel,
             description: fillPattern(template.descriptionPattern, shortFocusLabel(focus), params.dreamJob),
             whyItMatters: fillPattern(template.whyItMattersPattern, shortFocusLabel(focus), params.dreamJob),
             progressionType: template.progressionType,
             actions: actions.map((action) => action.title),
             actionIds: actions.map((action) => action.id),
-            resources: resources.map((resource) => mapCatalogResource(resource, requiredCapabilities)),
+            resources: resources.map((resource) => mapCatalogResource(resource, requiredCapabilities, stageOutcome)),
             resourceIds: resources.map((resource) => resource.id),
             capabilityIds,
             gapIds,
@@ -650,7 +677,7 @@ export const buildDeterministicStages = (params: {
                 : [roleForStage, params.dreamJob].filter(
                       (role, roleIndex, all) => all.indexOf(role) === roleIndex
                   ),
-            experienceAccumulation: buildExperienceTarget(primaryGaps),
+            experienceAccumulation: stageOutcome,
             completionCriteria: measurableCompletionEnabled
                 ? buildCompletionCriteria(stageId, primaryGaps)
                 : [],
@@ -706,6 +733,25 @@ export const buildDeterministicStages = (params: {
                     : isLearningStage
                       ? "Requires the prior foundation, but its study work may run alongside the next stage."
                       : "Complete the prerequisite milestone first so you can demonstrate the expected skills and scope.",
+            actionPlan: buildStageActionPlan({
+                milestone: {
+                    id: stageId,
+                    label: stageLabel,
+                    howToGetThere: fillPattern(template.descriptionPattern, shortFocusLabel(focus), params.dreamJob),
+                    whatYouGain: stageOutcome,
+                    whyItMatters: fillPattern(template.whyItMattersPattern, shortFocusLabel(focus), params.dreamJob),
+                    targetRole: roleForStage,
+                    progressionType: template.progressionType,
+                    capabilityIds,
+                    actions: actions.map((action) => action.title),
+                    completionCriteria: [],
+                    minMonths,
+                    maxMonths,
+                },
+                user: userContext,
+                dreamJob: params.dreamJob,
+                resourceUrls: resources.map((resource) => resource.url),
+            }),
         };
     });
 };

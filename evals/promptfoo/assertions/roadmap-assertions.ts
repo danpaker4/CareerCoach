@@ -10,6 +10,41 @@ const StageSchema = z.object({
     skillsToBuild: z.array(z.string()).optional(),
     estimatedTimeframe: z.string().optional(),
     reasonCodes: z.array(z.string()).optional(),
+    actionPlan: z
+        .object({
+            outcome: z.string(),
+            recommendedRouteId: z.string(),
+            routes: z.array(
+                z.object({
+                    id: z.string(),
+                    type: z.enum(["job", "internal", "project", "combined"]),
+                    isRecommended: z.boolean(),
+                    confidence: z.enum(["high", "medium", "low"]),
+                    completionRule: z.string(),
+                    roleOptions: z.array(
+                        z.object({
+                            id: z.string(),
+                            fit: z.enum(["pursue-now", "prepare-first"]),
+                            internalMoveSuitable: z.boolean(),
+                        }).passthrough(),
+                    ),
+                    missionOptions: z.array(z.object({ id: z.string() }).passthrough()),
+                    projectOptions: z.array(
+                        z.object({
+                            id: z.string(),
+                            estimatedHours: z.number(),
+                            level: z.enum(["beginner", "intermediate", "advanced"]),
+                            tasks: z.array(z.string()),
+                            deliverables: z.array(z.string()),
+                            completionChecklist: z.array(z.string()),
+                            optionalGuidance: z.array(z.string()),
+                        }).passthrough(),
+                    ),
+                    supportingResourceUrls: z.array(z.string()),
+                }).passthrough(),
+            ),
+        })
+        .optional(),
 });
 
 const RoadmapOutputSchema = z.object({
@@ -51,6 +86,14 @@ export type RoadmapEvalExpected = {
     forbidCapabilityPatterns?: string[];
     degreeTimelineMustMentionYears?: boolean;
     mustRemoveNoise?: boolean;
+    requireActionPlans?: boolean;
+    allowedRecommendedRouteTypes?: Array<"job" | "internal" | "project" | "combined">;
+    expectedProjectLevel?: "beginner" | "intermediate" | "advanced";
+    expectedProjectHours?: number;
+    requireInternalMission?: boolean;
+    forbidInternalMission?: boolean;
+    expectedFirstRoleFit?: "pursue-now" | "prepare-first";
+    expectedInternalMoveSuitable?: boolean;
 };
 
 type AssertionContext = {
@@ -119,7 +162,7 @@ export const assertRoadmapStageCount = async (
     const parsed = parseOutput(output);
     if (!parsed.success) return fail("Invalid roadmap output");
     const expected = readExpected(context);
-    const minStages = expected.minStages ?? 2;
+    const minStages = expected.minStages ?? (expected.requireActionPlans === true ? 1 : 2);
     if (parsed.data.stages.length < minStages) {
         return fail(`Expected at least ${minStages} stages, got ${parsed.data.stages.length}`);
     }
@@ -244,4 +287,80 @@ export const assertNoiseRemoved = async (
         return fail(`removedInputExamples missing expected reason kinds; got ${[...reasons].join(", ")}`);
     }
     return pass(`Noise removed (${removed.length} examples)`);
+};
+
+export const assertActionPlans = async (
+    output: unknown,
+    context: AssertionContext,
+): Promise<GradingResult> => {
+    const parsed = parseOutput(output);
+    if (!parsed.success) return fail("Invalid roadmap output");
+    const expected = readExpected(context);
+    if (expected.requireActionPlans !== true) return pass("Action-plan checks not required");
+
+    for (const stage of parsed.data.stages) {
+        const plan = stage.actionPlan;
+        if (!plan || plan.outcome.trim().length === 0) {
+            return fail(`Stage "${stage.label}" is missing an actionable plan or outcome`);
+        }
+        if (plan.routes.length < 3) {
+            return fail(`Stage "${stage.label}" should offer at least three routes`);
+        }
+        const recommendedRoutes = plan.routes.filter((route) => route.isRecommended);
+        if (recommendedRoutes.length !== 1 || recommendedRoutes[0]?.id !== plan.recommendedRouteId) {
+            return fail(`Stage "${stage.label}" must reference exactly one recommended route`);
+        }
+        const recommendedRoute = recommendedRoutes[0];
+        if (!recommendedRoute) return fail(`Stage "${stage.label}" has no recommended route`);
+        if (recommendedRoute.completionRule.trim().length < 20) {
+            return fail(`Stage "${stage.label}" has no meaningful route completion rule`);
+        }
+        if (expected.allowedRecommendedRouteTypes && !expected.allowedRecommendedRouteTypes.includes(recommendedRoute.type)) {
+            return fail(`Stage "${stage.label}" recommended unexpected route type "${recommendedRoute.type}"`);
+        }
+        if ((expected.requireInternalMission === true && recommendedRoute.missionOptions.length === 0)
+            || (expected.forbidInternalMission === true && recommendedRoute.missionOptions.length > 0)) {
+            return fail(`Stage "${stage.label}" internal mission availability does not match the user context`);
+        }
+        if (recommendedRoute.roleOptions.length < 3 || recommendedRoute.projectOptions.length < 3) {
+            return fail(`Stage "${stage.label}" needs at least three role and project options`);
+        }
+        const firstRole = recommendedRoute.roleOptions[0];
+        if (expected.expectedFirstRoleFit && firstRole?.fit !== expected.expectedFirstRoleFit) {
+            return fail(`Stage "${stage.label}" first role fit should be "${expected.expectedFirstRoleFit}"`);
+        }
+        if (expected.expectedInternalMoveSuitable !== undefined
+            && firstRole?.internalMoveSuitable !== expected.expectedInternalMoveSuitable) {
+            return fail(`Stage "${stage.label}" internal-move suitability is incorrect`);
+        }
+        for (const project of recommendedRoute.projectOptions) {
+            if (expected.expectedProjectLevel && project.level !== expected.expectedProjectLevel) {
+                return fail(`Stage "${stage.label}" project level should be "${expected.expectedProjectLevel}"`);
+            }
+            if (expected.expectedProjectHours && project.estimatedHours !== expected.expectedProjectHours) {
+                return fail(`Stage "${stage.label}" project estimate should be ${expected.expectedProjectHours} hours`);
+            }
+            if (project.tasks.length < 3 || project.deliverables.length < 3 || project.completionChecklist.length < 3) {
+                return fail(`Stage "${stage.label}" contains an incomplete project brief`);
+            }
+            if (!project.optionalGuidance.some((item) => /confidential|public|synthetic/i.test(item))) {
+                return fail(`Stage "${stage.label}" project guidance is missing data-safety advice`);
+            }
+        }
+        const routeIds = plan.routes.map((route) => route.id);
+        if (new Set(routeIds).size !== routeIds.length) {
+            return fail(`Stage "${stage.label}" contains duplicate route IDs`);
+        }
+        for (const route of plan.routes) {
+            const recommendationIds = [
+                ...route.roleOptions.map((role) => role.id),
+                ...route.missionOptions.map((mission) => mission.id),
+                ...route.projectOptions.map((project) => project.id),
+            ];
+            if (new Set(recommendationIds).size !== recommendationIds.length) {
+                return fail(`Stage "${stage.label}" contains duplicate recommendation IDs within a route`);
+            }
+        }
+    }
+    return pass(`All ${parsed.data.stages.length} stages contain personalized, actionable routes`);
 };

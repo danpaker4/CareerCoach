@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-teacher-to-instructional-designer",
+  "description": "A teacher changing careers receives internal proof missions and intermediate portfolio projects",
+  "tags": ["roadmap", "action-plan", "career-change", "education"],
+  "request": {
+    "dreamJob": "Instructional Designer",
+    "targetYears": 3,
+    "startingPoint": { "currentJob": "Teacher", "userSkills": ["Curriculum design", "Facilitation"], "isEntryLevel": false, "roleExperienceYears": 4, "roleExperienceLevel": "mid" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

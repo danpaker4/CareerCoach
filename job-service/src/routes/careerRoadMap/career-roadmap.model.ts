@@ -2,6 +2,33 @@ import { z } from "zod";
 
 export const ProgressionTypeSchema = z.enum(["learning", "experience", "hybrid"]);
 
+const RecommendationSourceSchema = z.enum(["profile-match", "job-market", "employer-signal", "reviewed-template", "ai-personalized"]);
+
+const RecommendedRoleSchema = z.object({
+    id: z.string(), title: z.string(), fit: z.enum(["pursue-now", "prepare-first"]), whyItFits: z.string(),
+    experienceGained: z.string(), missingRequirements: z.array(z.string()), internalMoveSuitable: z.boolean(), source: RecommendationSourceSchema,
+});
+
+const RecommendedMissionSchema = z.object({
+    id: z.string(), title: z.string(), requestToManager: z.string(), responsibilities: z.array(z.string()),
+    outcomes: z.array(z.string()), fallback: z.string(), source: RecommendationSourceSchema,
+});
+
+const RecommendedProjectSchema = z.object({
+    id: z.string(), title: z.string(), objective: z.string(), tasks: z.array(z.string()), deliverables: z.array(z.string()),
+    estimatedHours: z.number(), completionChecklist: z.array(z.string()), toolsAndSkills: z.array(z.string()), roleRelevance: z.string(),
+    optionalGuidance: z.array(z.string()), level: z.enum(["beginner", "intermediate", "advanced"]), source: RecommendationSourceSchema,
+});
+
+const ActionableRouteSchema = z.object({
+    id: z.string(), type: z.enum(["job", "internal", "project", "combined"]), title: z.string(), summary: z.string(),
+    whyRecommended: z.string(), completionRule: z.string(), isRecommended: z.boolean(), source: RecommendationSourceSchema,
+    confidence: z.enum(["high", "medium", "low"]), roleOptions: z.array(RecommendedRoleSchema),
+    missionOptions: z.array(RecommendedMissionSchema), projectOptions: z.array(RecommendedProjectSchema), supportingResourceUrls: z.array(z.string()),
+});
+
+const StageActionPlanSchema = z.object({ outcome: z.string(), recommendedRouteId: z.string(), routes: z.array(ActionableRouteSchema) });
+
 export const StageResourceSchema = z.object({
     title: z.string(),
     platform: z.string(),
@@ -12,6 +39,7 @@ export const StageResourceSchema = z.object({
     difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
     estimatedHours: z.number().positive().optional(),
     skills: z.array(z.string()).optional(),
+    reason: z.string().optional(),
     lastVerifiedAt: z.string().optional(),
 });
 
@@ -134,6 +162,7 @@ export const StageContentSchema = z.object({
     prerequisiteStageIds: z.array(z.string()).optional(),
     parallelStageIds: z.array(z.string()).optional(),
     orderingReason: z.string().optional(),
+    actionPlan: StageActionPlanSchema.optional(),
 });
 
 export const ProgressEvidenceSchema = z.object({
@@ -153,6 +182,10 @@ export const StageToDreamJobSchema = z.object({
     completedCriterionIds: z.array(z.string()).optional(),
     completedResourceUrls: z.array(z.string()).optional(),
     progressEvidence: z.array(ProgressEvidenceSchema).optional(),
+    selectedRouteId: z.string().optional(),
+    selectedProjectId: z.string().optional(),
+    completedProjectIds: z.array(z.string()).optional(),
+    dismissedRecommendationIds: z.array(z.string()).optional(),
 });
 
 export const CareerRoadMapSchema = z.object({

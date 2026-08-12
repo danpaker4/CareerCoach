@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-accountant-to-fintech-product",
+  "description": "An accountant moving into fintech product gets internal, role, and project alternatives",
+  "tags": ["roadmap", "action-plan", "career-change", "fintech"],
+  "request": {
+    "dreamJob": "Fintech Product Manager",
+    "targetYears": 5,
+    "startingPoint": { "currentJob": "Accountant", "userSkills": ["Financial analysis", "Excel"], "isEntryLevel": false, "roleExperienceYears": 4, "roleExperienceLevel": "mid" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

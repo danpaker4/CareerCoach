@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-senior-security-to-director",
+  "description": "A senior security engineer gets advanced proof projects and internal leadership missions",
+  "tags": ["roadmap", "action-plan", "senior", "cyber"],
+  "request": {
+    "dreamJob": "Cybersecurity Director",
+    "targetYears": 5,
+    "startingPoint": { "currentJob": "Senior Security Engineer", "userSkills": ["Security architecture", "Cloud security"], "isEntryLevel": false, "roleExperienceYears": 7, "roleExperienceLevel": "senior" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "advanced",
+    "expectedProjectHours": 50,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

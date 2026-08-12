@@ -1,0 +1,19 @@
+{
+  "id": "roadmap-actionplan-nurse-to-health-informatics",
+  "description": "A nurse receives health-informatics routes grounded in an internal measurable initiative",
+  "tags": ["roadmap", "action-plan", "career-change", "healthcare"],
+  "request": {
+    "dreamJob": "Health Informatics Analyst",
+    "targetYears": 4,
+    "startingPoint": { "currentJob": "Registered Nurse", "userSkills": ["Clinical workflows", "Patient care"], "isEntryLevel": false, "roleExperienceYears": 3, "roleExperienceLevel": "mid" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "internal"],
+    "expectedProjectLevel": "intermediate",
+    "expectedProjectHours": 35,
+    "requireInternalMission": true,
+    "expectedFirstRoleFit": "pursue-now",
+    "expectedInternalMoveSuitable": true
+  }
+}

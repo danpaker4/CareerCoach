@@ -13,6 +13,7 @@ import { getPlatformStyle, getResourceTypeStyle } from './platform-config';
 import { StageOpportunitiesPanel } from './StageOpportunitiesPanel';
 import { DestinationJobSearch } from './DestinationJobSearch';
 import { StageEvidenceEditor } from './StageEvidenceEditor';
+import { StageActionPlanPanel } from './StageActionPlanPanel';
 import './CareerRoadmap.css';
 import type { CareerProgressionMeta, CareerRoadmapData, CareerRoadmapProps, FetchState, ProgressEvidence, RoadmapGenerationResponse, StageContent } from './career-roadmap.types';
 
@@ -88,6 +89,12 @@ type UpgradePreview = {
   progressionMeta?: CareerProgressionMeta;
 };
 
+type StageUpgradePreview = {
+  roadmapId: string;
+  stageIndex: number;
+  content: StageContent;
+};
+
 export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [fetchState, setFetchState] = useState<FetchState>('idle');
@@ -102,6 +109,8 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
   const [deletingRoadmapId, setDeletingRoadmapId] = useState<string | null>(null);
   const [upgradingRoadmapId, setUpgradingRoadmapId] = useState<string | null>(null);
   const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
+  const [stageUpgradePreview, setStageUpgradePreview] = useState<StageUpgradePreview | null>(null);
+  const [improvingStageJobId, setImprovingStageJobId] = useState<number | null>(null);
 
   const toggleExpandedStage = (jobId: number) => {
     setExpandedDoneStages((prev) => {
@@ -242,6 +251,22 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
     }
   };
 
+  const updateStageChoices = async (roadmap: CareerRoadmapData, stageIndex: number, changes: Partial<typeof roadmap.stagesToDreamJob[number]>): Promise<boolean> => {
+    const updatedStages = roadmap.stagesToDreamJob.map((stage, index) => index === stageIndex ? { ...stage, ...changes } : stage);
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${roadmap.id}/stages`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ stagesToDreamJob: updatedStages }),
+      });
+      if (!res.ok) throw new Error('Failed to save stage choices');
+      setRoadmaps((items) => items.map((item) => item.id === roadmap.id ? { ...item, stagesToDreamJob: updatedStages } : item));
+      return true;
+    } catch {
+      setErrorMessage('Could not update this stage. Please try again.');
+      return false;
+    }
+  };
+
   const previewRoadmapUpgrade = async (roadmap: CareerRoadmapData) => {
     setUpgradingRoadmapId(roadmap.id);
     setErrorMessage('');
@@ -305,6 +330,62 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
       loadData();
     } catch {
       setErrorMessage('Could not apply the roadmap update. Please try again.');
+    }
+  };
+
+  const previewStageUpgrade = async (roadmap: CareerRoadmapData, stageIndex: number) => {
+    const stage = roadmap.stagesToDreamJob[stageIndex];
+    if (!stage) return;
+    setImprovingStageJobId(stage.jobId);
+    setErrorMessage('');
+    try {
+      const res = await apiFetch(`${ENV.ROADMAP_SERVICE_BASE_URL}/roadmap/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: roadmap.userId,
+          dreamJob: roadmap.dreamJob,
+          targetYears: roadmap.progressionMeta?.targetYears ?? 3,
+        }),
+      });
+      if (!res.ok) throw new Error('Stage reassessment failed');
+      const data: unknown = await res.json();
+      if (typeof data !== 'object' || data === null || !('stages' in data) || !Array.isArray(data.stages)) {
+        throw new Error('Invalid stage reassessment');
+      }
+      const generated = data as RoadmapGenerationResponse;
+      const matchedContent = generated.stages.find((content) =>
+        Boolean(stage.content?.templateId) && content.templateId === stage.content?.templateId
+      ) ?? generated.stages[stageIndex];
+      if (!matchedContent) throw new Error('No matching improved stage');
+      setStageUpgradePreview({ roadmapId: roadmap.id, stageIndex, content: matchedContent });
+    } catch {
+      setErrorMessage('Could not prepare this stage improvement. Please try again.');
+    } finally {
+      setImprovingStageJobId(null);
+    }
+  };
+
+  const applyStageUpgrade = async () => {
+    if (!stageUpgradePreview) return;
+    const roadmap = roadmaps.find((item) => item.id === stageUpgradePreview.roadmapId);
+    if (!roadmap) return;
+    const stagesToDreamJob = roadmap.stagesToDreamJob.map((stage, index) => index === stageUpgradePreview.stageIndex
+      ? { ...stage, content: stageUpgradePreview.content }
+      : stage);
+    try {
+      const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/career-roadmap/${roadmap.id}/stages`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ stagesToDreamJob }),
+      });
+      if (!res.ok) throw new Error('Failed to improve stage');
+      setRoadmaps((items) => items.map((item) => item.id === roadmap.id ? { ...item, stagesToDreamJob } : item));
+      setStageUpgradePreview(null);
+    } catch {
+      setErrorMessage('Could not apply this stage improvement. Please try again.');
     }
   };
 
@@ -520,67 +601,74 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                 <div className="roadmap-journey" key={activeRoadmap.id}>
                   {activeRoadmap.progressionMeta && (
                     <div className="journey-context-bar">
-                      {activeRoadmap.progressionMeta.currentRoleSummary && (
-                        <p className="journey-context-today">
-                          <strong>Where you are:</strong> {activeRoadmap.progressionMeta.currentRoleSummary}
-                        </p>
-                      )}
-                      {activeRoadmap.progressionMeta.gapAnalysis?.skillsPresent &&
-                        activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.length > 0 && (
-                          <p className="journey-context-skills">
-                            <strong>Skills we know:</strong>{' '}
-                            {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.join(', ')}
-                          </p>
+                      <div className={`journey-gap-summary${gapExpanded ? ' journey-gap-summary--expanded' : ''}`}>
+                        <button
+                          type="button"
+                          className="journey-gap-toggle"
+                          onClick={() => setGapExpanded((prev) => !prev)}
+                          aria-expanded={gapExpanded}
+                          aria-controls={`gap-analysis-${activeRoadmap.id}`}
+                        >
+                          <span>
+                            <strong>Roadmap analysis</strong>
+                            <small>{gapExpanded ? 'Hide profile, timeline, and gaps' : 'View profile, timeline, and gaps'}</small>
+                          </span>
+                          <span className="journey-gap-chevron" aria-hidden="true" />
+                        </button>
+                        {gapExpanded && (
+                          <div id={`gap-analysis-${activeRoadmap.id}`} className="journey-gap-content">
+                            {activeRoadmap.progressionMeta.currentRoleSummary && (
+                              <p className="journey-context-today">
+                                <strong>Where you are:</strong> {activeRoadmap.progressionMeta.currentRoleSummary}
+                              </p>
+                            )}
+                            {activeRoadmap.progressionMeta.gapAnalysis?.skillsPresent &&
+                              activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.length > 0 && (
+                                <p className="journey-context-skills">
+                                  <strong>Skills we know:</strong>{' '}
+                                  {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.join(', ')}
+                                </p>
+                              )}
+                            <p className="journey-context-target">
+                              <strong>Target role:</strong>{' '}
+                              {activeRoadmap.progressionMeta.dreamRoleCategory ?? activeRoadmap.dreamJob}
+                              {activeRoadmap.progressionMeta.estimatedYearsToGoal && (
+                                <span> · {activeRoadmap.progressionMeta.estimatedYearsToGoal}</span>
+                              )}
+                            </p>
+                            {activeRoadmap.progressionMeta.progressionReasoning && (
+                              <p className="journey-context-reasoning">{activeRoadmap.progressionMeta.progressionReasoning}</p>
+                            )}
+                            {activeRoadmap.progressionMeta.feasibility && (
+                              <div className={`roadmap-feasibility roadmap-feasibility--${activeRoadmap.progressionMeta.feasibility.status}`}>
+                                <strong>{activeRoadmap.progressionMeta.feasibility.status === 'on-track' ? 'Timeline assessment' : 'Important timeline assessment'}</strong>
+                                <span>{activeRoadmap.progressionMeta.feasibility.message}</span>
+                                {activeRoadmap.progressionMeta.feasibility.reasons.map((reason) => <small key={reason}>{reason}</small>)}
+                              </div>
+                            )}
+                            {activeRoadmap.progressionMeta.gapAnalysis && (
+                              <div className="journey-gap-details">
+                                <strong className="journey-gap-heading">Gaps to close</strong>
+                                <ul className="journey-gap-list">
+                                  {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.length > 0 && (
+                                    <li><strong>Skills to build:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.join(', ')}</li>
+                                  )}
+                                  {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.length > 0 && (
+                                    <li><strong>Responsibilities:</strong> {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.slice(0, 4).join('; ')}</li>
+                                  )}
+                                  {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.length > 0 && (
+                                    <li><strong>Leadership:</strong> {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.slice(0, 3).join('; ')}</li>
+                                  )}
+                                  {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.length > 0 && (
+                                    <li><strong>Architecture:</strong> {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.slice(0, 3).join('; ')}</li>
+                                  )}
+                                  <li>{activeRoadmap.progressionMeta.gapAnalysis.experienceGapSummary}</li>
+                                </ul>
+                              </div>
+                            )}
+                          </div>
                         )}
-                      <p className="journey-context-target">
-                        <strong>Target role:</strong>{' '}
-                        {activeRoadmap.progressionMeta.dreamRoleCategory ?? activeRoadmap.dreamJob}
-                        {activeRoadmap.progressionMeta.estimatedYearsToGoal && (
-                          <span> · {activeRoadmap.progressionMeta.estimatedYearsToGoal}</span>
-                        )}
-                      </p>
-                      {activeRoadmap.progressionMeta.progressionReasoning && (
-                        <p className="journey-context-reasoning">{activeRoadmap.progressionMeta.progressionReasoning}</p>
-                      )}
-                      {activeRoadmap.progressionMeta.feasibility && (
-                        <div className={`roadmap-feasibility roadmap-feasibility--${activeRoadmap.progressionMeta.feasibility.status}`}>
-                          <strong>{activeRoadmap.progressionMeta.feasibility.status === 'on-track' ? 'Timeline assessment' : 'Important timeline assessment'}</strong>
-                          <span>{activeRoadmap.progressionMeta.feasibility.message}</span>
-                          {activeRoadmap.progressionMeta.feasibility.reasons.map((reason) => <small key={reason}>{reason}</small>)}
-                        </div>
-                      )}
-                      {activeRoadmap.progressionMeta.gapAnalysis && (
-                        <div className="journey-gap-summary">
-                          <button
-                            type="button"
-                            className="journey-gap-toggle"
-                            onClick={() => setGapExpanded((prev) => !prev)}
-                            aria-expanded={gapExpanded}
-                          >
-                            Gap analysis
-                          </button>
-                          {gapExpanded && (
-                            <ul className="journey-gap-list">
-                              {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.length > 0 && (
-                                <li><strong>Skills already on file:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsPresent.join(', ')}</li>
-                              )}
-                              {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.length > 0 && (
-                                <li><strong>Skills to build:</strong> {activeRoadmap.progressionMeta.gapAnalysis.skillsMissing.join(', ')}</li>
-                              )}
-                              {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.length > 0 && (
-                                <li><strong>Responsibilities:</strong> {activeRoadmap.progressionMeta.gapAnalysis.responsibilitiesMissing.slice(0, 4).join('; ')}</li>
-                              )}
-                              {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.length > 0 && (
-                                <li><strong>Leadership:</strong> {activeRoadmap.progressionMeta.gapAnalysis.leadershipGaps.slice(0, 3).join('; ')}</li>
-                              )}
-                              {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.length > 0 && (
-                                <li><strong>Architecture:</strong> {activeRoadmap.progressionMeta.gapAnalysis.architectureGaps.slice(0, 3).join('; ')}</li>
-                              )}
-                              <li>{activeRoadmap.progressionMeta.gapAnalysis.experienceGapSummary}</li>
-                            </ul>
-                          )}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -799,12 +887,28 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                               </ul>
                             )}
                             {showDetails && (
+                              <div className="stage-improve-row">
+                                <button type="button" onClick={() => void previewStageUpgrade(activeRoadmap, idx)} disabled={improvingStageJobId === stage.jobId}>
+                                  {improvingStageJobId === stage.jobId ? 'Preparing preview…' : 'Improve this stage'}
+                                </button>
+                                <span>Preview updated roles, missions, projects, and courses before applying.</span>
+                              </div>
+                            )}
+                            {showDetails && content.actionPlan && user?.id && (
+                              <StageActionPlanPanel
+                                stage={stage}
+                                userId={user.id}
+                                userSkills={user.technologies}
+                                onUpdate={(changes) => updateStageChoices(activeRoadmap, idx, changes)}
+                              />
+                            )}
+                            {showDetails && (
                               <StageEvidenceEditor
                                 evidence={stage.progressEvidence ?? []}
                                 onAdd={(evidence) => addStageEvidence(activeRoadmap, idx, evidence)}
                               />
                             )}
-                            {showDetails && (content.futureOpportunities?.length ?? 0) > 0 && (
+                            {showDetails && !content.actionPlan && (content.futureOpportunities?.length ?? 0) > 0 && (
                               <div className="journey-detail-block">
                                 <span className="journey-detail-label">Future role categories</span>
                                 <div className="journey-role-chips">
@@ -814,7 +918,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                                 </div>
                               </div>
                             )}
-                            {showDetails &&
+                            {showDetails && !content.actionPlan &&
                               user?.id &&
                               (content.progressionType === 'experience' || content.progressionType === 'hybrid') && (
                               <StageOpportunitiesPanel
@@ -854,6 +958,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                                         {(resource.skills?.length ?? 0) > 0 && (
                                           <small className="resource-skills">Builds: {resource.skills!.join(', ')}</small>
                                         )}
+                                        {resource.reason && <small className="resource-reason"><strong>Why this course:</strong> {resource.reason}</small>}
                                         {resource.lastVerifiedAt && <small className="resource-verified">Link verified {resource.lastVerifiedAt}</small>}
                                         {ts && (
                                           <span
@@ -936,6 +1041,28 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               <div className="roadmap-upgrade-actions">
                 <button type="button" onClick={() => setUpgradePreview(null)}>Keep current roadmap</button>
                 <button type="button" className="primary" onClick={() => void applyRoadmapUpgrade()}>Apply future-stage update</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {stageUpgradePreview && (() => {
+        const route = stageUpgradePreview.content.actionPlan?.routes.find((item) => item.isRecommended);
+        return (
+          <div className="roadmap-upgrade-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setStageUpgradePreview(null); }}>
+            <div className="roadmap-upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="stage-upgrade-title">
+              <h3 id="stage-upgrade-title">Preview improved stage</h3>
+              <p>Your checkboxes, evidence, and completion state stay unchanged.</p>
+              <div className="stage-upgrade-summary">
+                <strong>{stageUpgradePreview.content.label}</strong>
+                <span>{stageUpgradePreview.content.estimatedTimeframe ?? 'Timing based on progress'}</span>
+                {route && <p><strong>Recommended route:</strong> {route.title}. {route.summary}</p>}
+                <p>{route?.roleOptions.length ?? 0} role options · {route?.projectOptions.length ?? 0} project options · {stageUpgradePreview.content.resources?.length ?? 0} courses</p>
+              </div>
+              <div className="roadmap-upgrade-actions">
+                <button type="button" onClick={() => setStageUpgradePreview(null)}>Keep current stage</button>
+                <button type="button" className="primary" onClick={() => void applyStageUpgrade()}>Apply improvement</button>
               </div>
             </div>
           </div>

@@ -202,6 +202,9 @@ Assertions check:
 - no JD fluff / company names / years-as-skills as capabilities
 - degree timelines mention years
 - noisy inputs appear in `removedInputExamples`
+- every stage has one valid recommended actionable route plus alternatives
+- route choice, internal missions, role fit, and project difficulty match the user's employment and experience context
+- project briefs include ordered work, deliverables, completion criteria, and data-safety guidance
 
 Add a fixture JSON under `fixtures/roadmap/`, then `npm run eval:promptfoo:roadmap:update`.
 

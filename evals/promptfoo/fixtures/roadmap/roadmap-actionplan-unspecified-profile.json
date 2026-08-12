@@ -1,0 +1,18 @@
+{
+  "id": "roadmap-actionplan-unspecified-profile",
+  "description": "A sparse profile still receives complete low-context project or combined action routes",
+  "tags": ["roadmap", "action-plan", "sparse-profile"],
+  "request": {
+    "dreamJob": "Business Analyst",
+    "targetYears": 3,
+    "startingPoint": { "currentJob": "Not specified", "currentRoleSummary": "Profile context unavailable", "userSkills": [], "isEntryLevel": true, "roleExperienceYears": 0, "roleExperienceLevel": "entry" }
+  },
+  "expected": {
+    "requireActionPlans": true,
+    "allowedRecommendedRouteTypes": ["combined", "project"],
+    "expectedProjectLevel": "beginner",
+    "expectedProjectHours": 20,
+    "forbidInternalMission": true,
+    "expectedFirstRoleFit": "prepare-first"
+  }
+}

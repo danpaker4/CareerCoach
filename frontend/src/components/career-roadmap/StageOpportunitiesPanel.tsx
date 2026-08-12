@@ -15,6 +15,8 @@ const EMPTY_PAGE: StageOpportunitiesResponse = {
   pagination: { page: 1, pageSize: 10, total: 0, totalPages: 0 },
 };
 
+const FILTER_SEPARATOR = '\u001f';
+
 const OpportunityList = ({ title, items, expandedJobId, onToggleDetails }: {
   title: string;
   items: StageOpportunity[];
@@ -73,16 +75,22 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
   const [seniority, setSeniority] = useState('');
   const [location, setLocation] = useState('');
   const primaryRole = roleCategories[0] ?? '';
+  const roleCategoriesKey = roleCategories.join(FILTER_SEPARATOR);
+  const userSkillsKey = (userSkills ?? []).join(FILTER_SEPARATOR);
 
   useEffect(() => {
-    if (!open || roleCategories.length === 0) return;
+    if (!open || roleCategoriesKey.length === 0) return;
     setLoading(true);
     setError('');
-    fetchStageOpportunities(roleCategories, userSkills, page)
+    fetchStageOpportunities(
+      roleCategoriesKey.split(FILTER_SEPARATOR),
+      userSkillsKey.length > 0 ? userSkillsKey.split(FILTER_SEPARATOR) : undefined,
+      page
+    )
       .then(setResult)
       .catch(() => setError('Could not load jobs for this roadmap stage.'))
       .finally(() => setLoading(false));
-  }, [open, page, roleCategories, userSkills]);
+  }, [open, page, roleCategoriesKey, userSkillsKey]);
 
   useEffect(() => {
     if (!open) return;
