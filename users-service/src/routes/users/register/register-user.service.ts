@@ -11,6 +11,7 @@ import { truncateCvTextForStorage } from "../users-cv.consts";
 import { regenerateProfileEmbedding } from "../user-embedding.service";
 import {
   throwIfUserAlreadyExists,
+  validateBirthDate,
   validatePdfFile,
   validateCvBuffer,
 } from "./register-user.utils";
@@ -75,6 +76,8 @@ export const registerUser = async (
   if (!email || !password || !firstName || !lastName || !birthDate) {
     throw new Error("Missing required fields");
   }
+
+  validateBirthDate(birthDate);
 
   const existingUser = await usersCollection.findOne({ email });
   throwIfUserAlreadyExists(Boolean(existingUser));
