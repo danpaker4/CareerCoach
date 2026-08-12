@@ -49,7 +49,7 @@ Rules:${COMMON_RULES}
 - When FOUND or NONE, respond with one short summary followed by: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
 - CHAT_STATED_FACTS are authoritative. Use their exact role and years in background and response; do not replace or contradict them.
 - Do not invent history or include account/CV details in the response when CHAT_STATED_FACTS are present.
-- If the latest message also states a direction, set mode to NEAR_TERM for a job now/soon, DREAMJOB for a future goal, GUIDED for uncertainty, otherwise null.
+- Always set mode=null. Direction routing is validated separately from the user's explicit wording.
 
 CHAT_STATED_FACTS: ${chatFactsLine}
 backgroundAskCount=${onboardingFlow.backgroundAskCount}

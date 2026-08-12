@@ -88,7 +88,7 @@ export const applyOnboardingDecision = (
                 backgroundAskCount: current.backgroundAskCount,
             };
             const resolvedMode: OnboardingInitialMode | null =
-                decision.mode ?? resolveOnboardingDirectionMode(latestUserMessage);
+                resolveOnboardingDirectionMode(latestUserMessage);
             if (resolvedMode) {
                 if (resolvedMode === "NEAR_TERM") {
                     return startNearTermTargetSelection(withBackground, latestUserMessage);
