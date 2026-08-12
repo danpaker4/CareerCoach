@@ -238,6 +238,39 @@ describe("checkIfNeededAddToPipeline", () => {
         assert.match(response?.reply ?? "", /Check Point/i);
     });
 
+    it("adds an offered job to wanted-job alerts for wanted-job and wishlist requests", async () => {
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"jobId":"cellebrite-1","confidence":"high"}',
+            appended,
+            searchCalled,
+        });
+        const wantedJobRequests: unknown[] = [];
+        globalThis.fetch = (async (input, init) => {
+            if (String(input).endsWith("/wanted-jobs")) {
+                wantedJobRequests.push(JSON.parse(String(init?.body)) as unknown);
+                return Response.json({ createdAt: new Date().toISOString() }, { status: 201 });
+            }
+            return new Response(null, { status: 409 });
+        }) as typeof fetch;
+        const conversation = buildConversation({
+            awaitingPipelineDecision: true,
+            jobs: [cellebrite],
+            focus: cellebrite,
+        });
+
+        const responses = await Promise.all([
+            "great add to my wanted job",
+            "add this also to my wishlist",
+        ].map((message) => checkIfNeededAddToPipeline(deps, buildCtx(message, conversation))));
+
+        assert.ok(responses.every((response) => response !== null));
+        assert.equal(wantedJobRequests.length, 2);
+        assert.equal((wantedJobRequests[0] as { jobTitle: string }).jobTitle, cellebrite.title);
+        assert.ok(responses.every((response) => /alert/i.test(response?.reply ?? "")));
+    });
+
     it("still adds another shortlist job after awaitingPipelineDecision was cleared", async () => {
         const intel = job("intel-1", "QA Engineer", "Intel");
         const appended: string[] = [];
