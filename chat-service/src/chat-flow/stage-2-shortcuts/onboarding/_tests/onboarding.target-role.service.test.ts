@@ -7,6 +7,7 @@ import {
     parseTargetRoleGroundingDecision,
 } from "../onboarding.target-role.llm.utils";
 import { resolveTargetRoleDecision } from "../onboarding.target-role.service";
+import { formatTargetRoleOptionsReply } from "../onboarding.target-role.utils";
 import { ONBOARDING_DIFFERENT_ROLE_REPLY, ONBOARDING_DIRECTION_REASK_REPLY } from "../onboarding.types";
 
 const createDifferentRoleConversation = (latestUserMessage = "product manager"): Conversation => ({
@@ -50,13 +51,57 @@ describe("parseTargetRoleDecision", () => {
     it("accepts a concrete target role", () => {
         const decision = parseTargetRoleDecision('{"status":"READY","targetRole":"product manager"}');
 
-        assert.deepEqual(decision, { status: "READY", targetRole: "product manager" });
+        assert.deepEqual(decision, { status: "READY", targetRole: "product manager", discoveryFacts: {} });
+    });
+
+    it("rejects placeholder role options", () => {
+        const decision = parseTargetRoleDecision(JSON.stringify({
+            status: "ROLE_OPTIONS",
+            summary: "Here are some possible directions.",
+            roles: [
+                { title: "[searchable role 1]", reason: "A possible match for your background." },
+                { title: "[searchable role 2]", reason: "Another possible match for your background." },
+                { title: "[searchable role 3]", reason: "A third possible match for your background." },
+            ],
+        }));
+
+        assert.equal(decision, null);
+    });
+
+    it("parses a dynamic discovery subject and supported facts", () => {
+        const decision = parseTargetRoleDecision(JSON.stringify({
+            status: "NEEDS_CLARIFICATION",
+            question: "Would you rather collaborate closely with customers or focus on internal product work?",
+            subject: "customer_collaboration",
+            discoveryFacts: { enjoyed_work: "solving complex technical problems" },
+        }));
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: "Would you rather collaborate closely with customers or focus on internal product work?",
+            subject: "customer_collaboration",
+            discoveryFacts: { enjoyed_work: "solving complex technical problems" },
+        });
+    });
+
+    it("formats validated role options as a readable numbered list", () => {
+        const reply = formatTargetRoleOptionsReply("These paths fit what you described.", [
+            { title: "Product Manager", reason: "Connects your technical background with product ownership." },
+            { title: "Solutions Engineer", reason: "Uses technical depth in customer-facing problem solving." },
+            { title: "Technical Program Manager", reason: "Centers on coordination across technical teams." },
+        ]);
+
+        assert.match(reply, /1\. Product Manager — Connects/);
+        assert.match(reply, /2\. Solutions Engineer — Uses/);
+        assert.match(reply, /Which role feels closest, or do none of them fit\?$/);
+        assert.doesNotMatch(reply, /\[searchable role/i);
     });
 
     it("rejects a question from an already completed onboarding stage", () => {
         const decision = parseTargetRoleDecision(JSON.stringify({
             status: "NEEDS_CLARIFICATION",
             question: ONBOARDING_DIRECTION_REASK_REPLY,
+            subject: "timeline",
         }));
 
         assert.equal(decision, null);
@@ -83,14 +128,26 @@ describe("resolveTargetRoleDecision", () => {
     it("switches from open questions to model-generated role choices after the limit", async () => {
         const conversation = createDifferentRoleConversation("i really don't know");
         if (conversation.onboardingFlow?.nearTermTarget) {
-            conversation.onboardingFlow.nearTermTarget.clarificationCount = 2;
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 4;
+            conversation.onboardingFlow.nearTermTarget.discoveryFacts = {
+                enjoyed_work: "solving technical problems",
+            };
+            conversation.onboardingFlow.nearTermTarget.coveredSubjects = ["enjoyed_work"];
         }
         const outputs = [
-            JSON.stringify({ status: "NEEDS_CLARIFICATION", question: "What kind of work sounds appealing?" }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: "What kind of work sounds appealing?",
+                subject: "desired_work",
+            }),
             JSON.stringify({
                 status: "ROLE_OPTIONS",
-                response: "You value strategy, collaboration, and leadership. Which is closest: Product Manager, Program Manager, or Operations Manager?",
-                roles: ["Product Manager", "Program Manager", "Operations Manager"],
+                summary: "You value strategy, collaboration, and leadership.",
+                roles: [
+                    { title: "Product Manager", reason: "Connects strategy with cross-functional product ownership." },
+                    { title: "Program Manager", reason: "Uses collaboration to coordinate complex initiatives." },
+                    { title: "Operations Manager", reason: "Applies leadership to improve teams and processes." },
+                ],
             }),
         ];
         const prompts: string[] = [];
@@ -105,6 +162,7 @@ describe("resolveTargetRoleDecision", () => {
             textCompletion,
             conversation,
             latestUserMessage: "i really don't know",
+            userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
             conversationId: "conversation-1",
         });
@@ -112,6 +170,9 @@ describe("resolveTargetRoleDecision", () => {
         assert.equal(decision.status, "ROLE_OPTIONS");
         assert.equal(prompts.length, 2);
         assert.match(prompts[0] ?? "", /mustOfferChoices=true/);
+        assert.match(prompts[0] ?? "", /solving technical problems/);
+        assert.match(prompts[0] ?? "", /coveredSubjects=\["enjoyed_work"\]/);
+        assert.match(prompts[0] ?? "", /Current role \/ headline: software developer/);
     });
 
     it("understands selection of a previously generated role suggestion", async () => {
@@ -124,7 +185,7 @@ describe("resolveTargetRoleDecision", () => {
             ];
         }
         const outputs = [
-            JSON.stringify({ status: "READY", targetRole: "Product Manager" }),
+            JSON.stringify({ status: "READY", targetRole: "Product Manager", discoveryFacts: {} }),
             JSON.stringify({ kind: "GROUNDED_SUGGESTION", evidenceQuote: "the first one" }),
         ];
         const textCompletion: TextCompletionPort = {
@@ -135,22 +196,66 @@ describe("resolveTargetRoleDecision", () => {
             textCompletion,
             conversation,
             latestUserMessage: "the first one",
+            userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
             conversationId: "conversation-1",
         });
 
-        assert.deepEqual(decision, { status: "READY", targetRole: "Product Manager" });
+        assert.deepEqual(decision, { status: "READY", targetRole: "Product Manager", discoveryFacts: {} });
     });
 
-    it("allows an explicitly requested exploratory job search after preference discovery", async () => {
+    it("accepts a suggested role title without requiring its description", async () => {
+        const conversation = createDifferentRoleConversation("Financial Analyst");
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.suggestedRoles = [
+                "Product Manager",
+                "Solutions Engineer",
+                "Financial Analyst",
+            ];
+        }
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return JSON.stringify({
+                    status: "ROLE_OPTIONS",
+                    summary: "These paths fit your background and interest in finance.",
+                    roles: [
+                        { title: "Product Manager", reason: "Combines technical context with product ownership." },
+                        { title: "Solutions Engineer", reason: "Uses technical knowledge in customer-facing work." },
+                        { title: "Financial Analyst", reason: "Applies analytical skills to financial decisions." },
+                    ],
+                });
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "Financial Analyst",
+            userAccountContext: "Current role / headline: software developer",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "Financial Analyst", discoveryFacts: {} });
+        assert.equal(prompts.length, 0);
+    });
+
+    it("offers roles instead of searching when the user has not selected a target", async () => {
         const conversation = createDifferentRoleConversation("are there any relevant jobs?");
         if (conversation.onboardingFlow?.nearTermTarget) {
-            conversation.onboardingFlow.nearTermTarget.clarificationCount = 3;
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 4;
         }
         const textCompletion: TextCompletionPort = {
             complete: async () => JSON.stringify({
-                status: "EXPLORE",
-                roles: ["Product Manager", "Program Manager", "Operations Manager"],
+                status: "ROLE_OPTIONS",
+                summary: "Based on your preferences, these are the strongest directions.",
+                roles: [
+                    { title: "Product Manager", reason: "Combines technical knowledge with product decisions." },
+                    { title: "Program Manager", reason: "Centers on cross-team planning and execution." },
+                    { title: "Solutions Engineer", reason: "Applies technical knowledge to customer problems." },
+                ],
             }),
         };
 
@@ -158,15 +263,12 @@ describe("resolveTargetRoleDecision", () => {
             textCompletion,
             conversation,
             latestUserMessage: "are there any relevant jobs?",
+            userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
             conversationId: "conversation-1",
         });
 
-        assert.deepEqual(decision, {
-            status: "EXPLORE",
-            response: "I'll show exploratory matches across Product Manager, Program Manager, Operations Manager.",
-            searchQuery: "Product Manager Program Manager Operations Manager",
-        });
+        assert.equal(decision.status, "ROLE_OPTIONS");
     });
 
     it("does not search an inferred role when the user only described a responsibility", async () => {
@@ -189,6 +291,7 @@ describe("resolveTargetRoleDecision", () => {
             textCompletion,
             conversation: createDifferentRoleConversation("leading teams"),
             latestUserMessage: "leading teams",
+            userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
             conversationId: "conversation-1",
         });
@@ -196,6 +299,8 @@ describe("resolveTargetRoleDecision", () => {
         assert.deepEqual(decision, {
             status: "NEEDS_CLARIFICATION",
             question: "Would you prefer to lead an engineering team, own product direction, or manage projects?",
+            subject: "target_role",
+            discoveryFacts: {},
         });
         assert.equal(prompts.length, 2);
         assert.match(prompts[1] ?? "", /concrete searchable occupational title/i);
@@ -203,7 +308,11 @@ describe("resolveTargetRoleDecision", () => {
 
     it("retries a wrong-stage response and understands the target role from the chat", async () => {
         const outputs = [
-            JSON.stringify({ status: "NEEDS_CLARIFICATION", question: ONBOARDING_DIRECTION_REASK_REPLY }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: ONBOARDING_DIRECTION_REASK_REPLY,
+                subject: "timeline",
+            }),
             JSON.stringify({ status: "READY", targetRole: "product manager" }),
             JSON.stringify({ kind: "GROUNDED_ROLE", evidenceQuote: "product manager" }),
         ];
@@ -219,11 +328,12 @@ describe("resolveTargetRoleDecision", () => {
             textCompletion,
             conversation: createDifferentRoleConversation(),
             latestUserMessage: "product manager",
+            userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
             conversationId: "conversation-1",
         });
 
-        assert.deepEqual(decision, { status: "READY", targetRole: "product manager" });
+        assert.deepEqual(decision, { status: "READY", targetRole: "product manager", discoveryFacts: {} });
         assert.equal(prompts.length, 3);
         assert.match(prompts[0] ?? "", /Latest user message: product manager/);
         assert.match(prompts[1] ?? "", /previous output was invalid/i);
@@ -240,6 +350,7 @@ describe("resolveTargetRoleDecision", () => {
             textCompletion,
             conversation: createDifferentRoleConversation(),
             latestUserMessage: "something different",
+            userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
             conversationId: "conversation-1",
         });
@@ -247,6 +358,8 @@ describe("resolveTargetRoleDecision", () => {
         assert.deepEqual(decision, {
             status: "NEEDS_CLARIFICATION",
             question: ONBOARDING_DIFFERENT_ROLE_REPLY,
+            subject: "target_direction",
+            discoveryFacts: {},
         });
     });
 });

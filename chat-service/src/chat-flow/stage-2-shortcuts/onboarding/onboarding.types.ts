@@ -14,8 +14,8 @@ export type OnboardingLlmDecision = {
     targetRole?: string | null;
     targetRoleReady?: boolean;
     targetRoleOptions?: string[];
-    targetSearchQuery?: string | null;
-    targetExplorationReady?: boolean;
+    targetDiscoveryFacts?: Readonly<Record<string, string>>;
+    targetDiscoverySubject?: string | null;
 };
 
 export type OnboardingStepResult = {

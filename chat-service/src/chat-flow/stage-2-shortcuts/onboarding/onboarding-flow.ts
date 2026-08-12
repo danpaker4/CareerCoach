@@ -18,6 +18,7 @@ import { ONBOARDING_PARSE_FALLBACK_REPLY } from "./onboarding.types";
 import type { OnboardingLlmDecision } from "./onboarding.types";
 import { recordChatLlmParseEvent } from "../../shared/llm/chat.llm.observability.utils";
 import { resolveTargetRoleDecision } from "./onboarding.target-role.service";
+import { formatTargetRoleOptionsReply } from "./onboarding.target-role.utils";
 
 const completeBackgroundAndTimelineStages = (completedStageIds: readonly string[]): string[] => {
     const next = new Set(completedStageIds);
@@ -156,6 +157,7 @@ const resolveOnboardingDecision = async (
         textCompletion: deps.textCompletion,
         conversation: ctx.conversationAfterUserMessage,
         latestUserMessage: ctx.normalizedMessage,
+        userAccountContext: ctx.userAccountContext,
         userId: ctx.userId,
         conversationId: ctx.conversationId,
         observer: deps.llmObserver,
@@ -168,25 +170,17 @@ const resolveOnboardingDecision = async (
             advance: true,
             targetRole: targetDecision.targetRole,
             targetRoleReady: true,
+            targetDiscoveryFacts: targetDecision.discoveryFacts,
         };
     }
     if (targetDecision.status === "ROLE_OPTIONS") {
         return {
-            response: targetDecision.response,
+            response: formatTargetRoleOptionsReply(targetDecision.summary, targetDecision.roles),
             background: currentFlow.background ?? { status: "UNKNOWN" },
             mode: null,
             advance: false,
-            targetRoleOptions: [...targetDecision.roles],
-        };
-    }
-    if (targetDecision.status === "EXPLORE") {
-        return {
-            response: targetDecision.response,
-            background: currentFlow.background ?? { status: "UNKNOWN" },
-            mode: null,
-            advance: true,
-            targetSearchQuery: targetDecision.searchQuery,
-            targetExplorationReady: true,
+            targetRoleOptions: targetDecision.roles.map((role) => role.title),
+            targetDiscoveryFacts: targetDecision.discoveryFacts,
         };
     }
     return {
@@ -195,6 +189,8 @@ const resolveOnboardingDecision = async (
         mode: null,
         advance: false,
         targetRoleReady: false,
+        targetDiscoveryFacts: targetDecision.discoveryFacts,
+        targetDiscoverySubject: targetDecision.subject,
     };
 };
 

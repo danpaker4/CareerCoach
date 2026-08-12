@@ -6,6 +6,7 @@ import type {
 import { parseJsonObjectFromLlm } from "../../shared/llm/json-response.utils";
 import type { OnboardingLlmDecision } from "./onboarding.types";
 import { ONBOARDING_DIRECTION_REASK_REPLY, ONBOARDING_PARSE_FALLBACK_REPLY } from "./onboarding.types";
+import { parseTargetDiscoveryFacts } from "./onboarding.target-role.utils";
 
 const INTERNAL_LABEL_LEAK_PATTERN =
     /\b(?:NEAR[_\s-]?TERM|DREAM[_\s-]?JOB|GUIDED|FOUND|UNKNOWN)\b|\[[^\]]*(?:NEAR_TERM|DREAMJOB|GUIDED)[^\]]*\]/gi;
@@ -116,5 +117,9 @@ export const parseOnboardingLlmDecisionFromJson = (rawText: string): OnboardingL
             ? obj.targetRole.trim()
             : null,
         targetRoleReady: obj.targetRoleReady === true,
+        targetDiscoverySubject: typeof obj.targetDiscoverySubject === "string"
+            ? obj.targetDiscoverySubject.trim().slice(0, 80) || null
+            : null,
+        targetDiscoveryFacts: parseTargetDiscoveryFacts(obj.targetDiscoveryFacts),
     };
 };

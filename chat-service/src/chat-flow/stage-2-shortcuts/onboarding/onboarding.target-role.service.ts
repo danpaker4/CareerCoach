@@ -11,6 +11,7 @@ import {
     buildTargetRoleDecisionPrompt,
     buildTargetRoleGroundingPrompt,
 } from "./onboarding.target-role.prompt.utils";
+import { matchSuggestedRoleTitle } from "./onboarding.target-role.utils";
 import type {
     ResolveTargetRoleDecisionParams,
     TargetRoleDecision,
@@ -55,8 +56,21 @@ const completeJsonAttempt = async <T>(
 export const resolveTargetRoleDecision = async (
     params: ResolveTargetRoleDecisionParams,
 ): Promise<TargetRoleDecision> => {
-    const prompt = buildTargetRoleDecisionPrompt(params.conversation, params.latestUserMessage);
-    const clarificationCount = params.conversation.onboardingFlow?.nearTermTarget?.clarificationCount ?? 0;
+    const targetState = params.conversation.onboardingFlow?.nearTermTarget;
+    const selectedSuggestedRole = matchSuggestedRoleTitle(
+        params.latestUserMessage,
+        targetState?.suggestedRoles ?? [],
+    );
+    if (selectedSuggestedRole) {
+        return { status: "READY", targetRole: selectedSuggestedRole, discoveryFacts: {} };
+    }
+
+    const prompt = buildTargetRoleDecisionPrompt(
+        params.conversation,
+        params.latestUserMessage,
+        params.userAccountContext,
+    );
+    const clarificationCount = targetState?.clarificationCount ?? 0;
     const mustOfferChoices = clarificationCount >= MAX_OPEN_TARGET_ROLE_QUESTIONS;
     const parseDecision = (rawText: string): TargetRoleDecision | null => {
         const decision = parseTargetRoleDecision(rawText);
@@ -81,9 +95,11 @@ export const resolveTargetRoleDecision = async (
         return resolved ?? {
             status: "NEEDS_CLARIFICATION",
             question: ONBOARDING_DIFFERENT_ROLE_REPLY,
+            subject: "target_direction",
+            discoveryFacts: {},
         };
     }
-    if (resolved.status === "ROLE_OPTIONS" || resolved.status === "EXPLORE") {
+    if (resolved.status === "ROLE_OPTIONS") {
         return resolved;
     }
 
@@ -109,7 +125,12 @@ export const resolveTargetRoleDecision = async (
         return resolved;
     }
     if (grounding.decision?.kind === "NEEDS_CLARIFICATION") {
-        return { status: "NEEDS_CLARIFICATION", question: grounding.decision.question };
+        return {
+            status: "NEEDS_CLARIFICATION",
+            question: grounding.decision.question,
+            subject: "target_role",
+            discoveryFacts: resolved.discoveryFacts,
+        };
     }
 
     const groundingRetry = await completeJsonAttempt(
@@ -125,10 +146,17 @@ export const resolveTargetRoleDecision = async (
         return resolved;
     }
     if (groundingRetry.decision?.kind === "NEEDS_CLARIFICATION") {
-        return { status: "NEEDS_CLARIFICATION", question: groundingRetry.decision.question };
+        return {
+            status: "NEEDS_CLARIFICATION",
+            question: groundingRetry.decision.question,
+            subject: "target_role",
+            discoveryFacts: resolved.discoveryFacts,
+        };
     }
     return {
         status: "NEEDS_CLARIFICATION",
         question: ONBOARDING_DIFFERENT_ROLE_REPLY,
+        subject: "target_direction",
+        discoveryFacts: resolved.discoveryFacts,
     };
 };

@@ -1,17 +1,50 @@
 import { parseJsonObjectFromLlm } from "../../shared/llm/json-response.utils";
-import { buildDifferentRoleDiscoveryReply, normalizeTargetRole } from "./onboarding.target-role.utils";
-import type { TargetRoleDecision, TargetRoleGroundingDecision } from "./onboarding.target-role.types";
+import {
+    buildDifferentRoleDiscoveryReply,
+    normalizeTargetRole,
+    parseTargetDiscoveryFacts,
+} from "./onboarding.target-role.utils";
+import type {
+    TargetRoleDecision,
+    TargetRoleGroundingDecision,
+    TargetRoleOption,
+} from "./onboarding.target-role.types";
+
+const MAX_ROLE_REASON_CHARS = 240;
+const INVALID_ROLE_TITLE_PATTERN = /[\[\]{}<>]|\bsearchable\s+role\b|\b(?:role|option)\s*\d+\b/i;
+const GENERIC_ROLE_TITLES = new Set(["role", "job", "position", "different role", "new role", "career"]);
 
 const normalizeEvidence = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, " ");
 
-const parseRoleList = (value: unknown): readonly string[] | null => {
+const normalizeRoleTitle = (value: unknown): string | null => {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const title = normalizeTargetRole(value);
+    if (!title || INVALID_ROLE_TITLE_PATTERN.test(title) || GENERIC_ROLE_TITLES.has(title.toLowerCase())) {
+        return null;
+    }
+    return title;
+};
+
+const parseRoleList = (value: unknown): readonly TargetRoleOption[] | null => {
     if (!Array.isArray(value)) {
         return null;
     }
-    const roles = [...new Set(value
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => normalizeTargetRole(item))
-        .filter((item): item is string => item !== null))];
+    const parsedRoles = value.flatMap((item): TargetRoleOption[] => {
+        if (typeof item !== "object" || item === null || Array.isArray(item)) {
+            return [];
+        }
+        const role = item as Record<string, unknown>;
+        const title = normalizeRoleTitle(role.title);
+        const reason = typeof role.reason === "string"
+            ? role.reason.trim().slice(0, MAX_ROLE_REASON_CHARS)
+            : "";
+        return title && reason.length >= 8 && !INVALID_ROLE_TITLE_PATTERN.test(reason)
+            ? [{ title, reason }]
+            : [];
+    });
+    const roles = [...new Map(parsedRoles.map((role) => [role.title.toLowerCase(), role])).values()];
     return roles.length >= 3 && roles.length <= 5 ? roles : null;
 };
 
@@ -22,40 +55,30 @@ export const parseTargetRoleDecision = (rawText: string): TargetRoleDecision | n
     }
 
     const status = object.status.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const discoveryFacts = parseTargetDiscoveryFacts(object.discoveryFacts);
     if (status === "READY") {
-        const targetRole = typeof object.targetRole === "string"
-            ? normalizeTargetRole(object.targetRole)
-            : null;
-        return targetRole ? { status: "READY", targetRole } : null;
+        const targetRole = normalizeRoleTitle(object.targetRole);
+        return targetRole ? { status: "READY", targetRole, discoveryFacts } : null;
     }
 
-    if (status === "NEEDS_CLARIFICATION" && typeof object.question === "string") {
+    if (
+        status === "NEEDS_CLARIFICATION"
+        && typeof object.question === "string"
+        && typeof object.subject === "string"
+    ) {
         const question = object.question.trim();
+        const subject = object.subject.trim().slice(0, 80);
         const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
-        return validatedQuestion === question
-            ? { status: "NEEDS_CLARIFICATION", question }
+        return validatedQuestion === question && subject.length >= 2
+            ? { status: "NEEDS_CLARIFICATION", question, subject, discoveryFacts }
             : null;
     }
 
-    if (status === "ROLE_OPTIONS" && typeof object.response === "string") {
-        const response = object.response.trim();
+    if (status === "ROLE_OPTIONS" && typeof object.summary === "string") {
+        const summary = object.summary.trim().slice(0, 400);
         const roles = parseRoleList(object.roles);
-        const validatedResponse = buildDifferentRoleDiscoveryReply(response);
-        return roles && validatedResponse === response
-            ? { status: "ROLE_OPTIONS", response, roles }
-            : null;
-    }
-
-    if (status === "EXPLORE") {
-        const roles = parseRoleList(object.roles);
-        const providedQuery = typeof object.searchQuery === "string" ? object.searchQuery.trim() : null;
-        const searchQuery = roles?.join(" ") ?? providedQuery;
-        const modelResponse = typeof object.response === "string" ? object.response.trim() : "";
-        const response = modelResponse || (roles
-            ? `I'll show exploratory matches across ${roles.join(", ")}.`
-            : "");
-        return response.length > 0 && searchQuery && searchQuery.length >= 3 && searchQuery.length <= 200
-            ? { status: "EXPLORE", response, searchQuery }
+        return roles && summary.length > 0 && !INVALID_ROLE_TITLE_PATTERN.test(summary)
+            ? { status: "ROLE_OPTIONS", summary, roles, discoveryFacts }
             : null;
     }
 

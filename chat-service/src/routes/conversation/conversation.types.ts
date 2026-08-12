@@ -37,14 +37,17 @@ export type OnboardingInitialMode = "NEAR_TERM" | "DREAMJOB" | "GUIDED";
 
 export type OnboardingNearTermRoleChoice = "SAME_ROLE" | "DIFFERENT_ROLE";
 
+export type OnboardingTargetDiscoveryFacts = Readonly<Record<string, string>>;
+
 export type OnboardingNearTermTarget = {
     step: "awaiting_role_choice" | "discovering_target";
     roleChoice?: OnboardingNearTermRoleChoice;
     targetRole?: string;
     searchQuery?: string;
-    exploratory?: boolean;
     clarificationCount?: number;
     suggestedRoles?: string[];
+    discoveryFacts?: OnboardingTargetDiscoveryFacts;
+    coveredSubjects?: string[];
 };
 
 export type OnboardingFlow = {

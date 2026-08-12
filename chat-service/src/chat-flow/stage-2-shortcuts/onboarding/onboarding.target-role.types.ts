@@ -2,11 +2,20 @@ import type { Conversation } from "../../../routes/conversation/conversation.mod
 import type { TextCompletionPort } from "../../../litellm/text-completion/text-completion.types";
 import type { ChatLlmObserver } from "../../shared/llm/chat.llm.types";
 
-export type TargetRoleDecision =
+export type TargetRoleOption = {
+    readonly title: string;
+    readonly reason: string;
+};
+
+type TargetRoleDecisionBase = {
+    readonly discoveryFacts: Readonly<Record<string, string>>;
+};
+
+export type TargetRoleDecision = TargetRoleDecisionBase & (
     | { readonly status: "READY"; readonly targetRole: string }
-    | { readonly status: "NEEDS_CLARIFICATION"; readonly question: string }
-    | { readonly status: "ROLE_OPTIONS"; readonly response: string; readonly roles: readonly string[] }
-    | { readonly status: "EXPLORE"; readonly response: string; readonly searchQuery: string };
+    | { readonly status: "NEEDS_CLARIFICATION"; readonly question: string; readonly subject: string }
+    | { readonly status: "ROLE_OPTIONS"; readonly summary: string; readonly roles: readonly TargetRoleOption[] }
+);
 
 export type TargetRoleGroundingDecision =
     | { readonly kind: "GROUNDED_ROLE"; readonly evidenceQuote: string }
@@ -17,6 +26,7 @@ export type ResolveTargetRoleDecisionParams = {
     readonly textCompletion: TextCompletionPort;
     readonly conversation: Conversation;
     readonly latestUserMessage: string;
+    readonly userAccountContext: string;
     readonly userId: string;
     readonly conversationId: string;
     readonly observer?: ChatLlmObserver;

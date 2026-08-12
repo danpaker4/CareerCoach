@@ -4,6 +4,7 @@ import type { JobSearchResultItem } from "../../chat-flow/api/shared/chat.types"
 import type { Conversation, ConversationStageProgress, OnboardingFlow } from "./conversation.model";
 import { CONVERSATION_STAGES } from "./conversation.stage.consts";
 import type { ConversationResponse } from "./conversation.types";
+import type { SanitizedJob } from "./job-in-conversation.types";
 
 export class ConversationNotFoundError extends Error {
     constructor() {
@@ -37,6 +38,15 @@ export const toAttachedJobSnapshots = (jobs: readonly JobSearchResultItem[]): At
         company: job.company,
         salary: typeof job.salary === "number" ? job.salary : 0,
     }));
+
+export const mergeReturnedJobHistory = (
+    existingJobs: readonly SanitizedJob[],
+    returnedJobs: readonly SanitizedJob[],
+): SanitizedJob[] => {
+    const jobsById = new Map(existingJobs.map((job) => [job.id, job]));
+    returnedJobs.forEach((job) => jobsById.set(job.id, job));
+    return [...jobsById.values()];
+};
 
 export const defaultStageProgress = (): ConversationStageProgress => ({
     currentStageIndex: 0,

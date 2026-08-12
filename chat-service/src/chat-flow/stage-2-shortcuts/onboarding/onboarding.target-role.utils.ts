@@ -4,11 +4,31 @@ import type {
 } from "../../../routes/conversation/conversation.types";
 import { extractNearTermSearchQuery } from "../../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
 import type { OnboardingLlmDecision, OnboardingStepResult } from "./onboarding.types";
+import type { TargetRoleOption } from "./onboarding.target-role.types";
 import {
     ONBOARDING_DIFFERENT_ROLE_REPLY,
     ONBOARDING_DIRECTION_REASK_REPLY,
     ONBOARDING_ROLE_CHOICE_REPLY,
 } from "./onboarding.types";
+
+const MAX_DISCOVERY_FACTS = 20;
+const MAX_DISCOVERY_FACT_CHARS = 240;
+
+const isStringFactEntry = (entry: [string, unknown]): entry is [string, string] =>
+    entry[0].trim().length > 0 && typeof entry[1] === "string";
+
+export const parseTargetDiscoveryFacts = (value: unknown): Readonly<Record<string, string>> => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return {};
+    }
+    return Object.fromEntries(
+        Object.entries(value)
+            .filter(isStringFactEntry)
+            .map(([key, fact]) => [key.trim().slice(0, 80), fact.trim().slice(0, MAX_DISCOVERY_FACT_CHARS)])
+            .filter(([, fact]) => fact.length > 0)
+            .slice(0, MAX_DISCOVERY_FACTS),
+    );
+};
 
 const SAME_ROLE_PATTERNS: readonly RegExp[] = [
     /^same(?: role| job| field)?[.!]?$/i,
@@ -51,12 +71,29 @@ export const buildDifferentRoleDiscoveryReply = (modelReply: string): string => 
     return ONBOARDING_DIFFERENT_ROLE_REPLY;
 };
 
+export const formatTargetRoleOptionsReply = (summary: string, roles: readonly TargetRoleOption[]): string => {
+    const roleLines = roles.map((role, index) => `${index + 1}. ${role.title} — ${role.reason}`);
+    return [
+        summary.trim(),
+        ...roleLines,
+        "Which role feels closest, or do none of them fit?",
+    ].join("\n");
+};
+
 export const normalizeTargetRole = (value: string | null | undefined): string | null => {
     const trimmed = value?.trim();
     if (!trimmed || trimmed.length < 3 || trimmed.length > 80) {
         return null;
     }
     return trimmed;
+};
+
+export const matchSuggestedRoleTitle = (
+    latestUserMessage: string,
+    suggestedRoles: readonly string[],
+): string | null => {
+    const normalizedMessage = latestUserMessage.trim().toLocaleLowerCase();
+    return suggestedRoles.find((role) => role.trim().toLocaleLowerCase() === normalizedMessage) ?? null;
 };
 
 const completeNearTermTarget = (
@@ -76,29 +113,6 @@ const completeNearTermTarget = (
             roleChoice,
             targetRole,
             searchQuery: targetRole,
-            exploratory: false,
-        },
-    },
-    completedThisTurn: true,
-});
-
-const completeNearTermExploration = (
-    current: OnboardingFlow,
-    searchQuery: string,
-    reply: string,
-): OnboardingStepResult => ({
-    reply,
-    onboardingFlow: {
-        ...current,
-        directionResolved: true,
-        completed: true,
-        initialMode: "NEAR_TERM",
-        nearTermTarget: {
-            ...current.nearTermTarget,
-            step: "discovering_target",
-            roleChoice: "DIFFERENT_ROLE",
-            searchQuery,
-            exploratory: true,
         },
     },
     completedThisTurn: true,
@@ -134,17 +148,26 @@ export const continueNearTermTargetSelection = (
     latestUserMessage: string,
 ): OnboardingStepResult => {
     const targetFlow = current.nearTermTarget ?? { step: "awaiting_role_choice" as const };
-    const explorationQuery = decision.targetExplorationReady
-        ? decision.targetSearchQuery?.trim()
-        : null;
-    if (explorationQuery) {
-        return completeNearTermExploration(current, explorationQuery, decision.response);
-    }
+    const discoveryFacts = {
+        ...(targetFlow.discoveryFacts ?? {}),
+        ...(decision.targetDiscoveryFacts ?? {}),
+    };
+    const coveredSubjects = decision.targetDiscoverySubject
+        ? [...new Set([...(targetFlow.coveredSubjects ?? []), decision.targetDiscoverySubject])]
+        : targetFlow.coveredSubjects;
+    const currentWithDiscovery: OnboardingFlow = {
+        ...current,
+        nearTermTarget: {
+            ...targetFlow,
+            discoveryFacts,
+            coveredSubjects,
+        },
+    };
     const explicitTarget = normalizeTargetRole(extractNearTermSearchQuery(latestUserMessage));
     const modelTarget = decision.targetRoleReady ? normalizeTargetRole(decision.targetRole) : null;
     const targetRole = explicitTarget ?? modelTarget;
     if (targetRole) {
-        return completeNearTermTarget(current, targetRole, "DIFFERENT_ROLE");
+        return completeNearTermTarget(currentWithDiscovery, targetRole, "DIFFERENT_ROLE");
     }
 
     if (targetFlow.step === "awaiting_role_choice") {
@@ -169,10 +192,16 @@ export const continueNearTermTargetSelection = (
         }
         if (roleChoice === "DIFFERENT_ROLE") {
             return {
-                reply: ONBOARDING_DIFFERENT_ROLE_REPLY,
+                reply: buildDifferentRoleDiscoveryReply(decision.response),
                 onboardingFlow: {
                     ...current,
-                    nearTermTarget: { step: "discovering_target", roleChoice, clarificationCount: 0 },
+                    nearTermTarget: {
+                        step: "discovering_target",
+                        roleChoice,
+                        clarificationCount: 1,
+                        discoveryFacts,
+                        coveredSubjects,
+                    },
                 },
                 completedThisTurn: false,
             };
@@ -191,8 +220,12 @@ export const continueNearTermTargetSelection = (
             nearTermTarget: {
                 ...targetFlow,
                 step: "discovering_target",
-                clarificationCount: (targetFlow.clarificationCount ?? 0) + 1,
+                clarificationCount: decision.targetDiscoverySubject
+                    ? (targetFlow.clarificationCount ?? 0) + 1
+                    : targetFlow.clarificationCount,
                 suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles,
+                discoveryFacts,
+                coveredSubjects,
             },
         },
         completedThisTurn: false,

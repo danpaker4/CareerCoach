@@ -94,6 +94,7 @@ const buildCtx = (
     message: string,
     conversation: Conversation,
     modeOverrides: Partial<typeof DEFAULT_MODE_DETECTION_RESULT> = {},
+    followUpOverrides: Partial<SendMessagePreparedContext["followUpIntent"]> = {},
 ): SendMessagePreparedContext => ({
     userId: "u1",
     conversationId: "c1",
@@ -117,7 +118,7 @@ const buildCtx = (
     },
     userRoleExperience: [],
     confidenceSummary: emptyConfidence,
-    followUpIntent: { isFollowUp: false, requestedField: null, isExplicitNewSearch: false },
+    followUpIntent: { isFollowUp: false, requestedField: null, isExplicitNewSearch: false, ...followUpOverrides },
     modeDetection: {
         ...DEFAULT_MODE_DETECTION_RESULT,
         mode: CONVERSATION_MODE.NEAR_TERM,
@@ -142,6 +143,7 @@ const buildDeps = (params: {
                 params.appended.push(reply);
             },
             saveJobContext: async () => undefined,
+            setSelectedJob: async () => undefined,
             updateDreamJobFlow: async () => undefined,
         } as unknown as ChatFlowDeps["conversationService"],
         externalService: {
@@ -334,5 +336,40 @@ describe("runStage2Shortcuts pipeline ordering", () => {
         assert.ok(response);
         assert.equal(searchCalled.value, false);
         assert.match(response?.reply ?? "", /Check Point/i);
+    });
+
+    it("answers salary follow-up before near-term search when jobs are already in context", async () => {
+        const pixelPerfect = {
+            ...job("pixel-1", "Frontend Developer (React)", "Pixel Perfect Labs"),
+            salary: 28000,
+        };
+        const wolt = job("wolt-1", "Frontend Developer (React)", "Wolt Israel");
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"jobId":"pixel-1","confidence":"high"}',
+            appended,
+            searchCalled,
+        });
+        const conversation = buildConversation({
+            awaitingPipelineDecision: false,
+            jobs: [pixelPerfect, wolt, checkPoint],
+            focus: pixelPerfect,
+        });
+        const response = await runStage2Shortcuts(
+            deps,
+            buildCtx(
+                "what the salary at frontend developer in pixel perfect",
+                conversation,
+                { shouldSearchJobs: true, mode: CONVERSATION_MODE.NEAR_TERM },
+                { isFollowUp: true, requestedField: "salary", isExplicitNewSearch: false },
+            ),
+        );
+
+        assert.ok(response);
+        assert.equal(searchCalled.value, false);
+        assert.match(response?.reply ?? "", /salary/i);
+        assert.match(response?.reply ?? "", /Pixel Perfect Labs/i);
+        assert.match(response?.reply ?? "", /28000/);
     });
 });

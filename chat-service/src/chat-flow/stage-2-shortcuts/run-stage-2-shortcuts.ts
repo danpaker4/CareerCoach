@@ -13,6 +13,16 @@ import { tryRefineSearchOfferResponse } from "./refine-search/refine-search-shor
 import { tryRoleConflictShortcutResponse } from "./role-conflict/role-conflict-shortcut";
 import { tryWishlistConfirmationResponse } from "./wanted-jobs/wishlist-shortcut";
 
+const hasShortlistJobs = (ctx: SendMessagePreparedContext): boolean =>
+    ((ctx.conversationAfterUserMessage.jobContext?.allReturnedJobs
+        ?? ctx.conversationAfterUserMessage.jobContext?.lastReturnedJobs)?.length ?? 0) > 0;
+
+/** Salary/details follow-ups should win over another NEAR_TERM search when jobs are already in context. */
+const shouldPrioritizeFollowUpShortcut = (ctx: SendMessagePreparedContext): boolean =>
+    hasShortlistJobs(ctx)
+    && ctx.followUpIntent.isFollowUp
+    && !ctx.followUpIntent.isExplicitNewSearch;
+
 export const runStage2Shortcuts = async (
     deps: ChatFlowDeps,
     ctx: SendMessagePreparedContext
@@ -31,6 +41,13 @@ export const runStage2Shortcuts = async (
         const pipelineWhileAwaiting = await checkIfNeededAddToPipeline(deps, ctx);
         if (pipelineWhileAwaiting) {
             return pipelineWhileAwaiting;
+        }
+    }
+
+    if (shouldPrioritizeFollowUpShortcut(ctx)) {
+        const followUpResponse = await tryFollowUpShortcutResponse(deps, ctx);
+        if (followUpResponse) {
+            return followUpResponse;
         }
     }
 

@@ -10,6 +10,7 @@ import {
     defaultOnboardingFlow,
     defaultStageProgress,
     InvalidConversationIdError,
+    mergeReturnedJobHistory,
     toAttachedJobSnapshots,
     toConversationResponse,
     parseConversationObjectIdOrThrow,
@@ -203,6 +204,10 @@ export class ChatConversationService {
     ): Promise<void> => {
         const now = new Date();
         const conversation = await this.getConversationByConversationIdAndUserId(userId, conversationId);
+        const existingJobHistory = conversation.jobContext?.allReturnedJobs
+            ?? conversation.jobContext?.lastReturnedJobs
+            ?? [];
+        const allReturnedJobs = mergeReturnedJobHistory(existingJobHistory, jobs);
         const prevRec = conversation.jobContext?.jobRecommendationContext;
         const mergedRejected = [...new Set([...(prevRec?.rejectedJobIds ?? [])])];
         const mergedAccepted = [...new Set([...(prevRec?.acceptedJobIds ?? [])])];
@@ -234,6 +239,7 @@ export class ChatConversationService {
                   }
                 : null;
         const jobContext: ConversationJobContext = {
+            allReturnedJobs,
             lastReturnedJobs: poolToUse,
             selectedJobId,
             selectedJobSnapshot,

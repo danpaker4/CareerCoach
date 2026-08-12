@@ -103,6 +103,28 @@ describe("buildOnboardingPrompt", () => {
         assert.match(prompt, /somehting diifererent.*DIFFERENT_ROLE/i);
         assert.match(prompt, /Do not repeat the same-role\/different-role question/i);
     });
+
+    it("asks the model for a dynamic first discovery question after choosing a different role", () => {
+        const flow = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const prompt = buildOnboardingPrompt(
+            emptyConversation(),
+            "i want a different role",
+            "Current role / headline: software developer\nCompany: Paragon",
+            flow,
+        );
+
+        assert.match(prompt, /ask one personalized, high-value discovery question/i);
+        assert.match(prompt, /examples rather than a fixed sequence/i);
+        assert.match(prompt, /Do not ask for information already known/i);
+        assert.match(prompt, /targetDiscoverySubject/);
+    });
 });
 
 describe("resolveOnboardingDirectionMode", () => {
@@ -296,17 +318,19 @@ describe("applyOnboardingDecision", () => {
         const choseDifferent = applyOnboardingDecision(
             awaitingChoice,
             {
-                response: "Which different role?",
+                response: "Which parts of software development have you enjoyed most?",
                 background: awaitingChoice.background,
                 mode: null,
                 advance: false,
                 roleChoice: "DIFFERENT_ROLE",
+                targetDiscoverySubject: "enjoyed_work",
             },
             "a different role",
         );
         assert.equal(choseDifferent.onboardingFlow.completed, false);
         assert.equal(choseDifferent.onboardingFlow.nearTermTarget?.step, "discovering_target");
-        assert.match(choseDifferent.reply, /what role or kind of work/i);
+        assert.match(choseDifferent.reply, /parts of software development/i);
+        assert.deepEqual(choseDifferent.onboardingFlow.nearTermTarget?.coveredSubjects, ["enjoyed_work"]);
 
         const stillDiscovering = applyOnboardingDecision(
             choseDifferent.onboardingFlow,
@@ -316,12 +340,15 @@ describe("applyOnboardingDecision", () => {
                 mode: null,
                 advance: false,
                 targetRoleReady: false,
+                targetDiscoverySubject: "product_area",
+                targetDiscoveryFacts: { enjoyed_work: "building products" },
             },
             "I want to build products",
         );
         assert.equal(stillDiscovering.onboardingFlow.completed, false);
-        assert.equal(stillDiscovering.onboardingFlow.nearTermTarget?.clarificationCount, 1);
+        assert.equal(stillDiscovering.onboardingFlow.nearTermTarget?.clarificationCount, 2);
         assert.match(stillDiscovering.reply, /interfaces, APIs, or mobile applications\?/i);
+        assert.equal(stillDiscovering.onboardingFlow.nearTermTarget?.discoveryFacts?.enjoyed_work, "building products");
 
         const withOptions = applyOnboardingDecision(
             stillDiscovering.onboardingFlow,
@@ -357,7 +384,7 @@ describe("applyOnboardingDecision", () => {
         assert.equal(understood.completedThisTurn, true);
     });
 
-    it("completes onboarding with a model-generated exploratory search query", () => {
+    it("keeps onboarding open while presenting role options", () => {
         const discoveringTarget = {
             ...defaultOnboardingFlow(),
             backgroundResolved: true,
@@ -373,23 +400,29 @@ describe("applyOnboardingDecision", () => {
         const step = applyOnboardingDecision(
             discoveringTarget,
             {
-                response: "I'll show exploratory matches based on the preferences you shared.",
+                response: [
+                    "These directions fit the preferences you shared.",
+                    "1. Product Manager — Combines technical context with product ownership.",
+                    "2. Program Manager — Focuses on delivery across multiple teams.",
+                    "3. Solutions Engineer — Applies technical skills to customer problems.",
+                    "Which role feels closest, or do none of them fit?",
+                ].join("\n"),
                 background: discoveringTarget.background,
                 mode: null,
-                advance: true,
-                targetSearchQuery: "product manager program manager operations manager",
-                targetExplorationReady: true,
+                advance: false,
+                targetRoleOptions: ["Product Manager", "Program Manager", "Solutions Engineer"],
             },
             "are there any relevant jobs?",
         );
 
-        assert.equal(step.onboardingFlow.completed, true);
-        assert.equal(step.onboardingFlow.nearTermTarget?.exploratory, true);
-        assert.equal(
-            step.onboardingFlow.nearTermTarget?.searchQuery,
-            "product manager program manager operations manager",
-        );
-        assert.equal(step.reply, "I'll show exploratory matches based on the preferences you shared.");
+        assert.equal(step.onboardingFlow.completed, false);
+        assert.equal(step.onboardingFlow.nearTermTarget?.searchQuery, undefined);
+        assert.deepEqual(step.onboardingFlow.nearTermTarget?.suggestedRoles, [
+            "Product Manager",
+            "Program Manager",
+            "Solutions Engineer",
+        ]);
+        assert.match(step.reply, /1\. Product Manager/);
     });
 
     it("rejects the old direction question while discovering a different target role", () => {

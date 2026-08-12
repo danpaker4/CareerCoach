@@ -1,1 +1,1 @@
-export const MAX_OPEN_TARGET_ROLE_QUESTIONS = 2;
+export const MAX_OPEN_TARGET_ROLE_QUESTIONS = 4;

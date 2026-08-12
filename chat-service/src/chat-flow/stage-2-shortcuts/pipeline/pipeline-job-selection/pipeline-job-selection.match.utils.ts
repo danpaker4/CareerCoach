@@ -28,6 +28,18 @@ const stripCompanySuffixes = (company: string): string =>
         .replace(/\s+/g, " ")
         .trim();
 
+const COMPANY_GENERIC_SUFFIX_TOKENS = new Set([
+    "labs",
+    "lab",
+    "group",
+    "technologies",
+    "technology",
+    "tech",
+    "solutions",
+    "software",
+    "systems",
+]);
+
 export const companyMentionedInMessage = (company: string, message: string): boolean => {
     const messageNorm = normalizeMatchText(message);
     const companyNorm = normalizeMatchText(company);
@@ -38,7 +50,13 @@ export const companyMentionedInMessage = (company: string, message: string): boo
         return true;
     }
     const stripped = stripCompanySuffixes(company);
-    return stripped.length >= 3 && messageNorm.includes(stripped);
+    if (stripped.length >= 3 && messageNorm.includes(stripped)) {
+        return true;
+    }
+    const tokens = stripped.split(" ").filter((token) => token.length >= 3);
+    const significantTokens = tokens.filter((token) => !COMPANY_GENERIC_SUFFIX_TOKENS.has(token));
+    const tokensToMatch = significantTokens.length >= 2 ? significantTokens : tokens;
+    return tokensToMatch.length >= 2 && tokensToMatch.every((token) => messageNorm.includes(token));
 };
 
 export const titleMentionedInMessage = (title: string, message: string): boolean => {

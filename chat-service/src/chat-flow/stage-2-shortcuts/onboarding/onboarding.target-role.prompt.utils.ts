@@ -4,6 +4,7 @@ import { MAX_OPEN_TARGET_ROLE_QUESTIONS } from "./onboarding.target-role.consts"
 const MAX_HISTORY_MESSAGES = 40;
 const MAX_HISTORY_MESSAGE_CHARS = 400;
 const MAX_PRIOR_OUTPUT_CHARS = 1_000;
+const MAX_ACCOUNT_CONTEXT_CHARS = 2_000;
 
 const buildDiscoveryHistory = (conversation: Conversation, latestUserMessage: string): string => {
     const lastMessage = conversation.messages.at(-1);
@@ -19,6 +20,7 @@ const buildDiscoveryHistory = (conversation: Conversation, latestUserMessage: st
 export const buildTargetRoleDecisionPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
+    userAccountContext: string,
 ): string => {
     const targetState = conversation.onboardingFlow?.nearTermTarget;
     const clarificationCount = targetState?.clarificationCount ?? 0;
@@ -27,25 +29,25 @@ export const buildTargetRoleDecisionPrompt = (
     return `
 You identify the concrete role a career-coaching user wants next. The user already chose to move into a DIFFERENT role.
 Return ONLY one of these compact JSON shapes, with no markdown:
-{"status":"READY","targetRole":"concrete searchable role or domain"}
-{"status":"NEEDS_CLARIFICATION","question":"one concise target-discovery question"}
-{"status":"ROLE_OPTIONS","response":"brief synthesis plus one choice question","roles":["searchable role 1","searchable role 2","searchable role 3"]}
-{"status":"EXPLORE","response":"brief acknowledgement that these are exploratory matches","roles":["searchable role 1","searchable role 2","searchable role 3"]}
+{"status":"READY","targetRole":"Product Manager","discoveryFacts":{"desired_work":"own product direction"}}
+{"status":"NEEDS_CLARIFICATION","question":"Which parts of your recent work gave you the most energy?","subject":"enjoyed_work","discoveryFacts":{}}
+{"status":"ROLE_OPTIONS","summary":"Your technical background and interest in customer problems point to these paths.","roles":[{"title":"Product Manager","reason":"Combines technical context with product ownership."},{"title":"Solutions Engineer","reason":"Uses technical knowledge in customer-facing problem solving."},{"title":"Technical Program Manager","reason":"Focuses on coordination and delivery across technical teams."}],"discoveryFacts":{}}
 
 Rules:
 - Interpret obvious spelling mistakes and informal wording from context before deciding. A misspelled but recognizable role or domain should be treated as the intended role; ask for clarification only when multiple meanings remain plausible.
-- First determine whether the latest message asks to see, find, show, or explore relevant jobs. If it does and the open-question limit was reached, you MUST return EXPLORE. This rule has highest priority, including for misspellings or informal wording. Never return ROLE_OPTIONS or NEEDS_CLARIFICATION for that request.
 - Understand the user's natural language yourself. Do not require special phrasing or a hardcoded title list.
 - READY when the user explicitly names a concrete searchable role/domain or selects one of the assistant's previously suggested roles.
-- NEEDS_CLARIFICATION is allowed only before the open-question limit. Ask one high-value question and never repeat or paraphrase a previous question.
-- ROLE_OPTIONS means: synthesize all accumulated preferences, propose 3-5 distinct concrete searchable roles, briefly explain the connection, and ask which is closest. Do not ask another open-ended introspection question.
-- EXPLORE is allowed only when the user explicitly asks to see relevant jobs after sharing preferences. Return 3-5 plausible concrete roles; the application builds the broad query. Do not pretend the user selected one role.
-- ROLE_OPTIONS and EXPLORE must not include the user's current/background role because the user explicitly chose to move into a different role.
-- An explicit request to see relevant jobs after the open-question limit takes priority: return EXPLORE instead of asking for more self-description.
+- NEEDS_CLARIFICATION is allowed only before the open-question limit. Ask exactly one high-value, natural question and identify its short semantic subject. The subject describes what the question learns; it is not chosen from a fixed list.
+- Choose the next subject dynamically from the full conversation, stored discovery facts, and covered subjects. Examples include enjoyed or disliked work, desired responsibilities, strengths, work style, domain, constraints, or remote/hybrid/office preference, but these are guidance rather than a checklist.
+- Do not follow a fixed question order. Skip anything already known, do not repeat or paraphrase an earlier question, and ask about workplace setting only when it would materially improve the recommendations.
+- ROLE_OPTIONS means: synthesize all accumulated preferences and propose 3-5 distinct concrete searchable roles with one specific fit reason each. The application formats the list and choice question.
+- ROLE_OPTIONS must not include the user's current/background role because the user explicitly chose to move into a different role.
+- If the user asks to see jobs without selecting a concrete role, return ROLE_OPTIONS rather than starting a broad search. Job search waits for the user to choose a role.
 - Treat repeated uncertainty, inability to answer, or vague value words as a signal to switch from interrogation to ROLE_OPTIONS.
 - If roles were already suggested, understand natural selections such as a role name, "the first one", or "compare the first two" from the conversation.
 - Selecting one previously suggested role takes priority over mustOfferChoices: return READY with that exact role. Example: if the third suggested role is Product Manager and the user says "the third one", return READY with Product Manager.
-- Use only this conversation for the desired target. Do not substitute CV, profile, or current-role data.
+- Use the user's background and profile as context, but use only this conversation to decide what target the user wants. Do not treat a background role as a selected target.
+- discoveryFacts must contain only concise facts explicitly supported by the user's messages. Return newly learned or corrected facts using short semantic keys. Never invent a preference.
 - Never ask whether they want a job now, in the future, or whether they want the same versus a different role; those decisions are already resolved.
 
 Discovery state:
@@ -53,12 +55,16 @@ clarificationCount=${clarificationCount}
 openQuestionLimit=${MAX_OPEN_TARGET_ROLE_QUESTIONS}
 mustOfferChoices=${mustOfferChoices}
 previouslySuggestedRoles=${JSON.stringify(suggestedRoles)}
+storedDiscoveryFacts=${JSON.stringify(targetState?.discoveryFacts ?? {})}
+coveredSubjects=${JSON.stringify(targetState?.coveredSubjects ?? [])}
 ${mustOfferChoices
-        ? "You MUST NOT return NEEDS_CLARIFICATION. Return READY, ROLE_OPTIONS, or EXPLORE."
+        ? "You MUST NOT return NEEDS_CLARIFICATION. Return READY or ROLE_OPTIONS."
         : "You may ask one useful clarification, but prefer ROLE_OPTIONS now if the user is already struggling to answer."}
 
 Relevant conversation:
 ${buildDiscoveryHistory(conversation, latestUserMessage)}
+Account/profile context (background evidence only, never proof of target preference):
+${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}
 Latest user message: ${latestUserMessage}
 `;
 };
@@ -68,7 +74,7 @@ ${originalPrompt}
 
 Your previous output was invalid or asked a question from the wrong conversation stage.
 Re-evaluate the latest user message and return exactly one valid JSON object from the allowed shapes above.
-Preserve a correct intent status and repair only its missing or invalid fields. In particular, an EXPLORE response must remain EXPLORE and include a roles array with 3-5 concrete searchable titles.
+Preserve a correct intent status and repair only its missing or invalid fields. ROLE_OPTIONS must include 3-5 real searchable titles and a specific reason for each.
 Previous invalid output: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
 `;
 

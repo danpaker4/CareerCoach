@@ -24,6 +24,8 @@ export type JobRecommendationContextState = {
 };
 
 export type ConversationJobContext = {
+    /** Every job surfaced during this conversation, retained for later follow-up questions. */
+    allReturnedJobs?: SanitizedJob[];
     lastReturnedJobs: SanitizedJob[];
     selectedJobId: string | null;
     selectedJobSnapshot: SanitizedJob | null;

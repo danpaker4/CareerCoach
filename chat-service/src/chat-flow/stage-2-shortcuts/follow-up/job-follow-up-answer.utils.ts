@@ -1,6 +1,10 @@
 import type { CareerSignal } from "../../../routes/career-profile/career-profile.types";
 import type { SanitizedJob } from "../../../routes/conversation/job-in-conversation.types";
 import type { JobFollowUpField, JobSelectionResolution } from "./job-follow-up-answer.types";
+import {
+    companyMentionedInMessage,
+    titleMentionedInMessage,
+} from "../pipeline/pipeline-job-selection/pipeline-job-selection.match.utils";
 
 export const JOB_FOLLOW_UP_NEW_SEARCH_PATTERNS = [
     "search again",
@@ -51,22 +55,11 @@ const JOB_SELECTION_ORDINAL_LOOKUP: ReadonlyArray<{ patterns: readonly string[];
 export const resolveJobSelectionFromFollowUpMessage = (
     userMessage: string,
     selectedJobSnapshot: SanitizedJob | null,
-    lastReturnedJobs: readonly SanitizedJob[]
+    lastReturnedJobs: readonly SanitizedJob[],
+    allReturnedJobs: readonly SanitizedJob[] = lastReturnedJobs,
 ): JobSelectionResolution => {
-    if (selectedJobSnapshot) {
-        return { status: "resolved", job: selectedJobSnapshot };
-    }
-
-    if (lastReturnedJobs.length === 0) {
+    if (allReturnedJobs.length === 0) {
         return { status: "missing" };
-    }
-
-    if (lastReturnedJobs.length === 1) {
-        const firstJob = lastReturnedJobs[0];
-        if (!firstJob) {
-            return { status: "missing" };
-        }
-        return { status: "resolved", job: firstJob };
     }
 
     const normalized = userMessage.toLowerCase();
@@ -81,8 +74,19 @@ export const resolveJobSelectionFromFollowUpMessage = (
         return { status: "resolved", job: selectedByOrdinal };
     }
 
-    const filteredByCompany = lastReturnedJobs.filter((job) =>
-        job.company.trim().length > 0 && normalized.includes(job.company.toLowerCase())
+    const byCompanyAndTitle = allReturnedJobs.filter(
+        (job) => companyMentionedInMessage(job.company, userMessage)
+            && titleMentionedInMessage(job.title, userMessage),
+    );
+    if (byCompanyAndTitle.length === 1) {
+        const match = byCompanyAndTitle[0];
+        if (match) {
+            return { status: "resolved", job: match };
+        }
+    }
+
+    const filteredByCompany = allReturnedJobs.filter((job) =>
+        companyMentionedInMessage(job.company, userMessage),
     );
     if (filteredByCompany.length === 1) {
         const companyMatch = filteredByCompany[0];
@@ -92,7 +96,21 @@ export const resolveJobSelectionFromFollowUpMessage = (
         return { status: "resolved", job: companyMatch };
     }
 
-    const filteredBySeniority = lastReturnedJobs.filter((job) => normalized.includes(job.seniority.toLowerCase()));
+    const filteredByTitle = allReturnedJobs.filter((job) =>
+        titleMentionedInMessage(job.title, userMessage),
+    );
+    if (filteredByTitle.length === 1) {
+        const titleMatch = filteredByTitle[0];
+        if (!titleMatch) {
+            return { status: "missing" };
+        }
+        return { status: "resolved", job: titleMatch };
+    }
+
+    const filteredBySeniority = allReturnedJobs.filter((job) => {
+        const seniority = job.seniority.trim().toLowerCase();
+        return seniority.length > 0 && normalized.includes(seniority);
+    });
     if (filteredBySeniority.length === 1) {
         const seniorityMatch = filteredBySeniority[0];
         if (!seniorityMatch) {
@@ -101,7 +119,16 @@ export const resolveJobSelectionFromFollowUpMessage = (
         return { status: "resolved", job: seniorityMatch };
     }
 
-    return { status: "ambiguous", options: [...lastReturnedJobs] };
+    if (selectedJobSnapshot) {
+        return { status: "resolved", job: selectedJobSnapshot };
+    }
+
+    if (allReturnedJobs.length === 1) {
+        const firstJob = allReturnedJobs[0];
+        return firstJob ? { status: "resolved", job: firstJob } : { status: "missing" };
+    }
+
+    return { status: "ambiguous", options: [...allReturnedJobs] };
 };
 
 /** Lowercase tokens scanned in job descriptions when structured skills are empty. */
