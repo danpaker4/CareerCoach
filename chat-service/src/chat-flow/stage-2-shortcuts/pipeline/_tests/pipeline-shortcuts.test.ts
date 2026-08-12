@@ -284,8 +284,15 @@ describe("checkIfNeededAddToPipeline", () => {
             searchCalled,
         });
         const pipelineRequests: unknown[] = [];
-        globalThis.fetch = (async (_input, init) => {
-            pipelineRequests.push(JSON.parse(String(init?.body)) as unknown);
+        const alertRequests: unknown[] = [];
+        globalThis.fetch = (async (input, init) => {
+            const requestBody = JSON.parse(String(init?.body)) as unknown;
+            const url = String(input);
+            if (url.endsWith("/wanted-jobs")) {
+                alertRequests.push(requestBody);
+                return Response.json({ createdAt: new Date().toISOString() }, { status: 201 });
+            }
+            pipelineRequests.push(requestBody);
             return new Response(null, { status: 201 });
         }) as typeof fetch;
         const conversation = buildConversation({
@@ -318,7 +325,13 @@ describe("checkIfNeededAddToPipeline", () => {
             pipelineRequests.map((request) => (request as { description: string }).description),
             displayedJobs.map(({ title, company }) => `${title} at ${company}`),
         );
+        assert.equal(alertRequests.length, 5);
+        assert.deepEqual(
+            alertRequests.map((request) => (request as { jobTitle: string }).jobTitle),
+            displayedJobs.map(({ title }) => title),
+        );
         assert.match(response?.reply ?? "", /added all 5 roles to your pipeline wishlist/i);
+        assert.match(response?.reply ?? "", /alerts? (?:are|is) active/i);
         assert.doesNotMatch(response?.reply ?? "", /added the Lead Full-Stack Developer role/i);
     });
 
