@@ -234,6 +234,8 @@ const normalizeExpectedForRun = (expected: EvaluationCaseResponse["expected"]): 
     return {
         maxLines: expected.maxLines,
         mustAskQuestion: expected.mustAskQuestion,
+        mustEndConversation: expected.mustEndConversation,
+        mustReturnNoJobs: expected.mustReturnNoJobs,
         forbiddenWords: expected.forbiddenWords,
         mode: normalizedMode !== undefined && isConversationModeValue(normalizedMode) ? normalizedMode : undefined,
     };
@@ -248,7 +250,7 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
     if (!hasCheckableExpected(expectedForRun)) {
         throw new EvaluationRunnerError(
             400,
-            "Evaluation case expected must include at least one of: mode, maxLines, mustAskQuestion, forbiddenWords",
+            "Evaluation case expected must include at least one supported check",
         );
     }
 
@@ -259,14 +261,15 @@ export const runEvaluationCaseById = async (config: RunnerConfig, caseId: string
     const conversationId = await createEvaluationConversation(config);
     const finalChatResponse = await replayUserTurns(config, conversationId, userMessages);
     const conversation = await fetchRunConversation(config, conversationId);
+    const jobCount =
+        (Array.isArray(finalChatResponse.jobs) ? finalChatResponse.jobs.length : 0) +
+        (Array.isArray(finalChatResponse.jobMatches) ? finalChatResponse.jobMatches.length : 0);
     const checks = evaluateAssistantReply({
         reply: finalChatResponse.reply,
         expected: expectedForRun,
         actualMode: finalChatResponse.mode,
+        jobCount,
     });
-    const jobCount =
-        (Array.isArray(finalChatResponse.jobs) ? finalChatResponse.jobs.length : 0) +
-        (Array.isArray(finalChatResponse.jobMatches) ? finalChatResponse.jobMatches.length : 0);
     const endedAt = new Date();
     const tokenUsage = await sumChatTokenUsageForUser({
         userId: config.evaluationUserId,

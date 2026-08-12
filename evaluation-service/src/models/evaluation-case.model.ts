@@ -23,6 +23,8 @@ const evaluationExpectedSchema = new Schema<EvaluationExpected>(
         mode: { type: String, enum: CONVERSATION_MODES, required: false },
         maxLines: { type: Number, required: false },
         mustAskQuestion: { type: Boolean, required: false },
+        mustEndConversation: { type: Boolean, required: false },
+        mustReturnNoJobs: { type: Boolean, required: false },
         forbiddenWords: { type: [String], required: false },
     },
     { _id: false },

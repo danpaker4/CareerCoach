@@ -1,0 +1,14 @@
+{
+  "id": "eval-43-conversation-end-stop-here",
+  "messages": [
+    { "role": "user", "content": "skip to jobs for devops engineer with terraform" },
+    { "role": "user", "content": "add the first job to my pipeline" },
+    { "role": "user", "content": "We can stop here; I'll come back when I need more help." }
+  ],
+  "expected": {
+    "mode": "NEAR_TERM",
+    "mustEndConversation": true,
+    "mustReturnNoJobs": true,
+    "maxLines": 3
+  }
+}

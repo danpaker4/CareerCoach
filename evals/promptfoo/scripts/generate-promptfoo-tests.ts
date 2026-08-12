@@ -21,6 +21,8 @@ const EvaluationExpectedSchema = z
         mode: z.string().optional(),
         maxLines: z.number().optional(),
         mustAskQuestion: z.boolean().optional(),
+        mustEndConversation: z.boolean().optional(),
+        mustReturnNoJobs: z.boolean().optional(),
         forbiddenWords: z.array(z.string()).optional(),
     })
     .refine(
@@ -28,9 +30,11 @@ const EvaluationExpectedSchema = z
             expected.mode !== undefined ||
             expected.maxLines !== undefined ||
             expected.mustAskQuestion !== undefined ||
+            expected.mustEndConversation !== undefined ||
+            expected.mustReturnNoJobs !== undefined ||
             (Array.isArray(expected.forbiddenWords) && expected.forbiddenWords.length > 0),
         {
-            message: "expected must include at least one of: mode, maxLines, mustAskQuestion, forbiddenWords",
+            message: "expected must include at least one supported check",
         },
     );
 
@@ -72,6 +76,8 @@ const DETERMINISTIC_ASSERTIONS: PromptfooAssertion[] = [
     { type: "javascript", value: "file://assertions/custom-assertions.ts:assertForbiddenWordsAbsent" },
     { type: "javascript", value: "file://assertions/custom-assertions.ts:assertNoInternalIds" },
     { type: "javascript", value: "file://assertions/custom-assertions.ts:assertNoJobsWhenModeDisallows" },
+    { type: "javascript", value: "file://assertions/custom-assertions.ts:assertConversationEndedWhenExpected" },
+    { type: "javascript", value: "file://assertions/custom-assertions.ts:assertNoJobsWhenExpected" },
 ];
 
 const LLM_RUBRIC_ASSERTIONS: PromptfooAssertion[] = [
@@ -158,6 +164,12 @@ const buildRubricSummary = (fixture: EvaluationCaseFixture): string => {
     }
     if (fixture.expected.mustAskQuestion === true) {
         parts.push("The assistant should ask a clarifying question.");
+    }
+    if (fixture.expected.mustEndConversation === true) {
+        parts.push("The assistant should close the current chat and explain that help remains available whenever needed.");
+    }
+    if (fixture.expected.mustReturnNoJobs === true) {
+        parts.push("The final turn must not return job recommendations.");
     }
     if (fixture.expected.maxLines !== undefined) {
         parts.push(`Keep the reply to at most ${fixture.expected.maxLines} non-empty lines.`);

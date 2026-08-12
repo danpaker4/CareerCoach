@@ -1,0 +1,14 @@
+{
+  "id": "eval-40-conversation-end-no-thanks",
+  "messages": [
+    { "role": "user", "content": "skip to jobs for devops engineer with terraform" },
+    { "role": "user", "content": "add the first job to my pipeline" },
+    { "role": "user", "content": "no thanks" }
+  ],
+  "expected": {
+    "mode": "NEAR_TERM",
+    "mustEndConversation": true,
+    "mustReturnNoJobs": true,
+    "maxLines": 3
+  }
+}

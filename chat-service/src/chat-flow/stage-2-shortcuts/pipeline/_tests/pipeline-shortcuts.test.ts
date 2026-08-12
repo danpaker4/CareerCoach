@@ -348,6 +348,9 @@ describe("checkIfNeededAddToPipeline", () => {
             jobs: [cellebrite, checkPoint],
             focus: cellebrite,
         });
+        const recommendation = conversation.jobContext?.jobRecommendationContext;
+        assert.ok(recommendation);
+        recommendation.acceptedJobIds = [cellebrite.id];
         const response = await checkIfNeededAddToPipeline(
             deps,
             buildCtx("yes", conversation),
@@ -358,6 +361,40 @@ describe("checkIfNeededAddToPipeline", () => {
 });
 
 describe("runStage2Shortcuts pipeline ordering", () => {
+    it("ends the current chat instead of searching again when the user declines further help", async () => {
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"shouldEndConversation":true}',
+            appended,
+            searchCalled,
+        });
+        const conversation = buildConversation({
+            awaitingPipelineDecision: false,
+            jobs: [cellebrite, checkPoint],
+            focus: cellebrite,
+        });
+        const recommendation = conversation.jobContext?.jobRecommendationContext;
+        assert.ok(recommendation);
+        recommendation.acceptedJobIds = [cellebrite.id];
+        conversation.messages = [{
+            role: "assistant",
+            content: "Rust Software Developer is already in your pipeline. Want to explore another opportunity or prepare for interviews?",
+            timestamp: new Date(),
+        }];
+
+        const response = await runStage2Shortcuts(
+            deps,
+            buildCtx("no thanks", conversation),
+        );
+
+        assert.ok(response);
+        assert.equal(searchCalled.value, false);
+        assert.match(response.reply, /you're all set/i);
+        assert.match(response.reply, /available.*whenever|whenever.*available/i);
+        assert.equal(appended.at(-1), response.reply);
+    });
+
     it("handles add-to-pipeline before near-term search when awaiting a pipeline decision", async () => {
         const appended: string[] = [];
         const searchCalled = { value: false };

@@ -6,7 +6,8 @@ export type ChatLlmObservedOperation =
     | "chat.onboarding.target_role"
     | "chat.onboarding.target_role.retry"
     | "chat.onboarding.target_role.verify"
-    | "chat.onboarding.target_role.verify.retry";
+    | "chat.onboarding.target_role.verify.retry"
+    | "chat.conversation_end";
 
 export type ChatLlmParseEvent = {
     readonly operation: ChatLlmObservedOperation;

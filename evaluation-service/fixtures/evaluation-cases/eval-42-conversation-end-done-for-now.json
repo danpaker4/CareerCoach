@@ -1,0 +1,14 @@
+{
+  "id": "eval-42-conversation-end-done-for-now",
+  "messages": [
+    { "role": "user", "content": "skip to jobs for devops engineer with terraform" },
+    { "role": "user", "content": "add the first job to my pipeline" },
+    { "role": "user", "content": "I'm done for now, appreciate your help." }
+  ],
+  "expected": {
+    "mode": "NEAR_TERM",
+    "mustEndConversation": true,
+    "mustReturnNoJobs": true,
+    "maxLines": 3
+  }
+}

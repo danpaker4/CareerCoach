@@ -1,0 +1,14 @@
+{
+  "id": "eval-41-conversation-end-task-complete",
+  "messages": [
+    { "role": "user", "content": "skip to jobs for devops engineer with terraform" },
+    { "role": "user", "content": "add the first job to my pipeline" },
+    { "role": "user", "content": "That's everything I needed today." }
+  ],
+  "expected": {
+    "mode": "NEAR_TERM",
+    "mustEndConversation": true,
+    "mustReturnNoJobs": true,
+    "maxLines": 3
+  }
+}

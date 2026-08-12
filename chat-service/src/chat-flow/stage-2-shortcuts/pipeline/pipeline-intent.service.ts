@@ -91,6 +91,11 @@ export const isAllShortlistedJobsAddIntent = (message: string): boolean => {
     return hasAddAction && targetsAll;
 };
 
+export const isExplicitWishlistAddIntent = (message: string): boolean => {
+    const normalized = normalize(message);
+    return /\b(?:add|put|save)\b/.test(normalized) && /\bwish\s*list\b/.test(normalized);
+};
+
 export const detectPipelineIntent = (message: string): PipelineIntent | null => {
     const normalized = normalize(message);
     if (normalized.length === 0) {

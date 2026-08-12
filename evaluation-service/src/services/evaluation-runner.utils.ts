@@ -25,14 +25,17 @@ export const hasCheckableExpected = (expected: EvaluationExpected): boolean =>
     expected.mode !== undefined ||
     expected.maxLines !== undefined ||
     expected.mustAskQuestion === true ||
+    expected.mustEndConversation === true ||
+    expected.mustReturnNoJobs === true ||
     (expected.forbiddenWords?.length ?? 0) > 0;
 
 export const evaluateAssistantReply = (params: {
     reply: string;
     expected: EvaluationExpected;
     actualMode: string | undefined;
+    jobCount: number;
 }): EvaluationCheckResult[] => {
-    const { reply, expected, actualMode } = params;
+    const { reply, expected, actualMode, jobCount } = params;
     const checks: EvaluationCheckResult[] = [];
 
     if (expected.maxLines !== undefined) {
@@ -55,6 +58,33 @@ export const evaluateAssistantReply = (params: {
             expected: true,
             actual: asksQuestion,
             message: asksQuestion ? undefined : "Reply should include a question",
+        });
+    }
+
+    if (expected.mustEndConversation === true) {
+        const lowerReply = reply.toLowerCase();
+        const mentionsFutureAvailability = lowerReply.includes("available") && lowerReply.includes("whenever");
+        const asksQuestion = replyAsksQuestion(reply);
+        const conversationEnded = mentionsFutureAvailability && !asksQuestion;
+        checks.push({
+            name: "mustEndConversation",
+            passed: conversationEnded,
+            expected: true,
+            actual: conversationEnded,
+            message: conversationEnded
+                ? undefined
+                : "Reply should close the current chat without a question and say help remains available whenever needed",
+        });
+    }
+
+    if (expected.mustReturnNoJobs === true) {
+        const returnedNoJobs = jobCount === 0;
+        checks.push({
+            name: "mustReturnNoJobs",
+            passed: returnedNoJobs,
+            expected: 0,
+            actual: jobCount,
+            message: returnedNoJobs ? undefined : `Closing turn returned ${jobCount} job recommendation(s)`,
         });
     }
 
