@@ -41,6 +41,11 @@ export type DeterministicStage = {
         readonly platform: string;
         readonly url: string;
         readonly type: "course" | "video" | "practice" | "article" | "docs" | "repository" | "certification";
+        readonly costType: "free" | "paid" | "free-audit";
+        readonly difficulty: "beginner" | "intermediate" | "advanced";
+        readonly estimatedHours: number;
+        readonly skills: readonly string[];
+        readonly lastVerifiedAt?: string;
     }[];
     readonly resourceIds: readonly string[];
     readonly capabilityIds: readonly string[];
@@ -56,4 +61,7 @@ export type DeterministicStage = {
     readonly estimatedTimeframe: string;
     readonly evidence: StageEvidence;
     readonly reasonCodes: readonly string[];
+    readonly prerequisiteStageIds: readonly string[];
+    readonly parallelStageIds: readonly string[];
+    readonly orderingReason: string;
 };

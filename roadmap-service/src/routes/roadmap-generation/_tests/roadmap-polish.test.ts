@@ -36,6 +36,9 @@ const baseStage = (stageId: string): DeterministicStage => ({
     estimatedTimeframe: "1–2 months",
     evidence: { gapIds: [], capabilityIds: [], actionIds: [], resourceIds: [], gapsAddressed: [], transitionReasons: [], marketSignals: [] },
     reasonCodes: ["deterministic_builder"],
+    prerequisiteStageIds: [],
+    parallelStageIds: [],
+    orderingReason: "Start here.",
 });
 
 describe("roadmap polish", () => {

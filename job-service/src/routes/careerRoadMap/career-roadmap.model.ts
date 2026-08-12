@@ -7,6 +7,12 @@ export const StageResourceSchema = z.object({
     platform: z.string(),
     url: z.string(),
     type: z.enum(["course", "video", "practice", "article", "docs", "repository", "certification"]).optional(),
+    costType: z.enum(["free", "paid", "free-audit"]).optional(),
+    priceLabel: z.string().optional(),
+    difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
+    estimatedHours: z.number().positive().optional(),
+    skills: z.array(z.string()).optional(),
+    lastVerifiedAt: z.string().optional(),
 });
 
 export const GapAnalysisSnapshotSchema = z.object({
@@ -67,6 +73,7 @@ export const CareerProgressionMetaSchema = z.object({
     currentRoleSummary: z.string().optional(),
     dreamRoleCategory: z.string(),
     estimatedYearsToGoal: z.string().optional(),
+    targetYears: z.number().int().positive().optional(),
     progressionReasoning: z.string().optional(),
     gapAnalysis: GapAnalysisSnapshotSchema.optional(),
     generationVersion: z.string().optional(),
@@ -77,9 +84,29 @@ export const CareerProgressionMetaSchema = z.object({
             gaps: z.array(StructuredCapabilityGapSchema),
         })
         .optional(),
+    alternativePaths: z.array(z.object({
+        id: z.string(),
+        label: z.string(),
+        summary: z.string(),
+        roles: z.array(z.string()),
+        isRecommended: z.boolean(),
+    })).max(3).optional(),
+    preferences: z.object({
+        courseBudget: z.enum(["free", "mixed", "paid"]).optional(),
+        locationPreference: z.string().optional(),
+        workPreference: z.enum(["onsite", "hybrid", "remote", "flexible"]).optional(),
+        willingToManagePeople: z.boolean().optional(),
+        willingToChangeCompanies: z.boolean().optional(),
+    }).optional(),
+    feasibility: z.object({
+        status: z.enum(["on-track", "ambitious", "conflict"]),
+        message: z.string(),
+        reasons: z.array(z.string()),
+    }).optional(),
 });
 
 export const StageContentSchema = z.object({
+    stageId: z.string().optional(),
     label: z.string(),
     description: z.string(),
     actions: z.array(z.string()),
@@ -104,6 +131,18 @@ export const StageContentSchema = z.object({
     reasonCodes: z.array(z.string()).optional(),
     actionIds: z.array(z.string()).optional(),
     resourceIds: z.array(z.string()).optional(),
+    prerequisiteStageIds: z.array(z.string()).optional(),
+    parallelStageIds: z.array(z.string()).optional(),
+    orderingReason: z.string().optional(),
+});
+
+export const ProgressEvidenceSchema = z.object({
+    id: z.string(),
+    type: z.enum(["project", "promotion", "responsibility", "note"]),
+    title: z.string(),
+    url: z.string().url().optional(),
+    details: z.string().optional(),
+    createdAt: z.string(),
 });
 
 export const StageToDreamJobSchema = z.object({
@@ -112,6 +151,8 @@ export const StageToDreamJobSchema = z.object({
     content: StageContentSchema.optional(),
     completedActions: z.array(z.string()).optional(),
     completedCriterionIds: z.array(z.string()).optional(),
+    completedResourceUrls: z.array(z.string()).optional(),
+    progressEvidence: z.array(ProgressEvidenceSchema).optional(),
 });
 
 export const CareerRoadMapSchema = z.object({

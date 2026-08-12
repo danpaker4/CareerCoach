@@ -4,10 +4,11 @@ import type { GeneratedStageContent } from "./roadmap-generation.types";
 export const mapDeterministicStageToGeneratedContent = (
     stage: DeterministicStage
 ): GeneratedStageContent => ({
+    stageId: stage.stageId,
     label: stage.label,
     description: stage.description,
     actions: [...stage.actions],
-    resources: stage.resources.map((resource) => ({ ...resource })),
+    resources: stage.resources.map((resource) => ({ ...resource, skills: [...resource.skills] })),
     estimatedTimeframe: stage.estimatedTimeframe,
     whyItMatters: stage.whyItMatters,
     howToGetThere: stage.howToGetThere,
@@ -44,4 +45,7 @@ export const mapDeterministicStageToGeneratedContent = (
     reasonCodes: [...stage.reasonCodes],
     actionIds: [...stage.actionIds],
     resourceIds: [...stage.resourceIds],
+    prerequisiteStageIds: [...stage.prerequisiteStageIds],
+    parallelStageIds: [...stage.parallelStageIds],
+    orderingReason: stage.orderingReason,
 });

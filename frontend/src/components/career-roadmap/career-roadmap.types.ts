@@ -9,6 +9,12 @@ export interface StageResource {
   platform: string;
   url: string;
   type?: ResourceType;
+  costType?: 'free' | 'paid' | 'free-audit';
+  priceLabel?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  estimatedHours?: number;
+  skills?: string[];
+  lastVerifiedAt?: string;
 }
 
 export interface GapAnalysisSnapshot {
@@ -39,13 +45,38 @@ export interface CareerProgressionMeta {
   currentRoleSummary?: string;
   dreamRoleCategory: string;
   estimatedYearsToGoal?: string;
+  targetYears?: number;
   progressionReasoning?: string;
   gapAnalysis?: GapAnalysisSnapshot;
   generationVersion?: string;
   generationMode?: string;
+  alternativePaths?: CareerPathOption[];
+  preferences?: RoadmapPreferences;
+  feasibility?: {
+    status: 'on-track' | 'ambitious' | 'conflict';
+    message: string;
+    reasons: string[];
+  };
+}
+
+export interface RoadmapPreferences {
+  courseBudget?: 'free' | 'mixed' | 'paid';
+  locationPreference?: string;
+  workPreference?: 'onsite' | 'hybrid' | 'remote' | 'flexible';
+  willingToManagePeople?: boolean;
+  willingToChangeCompanies?: boolean;
+}
+
+export interface CareerPathOption {
+  id: string;
+  label: string;
+  summary: string;
+  roles: string[];
+  isRecommended: boolean;
 }
 
 export interface StageContent {
+  stageId?: string;
   label: string;
   description: string;
   actions: string[];
@@ -67,6 +98,18 @@ export interface StageContent {
   completionCriteria?: CompletionCriterion[];
   timelineMeta?: TimelineMeta;
   reasonCodes?: string[];
+  prerequisiteStageIds?: string[];
+  parallelStageIds?: string[];
+  orderingReason?: string;
+}
+
+export interface ProgressEvidence {
+  id: string;
+  type: 'project' | 'promotion' | 'responsibility' | 'note';
+  title: string;
+  url?: string;
+  details?: string;
+  createdAt: string;
 }
 
 export interface RoadmapStage {
@@ -75,6 +118,8 @@ export interface RoadmapStage {
   content?: StageContent;
   completedActions?: string[];
   completedCriterionIds?: string[];
+  completedResourceUrls?: string[];
+  progressEvidence?: ProgressEvidence[];
 }
 
 export interface CareerRoadmapData {
@@ -105,10 +150,21 @@ export interface StageOpportunity {
   seniority: string;
   url: string;
   relevanceReason: string;
+  description: string;
+  requirements: string[];
+  missingRequirements: string[];
+  matchPct: number;
+  fit: 'apply-now' | 'target';
 }
 
 export interface StageOpportunitiesResponse {
   opportunities: StageOpportunity[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export type FetchState = 'idle' | 'loading' | 'success' | 'error';

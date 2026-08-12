@@ -18,7 +18,7 @@ export class RoadmapGenerationController {
             return;
         }
 
-        const { userId, dreamJob, targetYears, availableHoursPerWeek } = body;
+        const { userId, dreamJob, targetYears, availableHoursPerWeek, preferences } = body;
 
         if (
             !userId ||
@@ -49,7 +49,8 @@ export class RoadmapGenerationController {
                 userId,
                 dreamJob.trim(),
                 targetYears,
-                availableHoursPerWeek
+                availableHoursPerWeek,
+                preferences
             );
             reply.code(StatusCodes.OK).send(result);
         } catch (error) {

@@ -53,6 +53,7 @@ export const editStagesSchema = {
     }),
     body: z.object({
         stagesToDreamJob: z.array(StageToDreamJobSchema),
+        progressionMeta: CareerProgressionMetaSchema.optional(),
     }),
 } satisfies FastifySchema;
 
@@ -60,7 +61,8 @@ export const discoverOpportunitiesSchema = {
     body: z.object({
         roleCategories: z.array(z.string().min(1)).min(1),
         userSkills: z.array(z.string()).optional(),
-        limit: z.number().int().positive().max(20).optional(),
+        page: z.number().int().positive().optional(),
+        pageSize: z.number().int().positive().max(20).optional(),
     }),
     response: {
         [StatusCodes.OK]: z.object({
@@ -71,8 +73,18 @@ export const discoverOpportunitiesSchema = {
                 seniority: z.string(),
                 url: z.string(),
                 relevanceReason: z.string(),
+                description: z.string(),
+                requirements: z.array(z.string()),
+                missingRequirements: z.array(z.string()),
+                matchPct: z.number(),
+                fit: z.enum(["apply-now", "target"]),
             })),
+            pagination: z.object({
+                page: z.number().int(),
+                pageSize: z.number().int(),
+                total: z.number().int(),
+                totalPages: z.number().int(),
+            }),
         }),
     },
 } satisfies FastifySchema;
-

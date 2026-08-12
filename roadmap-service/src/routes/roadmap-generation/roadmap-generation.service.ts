@@ -4,7 +4,7 @@ import type { EmbeddingPort } from "../../ai/ports/embedding.types";
 import type { CareerPathSummary, RoadmapExternalService } from "../external/roadmap.external.service";
 import type { CareerDirectionExample } from "../knowledge/career-direction.types";
 import type { RoadmapFeatureFlags } from "./feature-flags";
-import type { RoadmapGenerationResponse } from "./roadmap-generation.types";
+import type { RoadmapGenerationResponse, RoadmapPreferences } from "./roadmap-generation.types";
 import type { RoadmapEvalFixtureRequestBody } from "./roadmap-generation.fixture.types";
 import { resolveUserStartingPoint } from "./user-starting-point.utils";
 import type { UserCareerContext } from "./gap-analysis.types";
@@ -32,7 +32,8 @@ export class RoadmapGenerationService {
         userId: string,
         dreamJob: string,
         targetYears: number,
-        availableHoursPerWeek?: number
+        availableHoursPerWeek?: number,
+        preferences?: RoadmapPreferences
     ): Promise<RoadmapGenerationResponse> => {
         return withSpan("roadmap.generate", { "roadmap.target_years": targetYears }, async (span) => {
             span.setAttribute("roadmap.deterministic", this.featureFlags.deterministicCoreEnabled);
@@ -77,6 +78,7 @@ export class RoadmapGenerationService {
                 careerPaths: context.careerPaths,
                 directionSkills: context.directions.flatMap((direction) => direction.relatedSkills).slice(0, 20),
                 featureFlags: this.featureFlags,
+                preferences,
             });
 
             if (!this.featureFlags.aiPolishEnabled) {

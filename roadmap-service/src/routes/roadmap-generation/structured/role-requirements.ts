@@ -1,6 +1,7 @@
 import { normalizeCapabilityText } from "../catalog/capability-normalization";
 import {
     EXECUTIVE_CYBER_LADDER,
+    EXECUTIVE_LADDER,
     resolveRoleArchetype,
 } from "../catalog/role-archetype.consts";
 import {
@@ -93,8 +94,9 @@ export const buildRoleRequirements = (params: {
         }
     };
 
-    if (archetype === "executive_cyber") {
-        for (const rung of EXECUTIVE_CYBER_LADDER) {
+    if (archetype === "executive_cyber" || archetype === "executive") {
+        const ladder = archetype === "executive_cyber" ? EXECUTIVE_CYBER_LADDER : EXECUTIVE_LADDER;
+        for (const rung of ladder) {
             upsert({
                 capabilityId: rung.capabilityId,
                 label: rung.label,

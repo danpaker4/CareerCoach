@@ -3,6 +3,15 @@ export type RoadmapGenerationRequestBody = {
     dreamJob: string;
     targetYears: number;
     availableHoursPerWeek?: number;
+    preferences?: RoadmapPreferences;
+};
+
+export type RoadmapPreferences = {
+    courseBudget?: "free" | "mixed" | "paid";
+    locationPreference?: string;
+    workPreference?: "onsite" | "hybrid" | "remote" | "flexible";
+    willingToManagePeople?: boolean;
+    willingToChangeCompanies?: boolean;
 };
 
 export type ResourceType = "course" | "video" | "practice" | "article" | "docs" | "repository" | "certification";
@@ -14,6 +23,12 @@ export type GeneratedResource = {
     platform: string;
     url: string;
     type: ResourceType;
+    costType?: "free" | "paid" | "free-audit";
+    priceLabel?: string;
+    difficulty?: "beginner" | "intermediate" | "advanced";
+    estimatedHours?: number;
+    skills?: string[];
+    lastVerifiedAt?: string;
 };
 
 export type GapAnalysisSnapshot = {
@@ -95,6 +110,7 @@ export type CareerProgressionMeta = {
     currentRoleSummary?: string;
     dreamRoleCategory: string;
     estimatedYearsToGoal?: string;
+    targetYears?: number;
     progressionReasoning?: string;
     gapAnalysis?: GapAnalysisSnapshot;
     generationVersion?: string;
@@ -111,9 +127,25 @@ export type CareerProgressionMeta = {
         overlappingStages: boolean;
         assumptions: string[];
     };
+    alternativePaths?: CareerPathOption[];
+    preferences?: RoadmapPreferences;
+    feasibility?: {
+        status: "on-track" | "ambitious" | "conflict";
+        message: string;
+        reasons: string[];
+    };
+};
+
+export type CareerPathOption = {
+    id: string;
+    label: string;
+    summary: string;
+    roles: string[];
+    isRecommended: boolean;
 };
 
 export type GeneratedStageContent = {
+    stageId?: string;
     label: string;
     description: string;
     actions: string[];
@@ -138,6 +170,9 @@ export type GeneratedStageContent = {
     reasonCodes?: string[];
     actionIds?: string[];
     resourceIds?: string[];
+    prerequisiteStageIds?: string[];
+    parallelStageIds?: string[];
+    orderingReason?: string;
 };
 
 export type RoadmapGenerationResponse = {

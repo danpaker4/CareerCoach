@@ -70,12 +70,12 @@ export const CareerRoadMapHandler = (
 
         editStagesHandler: async (request: SchematicRequest<typeof editStagesSchema>, reply: FastifyReply) => {
             const { id } = request.params;
-            const { stagesToDreamJob } = request.body;
+            const { stagesToDreamJob, progressionMeta } = request.body;
 
             try {
                 const result = await careerRoadMapsCollection.findOneAndUpdate(
                     { id },
-                    { $set: { stagesToDreamJob } },
+                    { $set: { stagesToDreamJob, ...(progressionMeta ? { progressionMeta } : {}) } },
                     { returnDocument: "after" }
                 );
 
@@ -91,14 +91,15 @@ export const CareerRoadMapHandler = (
         },
 
         discoverOpportunitiesHandler: async (request, reply) => {
-            const { roleCategories, userSkills, limit } = request.body;
+            const { roleCategories, userSkills, page, pageSize } = request.body;
             try {
-                const opportunities = await discoverStageOpportunities(jobsCollection, {
+                const result = await discoverStageOpportunities(jobsCollection, {
                     roleCategories,
                     ...(userSkills ? { userSkills } : {}),
-                    ...(limit ? { limit } : {}),
+                    ...(page ? { page } : {}),
+                    ...(pageSize ? { pageSize } : {}),
                 });
-                reply.code(StatusCodes.OK).send({ opportunities });
+                reply.code(StatusCodes.OK).send(result);
             } catch (error) {
                 reply.code(StatusCodes.INTERNAL_SERVER_ERROR).send({
                     error: "Failed to discover opportunities",
@@ -108,4 +109,3 @@ export const CareerRoadMapHandler = (
         },
     };
 };
-

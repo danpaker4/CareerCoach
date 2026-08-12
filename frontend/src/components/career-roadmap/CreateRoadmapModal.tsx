@@ -53,6 +53,12 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
   const [step, setStep] = useState<Step>(1);
   const [dreamJob, setDreamJob] = useState('');
   const [targetYears, setTargetYears] = useState(DEFAULT_TARGET_YEARS);
+  const [availableHoursPerWeek, setAvailableHoursPerWeek] = useState(8);
+  const [courseBudget, setCourseBudget] = useState<'free' | 'mixed' | 'paid'>('mixed');
+  const [locationPreference, setLocationPreference] = useState('');
+  const [workPreference, setWorkPreference] = useState<'onsite' | 'hybrid' | 'remote' | 'flexible'>('flexible');
+  const [willingToManagePeople, setWillingToManagePeople] = useState(true);
+  const [willingToChangeCompanies, setWillingToChangeCompanies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -79,7 +85,19 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ userId, dreamJob: dreamJob.trim(), targetYears }),
+      body: JSON.stringify({
+        userId,
+        dreamJob: dreamJob.trim(),
+        targetYears,
+        availableHoursPerWeek,
+        preferences: {
+          courseBudget,
+          ...(locationPreference.trim() ? { locationPreference: locationPreference.trim() } : {}),
+          workPreference,
+          willingToManagePeople,
+          willingToChangeCompanies,
+        },
+      }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -134,14 +152,19 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
       }
       if (generatedMeta || generatedGap) {
         body.progressionMeta = {
+          ...generatedMeta,
           dreamRoleCategory: generatedMeta?.dreamRoleCategory ?? dreamJob.trim(),
-          ...(generatedMeta?.currentRoleSummary ? { currentRoleSummary: generatedMeta.currentRoleSummary } : {}),
           ...(generatedMeta?.estimatedYearsToGoal
             ? { estimatedYearsToGoal: generatedMeta.estimatedYearsToGoal }
             : { estimatedYearsToGoal: `Up to ${formatTargetYearsLabel(targetYears)}` }),
-          ...(generatedMeta?.progressionReasoning ? { progressionReasoning: generatedMeta.progressionReasoning } : {}),
-          ...(generatedMeta?.generationVersion ? { generationVersion: generatedMeta.generationVersion } : {}),
-          ...(generatedMeta?.generationMode ? { generationMode: generatedMeta.generationMode } : {}),
+          targetYears,
+          preferences: {
+            courseBudget,
+            ...(locationPreference.trim() ? { locationPreference: locationPreference.trim() } : {}),
+            workPreference,
+            willingToManagePeople,
+            willingToChangeCompanies,
+          },
           ...(generatedGap ? { gapAnalysis: generatedGap } : {}),
         };
       }
@@ -254,6 +277,14 @@ export const CreateRoadmapModal = ({ userId, onClose, onCreated }: CreateRoadmap
             <p className="step-hint timeline-years-caption">
               {targetYears === 1 ? 'year' : 'years'} to your destination
             </p>
+            <div className="roadmap-preferences-grid">
+              <label>Study hours each week<input type="number" min="1" max="80" value={availableHoursPerWeek} onChange={(event) => setAvailableHoursPerWeek(Math.max(1, Math.min(80, Number(event.target.value))))} /></label>
+              <label>Course budget<select value={courseBudget} onChange={(event) => setCourseBudget(event.target.value as 'free' | 'mixed' | 'paid')}><option value="free">Free only</option><option value="mixed">Free and paid</option><option value="paid">Paid is fine</option></select></label>
+              <label>Location preference<input value={locationPreference} onChange={(event) => setLocationPreference(event.target.value)} placeholder="City, country, or anywhere" /></label>
+              <label>Work preference<select value={workPreference} onChange={(event) => setWorkPreference(event.target.value as 'onsite' | 'hybrid' | 'remote' | 'flexible')}><option value="flexible">Flexible</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="onsite">On-site</option></select></label>
+            </div>
+            <label className="roadmap-preference-check"><input type="checkbox" checked={willingToManagePeople} onChange={(event) => setWillingToManagePeople(event.target.checked)} /> I am willing to manage people</label>
+            <label className="roadmap-preference-check"><input type="checkbox" checked={willingToChangeCompanies} onChange={(event) => setWillingToChangeCompanies(event.target.checked)} /> I am willing to change companies</label>
           </div>
         )}
 

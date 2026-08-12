@@ -210,6 +210,30 @@ describe("career path resolution", () => {
 });
 
 describe("role milestone stages", () => {
+    it("preserves a fintech CEO target and builds flexible executive evidence milestones", () => {
+        const dreamJob = "CEO of a fintech company";
+        const plan = resolveRoleMilestonePlan({ dreamJob, targetYears: 10, isEntryLevel: false, hasNoSkills: false });
+        assert.ok(plan);
+        assert.ok(plan.reasonCodes.includes("exact_target_preserved"));
+        assert.equal(plan.milestones.at(-1)?.targetRole, dreamJob);
+        assert.ok(plan.milestones.some((stage) => /manage|management/i.test(stage.label)));
+        assert.ok(plan.milestones.some((stage) => /finance|budget/i.test(stage.label)));
+
+        const stages = buildDeterministicStages({
+            dreamJob,
+            preferredStageCount: 10,
+            gaps: [],
+            milestonePlan: plan,
+            hoursPerWeek: 8,
+            assumedAvailability: false,
+            courseBudget: "mixed",
+        });
+        assert.ok(stages.length > 4);
+        assert.ok(stages.slice(1).every((stage) => stage.prerequisiteStageIds.length > 0));
+        assert.ok(stages.some((stage) => stage.resources.some((resource) => resource.url.includes("coursera.org/learn/wharton-finance"))));
+        assert.ok(stages.flatMap((stage) => stage.resources).every((resource) => !resource.url.includes("google.com/search")));
+    });
+
     it("explains degree then cyber job then team lead for zero-knowledge CEO path", () => {
         const plan = resolveRoleMilestonePlan({
             dreamJob: "CEO of cybersecurity company",

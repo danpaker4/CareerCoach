@@ -5,6 +5,7 @@ import { decideDreamJobStep } from "../../shared/llm/chat.llm.service";
 import { sanitizeReply } from "../../stage-6-present-jobs/presentation/chat.validation.service";
 import {
     inferDreamJobTitleFromMessage,
+    chooseMostSpecificDreamJobTitle,
     isAffirmativeConfirmation,
     isNegativeConfirmation,
     normalizeDreamJobTitle,
@@ -31,7 +32,7 @@ export const runDreamJobFlow = async (
             .create(ctx.userId, pendingTitle, parsedYears)
             .catch(() => ({ created: false as const, reason: "generation_failed" as const }));
         const successReply = roadmapResult.created
-            ? `Saved ${pendingTitle} as your dream job and created a 4-stage roadmap toward it (~${parsedYears} years). You can review it on My Roadmap.`
+            ? `Saved ${pendingTitle} as your dream job and created a personalized roadmap toward it (~${parsedYears} years). You can review it on My Roadmap.`
             : `Saved ${pendingTitle} as your dream job, but I couldn't create the roadmap right now. You can create it from My Roadmap.`;
         await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, successReply);
         return { reply: successReply, mode: CONVERSATION_MODE.DREAMJOB, confidenceSummary: ctx.confidenceSummary };
@@ -51,14 +52,11 @@ export const runDreamJobFlow = async (
             ? normalizeDreamJobTitle(ctx.modeDetection.dreamJobTitle)
             : undefined;
     const inferredTitle = inferDreamJobTitleFromMessage(ctx.normalizedMessage) ?? detectedTitle;
-    const pendingTitle =
-        decision.proposedDreamJobTitle !== undefined && decision.proposedDreamJobTitle.length > 0
-            ? normalizeDreamJobTitle(decision.proposedDreamJobTitle)
-            : dreamJobFlow?.proposedTitle !== undefined && dreamJobFlow.proposedTitle.length > 0
-              ? dreamJobFlow.proposedTitle
-              : inferredTitle !== undefined
-                ? inferredTitle
-                : undefined;
+    const pendingTitle = chooseMostSpecificDreamJobTitle(
+        decision.proposedDreamJobTitle,
+        dreamJobFlow?.proposedTitle,
+        inferredTitle
+    );
 
     const rulesConfirmed =
         dreamJobFlow?.awaitingConfirmation === true &&
