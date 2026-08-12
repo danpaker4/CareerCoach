@@ -56,6 +56,7 @@ export const runNearTermSearchFlow = async (
     const rankedJobs = rankJobsBySearchQuery(query, jobs);
     const topRankedJobs = rankedJobs.map((item) => item.job);
     const focusJob = topRankedJobs[0] ?? null;
+    const presentationJobs = topRankedJobs.slice(0, 5);
 
     await deps.conversationService.setJobContextAfterSearch(
         ctx.userId,
@@ -63,10 +64,10 @@ export const runNearTermSearchFlow = async (
         topRankedJobs,
         focusJob,
         query,
-        "SEARCH_PLAN"
+        "SEARCH_PLAN",
+        presentationJobs,
     );
 
-    const presentationJobs = topRankedJobs.slice(0, 5);
     const reply =
         `Here are the roles I found that could fit — do any of these work for you? ` +
         `Tell me which one to add to your pipeline ` +

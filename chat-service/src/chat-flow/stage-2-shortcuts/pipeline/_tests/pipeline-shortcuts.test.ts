@@ -261,13 +261,21 @@ describe("checkIfNeededAddToPipeline", () => {
     });
 
     it("adds every shortlisted job when the user asks to add all five to their wishlist", async () => {
-        const jobs = [
+        const displayedJobs = [
             job("job-1", "Frontend Developer", "Alpha"),
             job("job-2", "Backend Developer", "Beta"),
             job("job-3", "Full-Stack Developer", "Gamma"),
             job("job-4", "Software Engineer", "Delta"),
             job("job-5", "Lead Full-Stack Developer", "Synergy Tech"),
         ];
+        const undisplayedJobs = [
+            job("job-6", "Mobile Developer", "Zeta"),
+            job("job-7", "Platform Engineer", "Eta"),
+            job("job-8", "DevOps Engineer", "Theta"),
+            job("job-9", "Data Engineer", "Iota"),
+            job("job-10", "Security Engineer", "Kappa"),
+        ];
+        const jobs = [...displayedJobs, ...undisplayedJobs];
         const appended: string[] = [];
         const searchCalled = { value: false };
         const deps = buildDeps({
@@ -283,8 +291,22 @@ describe("checkIfNeededAddToPipeline", () => {
         const conversation = buildConversation({
             awaitingPipelineDecision: true,
             jobs,
-            focus: jobs[0] ?? cellebrite,
+            focus: displayedJobs[0] ?? cellebrite,
         });
+        conversation.messages = [{
+            role: "assistant",
+            content: "Here are five roles",
+            timestamp: new Date(),
+            attachedJobs: displayedJobs.map((displayedJob) => ({
+                jobId: displayedJob.id,
+                jobTitle: displayedJob.title,
+                url: displayedJob.url,
+                seniority: displayedJob.seniority,
+                description: displayedJob.description,
+                company: displayedJob.company,
+                salary: displayedJob.salary ?? 0,
+            })),
+        }];
 
         const response = await checkIfNeededAddToPipeline(
             deps,
@@ -292,6 +314,10 @@ describe("checkIfNeededAddToPipeline", () => {
         );
 
         assert.equal(pipelineRequests.length, 5);
+        assert.deepEqual(
+            pipelineRequests.map((request) => (request as { description: string }).description),
+            displayedJobs.map(({ title, company }) => `${title} at ${company}`),
+        );
         assert.match(response?.reply ?? "", /added all 5 roles to your pipeline wishlist/i);
         assert.doesNotMatch(response?.reply ?? "", /added the Lead Full-Stack Developer role/i);
     });

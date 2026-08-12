@@ -91,7 +91,8 @@ const pipelineRejectFinalizeBroaderRefill = async (
         orderedPool,
         selectedJob,
         queryLabel,
-        "BROADER_PIPELINE_REFILL"
+        "BROADER_PIPELINE_REFILL",
+        [selectedJob],
     );
     const presentationJobs = [selectedJob];
     const rankedForMatches = rankJobs(userCareerProfile, presentationJobs);

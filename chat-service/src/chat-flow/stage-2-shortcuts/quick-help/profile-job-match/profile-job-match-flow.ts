@@ -51,6 +51,7 @@ export const runProfileJobMatchFlow = async (
     const sanitized = withPipelineClosing(
         `Based on your profile skills, here are roles that look like a fit.\n\n${fallbackPack.sanitizedReply}`
     );
+    const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
 
     await deps.conversationService.setJobContextAfterSearch(
         ctx.userId,
@@ -58,10 +59,10 @@ export const runProfileJobMatchFlow = async (
         topRankedJobs,
         focusJob,
         query,
-        "PROFILE_JOB_MATCH"
+        "PROFILE_JOB_MATCH",
+        presentationJobs,
     );
 
-    const presentationJobs = fallbackPack.validatedJobs.slice(0, 1);
     const primaryJobId = presentationJobs[0]?.id;
     const jobMatches = rankedJobs
         .filter((item) => item.jobId === primaryJobId)

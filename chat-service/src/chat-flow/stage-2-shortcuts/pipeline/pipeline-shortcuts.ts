@@ -12,6 +12,7 @@ import { buildDisambiguationQuestion } from "../follow-up/job-follow-up-answer.s
 import { resolvePipelineJobSelection } from "./pipeline-job-selection/pipeline-job-selection.service";
 import { extractPivotDirection } from "../../stage-5-job-search/direction-filters/chat.pivot-direction.utils";
 import { runNearTermSearchFlow } from "../near-term/near-term-search-flow";
+import { getPresentedPipelineCandidates } from "./pipeline.utils";
 
 const hasShortlistJobs = (ctx: SendMessagePreparedContext): boolean =>
     (ctx.conversationAfterUserMessage.jobContext?.lastReturnedJobs.length ?? 0) > 0;
@@ -55,7 +56,7 @@ export const checkIfNeededAddToPipeline = async (
             return null;
         }
 
-        const candidates = jobContext.lastReturnedJobs;
+        const candidates = getPresentedPipelineCandidates(ctx.conversationAfterUserMessage);
         if (isAllShortlistedJobsAddIntent(ctx.normalizedMessage)) {
             return await handlePipelineAcceptMany({ deps, ctx, jobContext, jobs: candidates });
         }
