@@ -1,6 +1,7 @@
 import type { OnboardingBackground } from "../../../routes/conversation/conversation.types";
 import { extractClaimedCurrentRole } from "../role-conflict/role-conflict.utils";
 import { ONBOARDING_DIRECTION_REASK_REPLY } from "./onboarding.types";
+import { resolveNormalizedChatRole } from "./onboarding.role-normalization.utils";
 
 export type ChatStatedBackgroundFacts = {
     readonly role?: string;
@@ -55,7 +56,7 @@ export const formatChatStatedFactsForPrompt = (facts: ChatStatedBackgroundFacts)
 
 export const buildChatStatedBackgroundReply = (facts: ChatStatedBackgroundFacts): string | null => {
     if (facts.role && facts.yearsOfExperience !== undefined) {
-        return `Nice — ${facts.role} for about ${facts.yearsOfExperience} years. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+        return `Nice — you have about ${facts.yearsOfExperience} years of experience as a ${facts.role}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
     }
     if (facts.role) {
         return `Nice — ${facts.role}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
@@ -90,7 +91,9 @@ export const applyChatStatedFactsToBackground = (
         return background;
     }
 
-    const role = facts.role ?? background.role ?? null;
+    const role = facts.role
+        ? resolveNormalizedChatRole(facts.role, background.role)
+        : background.role ?? null;
     const yearsOfExperience = facts.yearsOfExperience ?? background.yearsOfExperience ?? null;
     const company = background.companies?.[0]?.trim();
     const companySuffix = company && company.length > 0 ? ` at ${company}` : "";

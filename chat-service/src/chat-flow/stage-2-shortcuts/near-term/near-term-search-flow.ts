@@ -10,6 +10,7 @@ import {
 } from "../../stage-6-present-jobs/ranking/job-ranking.service";
 import { buildWishlistSavePrompt } from "../wanted-jobs/chat.wishlist.utils";
 import { buildWantedJobInputFromSearch } from "../wanted-jobs/wanted-job.service";
+import { sanitizeClaimedRole } from "../role-conflict/role-conflict.utils";
 
 export const runNearTermSearchFlow = async (
     deps: ChatFlowDeps,
@@ -17,7 +18,8 @@ export const runNearTermSearchFlow = async (
     queryOverride?: string
 ): Promise<ChatMessageResponse> => {
     const detectedQuery = queryOverride ?? ctx.modeDetection.searchQuery;
-    const query = detectedQuery !== undefined && detectedQuery.trim() !== "" ? detectedQuery : ctx.normalizedMessage;
+    const rawQuery = detectedQuery !== undefined && detectedQuery.trim() !== "" ? detectedQuery : ctx.normalizedMessage;
+    const query = sanitizeClaimedRole(rawQuery);
     const searchFilters = buildWorkDirectionFilters(query);
     console.info(
         `[CHAT][SEARCH] userId=${ctx.userId} trigger=NEAR_TERM query="${query}" filters=${JSON.stringify(searchFilters)}`

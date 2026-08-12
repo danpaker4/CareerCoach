@@ -12,8 +12,9 @@ const containsAnyMarker = (text: string, markers: readonly string[]): boolean =>
     return markers.some((marker) => normalized.includes(marker));
 };
 
-const cleanExtractedRole = (captured: string): string =>
+export const sanitizeClaimedRole = (captured: string): string =>
     captured
+        .replace(/\s+(?:in|for|with|over|during|since)\s+[^,.!?\n]{0,32}\b\d{1,2}\s+years?\b.*$/i, "")
         .replace(/\s+in\s+the\s+last\s+\d+\s+years?\b.*$/i, "")
         .replace(/\s+for\s+(?:the\s+)?(?:last\s+)?\d+\s+years?\b.*$/i, "")
         .replace(/\s+and\s+(?:i|my|in)\b.*$/i, "")
@@ -42,7 +43,7 @@ export const extractClaimedCurrentRole = (message: string): string | undefined =
         const match = trimmed.match(pattern);
         const captured = match?.[1]?.trim();
         if (!captured) continue;
-        const withoutTenure = cleanExtractedRole(captured);
+        const withoutTenure = sanitizeClaimedRole(captured);
         if (isAcceptableExtractedRole(withoutTenure)) {
             return withoutTenure;
         }

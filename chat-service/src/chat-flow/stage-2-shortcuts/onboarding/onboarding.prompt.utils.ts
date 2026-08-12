@@ -47,7 +47,7 @@ Rules:${COMMON_RULES}
 - NONE means the user explicitly has no experience or is seeking a first job. Set advance=true.
 - UNKNOWN means there is no usable background. Set advance=false and ask once for relevant background.
 - When FOUND or NONE, respond with one short summary followed by: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
-- CHAT_STATED_FACTS are authoritative. Use their exact role and years in background and response; do not replace or contradict them.
+- CHAT_STATED_FACTS are authoritative in meaning. Do not replace or contradict the role and years, but correct spelling and rewrite them as natural professional language instead of copying the user's wording.
 - Do not invent history or include account/CV details in the response when CHAT_STATED_FACTS are present.
 - Always set mode=null. Direction routing is validated separately from the user's explicit wording.
 

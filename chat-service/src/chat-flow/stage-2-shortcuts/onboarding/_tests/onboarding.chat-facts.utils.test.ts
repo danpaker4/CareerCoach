@@ -9,6 +9,14 @@ import {
 } from "../onboarding.chat-facts.utils";
 
 describe("onboarding chat facts", () => {
+    it("separates a role from structurally recognizable tenure text despite surrounding typos", () => {
+        const message = "hi my name gal kosover and im software engineer in teh lasst 4 years in paragon";
+        const facts = extractChatStatedBackgroundFacts(message);
+
+        assert.equal(facts.role, "software engineer");
+        assert.equal(facts.yearsOfExperience, 4);
+    });
+
     it("extracts role and years from the user's QA onboarding message", () => {
         const message = "hi my name is gal kosover and in the last 5 years im qa";
         const facts = extractChatStatedBackgroundFacts(message);

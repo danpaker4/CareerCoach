@@ -3,6 +3,7 @@ import type {
     OnboardingNearTermRoleChoice,
 } from "../../../routes/conversation/conversation.types";
 import { extractNearTermSearchQuery } from "../../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
+import { sanitizeClaimedRole } from "../role-conflict/role-conflict.utils";
 import type { OnboardingLlmDecision, OnboardingStepResult } from "./onboarding.types";
 import type { TargetRoleOption } from "./onboarding.target-role.types";
 import {
@@ -81,7 +82,7 @@ export const resolveNearTermRoleChoice = (message: string): OnboardingNearTermRo
 };
 
 export const buildNearTermRoleChoiceReply = (currentRole: string | null | undefined): string => {
-    const role = currentRole?.trim();
+    const role = normalizeTargetRole(currentRole);
     if (!role) {
         return ONBOARDING_ROLE_CHOICE_REPLY;
     }
@@ -108,7 +109,7 @@ export const formatTargetRoleOptionsReply = (summary: string, roles: readonly Ta
 };
 
 export const normalizeTargetRole = (value: string | null | undefined): string | null => {
-    const trimmed = value?.trim();
+    const trimmed = value ? sanitizeClaimedRole(value) : undefined;
     if (!trimmed || trimmed.length < 3 || trimmed.length > 80) {
         return null;
     }
@@ -123,6 +124,18 @@ export const matchSuggestedRoleTitle = (
     return suggestedRoles.find((role) => role.trim().toLocaleLowerCase() === normalizedMessage) ?? null;
 };
 
+const buildNormalizedSameRoleBackground = (current: OnboardingFlow, targetRole: string): OnboardingFlow["background"] => {
+    const background = current.background;
+    if (!background) return undefined;
+    const years = background.yearsOfExperience;
+    const company = background.companies?.[0]?.trim();
+    const companySuffix = company ? ` at ${company}` : "";
+    const summary = years !== null && years !== undefined
+        ? `${targetRole} for about ${years} years${companySuffix}`
+        : `${targetRole}${companySuffix}`;
+    return { ...background, role: targetRole, summary };
+};
+
 const completeNearTermTarget = (
     current: OnboardingFlow,
     targetRole: string,
@@ -131,6 +144,9 @@ const completeNearTermTarget = (
     reply: `Got it — I'll look for ${targetRole} roles you can move into soon.`,
     onboardingFlow: {
         ...current,
+        ...(roleChoice === "SAME_ROLE"
+            ? { background: buildNormalizedSameRoleBackground(current, targetRole) }
+            : {}),
         directionResolved: true,
         completed: true,
         initialMode: "NEAR_TERM",

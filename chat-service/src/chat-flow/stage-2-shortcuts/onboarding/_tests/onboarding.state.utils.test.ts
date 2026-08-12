@@ -79,7 +79,7 @@ describe("buildOnboardingPrompt", () => {
 
         assert.match(prompt, /CHAT_STATED_FACTS: role=qa, yearsOfExperience=5/);
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
-        assert.match(prompt, /exact role and years/i);
+        assert.match(prompt, /correct spelling.*natural professional language/i);
         assert.match(prompt, /do not replace or contradict/i);
     });
 
@@ -178,6 +178,74 @@ describe("resolveOnboardingDirectionMode", () => {
 });
 
 describe("applyOnboardingDecision", () => {
+    it("uses model-normalized facts for unrelated role and tenure misspellings", () => {
+        const cases = [
+            {
+                message: "im a prodcut manger with 3 years of experiance",
+                role: "product manager",
+                years: 3,
+            },
+            {
+                message: "im a cybersecurty analist and have worked 2 yaers",
+                role: "cybersecurity analyst",
+                years: 2,
+            },
+            {
+                message: "i work as a data scientsit for fiev years",
+                role: "data scientist",
+                years: 5,
+            },
+        ] as const;
+
+        for (const testCase of cases) {
+            const step = applyOnboardingDecision(
+                defaultOnboardingFlow(),
+                {
+                    response: `You have ${testCase.years} years of experience as a ${testCase.role}.`,
+                    background: {
+                        status: "FOUND",
+                        role: testCase.role,
+                        yearsOfExperience: testCase.years,
+                    },
+                    mode: null,
+                    advance: true,
+                },
+                testCase.message,
+            );
+
+            assert.equal(step.onboardingFlow.background?.role, testCase.role);
+            assert.equal(step.onboardingFlow.background?.yearsOfExperience, testCase.years);
+            assert.match(step.reply, new RegExp(testCase.role, "i"));
+            assert.doesNotMatch(step.reply, /prodcut|manger|experiance|cybersecurty|analist|yaers|scientsit|fiev/i);
+        }
+    });
+
+    it("rewrites typo-heavy background text instead of echoing it", () => {
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            {
+                response: "Nice — software engineer in thee lassst 4 years in paragon for about 4 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+                background: {
+                    status: "FOUND",
+                    role: "software engineer in thee lassst 4 years in paragon",
+                    yearsOfExperience: 4,
+                    companies: ["Paragon"],
+                },
+                mode: null,
+                advance: true,
+            },
+            "hi my name gal kosover and im software engineer in thee lassst 4 years in paragon",
+        );
+
+        assert.equal(step.onboardingFlow.background?.role, "software engineer");
+        assert.equal(step.onboardingFlow.background?.yearsOfExperience, 4);
+        assert.equal(
+            step.reply,
+            "Nice — you have about 4 years of experience as a software engineer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+        );
+        assert.doesNotMatch(step.reply, /thee|lassst|in paragon for about/i);
+    });
+
     it("resolves FOUND background without completing onboarding yet", () => {
         const step = applyOnboardingDecision(defaultOnboardingFlow(), {
             response: "Summary + direction?",
@@ -259,11 +327,11 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.background?.summary, "software developer for about 5 years at IDF");
         assert.equal(
             step.reply,
-            "Nice — software developer for about 5 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+            "Nice — you have about 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
         );
     });
 
-    it("keeps a natural model reply when it matches the authoritative chat facts", () => {
+    it("uses a normalized acknowledgement instead of echoing the model or user wording", () => {
         const modelReply = "Great — you have worked as a software developer for 5 years. What kind of role would you like next?";
         const step = applyOnboardingDecision(
             defaultOnboardingFlow(),
@@ -280,7 +348,10 @@ describe("applyOnboardingDecision", () => {
             "in the last 5 years im software developer",
         );
 
-        assert.equal(step.reply, modelReply);
+        assert.equal(
+            step.reply,
+            "Nice — you have about 5 years of experience as a software developer. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+        );
         assert.equal(step.onboardingFlow.background?.role, "software developer");
         assert.equal(step.onboardingFlow.background?.yearsOfExperience, 5);
     });
@@ -366,6 +437,37 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.onboardingFlow.nearTermTarget?.roleChoice, "SAME_ROLE");
         assert.equal(step.onboardingFlow.nearTermTarget?.targetRole, "software developer");
         assert.equal(step.completedThisTurn, true);
+    });
+
+    it("repairs an already-stored malformed role before a same-role search", () => {
+        const awaitingChoice = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: {
+                status: "FOUND" as const,
+                role: "software engineer in thee lassst 4 years in paragon",
+                yearsOfExperience: 4,
+                companies: ["Paragon"],
+            },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const step = applyOnboardingDecision(
+            awaitingChoice,
+            {
+                response: "Understood.",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: false,
+            },
+            "same role",
+        );
+
+        assert.equal(step.onboardingFlow.background?.role, "software engineer");
+        assert.equal(step.onboardingFlow.nearTermTarget?.targetRole, "software engineer");
+        assert.equal(step.onboardingFlow.nearTermTarget?.searchQuery, "software engineer");
+        assert.doesNotMatch(step.reply, /thee|lassst|paragon/i);
     });
 
     it("recognizes a misspelled different-role choice when the model is uncertain", () => {

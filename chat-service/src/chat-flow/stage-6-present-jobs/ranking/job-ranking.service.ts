@@ -125,14 +125,17 @@ export const filterJobsMatchingSearchQuery = (
     searchQuery: string,
     jobs: readonly JobSearchResultItem[],
 ): JobSearchResultItem[] => {
-    const tokens = tokenizeSearchQuery(searchQuery);
+    const tokens = [...new Set(tokenizeSearchQuery(searchQuery))];
     const strongTokens = tokens.filter((token) => !WEAK_DIRECTION_TOKENS.has(token));
-    const matchTokens = strongTokens.length > 0 ? strongTokens : tokens;
-    if (matchTokens.length === 0) {
+    if (tokens.length === 0) {
         return [...jobs];
     }
     return jobs.filter((job) => {
+        const title = job.title.toLowerCase();
         const corpus = `${job.title} ${job.description}`.toLowerCase();
-        return matchTokens.some((token) => corpus.includes(token));
+        if (strongTokens.length > 0) {
+            return strongTokens.some((token) => corpus.includes(token));
+        }
+        return tokens.every((token) => title.includes(token));
     });
 };

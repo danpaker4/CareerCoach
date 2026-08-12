@@ -29,6 +29,22 @@ describe("buildWorkDirectionFilters QA", () => {
 });
 
 describe("filterJobsMatchingSearchQuery", () => {
+    it("keeps only software-engineering titles for a same-role software engineer search", () => {
+        const filtered = filterJobsMatchingSearchQuery(
+            "software engineer",
+            [
+                job("DevOps Engineer"),
+                job("Junior QA Engineer"),
+                job("Security Engineer"),
+                job("Senior Backend Engineer (Python/AWS)"),
+                job("QA Automation Engineer"),
+                job("Software Engineer"),
+            ],
+        );
+
+        assert.deepEqual(filtered.map((item) => item.title), ["Software Engineer"]);
+    });
+
     it("keeps QA jobs and drops unrelated backend/devops near-misses", () => {
         const filtered = filterJobsMatchingSearchQuery(
             "QA Quality Assurance Test Automation SDET",
