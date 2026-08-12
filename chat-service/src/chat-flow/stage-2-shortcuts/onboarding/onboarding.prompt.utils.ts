@@ -4,9 +4,15 @@ import {
     formatChatStatedFactsForPrompt,
 } from "./onboarding.chat-facts.utils";
 
-const MAX_ACCOUNT_CONTEXT_CHARS = 2_000;
-const MAX_HISTORY_MESSAGES = 6;
-const MAX_HISTORY_MESSAGE_CHARS = 400;
+const MAX_ACCOUNT_CONTEXT_CHARS = 1_200;
+const MAX_HISTORY_MESSAGES = 4;
+const MAX_HISTORY_MESSAGE_CHARS = 300;
+
+const COMMON_RULES = `
+- Interpret obvious spelling mistakes, transposed letters, and informal wording from context.
+- If multiple meanings remain plausible, ask one concise clarification question instead of guessing.
+- Keep the user-facing response concise and natural.
+- Never expose JSON labels or internal routing terms in the user-facing response.`;
 
 const buildRecentHistory = (conversation: Conversation, latestUserMessage: string): string => {
     const lastMessage = conversation.messages.at(-1);
@@ -20,79 +26,85 @@ const buildRecentHistory = (conversation: Conversation, latestUserMessage: strin
         .join("\n");
 };
 
-export const buildOnboardingPrompt = (
-    conversation: Conversation,
+const buildBackgroundPrompt = (
     latestUserMessage: string,
     userAccountContext: string,
     onboardingFlow: OnboardingFlow,
 ): string => {
     const chatFacts = extractChatStatedBackgroundFacts(latestUserMessage);
     const chatFactsLine = formatChatStatedFactsForPrompt(chatFacts);
+    const hasChatFacts = chatFacts.role !== undefined || chatFacts.yearsOfExperience !== undefined;
+    const accountSection = hasChatFacts || userAccountContext.trim().length === 0
+        ? ""
+        : `\nSecondary account context (use only explicit facts; never mention missing sources):\n${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}\n`;
 
-    return `
-You are the onboarding layer of a career coach. Return ONLY compact JSON (no markdown):
-{"response":"message to user","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false,"roleChoice":null,"targetRole":null,"targetRoleReady":false,"targetDiscoverySubject":null,"targetDiscoveryFacts":{}}
+    return `You classify the user's professional background for a career coach.
+Return ONLY compact JSON, no markdown:
+{"response":"message","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false}
+
+Rules:${COMMON_RULES}
+- FOUND means the latest message or supplied account context contains usable work, study, project, or technical experience. Set advance=true.
+- NONE means the user explicitly has no experience or is seeking a first job. Set advance=true.
+- UNKNOWN means there is no usable background. Set advance=false and ask once for relevant background.
+- When FOUND or NONE, respond with one short summary followed by: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
+- CHAT_STATED_FACTS are authoritative. Use their exact role and years in background and response; do not replace or contradict them.
+- Do not invent history or include account/CV details in the response when CHAT_STATED_FACTS are present.
+- If the latest message also states a direction, set mode to NEAR_TERM for a job now/soon, DREAMJOB for a future goal, GUIDED for uncertainty, otherwise null.
+
+CHAT_STATED_FACTS: ${chatFactsLine}
+backgroundAskCount=${onboardingFlow.backgroundAskCount}
+${accountSection}Latest user message: ${latestUserMessage}`;
+};
+
+const buildDirectionPrompt = (latestUserMessage: string): string => `You classify a career-coaching user's timing preference.
+Return ONLY compact JSON, no markdown:
+{"response":"short acknowledgement or clarification","mode":null,"advance":false}
+
+Rules:${COMMON_RULES}
+- Set mode=NEAR_TERM for a job now, soon, the next few months, or bare "now".
+- Set mode=DREAMJOB for a longer-term, future, or dream role.
+- Set mode=GUIDED when the user is unsure or wants help deciding.
+- When mode is set, set advance=true and respond with a short acknowledgement.
+- When unclear, keep mode=null, set advance=false, and respond exactly: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
+- Do not repeat the user's professional background.
+
+Latest user message: ${latestUserMessage}`;
+
+const buildRoleChoicePrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+    onboardingFlow: OnboardingFlow,
+): string => `You classify whether a user wants the same or a different role for their near-term job search.
+Return ONLY compact JSON:
+{"response":"short acknowledgement or question","roleChoice":null,"targetRole":null,"targetRoleReady":false,"targetDiscoverySubject":null,"targetDiscoveryFacts":{}}
 
 Rules:
-- Interpret obvious spelling mistakes, transposed letters, and informal wording from conversation context before classifying intent. Do not require exact spelling when the meaning is clear.
-- For example, "i am thinking about somehting diifererent" means the user wants a different role, so set roleChoice=DIFFERENT_ROLE. Do not repeat the same-role/different-role question because of spelling mistakes.
-- If several interpretations remain genuinely plausible after using the conversation context, ask one concise clarification question instead of inventing an intent.
-- Do not invent professional history. Only use the latest user message and Account context when facts are explicitly present.
-- CHAT_STATED_FACTS are authoritative for role and yearsOfExperience whenever present. background.role, background.yearsOfExperience, background.summary, and the spoken response MUST use those chat values.
-- User chat is the source of truth. When chat conflicts with Account/profile/CV/skills, use only the latest explicit chat value for that fact and never ask the user to choose between sources.
-- Account/CV is secondary enrichment only for facts the user did not state. Never replace chat-stated wording or add Account/CV details to the spoken background summary when CHAT_STATED_FACTS are present.
-- If chat says "software developer" / "5 years" and CV says "QA Automation & Performance Engineer" / "2 years", the spoken response must use only "software developer" and "5 years" from chat.
-- Never mention missing LinkedIn/GitHub/CV. Omit unavailable sources entirely.
-- Never expose mode names, counters, brackets, or internal routing to the user. Forbidden in response: NEAR_TERM, DREAMJOB, GUIDED, FOUND, NONE, UNKNOWN, or patterns like [NEAR_TERM|DREAMJOB|GUIDED].
-- Keep responses concise, natural, and readable — like a human coach, not a form.
-- Do NOT repeat the same background paragraph on later turns. After background is resolved, response must be a short question or short acknowledgement only.
+- Interpret informal wording and obvious spelling mistakes. "differennnt", "differernet", and "somehting diifererent" mean DIFFERENT_ROLE.
+- Do not repeat the same-role/different-role question because of spelling mistakes.
+- Set roleChoice=SAME_ROLE or DIFFERENT_ROLE; use null only if genuinely unclear.
+- A concrete named target sets targetRole and targetRoleReady=true. Use SAME_ROLE only if it matches the current role.
+- A bare SAME_ROLE keeps targetRole=null and targetRoleReady=false.
+- For DIFFERENT_ROLE without a target, ask one personalized, high-value discovery question and describe it in targetDiscoverySubject.
+- Choose from full context; enjoyed work, responsibilities, strengths, work style, domain, constraints, and setting are examples rather than a fixed sequence.
+- Do not ask for information already known. Put only explicit user preferences in targetDiscoveryFacts.
+- Keep responses natural; never expose JSON or routing labels.
 
-CHAT_STATED_FACTS (authoritative for role/years): ${chatFactsLine}
-
-Current onboarding state (authoritative for what to do next):
-backgroundResolved=${onboardingFlow.backgroundResolved}
-backgroundAskCount=${onboardingFlow.backgroundAskCount}
-directionResolved=${onboardingFlow.directionResolved}
-directionAskCount=${onboardingFlow.directionAskCount}
-completed=${onboardingFlow.completed}
-storedBackground=${JSON.stringify(onboardingFlow.background ?? null)}
-nearTermTarget=${JSON.stringify(onboardingFlow.nearTermTarget ?? null)}
-
-If backgroundResolved is false:
-- Classify background.status as FOUND (usable role/experience/education/projects), NONE (explicitly no experience / first job), or UNKNOWN (hi / unrelated / no usable info).
-- FOUND: set advance=true, fill background fields from evidence (chat facts first), and set response to ONE short personalized summary PLUS a natural career-direction question.
-  Good example: "Nice — software developer for about 5 years. Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
-  Bad example: repeating a CV title/years the user did not claim, or "You're now looking to [NEAR_TERM|DREAMJOB|GUIDED]."
-- NONE: set advance=true, background reflects no experience, and ask the same kind of natural direction question (do not re-ask for background).
-- UNKNOWN: set advance=false and ask once for work experience, studies, projects, or technical background.
-
-If backgroundResolved is true and directionResolved is false:
-- Keep the stored background fields in JSON. Do NOT restate the full background in response.
-- Set mode in the JSON only (NEAR_TERM, DREAMJOB, or GUIDED) from the latest message, or null if unclear.
-- Treat as NEAR_TERM when the user wants something soon: "looking for something now", "job now", "soon", bare "now", "next few months", stay in current field and find work now.
-- Treat as DREAMJOB for longer-term / future / dream titles.
-- Treat as GUIDED for unsure / help me figure it out.
-- If mode is set: advance=true, and response is a short plain acknowledgement only (no biography repeat).
-- If mode is null: advance=false and response MUST be only: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
-
-If nearTermTarget.step is "awaiting_role_choice":
-- Classify roleChoice as SAME_ROLE, DIFFERENT_ROLE, or null from the latest message.
-- Correct obvious misspellings semantically. Variants such as "differernet", "diifererent", or "somehting different" must classify as DIFFERENT_ROLE.
-- If the user names a concrete target role directly, set roleChoice=DIFFERENT_ROLE unless it clearly matches storedBackground.role, set targetRole, and set targetRoleReady=true.
-- When roleChoice=DIFFERENT_ROLE without a concrete target, ask one personalized, high-value discovery question in response and set targetDiscoverySubject to a short semantic description of what it learns.
-- Choose that question dynamically from the full context. Subjects such as enjoyed work, desired responsibilities, strengths, work style, domain, constraints, or workplace setting are examples rather than a fixed sequence. Do not ask for information already known.
-- Otherwise keep targetRole=null and targetRoleReady=false.
-
-If nearTermTarget.step is "discovering_target":
-- The user chose a different role. Ask exactly ONE concise, high-value question per turn until their target is a concrete searchable role or domain.
-- Use recent chat answers, not Account/CV, to understand the target. Useful questions narrow responsibilities, type of work, technical focus, or industry.
-- Set targetRoleReady=true only when the user explicitly names or confirms a concrete searchable role/domain. Do not infer readiness from vague interests alone.
-- When ready, set targetRole to the user's target and make response a short acknowledgement. Otherwise set targetRoleReady=false and response to the next single question.
-
-Account:
-${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}
+Current role: ${onboardingFlow.background?.role ?? "unknown"}
 Recent conversation:
 ${buildRecentHistory(conversation, latestUserMessage)}
-Latest: ${latestUserMessage}
-`;
+Latest user message: ${latestUserMessage}`;
+
+export const buildOnboardingPrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+    userAccountContext: string,
+    onboardingFlow: OnboardingFlow,
+): string => {
+    if (!onboardingFlow.backgroundResolved) {
+        return buildBackgroundPrompt(latestUserMessage, userAccountContext, onboardingFlow);
+    }
+    if (!onboardingFlow.directionResolved) {
+        return buildDirectionPrompt(latestUserMessage);
+    }
+    return buildRoleChoicePrompt(conversation, latestUserMessage, onboardingFlow);
 };
