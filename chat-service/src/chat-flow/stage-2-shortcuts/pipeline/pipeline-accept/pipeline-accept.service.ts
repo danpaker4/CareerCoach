@@ -142,11 +142,12 @@ export const handlePipelineAcceptMany = async (params: HandlePipelineAcceptManyP
             ? " Alerts are active for matching roles."
             : ` Alerts are active for ${activeAlertCount} of ${savedJobs.length} saved roles.`
         : "";
+    const destination = wantsAlerts ? "pipeline wishlist" : "pipeline";
     const reply = failedCount === 0
-        ? `Done — I added all ${savedJobs.length} roles to your pipeline wishlist.${alertStatus} You can track them from My Pipeline.`
+        ? `Done — I added all ${savedJobs.length} roles to your ${destination}.${alertStatus} You can track them from My Pipeline.`
         : savedJobs.length === 0
-            ? "I couldn't add those roles to your pipeline wishlist just now. Please try again."
-            : `I added ${savedJobs.length} of ${jobs.length} roles to your pipeline wishlist, but ${failedCount} could not be added.${alertStatus} You can track the saved roles from My Pipeline.`;
+            ? `I couldn't add those roles to your ${destination} just now. Please try again.`
+            : `I added ${savedJobs.length} of ${jobs.length} roles to your ${destination}, but ${failedCount} could not be added.${alertStatus} You can track the saved roles from My Pipeline.`;
     await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
     return {
         reply,

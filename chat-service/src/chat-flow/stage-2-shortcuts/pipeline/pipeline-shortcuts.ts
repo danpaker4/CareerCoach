@@ -57,7 +57,7 @@ export const checkIfNeededAddToPipeline = async (
         }
 
         const candidates = getPresentedPipelineCandidates(ctx.conversationAfterUserMessage);
-        if (isAllShortlistedJobsAddIntent(ctx.normalizedMessage)) {
+        if (isAllShortlistedJobsAddIntent(ctx.normalizedMessage, candidates.length)) {
             return await handlePipelineAcceptMany({ deps, ctx, jobContext, jobs: candidates });
         }
         const resolution = await resolvePipelineJobSelection({

@@ -5,9 +5,11 @@ import {
     detectQuickHelpIntent,
     modeForQuickHelpFlow,
 } from "../shared/quick-help.utils";
-import { isInterviewAckMessage, isClearlyInsufficientInterviewAnswer } from "../interview-prep/interview-prep.utils";
+import {
+    isAllowedSpokenInterviewQuestion,
+    isInterviewFeedbackChallenge,
+} from "../interview-prep/interview-prep.utils";
 import { buildProfileJobSearchQuery } from "../profile-job-match/profile-job-match.utils";
-
 
 describe("detectQuickHelpIntent", () => {
     it("detects the quick prompt phrases", () => {
@@ -59,26 +61,16 @@ describe("buildProfileJobSearchQuery", () => {
     });
 });
 
-describe("isInterviewAckMessage", () => {
-    it("accepts common acknowledgements", () => {
-        assert.equal(isInterviewAckMessage("got it"), true);
-        assert.equal(isInterviewAckMessage("I understand"), true);
-        assert.equal(isInterviewAckMessage("no more questions"), true);
-    });
-});
-
-describe("isClearlyInsufficientInterviewAnswer", () => {
-    it("rejects thin or placeholder answers", () => {
-        assert.equal(isClearlyInsufficientInterviewAnswer("idk"), true);
-        assert.equal(isClearlyInsufficientInterviewAnswer("no idea"), true);
-        assert.equal(isClearlyInsufficientInterviewAnswer("yes"), true);
-        assert.equal(isClearlyInsufficientInterviewAnswer("asdf"), true);
+describe("interview prep message detection", () => {
+    it("detects challenges to interview feedback", () => {
+        assert.equal(isInterviewFeedbackChallenge("that's what I said"), true);
+        assert.equal(isInterviewFeedbackChallenge("Why was I wrong?"), true);
+        assert.equal(isInterviewFeedbackChallenge("Here is a clearer answer"), false);
     });
 
-    it("allows substantive answers through to the grader", () => {
-        assert.equal(
-            isClearlyInsufficientInterviewAnswer("React is a UI library that uses a component tree and a virtual DOM."),
-            false
-        );
+    it("rejects coding and drawing requests from generated interview questions", () => {
+        assert.equal(isAllowedSpokenInterviewQuestion("Explain the tradeoff verbally."), true);
+        assert.equal(isAllowedSpokenInterviewQuestion("Write code for a cache."), false);
+        assert.equal(isAllowedSpokenInterviewQuestion("Draw a system design diagram."), false);
     });
 });

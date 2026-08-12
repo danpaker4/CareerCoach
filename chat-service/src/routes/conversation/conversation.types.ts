@@ -1,6 +1,10 @@
 import type { ObjectId } from "mongodb";
 import type { AttachedJobSnapshot, ChatMessage, UserAchievement } from "../../chat-flow/api/shared/chat-message.types";
 import type { ConversationJobContext } from "./job-in-conversation.types";
+import type {
+    InterviewDifficulty,
+    InterviewFocusOption,
+} from "../../chat-flow/stage-2-shortcuts/quick-help/interview-prep/interview-prep.types";
 
 export type ConversationStage = {
     id: string;
@@ -74,10 +78,35 @@ export type CvImproveQuickHelpFlow = {
 
 export type InterviewPrepQuickHelpFlow = {
     kind: "interview_prep";
-    step: "awaiting_topic" | "awaiting_answer" | "awaiting_ack";
+    step:
+        | "awaiting_topic"
+        | "awaiting_experience"
+        | "awaiting_focus"
+        | "awaiting_first_focus"
+        | "awaiting_saved_focus"
+        | "awaiting_answer"
+        | "awaiting_follow_up"
+        | "awaiting_teaching_check"
+        | "awaiting_ack";
     topic?: string;
     questions?: string[];
     index?: number;
+    evaluatedQuestion?: string;
+    candidateAnswer?: string;
+    lastFeedback?: string;
+    modelAnswer?: string;
+    improvementTip?: string;
+    pendingFollowUpQuestions?: string[];
+    activeFollowUpQuestion?: string;
+    followUpCount?: number;
+    teachingExplanation?: string;
+    teachingExample?: string;
+    understandingCheck?: string;
+    teachingAttemptCount?: number;
+    baseTopic?: string;
+    focusOptions?: [InterviewFocusOption, InterviewFocusOption];
+    deferredFocus?: InterviewFocusOption;
+    difficulty?: InterviewDifficulty;
 };
 
 export type QuickHelpFlow = SkillsGapQuickHelpFlow | CvImproveQuickHelpFlow | InterviewPrepQuickHelpFlow;

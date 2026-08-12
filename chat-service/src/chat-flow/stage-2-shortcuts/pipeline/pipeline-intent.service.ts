@@ -84,11 +84,18 @@ export const isExplicitPipelineAddIntent = (message: string): boolean => {
     return isPipelineSelection(normalized);
 };
 
-export const isAllShortlistedJobsAddIntent = (message: string): boolean => {
+export const isAllShortlistedJobsAddIntent = (message: string, presentedJobCount?: number): boolean => {
     const normalized = normalize(message);
     const hasAddAction = /\b(?:add|put|save)\b/.test(normalized);
     const targetsAll = /\b(?:all|every)\b/.test(normalized);
-    return hasAddAction && targetsAll;
+    if (!hasAddAction) return false;
+    if (targetsAll) return true;
+    if (presentedJobCount !== 2) return false;
+
+    const targetsBoth = /\bboth\b/.test(normalized);
+    const targetsCompletePair = /\b(?:this|these|those|the)\s+(?:two|2)\b/.test(normalized)
+        || /\b(?:two|2)\s+(?:jobs|roles|ones|opportunities)\b/.test(normalized);
+    return targetsBoth || targetsCompletePair;
 };
 
 export const isExplicitWishlistAddIntent = (message: string): boolean => {
