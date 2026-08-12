@@ -100,7 +100,9 @@ export const isAllShortlistedJobsAddIntent = (message: string, presentedJobCount
 
 export const isExplicitWishlistAddIntent = (message: string): boolean => {
     const normalized = normalize(message);
-    return /\b(?:add|put|save)\b/.test(normalized) && /\bwish\s*list\b/.test(normalized);
+    const hasSaveAction = /\b(?:add|put|save)\b/.test(normalized);
+    const hasWantedJobsDestination = /\b(?:wish\s*list|wanted\s+jobs?)\b/.test(normalized);
+    return hasSaveAction && hasWantedJobsDestination;
 };
 
 export const detectPipelineIntent = (message: string): PipelineIntent | null => {
