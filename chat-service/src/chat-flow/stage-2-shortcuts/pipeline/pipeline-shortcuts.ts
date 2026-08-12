@@ -1,8 +1,12 @@
 import type { ChatMessageResponse } from "../../api/shared/chat.types";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../../chat-flow.types";
 import { PIPELINE_INTENT } from "./pipeline.consts";
-import { detectPipelineIntent, isExplicitPipelineAddIntent } from "./pipeline-intent.service";
-import { handlePipelineAccept } from "./pipeline-accept/pipeline-accept.service";
+import {
+    detectPipelineIntent,
+    isAllShortlistedJobsAddIntent,
+    isExplicitPipelineAddIntent,
+} from "./pipeline-intent.service";
+import { handlePipelineAccept, handlePipelineAcceptMany } from "./pipeline-accept/pipeline-accept.service";
 import { handlePipelineReject } from "./pipeline-reject/pipeline-reject.service";
 import { buildDisambiguationQuestion } from "../follow-up/job-follow-up-answer.service";
 import { resolvePipelineJobSelection } from "./pipeline-job-selection/pipeline-job-selection.service";
@@ -52,6 +56,9 @@ export const checkIfNeededAddToPipeline = async (
         }
 
         const candidates = jobContext.lastReturnedJobs;
+        if (isAllShortlistedJobsAddIntent(ctx.normalizedMessage)) {
+            return await handlePipelineAcceptMany({ deps, ctx, jobContext, jobs: candidates });
+        }
         const resolution = await resolvePipelineJobSelection({
             textCompletion: deps.textCompletion,
             userMessage: ctx.normalizedMessage,

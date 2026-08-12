@@ -260,6 +260,42 @@ describe("checkIfNeededAddToPipeline", () => {
         assert.equal(searchCalled.value, false);
     });
 
+    it("adds every shortlisted job when the user asks to add all five to their wishlist", async () => {
+        const jobs = [
+            job("job-1", "Frontend Developer", "Alpha"),
+            job("job-2", "Backend Developer", "Beta"),
+            job("job-3", "Full-Stack Developer", "Gamma"),
+            job("job-4", "Software Engineer", "Delta"),
+            job("job-5", "Lead Full-Stack Developer", "Synergy Tech"),
+        ];
+        const appended: string[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"jobId":"job-5","confidence":"high"}',
+            appended,
+            searchCalled,
+        });
+        const pipelineRequests: unknown[] = [];
+        globalThis.fetch = (async (_input, init) => {
+            pipelineRequests.push(JSON.parse(String(init?.body)) as unknown);
+            return new Response(null, { status: 201 });
+        }) as typeof fetch;
+        const conversation = buildConversation({
+            awaitingPipelineDecision: true,
+            jobs,
+            focus: jobs[0] ?? cellebrite,
+        });
+
+        const response = await checkIfNeededAddToPipeline(
+            deps,
+            buildCtx("add to my wishlist all the five", conversation),
+        );
+
+        assert.equal(pipelineRequests.length, 5);
+        assert.match(response?.reply ?? "", /added all 5 roles to your pipeline wishlist/i);
+        assert.doesNotMatch(response?.reply ?? "", /added the Lead Full-Stack Developer role/i);
+    });
+
     it("does not treat a bare yes as an add once awaitingPipelineDecision is cleared", async () => {
         const appended: string[] = [];
         const searchCalled = { value: false };

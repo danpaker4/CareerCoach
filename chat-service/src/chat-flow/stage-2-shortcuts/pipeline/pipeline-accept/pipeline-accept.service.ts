@@ -1,6 +1,26 @@
 import type { ChatMessageResponse } from "../../../api/shared/chat.types";
+import type { SanitizedJob } from "../../../../routes/conversation/job-in-conversation.types";
 import { addJobToPipeline } from "./pipeline-accept.api.service";
-import type { HandlePipelineAcceptParams } from "./pipeline-accept.types";
+import type {
+    AddJobToPipelineResult,
+    HandlePipelineAcceptManyParams,
+    HandlePipelineAcceptParams,
+} from "./pipeline-accept.types";
+
+const addJobToPipelineSafely = async (
+    jobServiceBaseUrl: string,
+    userId: string,
+    job: SanitizedJob,
+): Promise<AddJobToPipelineResult> => {
+    try {
+        return await addJobToPipeline(jobServiceBaseUrl, userId, job);
+    } catch (error: unknown) {
+        return {
+            status: "error",
+            message: error instanceof Error ? error.message : "Pipeline request failed",
+        };
+    }
+};
 
 export const handlePipelineAccept = async (params: HandlePipelineAcceptParams): Promise<ChatMessageResponse> => {
     const { deps, ctx, jobContext } = params;
@@ -40,4 +60,55 @@ export const handlePipelineAccept = async (params: HandlePipelineAcceptParams): 
     await deps.conversationService.saveJobContext(userId, conversationId, nextContext);
     await deps.conversationService.appendAssistantMessage(userId, conversationId, reply);
     return { reply, mode, confidenceSummary };
+};
+
+export const handlePipelineAcceptMany = async (params: HandlePipelineAcceptManyParams): Promise<ChatMessageResponse> => {
+    const { deps, ctx, jobContext } = params;
+    const jobs = [...new Map(params.jobs.map((job) => [job.id, job])).values()];
+    const results = await Promise.all(
+        jobs.map(async (job) => ({ job, result: await addJobToPipelineSafely(deps.jobServiceBaseUrl, ctx.userId, job) })),
+    );
+    const savedJobs = results.filter(({ result }) => result.status !== "error").map(({ job }) => job);
+    const failedCount = jobs.length - savedJobs.length;
+    const savedIds = new Set([
+        ...(jobContext.jobRecommendationContext?.acceptedJobIds ?? []),
+        ...savedJobs.map((job) => job.id),
+    ]);
+    const now = new Date();
+    const firstJob = jobs[0] ?? null;
+    const recommendationContext = jobContext.jobRecommendationContext ?? {
+        selectedJobId: firstJob?.id ?? null,
+        selectedJob: firstJob,
+        recommendedJobIds: jobs.map((job) => job.id),
+        rejectedJobIds: [],
+        acceptedJobIds: [],
+        lastRecommendationAt: null,
+        awaitingPipelineDecision: false,
+    };
+    const nextContext = {
+        ...jobContext,
+        jobRecommendationContext: {
+            ...recommendationContext,
+            acceptedJobIds: [...savedIds],
+            awaitingPipelineDecision: false,
+            lastRecommendationAt: now,
+        },
+        updatedAt: now,
+    };
+
+    if (savedJobs.length > 0) {
+        await deps.conversationService.saveJobContext(ctx.userId, ctx.conversationId, nextContext);
+    }
+
+    const reply = failedCount === 0
+        ? `Done — I added all ${savedJobs.length} roles to your pipeline wishlist. You can track them from My Pipeline.`
+        : savedJobs.length === 0
+            ? "I couldn't add those roles to your pipeline wishlist just now. Please try again."
+            : `I added ${savedJobs.length} of ${jobs.length} roles to your pipeline wishlist, but ${failedCount} could not be added. You can track the saved roles from My Pipeline.`;
+    await deps.conversationService.appendAssistantMessage(ctx.userId, ctx.conversationId, reply);
+    return {
+        reply,
+        mode: ctx.modeDetection.mode,
+        confidenceSummary: ctx.confidenceSummary,
+    };
 };
