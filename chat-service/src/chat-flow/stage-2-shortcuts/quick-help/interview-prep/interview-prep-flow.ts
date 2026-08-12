@@ -10,24 +10,32 @@ import {
     QUICK_HELP_INTERVIEW_ASK_TOPIC,
     QUICK_HELP_INTERVIEW_MAX_FOLLOW_UPS,
     QUICK_HELP_INTERVIEW_MAX_TEACHING_ATTEMPTS,
+    QUICK_HELP_INTERVIEW_QUESTION_COUNT,
 } from "./interview-prep.consts";
 import {
     evaluateInterviewTeachingReply,
-    generateInterviewQuestions,
+    generateInterviewQuestion,
     gradeInterviewAnswer,
     planInterviewTopic,
     reconsiderInterviewAnswer,
     selectInterviewFocus,
 } from "./interview-prep.llm";
-import type { InterviewDifficulty, InterviewFocusOption, InterviewGradeLlmResult } from "./interview-prep.types";
+import type {
+    InterviewDifficulty,
+    InterviewFocusOption,
+    InterviewGradeLlmResult,
+} from "./interview-prep.types";
 import {
+    completeInterviewQuestion,
     extractInterviewTopicCorrection,
+    isExplicitInterviewKnowledgeGap,
     isInterviewFeedbackChallenge,
     isLegacyInterviewAcknowledgement,
     mapInterviewYearsToDifficulty,
     parseInterviewDifficulty,
     parseInterviewExperienceYears,
     resolveInterviewDifficulty,
+    updateInterviewAttemptScores,
 } from "./interview-prep.utils";
 
 const formatQuestionPrompt = (index: number, total: number, question: string): string =>
@@ -80,6 +88,7 @@ const finishInterview = async (
                 baseTopic: activeFlow.baseTopic,
                 deferredFocus: activeFlow.deferredFocus,
                 difficulty: activeFlow.difficulty,
+                startingDifficulty: activeFlow.startingDifficulty,
             });
             return appendReply(
                 deps,
@@ -99,22 +108,50 @@ const moveToNextMainQuestion = async (
 ): Promise<ChatMessageResponse> => {
     const questions = flow.questions ?? [];
     const nextIndex = (flow.index ?? 0) + 1;
-    if (nextIndex >= questions.length) {
+    const { questionResults, nextDifficulty } = completeInterviewQuestion({
+        question: questions[flow.index ?? 0],
+        difficulty: flow.difficulty ?? flow.startingDifficulty ?? "medium",
+        attemptScores: flow.currentAttemptScores ?? [],
+        questionResults: flow.questionResults ?? [],
+    });
+    const isLegacyFlow = flow.startingDifficulty === undefined;
+    if (nextIndex >= QUICK_HELP_INTERVIEW_QUESTION_COUNT || (isLegacyFlow && nextIndex >= questions.length)) {
         return finishInterview(deps, ctx, `${feedback}\n\nNice work — that's the end of this practice set.`);
     }
 
-    const nextQuestion = questions[nextIndex] ?? `Tell me about ${flow.topic ?? "this topic"}.`;
+    const isLegacyQuestionSet = isLegacyFlow && questions[nextIndex] !== undefined;
+    const nextQuestion = isLegacyQuestionSet
+        ? questions[nextIndex] ?? `Tell me about ${flow.topic ?? "this topic"}.`
+        : await generateInterviewQuestion(deps.textCompletion, {
+              topic: flow.questionContext ?? flow.topic ?? "this topic",
+              difficulty: nextDifficulty,
+              previousQuestions: questions,
+              userId: ctx.userId,
+          });
+    const updatedQuestions = isLegacyQuestionSet ? questions : [...questions, nextQuestion];
     await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
         kind: "interview_prep",
         step: "awaiting_answer",
         topic: flow.topic,
-        questions,
+        questions: updatedQuestions,
         index: nextIndex,
         baseTopic: flow.baseTopic,
         deferredFocus: flow.deferredFocus,
-        difficulty: flow.difficulty,
+        difficulty: isLegacyQuestionSet ? flow.difficulty : nextDifficulty,
+        startingDifficulty: flow.startingDifficulty,
+        questionContext: flow.questionContext,
+        questionResults,
+        currentAttemptScores: [],
     });
-    return appendReply(deps, ctx, `${feedback}\n\n${formatQuestionPrompt(nextIndex, questions.length, nextQuestion)}`);
+    return appendReply(
+        deps,
+        ctx,
+        `${feedback}\n\n${formatQuestionPrompt(
+            nextIndex,
+            isLegacyFlow ? questions.length : QUICK_HELP_INTERVIEW_QUESTION_COUNT,
+            nextQuestion
+        )}`
+    );
 };
 
 const uniqueQuestions = (questions: readonly string[]): string[] =>
@@ -143,6 +180,10 @@ const enterTeachingMode = async (
         baseTopic: flow.baseTopic,
         deferredFocus: flow.deferredFocus,
         difficulty: flow.difficulty,
+        startingDifficulty: flow.startingDifficulty,
+        questionContext: flow.questionContext,
+        questionResults: flow.questionResults,
+        currentAttemptScores: flow.currentAttemptScores,
     });
     return appendReply(
         deps,
@@ -157,17 +198,24 @@ const respondToGrade = async (
     flow: InterviewPrepQuickHelpFlow,
     grade: InterviewGradeLlmResult,
     evaluatedQuestion: string,
-    candidateAnswer: string
+    candidateAnswer: string,
+    scoreMode: "append" | "replace" = "append"
 ): Promise<ChatMessageResponse> => {
+    const scoredFlow = {
+        ...flow,
+        currentAttemptScores: updateInterviewAttemptScores(flow.currentAttemptScores ?? [], grade.score, scoreMode),
+    };
     if (grade.outcome === "needs_teaching") {
-        return enterTeachingMode(deps, ctx, flow, grade, evaluatedQuestion);
+        return enterTeachingMode(deps, ctx, scoredFlow, grade, evaluatedQuestion);
     }
 
-    const existingFollowUps = flow.step === "awaiting_follow_up" ? flow.pendingFollowUpQuestions ?? [] : [];
-    const followUpCount = flow.step === "awaiting_follow_up" ? flow.followUpCount ?? 0 : 0;
+    const existingFollowUps = scoredFlow.step === "awaiting_follow_up"
+        ? scoredFlow.pendingFollowUpQuestions ?? []
+        : [];
+    const followUpCount = scoredFlow.step === "awaiting_follow_up" ? scoredFlow.followUpCount ?? 0 : 0;
 
     if (grade.outcome === "correct" && existingFollowUps.length === 0) {
-        return moveToNextMainQuestion(deps, ctx, flow, grade.feedback);
+        return moveToNextMainQuestion(deps, ctx, scoredFlow, grade.feedback);
     }
 
     const generatedFollowUps = grade.outcome === "correct" ? [] : grade.followUpQuestions;
@@ -179,9 +227,9 @@ const respondToGrade = async (
         await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
             kind: "interview_prep",
             step: "awaiting_follow_up",
-            topic: flow.topic,
-            questions: flow.questions,
-            index: flow.index,
+            topic: scoredFlow.topic,
+            questions: scoredFlow.questions,
+            index: scoredFlow.index,
             evaluatedQuestion,
             candidateAnswer,
             lastFeedback: grade.feedback,
@@ -190,15 +238,19 @@ const respondToGrade = async (
             activeFollowUpQuestion: nextFollowUp,
             pendingFollowUpQuestions: pendingFollowUps.slice(1),
             followUpCount: followUpCount + 1,
-            baseTopic: flow.baseTopic,
-            deferredFocus: flow.deferredFocus,
-            difficulty: flow.difficulty,
+            baseTopic: scoredFlow.baseTopic,
+            deferredFocus: scoredFlow.deferredFocus,
+            difficulty: scoredFlow.difficulty,
+            startingDifficulty: scoredFlow.startingDifficulty,
+            questionContext: scoredFlow.questionContext,
+            questionResults: scoredFlow.questionResults,
+            currentAttemptScores: scoredFlow.currentAttemptScores,
         });
         return appendReply(deps, ctx, `${grade.feedback}\n\n${nextFollowUp}`);
     }
 
     const summary = `${grade.feedback}\n\nHere's how I'd shape it into a polished interview answer: ${grade.modelAnswer}\n\nFor the next one, ${grade.improvementTip}`;
-    return moveToNextMainQuestion(deps, ctx, flow, summary);
+    return moveToNextMainQuestion(deps, ctx, scoredFlow, summary);
 };
 
 const startQuestionSet = async (
@@ -212,27 +264,31 @@ const startQuestionSet = async (
         difficulty: InterviewDifficulty;
     }
 ): Promise<ChatMessageResponse> => {
-    const generated = await generateInterviewQuestions(deps.textCompletion, {
-        topic: params.questionContext ?? params.topic,
+    const questionContext = params.questionContext ?? params.topic;
+    const firstQuestion = await generateInterviewQuestion(deps.textCompletion, {
+        topic: questionContext,
         difficulty: params.difficulty,
+        previousQuestions: [],
         userId: ctx.userId,
     });
-    const questions = generated.questions;
-    const firstQuestion = questions[0] ?? `Tell me about your experience with ${params.topic}.`;
     await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
         kind: "interview_prep",
         step: "awaiting_answer",
         topic: params.topic,
-        questions,
+        questions: [firstQuestion],
         index: 0,
         baseTopic: params.baseTopic,
         deferredFocus: params.deferredFocus,
         difficulty: params.difficulty,
+        startingDifficulty: params.difficulty,
+        questionContext,
+        questionResults: [],
+        currentAttemptScores: [],
     });
     return appendReply(
         deps,
         ctx,
-        `Great — we'll practice ${params.topic}.\n\n${formatQuestionPrompt(0, questions.length, firstQuestion)}`
+        `Great — we'll practice ${params.topic}.\n\n${formatQuestionPrompt(0, QUICK_HELP_INTERVIEW_QUESTION_COUNT, firstQuestion)}`
     );
 };
 
@@ -427,7 +483,7 @@ export const runInterviewPrepFlow = async (
             topic: `${savedFocus.title} for ${baseTopic}`,
             questionContext: `${savedFocus.title} for ${baseTopic}. Focus: ${savedFocus.description}`,
             baseTopic,
-            difficulty: activeFlow.difficulty ?? "medium",
+            difficulty: activeFlow.startingDifficulty ?? activeFlow.difficulty ?? "medium",
         });
     }
 
@@ -459,6 +515,10 @@ export const runInterviewPrepFlow = async (
                 baseTopic: activeFlow.baseTopic,
                 deferredFocus: activeFlow.deferredFocus,
                 difficulty: activeFlow.difficulty,
+                startingDifficulty: activeFlow.startingDifficulty,
+                questionContext: activeFlow.questionContext,
+                questionResults: activeFlow.questionResults,
+                currentAttemptScores: activeFlow.currentAttemptScores,
             });
             return appendReply(
                 deps,
@@ -516,14 +576,22 @@ export const runInterviewPrepFlow = async (
             challenge: ctx.normalizedMessage,
             userId: ctx.userId,
         });
+        const reconsideredFlow = {
+            ...activeFlow,
+            currentAttemptScores: updateInterviewAttemptScores(
+                activeFlow.currentAttemptScores ?? [],
+                reconsidered.score,
+                "replace"
+            ),
+        };
 
         if (reconsidered.outcome === "correct") {
-            return moveToNextMainQuestion(deps, ctx, activeFlow, reconsidered.feedback);
+            return moveToNextMainQuestion(deps, ctx, reconsideredFlow, reconsidered.feedback);
         }
 
         if (activeFlow.activeFollowUpQuestion) {
             await deps.conversationService.updateQuickHelpFlow(ctx.userId, ctx.conversationId, {
-                ...activeFlow,
+                ...reconsideredFlow,
                 step: "awaiting_follow_up",
                 lastFeedback: reconsidered.feedback,
                 modelAnswer: reconsidered.modelAnswer,
@@ -536,7 +604,15 @@ export const runInterviewPrepFlow = async (
             );
         }
 
-        return respondToGrade(deps, ctx, activeFlow, reconsidered, evaluatedQuestion, candidateAnswer);
+        return respondToGrade(
+            deps,
+            ctx,
+            activeFlow,
+            reconsidered,
+            evaluatedQuestion,
+            candidateAnswer,
+            "replace"
+        );
     }
 
     const evaluatedQuestion = activeFlow.step === "awaiting_follow_up"
@@ -554,5 +630,8 @@ export const runInterviewPrepFlow = async (
               }
             : undefined,
     });
-    return respondToGrade(deps, ctx, activeFlow, grade, evaluatedQuestion, ctx.normalizedMessage);
+    const effectiveGrade: InterviewGradeLlmResult = isExplicitInterviewKnowledgeGap(ctx.normalizedMessage)
+        ? { ...grade, outcome: "needs_teaching", score: 0, feedback: "", followUpQuestions: [] }
+        : grade;
+    return respondToGrade(deps, ctx, activeFlow, effectiveGrade, evaluatedQuestion, ctx.normalizedMessage);
 };

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import type { ChatFlowDeps, SendMessagePreparedContext } from "../../../chat-flow.types";
 import type { Conversation } from "../../../../routes/conversation/conversation.model";
-import type { SanitizedJob } from "../../../../routes/conversation/job-in-conversation.types";
+import type { ConversationJobContext, SanitizedJob } from "../../../../routes/conversation/job-in-conversation.types";
 import type { ConfidenceSummary } from "../../../stage-1-prepare-context/confidence/confidence.types";
 import {
     CONVERSATION_MODE,
@@ -133,6 +133,7 @@ const buildDeps = (params: {
     completeJson: string;
     appended: string[];
     searchCalled: { value: boolean };
+    savedJobContexts?: ConversationJobContext[];
 }): ChatFlowDeps => {
     globalThis.fetch = (async () =>
         new Response(null, { status: 201 })) as typeof fetch;
@@ -142,7 +143,9 @@ const buildDeps = (params: {
             appendAssistantMessage: async (_userId: string, _conversationId: string, reply: string) => {
                 params.appended.push(reply);
             },
-            saveJobContext: async () => undefined,
+            saveJobContext: async (_userId: string, _conversationId: string, jobContext: ConversationJobContext) => {
+                params.savedJobContexts?.push(jobContext);
+            },
             setSelectedJob: async () => undefined,
             updateDreamJobFlow: async () => undefined,
         } as unknown as ChatFlowDeps["conversationService"],
@@ -411,6 +414,43 @@ describe("checkIfNeededAddToPipeline", () => {
 });
 
 describe("runStage2Shortcuts pipeline ordering", () => {
+    it("ends the chat when the user is done while a pipeline decision is still pending", async () => {
+        const appended: string[] = [];
+        const savedJobContexts: ConversationJobContext[] = [];
+        const searchCalled = { value: false };
+        const deps = buildDeps({
+            completeJson: '{"shouldEndConversation":false}',
+            appended,
+            searchCalled,
+            savedJobContexts,
+        });
+        const conversation = buildConversation({
+            awaitingPipelineDecision: true,
+            jobs: [cellebrite, checkPoint],
+            focus: cellebrite,
+        });
+        conversation.messages = [{
+            role: "assistant",
+            content: "Here are the roles I found. Tell me which one to add to your pipeline.",
+            timestamp: new Date(),
+        }];
+
+        const response = await runStage2Shortcuts(
+            deps,
+            buildCtx(
+                "great thats all",
+                conversation,
+                { shouldSearchJobs: true, mode: CONVERSATION_MODE.NEAR_TERM },
+            ),
+        );
+
+        assert.ok(response);
+        assert.equal(searchCalled.value, false);
+        assert.match(response.reply, /you're all set/i);
+        assert.equal(appended.at(-1), response.reply);
+        assert.equal(savedJobContexts.at(-1)?.jobRecommendationContext?.awaitingPipelineDecision, false);
+    });
+
     it("ends the current chat instead of searching again when the user declines further help", async () => {
         const appended: string[] = [];
         const searchCalled = { value: false };

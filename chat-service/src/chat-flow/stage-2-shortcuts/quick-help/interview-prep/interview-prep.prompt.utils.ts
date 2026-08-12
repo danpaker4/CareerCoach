@@ -1,12 +1,17 @@
+import { isExplicitInterviewKnowledgeGap } from "./interview-prep.utils";
+
 export const buildInterviewQuestionsPrompt = (params: {
     topic: string;
-    count: number;
     difficulty: string;
-}): string => `Create ${params.count} interview practice questions about: ${params.topic}
+    previousQuestions: readonly string[];
+}): string => `Create 1 interview practice question about: ${params.topic}
 
 Difficulty: ${params.difficulty}
+Previous questions:
+${params.previousQuestions.length > 0 ? params.previousQuestions.map((question) => `- ${question}`).join("\n") : "None"}
 
 Rules:
+- The new question must not repeat or closely paraphrase a previous question.
 - Treat the requested topic as a hard content boundary. Do not introduce roles, technologies, skills, or adjacent subjects outside it.
 - Questions must be theoretical / conceptual (definitions, tradeoffs, when to use X, how concepts relate).
 - Sound like a friendly interviewer speaking naturally, not a test generator.
@@ -17,7 +22,7 @@ Rules:
 
 Return ONLY JSON:
 {
-  "questions": ["question1", "question2"]
+  "questions": ["question1"]
 }
 
 No spoilers or answer keys in the questions.`;
@@ -104,7 +109,16 @@ export const buildInterviewGradePrompt = (params: {
         previousCandidateAnswer: string;
         previousFeedback: string;
     };
-}): string => `You are a warm, attentive interview coach responding naturally to a spoken conceptual answer.
+}): string => {
+    const knowledgeGapDetected = isExplicitInterviewKnowledgeGap(params.answer);
+    const exampleOutcome = knowledgeGapDetected ? "needs_teaching" : "partially_correct";
+    const exampleScore = knowledgeGapDetected ? 0 : 65;
+    const exampleFeedback = knowledgeGapDetected
+        ? ""
+        : "You explained X clearly. To complete the answer, connect it to Y as well.";
+    const exampleFollowUpQuestions = knowledgeGapDetected ? "[]" : '["Short question about Y?"]';
+
+    return `You are a warm, attentive interview coach responding naturally to a spoken conceptual answer.
 
 Topic: ${params.topic}
 Question: ${params.question}
@@ -112,8 +126,14 @@ Candidate answer: ${params.answer}
 ${params.coachingContext ? `Coaching phase: The candidate is responding to a focused follow-up about a gap in their earlier answer.
 Previous candidate answer: ${params.coachingContext.previousCandidateAnswer}
 Previous feedback: ${params.coachingContext.previousFeedback}` : "Coaching phase: The candidate is answering a main interview question."}
+${knowledgeGapDetected ? `
+Non-negotiable instruction: An explicit knowledge gap has already been detected in the candidate's answer.
+- The outcome must be "needs_teaching".
+- Do not praise the answer or claim the candidate provided an idea, example, or explanation.
+- Return empty feedback and no follow-up questions. Provide the teaching explanation, example, and understanding check instead.` : ""}
 
 Grading rules:
+- Return a numeric score from 0 to 100 using these enforced bands: "correct" is 80-100, "partially_correct" is 50-79, "incorrect" is 1-49, and "needs_teaching" always has score 0.
 - React to the candidate's actual idea before grading it. Treat clear paraphrases and relevant real-world examples as evidence of understanding, even when the wording is informal or imperfect.
 - Use "needs_teaching" when the candidate says they do not know, asks what the concept means, or clearly lacks the foundational concept needed to answer.
 - During a focused follow-up, interpret short replies in the context of the previous answer and feedback. If the candidate cannot provide the missing information or declines because they do not know it, use "needs_teaching" and teach that specific gap.
@@ -131,15 +151,17 @@ Grading rules:
 
 Return ONLY JSON:
 {
-  "outcome": "partially_correct",
-  "feedback": "Your scaling example is right on target. To make the answer complete, connect it to Y as well.",
-  "followUpQuestions": ["Short question about Y?"],
+  "outcome": "${exampleOutcome}",
+  "score": ${exampleScore},
+  "feedback": "${exampleFeedback}",
+  "followUpQuestions": ${exampleFollowUpQuestions},
   "modelAnswer": "A strong answer would briefly cover X and Y.",
   "improvementTip": "State the tradeoff explicitly.",
   "teachingExplanation": "A simple explanation used only for needs_teaching.",
   "teachingExample": "A short real-world example used only for needs_teaching.",
   "understandingCheck": "One tiny question that checks the concept."
 }`;
+};
 
 export const buildInterviewReconsiderationPrompt = (params: {
     topic: string;
@@ -158,10 +180,12 @@ Candidate's challenge: ${params.challenge}
 Re-read the original answer fairly. Treat clear paraphrases and relevant real-world examples as evidence of understanding. If the previous grade overlooked a correct point, acknowledge the mistake and apologize briefly. Otherwise, clearly distinguish what the candidate said from the specific missing or incorrect part. Keep feedback warm, natural, and under 3 short sentences. Do not use canned transitions such as "I see what you're getting at", "that's a good start, but", or "let me clarify".
 
 Use "correct", "partially_correct", "incorrect", or "needs_teaching". Return up to 3 short verbal follow-up questions for remaining gaps. Never request code, pseudocode, drawings, or diagrams. Include a concise model answer and one improvement tip.
+Return a numeric score from 0 to 100 using these enforced bands: "correct" is 80-100, "partially_correct" is 50-79, "incorrect" is 1-49, and "needs_teaching" always has score 0.
 
 Return ONLY JSON:
 {
   "outcome": "partially_correct",
+  "score": 65,
   "feedback": "You were right about X; I should have acknowledged that. The missing part is Y.",
   "followUpQuestions": ["Short question about Y?"],
   "modelAnswer": "A strong answer would briefly cover X and Y.",

@@ -175,6 +175,53 @@ describe("runInterviewPrepFlow", () => {
         assert.equal(replies.at(-1), response.reply);
     });
 
+    it("replaces the challenged attempt score instead of counting it twice", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [
+                JSON.stringify({
+                    outcome: "correct",
+                    score: 90,
+                    feedback: "You were right; I overlooked that part.",
+                    followUpQuestions: [],
+                }),
+                JSON.stringify({ questions: ["What is another important QA automation principle?"] }),
+            ],
+        });
+
+        await runInterviewPrepFlow(
+            deps,
+            buildContext("that's what I said", {
+                kind: "interview_prep",
+                step: "awaiting_follow_up",
+                topic: "QA automation",
+                questionContext: "QA automation",
+                questions: ["What makes an automated test reliable?"],
+                index: 0,
+                difficulty: "medium",
+                startingDifficulty: "medium",
+                currentAttemptScores: [30],
+                questionResults: [],
+                evaluatedQuestion: "What makes an automated test reliable?",
+                candidateAnswer: "It is deterministic and isolated.",
+                lastFeedback: "You did not mention isolation.",
+                activeFollowUpQuestion: "How does isolation improve reliability?",
+                pendingFollowUpQuestions: [],
+                followUpCount: 1,
+            }),
+            false
+        );
+
+        assert.deepEqual(flowUpdates.at(-1)?.questionResults?.[0]?.attemptScores, [90]);
+        assert.equal(flowUpdates.at(-1)?.questionResults?.[0]?.score, 90);
+        assert.equal(flowUpdates.at(-1)?.difficulty, "hard");
+    });
+
     it("uses the LLM to generate two explained options for a broad interview request", async () => {
         const completionPrompts: string[] = [];
         const replies: string[] = [];
@@ -341,6 +388,115 @@ describe("runInterviewPrepFlow", () => {
         assert.doesNotMatch(completionPrompts[0] ?? "", /1\.5 years/i);
         assert.match(completionPrompts[1] ?? "", /Difficulty: easy/i);
         assert.match(response.reply, /What makes an automated test reliable/i);
+        assert.equal(flowUpdates.at(-1)?.difficulty, "easy");
+        assert.equal(flowUpdates.at(-1)?.startingDifficulty, "easy");
+        assert.deepEqual(flowUpdates.at(-1)?.questionResults, []);
+    });
+
+    it("averages attempts for one question and uses the session average for the next difficulty", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [
+                JSON.stringify({
+                    outcome: "correct",
+                    score: 80,
+                    feedback: "That completes the missing part.",
+                    followUpQuestions: [],
+                }),
+                JSON.stringify({ questions: ["How do you choose valuable automation coverage?"] }),
+            ],
+        });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext("It should cover the highest product risks first.", {
+                kind: "interview_prep",
+                step: "awaiting_follow_up",
+                topic: "QA automation",
+                questionContext: "QA automation",
+                questions: ["What makes an automation strategy effective?"],
+                index: 0,
+                difficulty: "easy",
+                startingDifficulty: "medium",
+                currentAttemptScores: [30],
+                questionResults: [],
+                evaluatedQuestion: "What makes an automation strategy effective?",
+                candidateAnswer: "Automate everything.",
+                lastFeedback: "Connect coverage to risk.",
+                activeFollowUpQuestion: "How would you prioritize coverage?",
+                pendingFollowUpQuestions: [],
+                followUpCount: 1,
+            }),
+            false
+        );
+
+        assert.match(completionPrompts[1] ?? "", /Difficulty: medium/i);
+        assert.match(completionPrompts[1] ?? "", /What makes an automation strategy effective/i);
+        assert.match(response.reply, /Question 2\/5/i);
+        assert.deepEqual(flowUpdates.at(-1)?.questionResults?.[0]?.attemptScores, [30, 80]);
+        assert.equal(flowUpdates.at(-1)?.questionResults?.[0]?.score, 55);
+        assert.equal(flowUpdates.at(-1)?.difficulty, "medium");
+    });
+
+    it("makes the fifth question easy after four failed questions", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const previousQuestions = ["Question one?", "Question two?", "Question three?", "Question four?"];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [
+                JSON.stringify({
+                    outcome: "incorrect",
+                    score: 25,
+                    feedback: "That misses the core idea.",
+                    followUpQuestions: [],
+                    modelAnswer: "A concise model answer.",
+                    improvementTip: "State the core idea first.",
+                }),
+                JSON.stringify({ questions: ["What is a flaky test?"] }),
+            ],
+        });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext("I still don't know.", {
+                kind: "interview_prep",
+                step: "awaiting_follow_up",
+                topic: "QA automation",
+                questionContext: "QA automation",
+                questions: previousQuestions,
+                index: 3,
+                difficulty: "easy",
+                startingDifficulty: "hard",
+                currentAttemptScores: [25],
+                questionResults: previousQuestions.slice(0, 3).map((question) => ({
+                    question,
+                    difficulty: "easy",
+                    attemptScores: [25],
+                    score: 25,
+                })),
+                evaluatedQuestion: previousQuestions[3],
+                candidateAnswer: "I don't know.",
+                lastFeedback: "The answer is missing.",
+                activeFollowUpQuestion: "What would you add?",
+                pendingFollowUpQuestions: [],
+                followUpCount: 3,
+            }),
+            false
+        );
+
+        assert.match(completionPrompts[1] ?? "", /Difficulty: easy/i);
+        previousQuestions.forEach((question) => assert.match(completionPrompts[1] ?? "", new RegExp(question)));
+        assert.match(response.reply, /Question 5\/5: What is a flaky test/i);
+        assert.equal(flowUpdates.at(-1)?.questionResults?.length, 4);
         assert.equal(flowUpdates.at(-1)?.difficulty, "easy");
     });
 
@@ -696,6 +852,15 @@ describe("runInterviewPrepFlow", () => {
                 step: "awaiting_saved_focus",
                 topic: "API testing for QA automation",
                 baseTopic: "QA automation",
+                difficulty: "easy",
+                startingDifficulty: "hard",
+                questionResults: [{
+                    question: "How would you test an API contract?",
+                    difficulty: "easy",
+                    attemptScores: [25],
+                    score: 25,
+                }],
+                currentAttemptScores: [25],
                 deferredFocus: {
                     id: "option-2",
                     title: "UI reliability",
@@ -709,6 +874,10 @@ describe("runInterviewPrepFlow", () => {
         assert.match(response.reply, /UI reliability for QA automation/i);
         assert.match(response.reply, /How do you avoid brittle UI selectors/i);
         assert.equal(flowUpdates.at(-1)?.deferredFocus, undefined);
+        assert.equal(flowUpdates.at(-1)?.difficulty, "hard");
+        assert.equal(flowUpdates.at(-1)?.startingDifficulty, "hard");
+        assert.deepEqual(flowUpdates.at(-1)?.questionResults, []);
+        assert.deepEqual(flowUpdates.at(-1)?.currentAttemptScores, []);
     });
 
     it("queues multiple gaps and asks only one focused follow-up at a time", async () => {
@@ -833,6 +1002,46 @@ describe("runInterviewPrepFlow", () => {
         assert.equal(flowUpdates.at(-1)?.step, "awaiting_teaching_check");
     });
 
+    it("enters teaching mode when the candidate does not know even if the LLM misclassifies the answer", async () => {
+        const completionPrompts: string[] = [];
+        const replies: string[] = [];
+        const flowUpdates: Array<InterviewPrepQuickHelpFlow | undefined> = [];
+        const deps = buildDeps({
+            completionPrompts,
+            replies,
+            flowUpdates,
+            completionResponses: [JSON.stringify({
+                outcome: "partially_correct",
+                feedback: "I think you're on the right track, but let's explore this further.",
+                followUpQuestions: ["How do these strategies affect the problem-solving process?"],
+                teachingExplanation: "Top-down starts with the whole problem, while bottom-up starts with smaller pieces.",
+                teachingExample: "You can design an app's architecture first or compose it from tested utilities.",
+                understandingCheck: "Which approach starts with the overall system?",
+                modelAnswer: "Top-down decomposes a whole, while bottom-up composes smaller parts.",
+                improvementTip: "Contrast where each approach begins.",
+            })],
+        });
+
+        const response = await runInterviewPrepFlow(
+            deps,
+            buildContext("i dont know that", {
+                kind: "interview_prep",
+                step: "awaiting_answer",
+                topic: "Problem-Solving Strategies for software engineer",
+                questions: [
+                    "Can you explain the difference between top-down and bottom-up problem-solving approaches, and when would you use each?",
+                ],
+                index: 0,
+            }),
+            false
+        );
+
+        assert.doesNotMatch(response.reply, /right track/i);
+        assert.match(response.reply, /top-down starts with the whole problem/i);
+        assert.match(response.reply, /which approach starts with the overall system/i);
+        assert.equal(flowUpdates.at(-1)?.step, "awaiting_teaching_check");
+    });
+
     it("gives the LLM enough context to teach when the candidate says no to a missing-detail follow-up", async () => {
         const completionPrompts: string[] = [];
         const replies: string[] = [];
@@ -939,13 +1148,17 @@ describe("runInterviewPrepFlow", () => {
 
         const response = await runInterviewPrepFlow(
             deps,
-            buildContext("It is a test that changes result even though the code stayed the same.", teachingFlow),
+            buildContext("It is a test that changes result even though the code stayed the same.", {
+                ...teachingFlow,
+                currentAttemptScores: [0],
+            }),
             false
         );
 
         assert.match(response.reply, /now try the interview question again/i);
         assert.match(response.reply, /what is a flaky test/i);
         assert.equal(flowUpdates.at(-1)?.step, "awaiting_answer");
+        assert.deepEqual(flowUpdates.at(-1)?.currentAttemptScores, [0]);
     });
 
     it("shares a polished answer conversationally after two unsuccessful teaching attempts", async () => {

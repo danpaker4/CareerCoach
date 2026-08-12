@@ -4,6 +4,7 @@ import type { ConversationJobContext } from "./job-in-conversation.types";
 import type {
     InterviewDifficulty,
     InterviewFocusOption,
+    InterviewQuestionResult,
 } from "../../chat-flow/stage-2-shortcuts/quick-help/interview-prep/interview-prep.types";
 
 export type ConversationStage = {
@@ -107,6 +108,10 @@ export type InterviewPrepQuickHelpFlow = {
     focusOptions?: [InterviewFocusOption, InterviewFocusOption];
     deferredFocus?: InterviewFocusOption;
     difficulty?: InterviewDifficulty;
+    startingDifficulty?: InterviewDifficulty;
+    questionContext?: string;
+    questionResults?: InterviewQuestionResult[];
+    currentAttemptScores?: number[];
 };
 
 export type QuickHelpFlow = SkillsGapQuickHelpFlow | CvImproveQuickHelpFlow | InterviewPrepQuickHelpFlow;

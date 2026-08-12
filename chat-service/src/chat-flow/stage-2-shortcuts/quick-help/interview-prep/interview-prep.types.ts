@@ -1,8 +1,16 @@
-export type InterviewQuestionsLlmResult = {
-    questions: string[];
+export type InterviewDifficulty = "easy" | "medium" | "hard";
+
+export type InterviewQuestionResult = {
+    question: string;
+    difficulty: InterviewDifficulty;
+    attemptScores: number[];
+    score: number;
 };
 
-export type InterviewDifficulty = "easy" | "medium" | "hard";
+export type InterviewProgressUpdate = {
+    questionResults: InterviewQuestionResult[];
+    nextDifficulty: InterviewDifficulty;
+};
 
 export type InterviewFocusOption = {
     id: string;
@@ -25,6 +33,7 @@ export type InterviewGradeOutcome = "correct" | "partially_correct" | "incorrect
 
 export type InterviewGradeLlmResult = {
     outcome: InterviewGradeOutcome;
+    score: number;
     feedback: string;
     followUpQuestions: string[];
     modelAnswer: string;

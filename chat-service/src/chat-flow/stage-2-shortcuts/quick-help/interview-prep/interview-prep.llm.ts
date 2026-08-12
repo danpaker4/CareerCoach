@@ -2,7 +2,6 @@ import type { TextCompletionPort } from "../../../../litellm/text-completion/tex
 import { parseJsonObjectFromLlm } from "../../../shared/llm/json-response.utils";
 import {
     QUICK_HELP_INTERVIEW_PLAN_ATTEMPTS,
-    QUICK_HELP_INTERVIEW_QUESTION_COUNT,
     QUICK_HELP_INTERVIEW_QUESTION_MAX_CHARS,
 } from "./interview-prep.consts";
 import {
@@ -18,12 +17,13 @@ import type {
     InterviewFocusOption,
     InterviewFocusSelectionLlmResult,
     InterviewGradeLlmResult,
-    InterviewQuestionsLlmResult,
+    InterviewDifficulty,
     InterviewTeachingLlmResult,
     InterviewTopicPlanLlmResult,
 } from "./interview-prep.types";
 import {
     compactInterviewText,
+    getFallbackInterviewQuestions,
     isAllowedSpokenInterviewQuestion,
     parseInterviewFocusSelection,
     parseInterviewGradeResult,
@@ -81,20 +81,21 @@ export const selectInterviewFocus = async (
     return parseInterviewFocusSelection(parseJsonObjectFromLlm(raw), params.options);
 };
 
-export const generateInterviewQuestions = async (
+export const generateInterviewQuestion = async (
     textCompletion: TextCompletionPort,
-    params: { topic: string; difficulty: string; userId: string }
-): Promise<InterviewQuestionsLlmResult> => {
+    params: { topic: string; difficulty: InterviewDifficulty; previousQuestions: readonly string[]; userId: string }
+): Promise<string> => {
     const raw = await textCompletion.complete(
         buildInterviewQuestionsPrompt({
             topic: params.topic,
-            count: QUICK_HELP_INTERVIEW_QUESTION_COUNT,
             difficulty: params.difficulty,
+            previousQuestions: params.previousQuestions,
         }),
         { operation: "chat.quick_help.interview_questions", userId: params.userId, responseFormat: "json" }
     );
     const parsed = parseJsonObjectFromLlm(raw);
-    const generatedQuestions = Array.isArray(parsed?.questions)
+    const previousQuestions = new Set(params.previousQuestions.map((question) => question.trim().toLowerCase()));
+    const generatedQuestion = Array.isArray(parsed?.questions)
         ? parsed.questions
               .filter(
                   (item): item is string =>
@@ -103,16 +104,13 @@ export const generateInterviewQuestions = async (
                       isAllowedSpokenInterviewQuestion(item)
               )
               .map((item) => compactInterviewText(item, QUICK_HELP_INTERVIEW_QUESTION_MAX_CHARS, 1))
-              .slice(0, QUICK_HELP_INTERVIEW_QUESTION_COUNT)
-        : [];
-    const fallbackQuestions = [
-        `What is ${params.topic}, in simple terms?`,
-        `When would you choose ${params.topic} over a common alternative, and why?`,
-        `What are two important tradeoffs or limitations related to ${params.topic}?`,
-        `How would you explain a core concept in ${params.topic} to a non-technical interviewer?`,
-        `What misconception do people often have about ${params.topic}?`,
-    ];
-    return { questions: [...generatedQuestions, ...fallbackQuestions].slice(0, QUICK_HELP_INTERVIEW_QUESTION_COUNT) };
+              .find((question) => !previousQuestions.has(question.toLowerCase()))
+        : undefined;
+    if (generatedQuestion) return generatedQuestion;
+
+    return getFallbackInterviewQuestions(params.topic, params.difficulty)
+        .find((question) => !previousQuestions.has(question.toLowerCase()))
+        ?? `What else is important to understand about ${params.topic}?`;
 };
 
 export const gradeInterviewAnswer = async (

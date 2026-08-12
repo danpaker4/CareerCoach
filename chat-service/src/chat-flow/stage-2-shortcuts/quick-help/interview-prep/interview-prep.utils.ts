@@ -4,6 +4,8 @@ import type {
     InterviewFocusSelectionLlmResult,
     InterviewGradeLlmResult,
     InterviewGradeOutcome,
+    InterviewProgressUpdate,
+    InterviewQuestionResult,
     InterviewTeachingLlmResult,
     InterviewTeachingStatus,
     InterviewTopicPlanLlmResult,
@@ -11,8 +13,11 @@ import type {
 import type { RoleExperienceEntry } from "../../../../routes/external-chat-tools/role-experience.types";
 import {
     QUICK_HELP_INTERVIEW_FEEDBACK_MAX_CHARS,
+    QUICK_HELP_INTERVIEW_HARD_SCORE_MIN,
+    QUICK_HELP_INTERVIEW_MEDIUM_SCORE_MIN,
     QUICK_HELP_INTERVIEW_MODEL_ANSWER_MAX_CHARS,
     QUICK_HELP_INTERVIEW_QUESTION_MAX_CHARS,
+    QUICK_HELP_INTERVIEW_SCORE_BANDS,
     QUICK_HELP_INTERVIEW_TIP_MAX_CHARS,
 } from "./interview-prep.consts";
 
@@ -47,6 +52,11 @@ export const isInterviewFeedbackChallenge = (message: string): boolean =>
 export const isLegacyInterviewAcknowledgement = (message: string): boolean =>
     /^(got it|i understand|makes sense|okay|ok|clear|thanks)[.!]?$/i.test(message.trim());
 
+export const isExplicitInterviewKnowledgeGap = (message: string): boolean =>
+    /^(?:i\s+)?(?:don'?t|do not)\s+know(?:\s+(?:that|this|it|the answer|what (?:that|this|it) is))?[.!]?$/i.test(
+        message.trim()
+    ) || /^(?:i\s+have\s+)?no idea[.!]?$/i.test(message.trim()) || /^idk[.!]?$/i.test(message.trim());
+
 export const extractInterviewTopicCorrection = (message: string): string | undefined => {
     const correction = message.match(/\bi\s+(?:said|asked\s+for)\s+(.+?)(?:[,.;]?\s+(?:not|instead\s+of)\b|$)/i)?.[1]
         ?? message.match(/\bi\s+want(?:ed)?\s+(.+?)\s+(?:not|instead\s+of)\b/i)?.[1];
@@ -76,6 +86,85 @@ export const mapInterviewYearsToDifficulty = (years: number): InterviewDifficult
     if (years < 2) return "easy";
     if (years > 10) return "hard";
     return "medium";
+};
+
+export const normalizeInterviewScore = (outcome: InterviewGradeOutcome, score: unknown): number => {
+    const band = QUICK_HELP_INTERVIEW_SCORE_BANDS[outcome];
+    if (typeof score !== "number" || !Number.isFinite(score) || score < band.min || score > band.max) {
+        return band.fallback;
+    }
+    return score;
+};
+
+export const calculateInterviewAverage = (scores: readonly number[]): number => {
+    if (scores.length === 0) return 0;
+    return scores.reduce((total, score) => total + score, 0) / scores.length;
+};
+
+export const difficultyForInterviewAverage = (average: number): InterviewDifficulty => {
+    if (average < QUICK_HELP_INTERVIEW_MEDIUM_SCORE_MIN) return "easy";
+    if (average < QUICK_HELP_INTERVIEW_HARD_SCORE_MIN) return "medium";
+    return "hard";
+};
+
+export const updateInterviewAttemptScores = (
+    currentAttemptScores: readonly number[],
+    score: number,
+    mode: "append" | "replace"
+): number[] => {
+    if (mode === "replace" && currentAttemptScores.length > 0) {
+        return [...currentAttemptScores.slice(0, -1), score];
+    }
+    return [...currentAttemptScores, score];
+};
+
+export const completeInterviewQuestion = (params: {
+    question: string | undefined;
+    difficulty: InterviewDifficulty;
+    attemptScores: readonly number[];
+    questionResults: readonly InterviewQuestionResult[];
+}): InterviewProgressUpdate => {
+    if (!params.question || params.attemptScores.length === 0) {
+        return { questionResults: [...params.questionResults], nextDifficulty: params.difficulty };
+    }
+
+    const result: InterviewQuestionResult = {
+        question: params.question,
+        difficulty: params.difficulty,
+        attemptScores: [...params.attemptScores],
+        score: calculateInterviewAverage(params.attemptScores),
+    };
+    const questionResults = [...params.questionResults, result];
+    const sessionAverage = calculateInterviewAverage(questionResults.map((questionResult) => questionResult.score));
+    return { questionResults, nextDifficulty: difficultyForInterviewAverage(sessionAverage) };
+};
+
+export const getFallbackInterviewQuestions = (topic: string, difficulty: InterviewDifficulty): string[] => {
+    if (difficulty === "easy") {
+        return [
+            `What is ${topic}, in simple terms?`,
+            `Why is ${topic} useful?`,
+            `What is one common concept in ${topic}?`,
+            `When would you use ${topic}?`,
+            `What is one common mistake related to ${topic}?`,
+        ];
+    }
+    if (difficulty === "hard") {
+        return [
+            `What are the most important tradeoffs in a complex use of ${topic}?`,
+            `How would you evaluate competing approaches within ${topic}?`,
+            `What subtle failure modes should an expert consider in ${topic}?`,
+            `How do constraints change the best approach to ${topic}?`,
+            `What advanced misconception about ${topic} causes poor decisions?`,
+        ];
+    }
+    return [
+        `When would you choose ${topic} over a common alternative, and why?`,
+        `What are two important tradeoffs or limitations related to ${topic}?`,
+        `How do the core concepts in ${topic} relate to each other?`,
+        `How would you explain a practical decision involving ${topic}?`,
+        `What misconception do people often have about ${topic}?`,
+    ];
 };
 
 export const parseInterviewExperienceYears = (message: string): number | undefined => {
@@ -194,9 +283,11 @@ export const parseInterviewGradeResult = (parsed: Record<string, unknown> | null
     const understandingCheck = typeof parsed?.understandingCheck === "string" && parsed.understandingCheck.trim().length > 0
         ? compactInterviewText(parsed.understandingCheck, QUICK_HELP_INTERVIEW_QUESTION_MAX_CHARS, 1)
         : "How would you describe the core idea in your own words?";
+    const score = normalizeInterviewScore(outcome, parsed?.score);
 
     return {
         outcome,
+        score,
         feedback,
         followUpQuestions,
         modelAnswer,

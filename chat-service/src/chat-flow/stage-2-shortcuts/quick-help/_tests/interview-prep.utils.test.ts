@@ -1,12 +1,33 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+    calculateInterviewAverage,
+    difficultyForInterviewAverage,
     mapInterviewYearsToDifficulty,
+    normalizeInterviewScore,
     parseInterviewExperienceYears,
     resolveInterviewDifficulty,
 } from "../interview-prep/interview-prep.utils";
 
 describe("interview prep difficulty", () => {
+    it("enforces score bands and safe fallbacks", () => {
+        assert.equal(normalizeInterviewScore("correct", 95), 95);
+        assert.equal(normalizeInterviewScore("correct", 20), 90);
+        assert.equal(normalizeInterviewScore("partially_correct", 65), 65);
+        assert.equal(normalizeInterviewScore("partially_correct", undefined), 65);
+        assert.equal(normalizeInterviewScore("incorrect", 30), 30);
+        assert.equal(normalizeInterviewScore("incorrect", 80), 25);
+        assert.equal(normalizeInterviewScore("needs_teaching", 100), 0);
+    });
+
+    it("averages attempts and maps the running average to difficulty", () => {
+        assert.equal(calculateInterviewAverage([30, 80]), 55);
+        assert.equal(difficultyForInterviewAverage(49), "easy");
+        assert.equal(difficultyForInterviewAverage(50), "medium");
+        assert.equal(difficultyForInterviewAverage(79), "medium");
+        assert.equal(difficultyForInterviewAverage(80), "hard");
+    });
+
     it("maps the agreed experience boundaries", () => {
         assert.equal(mapInterviewYearsToDifficulty(1.5), "easy");
         assert.equal(mapInterviewYearsToDifficulty(2), "medium");
