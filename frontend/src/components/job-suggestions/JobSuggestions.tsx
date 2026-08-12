@@ -6,6 +6,7 @@ import iconArrowRight from '../../assets/icon-arrow-right.svg';
 import iconPlus from '../../assets/icon-plus.svg';
 import iconMinus from '../../assets/icon-minus.svg';
 import iconX from '../../assets/icon-x.svg';
+import { ExpandableJobDescription } from '../job-description/ExpandableJobDescription';
 import { UploadJobModal } from './UploadJobModal';
 import { JobSuggestionsSkeleton } from './JobSuggestionsSkeleton';
 import { JOB_SEARCH_DEBOUNCE_MS, JOBS_PREFETCH_ROOT_MARGIN } from './job-suggestions.consts';
@@ -342,6 +343,8 @@ export const JobSuggestions = ({ user }: JobSuggestionsProps) => {
                           <span className="badge badge-blue job-seniority">{job.seniority}</span>
                         </div>
                       </div>
+
+                      <ExpandableJobDescription description={job.description} />
 
                       {firstTwo.length > 0 && (
                         <div className="job-reqs">

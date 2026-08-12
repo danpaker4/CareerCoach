@@ -4,6 +4,7 @@ import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import { getStoredAccessToken } from '../../lib/authSession';
 import { normalizeUser } from '../../lib/authResponse';
+import { ChatJobCard } from './ChatJobCard';
 import type {
     ChatInterfaceHandle,
     ChatProps,
@@ -203,6 +204,7 @@ const extractJobCards = (data: ChatResponse): Message['jobs'] =>
         title: job.title,
         company: job.company,
         seniority: job.seniority,
+        description: job.description,
         location: job.location,
         url: job.url && job.url.trim().length > 0 ? job.url : null,
     }));
@@ -487,6 +489,7 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
                         title: job.jobTitle,
                         company: job.company ?? '',
                         seniority: job.seniority ?? '',
+                        description: job.description ?? '',
                         location: null,
                         url: job.url && job.url.trim().length > 0 ? job.url : null,
                     }));
@@ -640,29 +643,7 @@ export const ChatInterface = forwardRef<ChatInterfaceHandle, ChatProps>(({
                         <div className="message-bubble">{msg.content}</div>
                         {msg.jobs && msg.jobs.length > 0 && (
                             <div className="chat-job-cards">
-                                {msg.jobs.map((job, index) => (
-                                    <div key={job.id} className="chat-job-card">
-                                        <span className="chat-job-card__index">{index + 1}</span>
-                                        <div className="chat-job-card__body">
-                                            <div className="chat-job-card__title">{job.title}</div>
-                                            <div className="chat-job-card__company">{job.company}</div>
-                                            <div className="chat-job-card__meta">
-                                                {job.seniority && <span className="chat-job-card__chip">{job.seniority}</span>}
-                                                {job.location && <span className="chat-job-card__loc">{job.location}</span>}
-                                                {job.url && (
-                                                    <a
-                                                        className="chat-job-card__link"
-                                                        href={job.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        View job
-                                                    </a>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                {msg.jobs.map((job, index) => <ChatJobCard key={job.id} job={job} index={index} />)}
                             </div>
                         )}
                     </div>

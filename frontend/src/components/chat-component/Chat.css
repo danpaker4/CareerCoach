@@ -66,6 +66,11 @@
   justify-content: center;
 }
 
+.chat-job-card__body {
+  min-width: 0;
+  flex: 1;
+}
+
 .chat-job-card__title {
   font-weight: 600;
   color: var(--text-heading);

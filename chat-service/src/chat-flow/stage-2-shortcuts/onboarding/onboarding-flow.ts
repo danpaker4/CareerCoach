@@ -15,7 +15,9 @@ import { buildOnboardingPrompt } from "./onboarding.prompt.utils";
 import { parseOnboardingLlmDecisionFromJson } from "./onboarding.llm.utils";
 import { applyOnboardingDecision } from "./onboarding.state.utils";
 import { ONBOARDING_PARSE_FALLBACK_REPLY } from "./onboarding.types";
+import type { OnboardingLlmDecision } from "./onboarding.types";
 import { recordChatLlmParseEvent } from "../../shared/llm/chat.llm.observability.utils";
+import { resolveTargetRoleDecision } from "./onboarding.target-role.service";
 
 const completeBackgroundAndTimelineStages = (completedStageIds: readonly string[]): string[] => {
     const next = new Set(completedStageIds);
@@ -30,14 +32,18 @@ const buildModeDetectionForHandoff = (
 ): ConversationModeDetectionResult => {
     const mode = onboardingFlow.initialMode ?? "GUIDED";
     if (mode === "NEAR_TERM") {
-        const searchQuery = onboardingFlow.background?.role?.trim()
+        const searchQuery = onboardingFlow.nearTermTarget?.searchQuery?.trim()
+            || onboardingFlow.nearTermTarget?.targetRole?.trim()
+            || (onboardingFlow.completed && !onboardingFlow.nearTermTarget
+                ? onboardingFlow.background?.role?.trim()
+                : undefined)
             || extractNearTermSearchQuery(latestUserMessage)
             || undefined;
         return {
             ...DEFAULT_MODE_DETECTION_RESULT,
             mode: CONVERSATION_MODE.NEAR_TERM,
-            isReady: true,
-            readinessScore: 100,
+            isReady: Boolean(searchQuery),
+            readinessScore: searchQuery ? 100 : 0,
             shouldSearchJobs: Boolean(searchQuery),
             searchQuery,
             missingInformation: searchQuery ? [] : ["target role"],
@@ -90,19 +96,17 @@ const persistOnboardingProgress = async (
     );
 };
 
-export const runOnboardingFlow = async (
+const resolveGeneralOnboardingDecision = async (
     deps: ChatFlowDeps,
     ctx: SendMessageBaseContext,
-): Promise<ChatMessageResponse> => {
-    const currentFlow = ctx.conversationAfterUserMessage.onboardingFlow ?? defaultOnboardingFlow();
+    currentFlow: OnboardingFlow,
+): Promise<OnboardingLlmDecision> => {
     const prompt = buildOnboardingPrompt(
         ctx.conversationAfterUserMessage,
         ctx.normalizedMessage,
         ctx.userAccountContext,
         currentFlow,
     );
-
-    let decision;
     try {
         const rawText = await deps.textCompletion.complete(prompt, {
             operation: "chat.onboarding",
@@ -111,7 +115,7 @@ export const runOnboardingFlow = async (
             feature: "chat",
             responseFormat: "json",
         });
-        decision = parseOnboardingLlmDecisionFromJson(rawText);
+        const decision = parseOnboardingLlmDecisionFromJson(rawText);
         recordChatLlmParseEvent(deps.llmObserver, {
             operation: "chat.onboarding",
             rawText,
@@ -119,6 +123,7 @@ export const runOnboardingFlow = async (
             userId: ctx.userId,
             sessionId: ctx.conversationId,
         });
+        return decision;
     } catch (error: unknown) {
         recordChatLlmParseEvent(deps.llmObserver, {
             operation: "chat.onboarding",
@@ -127,20 +132,83 @@ export const runOnboardingFlow = async (
             userId: ctx.userId,
             sessionId: ctx.conversationId,
         }, error);
-        decision = {
+        return {
             response: currentFlow.backgroundResolved
                 ? ONBOARDING_PARSE_FALLBACK_REPLY
                 : "Before we continue, I'd like to understand your starting point. Can you tell me about your work experience, studies, projects, or technical background?",
-            background: currentFlow.background ?? { status: "UNKNOWN" as const },
+            background: currentFlow.background ?? { status: "UNKNOWN" },
             mode: null,
             advance: false,
         };
     }
+};
+
+const resolveOnboardingDecision = async (
+    deps: ChatFlowDeps,
+    ctx: SendMessageBaseContext,
+    currentFlow: OnboardingFlow,
+): Promise<OnboardingLlmDecision> => {
+    if (currentFlow.nearTermTarget?.step !== "discovering_target") {
+        return await resolveGeneralOnboardingDecision(deps, ctx, currentFlow);
+    }
+
+    const targetDecision = await resolveTargetRoleDecision({
+        textCompletion: deps.textCompletion,
+        conversation: ctx.conversationAfterUserMessage,
+        latestUserMessage: ctx.normalizedMessage,
+        userId: ctx.userId,
+        conversationId: ctx.conversationId,
+        observer: deps.llmObserver,
+    });
+    if (targetDecision.status === "READY") {
+        return {
+            response: `Got it — ${targetDecision.targetRole}.`,
+            background: currentFlow.background ?? { status: "UNKNOWN" },
+            mode: null,
+            advance: true,
+            targetRole: targetDecision.targetRole,
+            targetRoleReady: true,
+        };
+    }
+    if (targetDecision.status === "ROLE_OPTIONS") {
+        return {
+            response: targetDecision.response,
+            background: currentFlow.background ?? { status: "UNKNOWN" },
+            mode: null,
+            advance: false,
+            targetRoleOptions: [...targetDecision.roles],
+        };
+    }
+    if (targetDecision.status === "EXPLORE") {
+        return {
+            response: targetDecision.response,
+            background: currentFlow.background ?? { status: "UNKNOWN" },
+            mode: null,
+            advance: true,
+            targetSearchQuery: targetDecision.searchQuery,
+            targetExplorationReady: true,
+        };
+    }
+    return {
+        response: targetDecision.question,
+        background: currentFlow.background ?? { status: "UNKNOWN" },
+        mode: null,
+        advance: false,
+        targetRoleReady: false,
+    };
+};
+
+export const runOnboardingFlow = async (
+    deps: ChatFlowDeps,
+    ctx: SendMessageBaseContext,
+): Promise<ChatMessageResponse> => {
+    const currentFlow = ctx.conversationAfterUserMessage.onboardingFlow ?? defaultOnboardingFlow();
+    const decision = await resolveOnboardingDecision(deps, ctx, currentFlow);
 
     const step = applyOnboardingDecision(currentFlow, decision, ctx.normalizedMessage);
     await persistOnboardingProgress(deps, ctx, step.onboardingFlow);
 
-    const modeDetection = step.onboardingFlow.completed
+    const modeDetection = step.onboardingFlow.completed || step.onboardingFlow.initialMode
         ? buildModeDetectionForHandoff(step.onboardingFlow, ctx.normalizedMessage)
         : DEFAULT_MODE_DETECTION_RESULT;
 

@@ -1,4 +1,8 @@
-import type { OnboardingBackground, OnboardingInitialMode } from "../../../routes/conversation/conversation.types";
+import type {
+    OnboardingBackground,
+    OnboardingInitialMode,
+    OnboardingNearTermRoleChoice,
+} from "../../../routes/conversation/conversation.types";
 import { parseJsonObjectFromLlm } from "../../shared/llm/json-response.utils";
 import type { OnboardingLlmDecision } from "./onboarding.types";
 import { ONBOARDING_DIRECTION_REASK_REPLY, ONBOARDING_PARSE_FALLBACK_REPLY } from "./onboarding.types";
@@ -59,6 +63,20 @@ const parseMode = (value: unknown): OnboardingInitialMode | null => {
     return null;
 };
 
+const parseRoleChoice = (value: unknown): OnboardingNearTermRoleChoice | null => {
+    if (typeof value !== "string") {
+        return null;
+    }
+    const normalized = value.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    if (normalized === "SAME" || normalized === "SAME_ROLE") {
+        return "SAME_ROLE";
+    }
+    if (normalized === "DIFFERENT" || normalized === "DIFFERENT_ROLE") {
+        return "DIFFERENT_ROLE";
+    }
+    return null;
+};
+
 const parseBackground = (value: unknown): OnboardingBackground => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
         return { status: "UNKNOWN" };
@@ -93,5 +111,10 @@ export const parseOnboardingLlmDecisionFromJson = (rawText: string): OnboardingL
         background: parseBackground(obj.background),
         mode: parseMode(obj.mode),
         advance: obj.advance === true,
+        roleChoice: parseRoleChoice(obj.roleChoice),
+        targetRole: typeof obj.targetRole === "string" && obj.targetRole.trim().length > 0
+            ? obj.targetRole.trim()
+            : null,
+        targetRoleReady: obj.targetRoleReady === true,
     };
 };

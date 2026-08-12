@@ -14,6 +14,10 @@ import {
     doesReplyMatchChatStatedFacts,
     extractChatStatedBackgroundFacts,
 } from "./onboarding.chat-facts.utils";
+import {
+    continueNearTermTargetSelection,
+    startNearTermTargetSelection,
+} from "./onboarding.target-role.utils";
 
 const withStoredBackground = (
     flow: OnboardingFlow,
@@ -86,6 +90,9 @@ export const applyOnboardingDecision = (
             const resolvedMode: OnboardingInitialMode | null =
                 decision.mode ?? resolveOnboardingDirectionMode(latestUserMessage);
             if (resolvedMode) {
+                if (resolvedMode === "NEAR_TERM") {
+                    return startNearTermTargetSelection(withBackground, latestUserMessage);
+                }
                 const next: OnboardingFlow = {
                     ...withBackground,
                     directionResolved: true,
@@ -141,6 +148,9 @@ export const applyOnboardingDecision = (
             decision.mode ?? resolveOnboardingDirectionMode(latestUserMessage);
 
         if (resolvedMode) {
+            if (resolvedMode === "NEAR_TERM") {
+                return startNearTermTargetSelection(current, latestUserMessage);
+            }
             const next: OnboardingFlow = {
                 ...current,
                 background: current.background ?? decision.background,
@@ -179,6 +189,10 @@ export const applyOnboardingDecision = (
             },
             completedThisTurn: false,
         };
+    }
+
+    if (current.initialMode === "NEAR_TERM" && current.directionResolved) {
+        return continueNearTermTargetSelection(current, decision, latestUserMessage);
     }
 
     return {

@@ -47,6 +47,7 @@ export interface ChatJobCard {
     title: string;
     company: string;
     seniority: string;
+    description: string;
     location: string | null;
     url: string | null;
 }

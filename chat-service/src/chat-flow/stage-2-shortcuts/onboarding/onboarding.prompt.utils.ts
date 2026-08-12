@@ -31,9 +31,12 @@ export const buildOnboardingPrompt = (
 
     return `
 You are the onboarding layer of a career coach. Return ONLY compact JSON (no markdown):
-{"response":"message to user","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false,"onboarding":{"backgroundResolved":false,"backgroundAskCount":0,"directionResolved":false,"directionAskCount":0,"completed":false}}
+{"response":"message to user","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false,"roleChoice":null,"targetRole":null,"targetRoleReady":false}
 
 Rules:
+- Interpret obvious spelling mistakes, transposed letters, and informal wording from conversation context before classifying intent. Do not require exact spelling when the meaning is clear.
+- For example, "i am thinking about somehting diifererent" means the user wants a different role, so set roleChoice=DIFFERENT_ROLE. Do not repeat the same-role/different-role question because of spelling mistakes.
+- If several interpretations remain genuinely plausible after using the conversation context, ask one concise clarification question instead of inventing an intent.
 - Do not invent professional history. Only use the latest user message and Account context when facts are explicitly present.
 - CHAT_STATED_FACTS are authoritative for role and yearsOfExperience whenever present. background.role, background.yearsOfExperience, background.summary, and the spoken response MUST use those chat values.
 - User chat is the source of truth. When chat conflicts with Account/profile/CV/skills, use only the latest explicit chat value for that fact and never ask the user to choose between sources.
@@ -53,6 +56,7 @@ directionResolved=${onboardingFlow.directionResolved}
 directionAskCount=${onboardingFlow.directionAskCount}
 completed=${onboardingFlow.completed}
 storedBackground=${JSON.stringify(onboardingFlow.background ?? null)}
+nearTermTarget=${JSON.stringify(onboardingFlow.nearTermTarget ?? null)}
 
 If backgroundResolved is false:
 - Classify background.status as FOUND (usable role/experience/education/projects), NONE (explicitly no experience / first job), or UNKNOWN (hi / unrelated / no usable info).
@@ -70,6 +74,18 @@ If backgroundResolved is true and directionResolved is false:
 - Treat as GUIDED for unsure / help me figure it out.
 - If mode is set: advance=true, and response is a short plain acknowledgement only (no biography repeat).
 - If mode is null: advance=false and response MUST be only: "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
+
+If nearTermTarget.step is "awaiting_role_choice":
+- Classify roleChoice as SAME_ROLE, DIFFERENT_ROLE, or null from the latest message.
+- Correct obvious misspellings semantically. Variants such as "differernet", "diifererent", or "somehting different" must classify as DIFFERENT_ROLE.
+- If the user names a concrete target role directly, set roleChoice=DIFFERENT_ROLE unless it clearly matches storedBackground.role, set targetRole, and set targetRoleReady=true.
+- Otherwise keep targetRole=null and targetRoleReady=false. The application will ask the same-role/different-role question deterministically.
+
+If nearTermTarget.step is "discovering_target":
+- The user chose a different role. Ask exactly ONE concise, high-value question per turn until their target is a concrete searchable role or domain.
+- Use recent chat answers, not Account/CV, to understand the target. Useful questions narrow responsibilities, type of work, technical focus, or industry.
+- Set targetRoleReady=true only when the user explicitly names or confirms a concrete searchable role/domain. Do not infer readiness from vague interests alone.
+- When ready, set targetRole to the user's target and make response a short acknowledgement. Otherwise set targetRoleReady=false and response to the next single question.
 
 Account:
 ${userAccountContext.slice(0, MAX_ACCOUNT_CONTEXT_CHARS)}

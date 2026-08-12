@@ -1,0 +1,1 @@
+export const JOB_DESCRIPTION_PREVIEW_LENGTH = 240;

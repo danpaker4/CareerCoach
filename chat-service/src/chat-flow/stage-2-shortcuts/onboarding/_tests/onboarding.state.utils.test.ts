@@ -36,12 +36,18 @@ describe("parseOnboardingLlmDecisionFromJson", () => {
             },
             mode: null,
             advance: true,
+            roleChoice: "DIFFERENT_ROLE",
+            targetRole: "frontend developer",
+            targetRoleReady: true,
         }));
 
         assert.equal(decision.background.status, "FOUND");
         assert.equal(decision.background.role, "software developer");
         assert.equal(decision.mode, null);
         assert.equal(decision.advance, true);
+        assert.equal(decision.roleChoice, "DIFFERENT_ROLE");
+        assert.equal(decision.targetRole, "frontend developer");
+        assert.equal(decision.targetRoleReady, true);
     });
 
     it("falls back safely on invalid JSON", () => {
@@ -75,6 +81,27 @@ describe("buildOnboardingPrompt", () => {
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative for role and yearsOfExperience/);
         assert.match(prompt, /use only the latest explicit chat value/i);
         assert.match(prompt, /Never replace chat-stated wording/i);
+    });
+
+    it("tells the model to resolve obvious misspellings from conversation context", () => {
+        const flow = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const prompt = buildOnboardingPrompt(
+            emptyConversation(),
+            "i am thinking about somehting diifererent",
+            "",
+            flow,
+        );
+
+        assert.match(prompt, /obvious spelling mistakes/i);
+        assert.match(prompt, /somehting diifererent.*DIFFERENT_ROLE/i);
+        assert.match(prompt, /Do not repeat the same-role\/different-role question/i);
     });
 });
 
@@ -205,7 +232,7 @@ describe("applyOnboardingDecision", () => {
         assert.equal(second.reply, ONBOARDING_DIRECTION_REASK_REPLY);
     });
 
-    it("completes with NEAR_TERM from message even when LLM mode is null", () => {
+    it("asks whether a near-term search should use the same or a different role", () => {
         const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
             response: "Direction?",
             background: { status: "FOUND", role: "software developer" },
@@ -223,11 +250,175 @@ describe("applyOnboardingDecision", () => {
             },
             "im looking for something now",
         );
-        assert.equal(step.onboardingFlow.completed, true);
+        assert.equal(step.onboardingFlow.completed, false);
         assert.equal(step.onboardingFlow.initialMode, "NEAR_TERM");
-        assert.equal(step.completedThisTurn, true);
-        assert.match(step.reply, /look for software developer roles/i);
+        assert.equal(step.completedThisTurn, false);
+        assert.match(step.reply, /same role/i);
+        assert.match(step.reply, /different role/i);
         assert.doesNotMatch(step.reply, /You've been/);
+    });
+
+    it("searches the current role only after the user chooses the same role", () => {
+        const awaitingChoice = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const step = applyOnboardingDecision(
+            awaitingChoice,
+            {
+                response: "Understood.",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: false,
+            },
+            "same role",
+        );
+
+        assert.equal(step.onboardingFlow.completed, true);
+        assert.equal(step.onboardingFlow.nearTermTarget?.roleChoice, "SAME_ROLE");
+        assert.equal(step.onboardingFlow.nearTermTarget?.targetRole, "software developer");
+        assert.equal(step.completedThisTurn, true);
+    });
+
+    it("keeps asking about a different role until a concrete target is understood", () => {
+        const awaitingChoice = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: { step: "awaiting_role_choice" as const },
+        };
+        const choseDifferent = applyOnboardingDecision(
+            awaitingChoice,
+            {
+                response: "Which different role?",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: false,
+                roleChoice: "DIFFERENT_ROLE",
+            },
+            "a different role",
+        );
+        assert.equal(choseDifferent.onboardingFlow.completed, false);
+        assert.equal(choseDifferent.onboardingFlow.nearTermTarget?.step, "discovering_target");
+        assert.match(choseDifferent.reply, /what role or kind of work/i);
+
+        const stillDiscovering = applyOnboardingDecision(
+            choseDifferent.onboardingFlow,
+            {
+                response: "Would you rather build user interfaces, APIs, or mobile applications?",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: false,
+                targetRoleReady: false,
+            },
+            "I want to build products",
+        );
+        assert.equal(stillDiscovering.onboardingFlow.completed, false);
+        assert.equal(stillDiscovering.onboardingFlow.nearTermTarget?.clarificationCount, 1);
+        assert.match(stillDiscovering.reply, /interfaces, APIs, or mobile applications\?/i);
+
+        const withOptions = applyOnboardingDecision(
+            stillDiscovering.onboardingFlow,
+            {
+                response: "Would Product Manager, Program Manager, or Operations Manager be closest?",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: false,
+                targetRoleOptions: ["Product Manager", "Program Manager", "Operations Manager"],
+            },
+            "I really don't know",
+        );
+        assert.deepEqual(withOptions.onboardingFlow.nearTermTarget?.suggestedRoles, [
+            "Product Manager",
+            "Program Manager",
+            "Operations Manager",
+        ]);
+
+        const understood = applyOnboardingDecision(
+            withOptions.onboardingFlow,
+            {
+                response: "Frontend developer sounds like the target.",
+                background: awaitingChoice.background,
+                mode: null,
+                advance: true,
+                targetRole: "frontend developer",
+                targetRoleReady: true,
+            },
+            "frontend developer",
+        );
+        assert.equal(understood.onboardingFlow.completed, true);
+        assert.equal(understood.onboardingFlow.nearTermTarget?.targetRole, "frontend developer");
+        assert.equal(understood.completedThisTurn, true);
+    });
+
+    it("completes onboarding with a model-generated exploratory search query", () => {
+        const discoveringTarget = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: {
+                step: "discovering_target" as const,
+                roleChoice: "DIFFERENT_ROLE" as const,
+                clarificationCount: 3,
+            },
+        };
+        const step = applyOnboardingDecision(
+            discoveringTarget,
+            {
+                response: "I'll show exploratory matches based on the preferences you shared.",
+                background: discoveringTarget.background,
+                mode: null,
+                advance: true,
+                targetSearchQuery: "product manager program manager operations manager",
+                targetExplorationReady: true,
+            },
+            "are there any relevant jobs?",
+        );
+
+        assert.equal(step.onboardingFlow.completed, true);
+        assert.equal(step.onboardingFlow.nearTermTarget?.exploratory, true);
+        assert.equal(
+            step.onboardingFlow.nearTermTarget?.searchQuery,
+            "product manager program manager operations manager",
+        );
+        assert.equal(step.reply, "I'll show exploratory matches based on the preferences you shared.");
+    });
+
+    it("rejects the old direction question while discovering a different target role", () => {
+        const discoveringTarget = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "FOUND" as const, role: "software developer" },
+            nearTermTarget: {
+                step: "discovering_target" as const,
+                roleChoice: "DIFFERENT_ROLE" as const,
+            },
+        };
+        const step = applyOnboardingDecision(
+            discoveringTarget,
+            {
+                response: ONBOARDING_DIRECTION_REASK_REPLY,
+                background: discoveringTarget.background,
+                mode: null,
+                advance: false,
+                targetRoleReady: false,
+            },
+            "product manager",
+        );
+
+        assert.equal(step.onboardingFlow.completed, false);
+        assert.doesNotMatch(step.reply, /looking for a job now/i);
+        assert.match(step.reply, /role or kind of work/i);
     });
 
     it("uses a short direction re-ask instead of repeating biography", () => {

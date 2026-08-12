@@ -35,6 +35,18 @@ export type OnboardingBackground = {
 
 export type OnboardingInitialMode = "NEAR_TERM" | "DREAMJOB" | "GUIDED";
 
+export type OnboardingNearTermRoleChoice = "SAME_ROLE" | "DIFFERENT_ROLE";
+
+export type OnboardingNearTermTarget = {
+    step: "awaiting_role_choice" | "discovering_target";
+    roleChoice?: OnboardingNearTermRoleChoice;
+    targetRole?: string;
+    searchQuery?: string;
+    exploratory?: boolean;
+    clarificationCount?: number;
+    suggestedRoles?: string[];
+};
+
 export type OnboardingFlow = {
     started: true;
     backgroundResolved: boolean;
@@ -44,6 +56,7 @@ export type OnboardingFlow = {
     completed: boolean;
     background?: OnboardingBackground;
     initialMode?: OnboardingInitialMode;
+    nearTermTarget?: OnboardingNearTermTarget;
 };
 
 export type SkillsGapQuickHelpFlow = {
