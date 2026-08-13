@@ -466,6 +466,31 @@ describe("applyOnboardingDecision", () => {
         assert.equal(step.completedThisTurn, false);
     });
 
+    it("uses the model-generated first discovery question when its subject metadata is missing", () => {
+        const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
+            response: "You are just starting out. What are you looking for?",
+            background: { status: "NONE", role: null },
+            mode: null,
+            advance: true,
+        }).onboardingFlow;
+        const modelQuestion = "Would you rather create things, solve technical problems, or work directly with people?";
+
+        const step = applyOnboardingDecision(
+            afterBackground,
+            {
+                response: modelQuestion,
+                background: { status: "UNKNOWN" },
+                mode: "NEAR_TERM",
+                advance: true,
+            },
+            "now",
+        );
+
+        assert.equal(step.reply, modelQuestion);
+        assert.equal(step.onboardingFlow.nearTermTarget?.clarificationCount, 1);
+        assert.notEqual(step.onboardingFlow.nearTermTarget?.coveredSubjects?.[0], "semantic focus");
+    });
+
     it("keeps an explicit first-job request near-term when the model misclassifies it", () => {
         const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
             response: "You are just starting out. What are you looking for?",

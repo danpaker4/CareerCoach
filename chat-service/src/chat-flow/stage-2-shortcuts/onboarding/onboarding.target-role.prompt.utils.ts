@@ -37,7 +37,7 @@ export const buildTargetRoleDecisionPrompt = (
     return `You identify the user's next concrete job target. ${roleContext}
 Return ONLY one compact JSON object, using one contract:
 - READY: {"status":"READY","targetRole":"","evidenceQuote":"exact latest-user quote","discoveryFacts":{}}
-- NEEDS_CLARIFICATION: {"status":"NEEDS_CLARIFICATION","question":"","subject":"semantic focus","discoveryFacts":{},"rejectedSuggestedRoles":false}
+- NEEDS_CLARIFICATION: status, question, subject, discoveryFacts, and rejectedSuggestedRoles
 - ROLE_OPTIONS: {"status":"ROLE_OPTIONS","summary":"","roles":[{"title":"","reason":""}],"discoveryFacts":{}}
 Generate values from the conversation; contract strings are not answers.
 
@@ -48,8 +48,10 @@ Decision policy, in order:
 
 Discovery quality:
 - Build on known facts and skip covered subjects. Never repeat/paraphrase a question or ask a generic continuation question that only invites elaboration.
+- For NEEDS_CLARIFICATION, subject must be a short snake_case topic specific to the generated question. Never return placeholder labels such as "semantic focus", "subject", "focus", or "topic".
 - Use concrete tradeoffs or examples when they make answering easier. After an uncertain answer, make the next question easier and more concrete.
 - Save each distinct newly stated signal as its own discoveryFacts entry with a short semantic key. Facts and option reasons must be explicit; never infer preferences from inexperience or uncertainty.
+- Every discoveryFacts value must be a short string. Never use booleans, arrays, or objects as fact values.
 - If all active suggestions are rejected, mark rejectedSuggestedRoles=true and ask about a new discriminator; do not replace or repeat the list unless asked.
 
 Boundaries:
@@ -85,7 +87,30 @@ ${originalPrompt}
 Your previous output was invalid or asked a question from the wrong conversation stage.
 Re-evaluate the latest user message and return exactly one valid JSON object from the allowed shapes above.
 Preserve a correct intent status and repair only its missing or invalid fields. READY requires an exact evidenceQuote from the latest user message. ROLE_OPTIONS must include 3-5 real searchable titles and a specific reason for each.
+For NEEDS_CLARIFICATION, generate a specific snake_case subject that names the question's actual topic; never copy schema or placeholder wording.
 Previous invalid output: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
+`;
+
+export const buildTargetRoleDiscoveryRecoveryPrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+): string => `
+You are a career coach choosing the next discovery question for a first-time job seeker who does not know which role fits yet.
+Return ONLY one compact JSON object: {"status":"NEEDS_CLARIFICATION","question":"","discoveryFacts":{}}
+
+Rules:
+- Generate one natural question ending in "?". The question must come from the conversation, not from this instruction.
+- Ask about 2-3 concrete, related preferences that distinguish plausible job paths, using easy choices when helpful.
+- Build on interests the user already stated and make an uncertain user's next question easier to answer.
+- Do not ask for a job title, ask what role they want, ask generic "what aspects" questions, or revisit timing.
+- Do not repeat or paraphrase an earlier assistant question.
+- Put newly stated facts in discoveryFacts using short semantic keys and string values only.
+
+Stored discovery facts: ${JSON.stringify(conversation.onboardingFlow?.nearTermTarget?.discoveryFacts ?? {})}
+Covered subjects: ${JSON.stringify(conversation.onboardingFlow?.nearTermTarget?.coveredSubjects ?? [])}
+Relevant conversation:
+${buildDiscoveryHistory(conversation, latestUserMessage)}
+Latest user message: ${latestUserMessage}
 `;
 
 export const buildTargetRoleOptionsReviewPrompt = (
@@ -129,6 +154,17 @@ Active suggested roles: ${JSON.stringify(targetState?.suggestedRoles ?? [])}
 Prior decision: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
 `;
 };
+
+export const buildTargetRoleOptionsReviewCorrectionPrompt = (
+    originalPrompt: string,
+    priorOutput: string,
+): string => `
+${originalPrompt}
+
+Your previous review output was invalid, inferred a role the user did not select, or repeated a covered question.
+Return exactly one valid review object. If more discovery is needed, ask a new natural-language question ending in "?" about an uncovered topic and give it a specific snake_case subject.
+Previous invalid review: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
+`;
 
 export const buildTargetRoleGroundingPrompt = (
     conversation: Conversation,

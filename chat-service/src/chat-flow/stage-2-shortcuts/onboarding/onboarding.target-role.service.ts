@@ -1,8 +1,10 @@
 import { recordChatLlmParseEvent } from "../../shared/llm/chat.llm.observability.utils";
 import type { ChatLlmObservedOperation } from "../../shared/llm/chat.llm.types";
+import type { OnboardingNearTermTarget } from "../../../routes/conversation/conversation.types";
 import {
     MAX_OPEN_TARGET_ROLE_QUESTIONS,
     MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS,
+    MIN_TARGET_DISCOVERY_QUESTIONS_FOR_OPTIONS,
 } from "./onboarding.target-role.consts";
 import {
     parseTargetRoleDecision,
@@ -12,8 +14,10 @@ import {
 import {
     buildTargetRoleCorrectionPrompt,
     buildTargetRoleDecisionPrompt,
+    buildTargetRoleDiscoveryRecoveryPrompt,
     buildTargetRoleGroundingCorrectionPrompt,
     buildTargetRoleGroundingPrompt,
+    buildTargetRoleOptionsReviewCorrectionPrompt,
     buildTargetRoleOptionsReviewPrompt,
 } from "./onboarding.target-role.prompt.utils";
 import { buildTargetRoleFallbackReply } from "./onboarding.target-role.utils";
@@ -58,6 +62,64 @@ const completeJsonAttempt = async <T>(
     }
 };
 
+const shouldUseTargetRoleOptions = (
+    decision: TargetRoleDecision,
+    targetState: OnboardingNearTermTarget | undefined,
+    mustOfferChoices: boolean,
+    reviewerKeptOptions: boolean,
+): boolean => {
+    if (decision.status !== "ROLE_OPTIONS") {
+        return false;
+    }
+    const discoveryFactCount = Object.keys({
+        ...(targetState?.discoveryFacts ?? {}),
+        ...decision.discoveryFacts,
+    }).length;
+    const previousRoleNames = [
+        ...(targetState?.suggestedRoles ?? []),
+        ...(targetState?.rejectedSuggestedRoles ?? []),
+    ].map((role) => role.trim().toLowerCase());
+    const repeatsPreviousRole = decision.roles.some(
+        (role) => previousRoleNames.includes(role.title.trim().toLowerCase()),
+    );
+    const clarificationCount = targetState?.clarificationCount ?? 0;
+    const hasEnoughDiscoveryFacts = discoveryFactCount >= MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS
+        || (
+            clarificationCount >= MIN_TARGET_DISCOVERY_QUESTIONS_FOR_OPTIONS
+            && discoveryFactCount > 0
+        );
+    return !repeatsPreviousRole && (mustOfferChoices || hasEnoughDiscoveryFacts || reviewerKeptOptions);
+};
+
+const resolveDiscoveryRecovery = async (
+    params: ResolveTargetRoleDecisionParams,
+    fallbackQuestion: string,
+): Promise<TargetRoleDecision> => {
+    const previousAssistantMessage = [...params.conversation.messages]
+        .reverse()
+        .find((message) => message.role === "assistant")?.content;
+    const attempt = await completeJsonAttempt(
+        params,
+        buildTargetRoleDiscoveryRecoveryPrompt(params.conversation, params.latestUserMessage),
+        "chat.onboarding.target_role.discovery",
+        (rawText) => {
+            const decision = parseTargetRoleDecision(rawText, params.latestUserMessage);
+            if (decision?.status !== "NEEDS_CLARIFICATION") {
+                return null;
+            }
+            const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
+                === decision.question.trim().toLowerCase();
+            return repeatedQuestion ? null : decision;
+        },
+    );
+    return attempt.decision ?? {
+        status: "NEEDS_CLARIFICATION",
+        question: fallbackQuestion,
+        subject: "target_direction",
+        discoveryFacts: {},
+    };
+};
+
 export const resolveTargetRoleDecision = async (
     params: ResolveTargetRoleDecisionParams,
 ): Promise<TargetRoleDecision> => {
@@ -100,34 +162,41 @@ export const resolveTargetRoleDecision = async (
         );
     const initialResolved = retry.decision;
     if (!initialResolved || initialResolved.status === "NEEDS_CLARIFICATION") {
-        return initialResolved ?? {
-            status: "NEEDS_CLARIFICATION",
-            question: fallbackQuestion,
-            subject: "target_direction",
-            discoveryFacts: {},
-        };
+        return initialResolved ?? await resolveDiscoveryRecovery(params, fallbackQuestion);
     }
-    const optionsReview = initialResolved.status === "ROLE_OPTIONS"
-        ? await completeJsonAttempt(
-            params,
-            buildTargetRoleOptionsReviewPrompt(
-                params.conversation,
-                params.latestUserMessage,
-                JSON.stringify(initialResolved),
-            ),
-            "chat.onboarding.target_role.review",
-            (rawText) => {
-                const decision = parseTargetRoleOptionsReviewDecision(rawText, params.latestUserMessage);
-                if (decision?.verdict !== "RESUME_DISCOVERY") {
-                    return decision;
-                }
-                const repeatedSubject = (targetState?.coveredSubjects ?? []).includes(decision.subject);
-                const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-                    === decision.question.trim().toLowerCase();
-                return repeatedSubject || repeatedQuestion ? null : decision;
-            },
+    const optionsReviewPrompt = initialResolved.status === "ROLE_OPTIONS"
+        ? buildTargetRoleOptionsReviewPrompt(
+            params.conversation,
+            params.latestUserMessage,
+            JSON.stringify(initialResolved),
         )
         : null;
+    const parseOptionsReview = (rawText: string) => {
+        const decision = parseTargetRoleOptionsReviewDecision(rawText, params.latestUserMessage);
+        if (decision?.verdict !== "RESUME_DISCOVERY") {
+            return decision;
+        }
+        const repeatedSubject = (targetState?.coveredSubjects ?? []).includes(decision.subject);
+        const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
+            === decision.question.trim().toLowerCase();
+        return repeatedSubject || repeatedQuestion ? null : decision;
+    };
+    const firstOptionsReview = optionsReviewPrompt
+        ? await completeJsonAttempt(
+            params,
+            optionsReviewPrompt,
+            "chat.onboarding.target_role.review",
+            parseOptionsReview,
+        )
+        : null;
+    const optionsReview = firstOptionsReview && !firstOptionsReview.decision && optionsReviewPrompt
+        ? await completeJsonAttempt(
+            params,
+            buildTargetRoleOptionsReviewCorrectionPrompt(optionsReviewPrompt, firstOptionsReview.rawText),
+            "chat.onboarding.target_role.review.retry",
+            parseOptionsReview,
+        )
+        : firstOptionsReview;
     if (optionsReview?.decision?.verdict === "RESUME_DISCOVERY") {
         return {
             status: "NEEDS_CLARIFICATION",
@@ -147,28 +216,11 @@ export const resolveTargetRoleDecision = async (
     const resolved = reviewedReady ?? initialResolved;
     const optionsFallback = initialResolved.status === "ROLE_OPTIONS" ? initialResolved : null;
     if (resolved.status === "ROLE_OPTIONS") {
-        const discoveryFactCount = Object.keys({
-            ...(targetState?.discoveryFacts ?? {}),
-            ...resolved.discoveryFacts,
-        }).length;
-        const previousRoleNames = [
-            ...(targetState?.suggestedRoles ?? []),
-            ...(targetState?.rejectedSuggestedRoles ?? []),
-        ].map((role) => role.trim().toLowerCase());
-        const repeatsPreviousRole = resolved.roles.some(
-            (role) => previousRoleNames.includes(role.title.trim().toLowerCase()),
-        );
         const reviewerKeptOptions = optionsReview?.decision?.verdict === "KEEP_OPTIONS";
-        const hasEnoughDiscoveryFacts = discoveryFactCount >= MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS;
-        if (!repeatsPreviousRole && (mustOfferChoices || hasEnoughDiscoveryFacts || reviewerKeptOptions)) {
+        if (shouldUseTargetRoleOptions(resolved, targetState, mustOfferChoices, reviewerKeptOptions)) {
             return resolved;
         }
-        return {
-            status: "NEEDS_CLARIFICATION",
-            question: fallbackQuestion,
-            subject: "target_direction",
-            discoveryFacts: resolved.discoveryFacts,
-        };
+        return await resolveDiscoveryRecovery(params, fallbackQuestion);
     }
 
     const groundingPrompt = buildTargetRoleGroundingPrompt(
@@ -200,7 +252,7 @@ export const resolveTargetRoleDecision = async (
         return resolved;
     }
     if (grounding.decision?.kind === "NEEDS_CLARIFICATION") {
-        if (optionsFallback) {
+        if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
             return optionsFallback;
         }
         return {
@@ -227,7 +279,7 @@ export const resolveTargetRoleDecision = async (
         return resolved;
     }
     if (groundingRetry.decision?.kind === "NEEDS_CLARIFICATION") {
-        if (optionsFallback) {
+        if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
             return optionsFallback;
         }
         return {
@@ -237,13 +289,8 @@ export const resolveTargetRoleDecision = async (
             discoveryFacts: resolved.discoveryFacts,
         };
     }
-    if (optionsFallback) {
+    if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
         return optionsFallback;
     }
-    return {
-        status: "NEEDS_CLARIFICATION",
-        question: fallbackQuestion,
-        subject: "target_direction",
-        discoveryFacts: resolved.discoveryFacts,
-    };
+    return await resolveDiscoveryRecovery(params, fallbackQuestion);
 };
