@@ -38,3 +38,23 @@ export const fetchJobsByTitle = async (userId: string, search: string): Promise<
   const data: unknown = await res.json().catch(() => []);
   return parseJobs(data);
 };
+
+export const saveDestinationToWishlist = async (userId: string, jobTitle: string): Promise<boolean> => {
+  const trimmedTitle = jobTitle.trim();
+  if (!trimmedTitle) return false;
+
+  const keywords = [...new Set(trimmedTitle.toLowerCase().split(/\s+/).filter(Boolean))];
+  const res = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/wanted-jobs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      userId,
+      jobTitle: trimmedTitle,
+      keywords,
+      rawText: `Roadmap destination search for ${trimmedTitle}`,
+    }),
+  });
+
+  return res.ok;
+};

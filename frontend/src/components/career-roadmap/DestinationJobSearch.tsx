@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchJobsByTitle } from './career-roadmap-job-search.utils';
+import { fetchJobsByTitle, saveDestinationToWishlist } from './career-roadmap-job-search.utils';
 import type { DestinationJobResult } from './career-roadmap-job-search.utils';
 
 type DestinationJobSearchProps = {
@@ -13,6 +13,7 @@ export const DestinationJobSearch = ({ userId, defaultJobTitle }: DestinationJob
   const [jobs, setJobs] = useState<DestinationJobResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [wishlistState, setWishlistState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const runSearch = useCallback((query: string) => {
@@ -40,10 +41,21 @@ export const DestinationJobSearch = ({ userId, defaultJobTitle }: DestinationJob
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setWishlistState('idle');
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       runSearch(value);
     }, 600);
+  };
+
+  const handleAddToWishlist = async () => {
+    setWishlistState('saving');
+    try {
+      const saved = await saveDestinationToWishlist(userId, searchQuery);
+      setWishlistState(saved ? 'saved' : 'error');
+    } catch {
+      setWishlistState('error');
+    }
   };
 
   return (
@@ -73,9 +85,20 @@ export const DestinationJobSearch = ({ userId, defaultJobTitle }: DestinationJob
           {loading && <p className="journey-destination-search-status">Searching for matching roles...</p>}
           {error && <p className="journey-destination-search-error">{error}</p>}
           {!loading && !error && searchQuery.trim() && jobs.length === 0 && (
-            <p className="journey-destination-search-empty">
-              No jobs with 80%+ fit found for &ldquo;{searchQuery.trim()}&rdquo;. Try a different title.
-            </p>
+            <div className="journey-destination-search-empty">
+              <p>There are no jobs available in our job listings right now. Do you want to add this role to your wishlist?</p>
+              <button
+                type="button"
+                className="btn-outline journey-destination-wishlist-button"
+                onClick={() => void handleAddToWishlist()}
+                disabled={wishlistState === 'saving' || wishlistState === 'saved'}
+              >
+                {wishlistState === 'saving' ? 'Saving…' : wishlistState === 'saved' ? 'Added to wishlist' : 'Add to wishlist'}
+              </button>
+              {wishlistState === 'error' && (
+                <p className="journey-destination-search-error">Could not add this role to your wishlist. Please try again.</p>
+              )}
+            </div>
           )}
           {!loading && jobs.length > 0 && (
             <ul className="journey-opportunities-list">

@@ -596,6 +596,7 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
               };
               const progressSum = activeRoadmap.stagesToDreamJob.reduce((sum, stage, idx) => sum + stageFraction(stage, idx), 0);
               const pct = totalStages === 0 ? 0 : Math.round((progressSum / totalStages) * 100);
+              const recommendedPath = activeRoadmap.progressionMeta?.alternativePaths?.find((path) => path.isRecommended);
 
               return (
                 <div className="roadmap-journey" key={activeRoadmap.id}>
@@ -713,20 +714,18 @@ export const CareerRoadmap = ({ user }: CareerRoadmapProps) => {
                     <DestinationJobSearch userId={user.id} defaultJobTitle={activeRoadmap.dreamJob} />
                   )}
 
-                  {(activeRoadmap.progressionMeta?.alternativePaths?.length ?? 0) > 0 && (
-                    <section className="roadmap-path-options" aria-label="Career path options">
+                  {recommendedPath && (
+                    <section className="roadmap-path-options" aria-label="Recommended career path">
                       <div className="roadmap-path-options-head">
-                        <span>Career paths</span>
-                        <p>Compare the recommended route with alternative ways to reach the same exact destination.</p>
+                        <span>Recommended career path</span>
+                        <p>The strongest progression from your current profile to your destination.</p>
                       </div>
                       <div className="roadmap-path-options-grid">
-                        {activeRoadmap.progressionMeta!.alternativePaths!.map((path) => (
-                          <article key={path.id} className={`roadmap-path-option${path.isRecommended ? ' roadmap-path-option--recommended' : ''}`}>
-                            <h4>{path.label}{path.isRecommended && <span>Recommended</span>}</h4>
-                            <p>{path.summary}</p>
-                            <ol>{path.roles.map((role) => <li key={role}>{role}</li>)}</ol>
-                          </article>
-                        ))}
+                        <article className="roadmap-path-option roadmap-path-option--recommended">
+                          <h4>{recommendedPath.label}<span>Recommended</span></h4>
+                          <p>{recommendedPath.summary}</p>
+                          <ol>{recommendedPath.roles.map((role) => <li key={role}>{role}</li>)}</ol>
+                        </article>
                       </div>
                     </section>
                   )}
