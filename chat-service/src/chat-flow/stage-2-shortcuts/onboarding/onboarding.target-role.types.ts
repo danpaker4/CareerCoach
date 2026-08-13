@@ -33,6 +33,11 @@ export type TargetRoleOptionsReviewDecision =
         readonly rejectedSuggestedRoles: boolean;
     };
 
+export type TargetRoleSuggestionReviewDecision =
+    | { readonly verdict: "SELECTED"; readonly targetRole: string; readonly evidenceQuote: string }
+    | { readonly verdict: "CLARIFY_SELECTION"; readonly question: string }
+    | { readonly verdict: "CONTINUE_DISCOVERY" };
+
 export type TargetRoleGroundingDecision =
     | { readonly kind: "GROUNDED_ROLE"; readonly evidenceQuote: string; readonly normalizedTargetRole: string }
     | { readonly kind: "GROUNDED_SUGGESTION"; readonly evidenceQuote: string }

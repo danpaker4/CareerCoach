@@ -1,0 +1,65 @@
+{
+  "id": "6a7dd496eaf7c7901ea4af66",
+  "chat": [
+    {
+      "user": "",
+      "chatbot": "Hi shai, tell me a little about your professional background."
+    },
+    {
+      "user": "hi my name is shai and i just finished high school",
+      "chatbot": "Hi Shai, I'm excited to help you with your career goals!"
+    },
+    {
+      "user": "lets start",
+      "chatbot": "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?"
+    },
+    {
+      "user": "i am looking for something now",
+      "chatbot": "What kind of work are you interested in doing now?"
+    },
+    {
+      "user": "i dont know",
+      "chatbot": "What aspects of your high school experience or education are you most proud of?"
+    },
+    {
+      "user": "i once did a large web design project",
+      "chatbot": "What do you enjoy most about the web design project you mentioned, was it creating something visually appealing, solving technical challenges, or working with others to bring your idea to life?"
+    },
+    {
+      "user": "creating something visually appealing",
+      "chatbot": "Do you prefer working on projects that allow for creative freedom and self-expression, or do you enjoy being part of a team and collaborating with others to achieve a common goal?"
+    },
+    {
+      "user": "reative freedom and self-expression",
+      "chatbot": "What kind of creative projects would you enjoy working on?"
+    },
+    {
+      "user": "i dont know",
+      "chatbot": "What specific aspects of web design, such as visual appeal or creative freedom, excite you most?"
+    },
+    {
+      "user": "visual appeal or creative freedom",
+      "chatbot": "Do you prefer working with existing designs and building upon them, or do you enjoy starting from scratch and creating something entirely new?"
+    },
+    {
+      "user": "creating something entirely new",
+      "chatbot": "Explore roles that align with your creative interests and skills.\n1. UX/UI Designer — You enjoy creating visually appealing designs and value creative freedom.\n2. Graphic Designer — Your high school project showcased your design skills, and you appreciate the opportunity to express yourself creatively.\n3. Digital Artist — You mentioned enjoying the process of creating something entirely new, which aligns with the creative freedom found in digital art roles.\nWhich role feels closest, or do none of them fit?"
+    },
+    {
+      "user": "UX/UI Designer",
+      "chatbot": "Got it — I'll look for UX/UI Designer roles you can move into soon."
+    },
+    {
+      "user": "",
+      "chatbot": "Here are the roles I found that could fit — do any of these work for you? Tell me which one to add to your pipeline (e.g. \"add the first one\" or \"add the Zendesk role\"). If none fit, just say \"none\" and I can save a role to your wishlist so you're alerted when a better match appears."
+    },
+    {
+      "user": "add the first one to my pipeline",
+      "chatbot": "Done — I added the UX/UI Designer role at Zendesk to your pipeline.\n\nYou can now track it from My Pipeline. Want help preparing for interviews, strengthening a missing skill, or exploring more roles?"
+    },
+    {
+      "user": "thanks thats all",
+      "chatbot": "You're all set for now. I'm available whenever you want help with your job search, pipeline, interviews, or career plans."
+    }
+  ]
+}

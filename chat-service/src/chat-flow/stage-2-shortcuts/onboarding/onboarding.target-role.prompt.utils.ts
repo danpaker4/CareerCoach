@@ -1,7 +1,6 @@
 import type { Conversation } from "../../../routes/conversation/conversation.model";
 import {
     MAX_OPEN_TARGET_ROLE_QUESTIONS,
-    MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS,
 } from "./onboarding.target-role.consts";
 
 const MAX_HISTORY_MESSAGES = 40;
@@ -43,7 +42,7 @@ Generate values from the conversation; contract strings are not answers.
 
 Decision policy, in order:
 1. READY only for a concrete searchable role/domain explicitly named now or unambiguously selected from prior suggestions. Copy exact evidenceQuote. A selected suggestion overrides mustOfferChoices.
-2. ROLE_OPTIONS gives 3-5 distinct searchable roles with specific reasons grounded in explicit facts. Use it when suggestions are requested, the question limit is reached, or enough facts support useful choices. Once at least ${MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS} meaningful facts are known, prefer ROLE_OPTIONS unless one critical discriminator would materially change the choices.
+2. ROLE_OPTIONS gives 3-5 distinct searchable roles. Use it when requested, at the question limit, or when known skills or preferences distinguish useful paths; background, timing, and uncertainty do not count.
 3. Otherwise NEEDS_CLARIFICATION, only before the limit. Ask one easy, concise question that maximizes information gain by collecting 2-3 related job-relevant signals which distinguish plausible paths. Choose those signals dynamically from what is unknown; do not follow a fixed checklist.
 
 Discovery quality:
@@ -134,7 +133,7 @@ Return ONLY one compact JSON object with one of these contracts:
 
 Rules:
 - The latest user message is authoritative. Use READY only when it explicitly names a concrete searchable role/domain or unambiguously selects a previously suggested role.
-- Use KEEP_OPTIONS only when the options are grounded in stored or prior-output discoveryFacts, the open-question limit was reached, or the user explicitly requested suggestions.
+- Use KEEP_OPTIONS only when known skills or preferences distinguish the options, the question limit was reached, or suggestions were requested. Background, timing, and uncertainty are insufficient.
 - Use RESUME_DISCOVERY when preferences are still insufficient, when a single uncertain answer caused premature options, when the options invent preferences, or when the user rejects all active suggestions.
 - A broad activity, responsibility, skill, or interest is not READY. Do not infer an adjacent role.
 - The discovery question must be easy and concrete, collect 2-3 related job-relevant signals, and distinguish plausible paths. Avoid generic continuation, repetition, or paraphrase.
@@ -163,6 +162,34 @@ ${originalPrompt}
 
 Your previous review output was invalid, inferred a role the user did not select, or repeated a covered question.
 Return exactly one valid review object. If more discovery is needed, ask a new natural-language question ending in "?" about an uncovered topic and give it a specific snake_case subject.
+Previous invalid review: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
+`;
+
+export const buildTargetRoleSuggestionReviewPrompt = (
+    latestUserMessage: string,
+    suggestedRoles: readonly string[],
+): string => `
+Decide whether the latest reply selects one of the numbered roles. Return JSON only:
+- SELECTED: {"verdict":"SELECTED","targetRole":"exact title from Active suggestions","evidenceQuote":"exact latest-user quote"}
+- CLARIFY_SELECTION: {"verdict":"CLARIFY_SELECTION","question":"ask which listed role they mean"}
+- CONTINUE_DISCOVERY: {"verdict":"CONTINUE_DISCOVERY"}
+
+Infer references semantically from order, wording, meaning, and tone; the user need not repeat a title.
+Use SELECTED for one clear preference, CLARIFY_SELECTION only for an unclear referent, and CONTINUE_DISCOVERY when no role was chosen.
+For SELECTED, copy targetRole exactly from the list and evidenceQuote exactly from the reply.
+
+Roles:
+${suggestedRoles.map((role, index) => `${index + 1}. ${role}`).join("\n")}
+Reply: ${latestUserMessage}
+`;
+
+export const buildTargetRoleSuggestionReviewCorrectionPrompt = (
+    originalPrompt: string,
+    priorOutput: string,
+): string => `
+${originalPrompt}
+
+Repair the invalid output using one allowed JSON shape. Copy selected titles from Roles and evidence from Reply.
 Previous invalid review: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
 `;
 

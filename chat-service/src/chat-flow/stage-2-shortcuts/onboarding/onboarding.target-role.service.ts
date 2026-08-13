@@ -1,15 +1,12 @@
 import { recordChatLlmParseEvent } from "../../shared/llm/chat.llm.observability.utils";
 import type { ChatLlmObservedOperation } from "../../shared/llm/chat.llm.types";
 import type { OnboardingNearTermTarget } from "../../../routes/conversation/conversation.types";
-import {
-    MAX_OPEN_TARGET_ROLE_QUESTIONS,
-    MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS,
-    MIN_TARGET_DISCOVERY_QUESTIONS_FOR_OPTIONS,
-} from "./onboarding.target-role.consts";
+import { MAX_OPEN_TARGET_ROLE_QUESTIONS } from "./onboarding.target-role.consts";
 import {
     parseTargetRoleDecision,
     parseTargetRoleGroundingDecision,
     parseTargetRoleOptionsReviewDecision,
+    parseTargetRoleSuggestionReviewDecision,
 } from "./onboarding.target-role.llm.utils";
 import {
     buildTargetRoleCorrectionPrompt,
@@ -19,8 +16,14 @@ import {
     buildTargetRoleGroundingPrompt,
     buildTargetRoleOptionsReviewCorrectionPrompt,
     buildTargetRoleOptionsReviewPrompt,
+    buildTargetRoleSuggestionReviewCorrectionPrompt,
+    buildTargetRoleSuggestionReviewPrompt,
 } from "./onboarding.target-role.prompt.utils";
-import { buildTargetRoleFallbackReply } from "./onboarding.target-role.utils";
+import {
+    buildTargetRoleFallbackReply,
+    isTargetDiscoveryQuestionDisallowed,
+    resolveTargetDiscoverySubject,
+} from "./onboarding.target-role.utils";
 import type {
     ResolveTargetRoleDecisionParams,
     TargetRoleDecision,
@@ -71,10 +74,6 @@ const shouldUseTargetRoleOptions = (
     if (decision.status !== "ROLE_OPTIONS") {
         return false;
     }
-    const discoveryFactCount = Object.keys({
-        ...(targetState?.discoveryFacts ?? {}),
-        ...decision.discoveryFacts,
-    }).length;
     const previousRoleNames = [
         ...(targetState?.suggestedRoles ?? []),
         ...(targetState?.rejectedSuggestedRoles ?? []),
@@ -82,22 +81,16 @@ const shouldUseTargetRoleOptions = (
     const repeatsPreviousRole = decision.roles.some(
         (role) => previousRoleNames.includes(role.title.trim().toLowerCase()),
     );
-    const clarificationCount = targetState?.clarificationCount ?? 0;
-    const hasEnoughDiscoveryFacts = discoveryFactCount >= MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS
-        || (
-            clarificationCount >= MIN_TARGET_DISCOVERY_QUESTIONS_FOR_OPTIONS
-            && discoveryFactCount > 0
-        );
-    return !repeatsPreviousRole && (mustOfferChoices || hasEnoughDiscoveryFacts || reviewerKeptOptions);
+    return !repeatsPreviousRole && (mustOfferChoices || reviewerKeptOptions);
 };
 
 const resolveDiscoveryRecovery = async (
     params: ResolveTargetRoleDecisionParams,
     fallbackQuestion: string,
 ): Promise<TargetRoleDecision> => {
-    const previousAssistantMessage = [...params.conversation.messages]
-        .reverse()
-        .find((message) => message.role === "assistant")?.content;
+    const previousAssistantMessages = params.conversation.messages
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.content);
     const attempt = await completeJsonAttempt(
         params,
         buildTargetRoleDiscoveryRecoveryPrompt(params.conversation, params.latestUserMessage),
@@ -107,9 +100,9 @@ const resolveDiscoveryRecovery = async (
             if (decision?.status !== "NEEDS_CLARIFICATION") {
                 return null;
             }
-            const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-                === decision.question.trim().toLowerCase();
-            return repeatedQuestion ? null : decision;
+            return isTargetDiscoveryQuestionDisallowed(decision.question, previousAssistantMessages)
+                ? null
+                : decision;
         },
     );
     return attempt.decision ?? {
@@ -120,13 +113,66 @@ const resolveDiscoveryRecovery = async (
     };
 };
 
+const resolveSuggestedRoleSelection = async (
+    params: ResolveTargetRoleDecisionParams,
+    suggestedRoles: readonly string[],
+    discoveryFacts: Readonly<Record<string, string>>,
+): Promise<TargetRoleDecision | null> => {
+    const prompt = buildTargetRoleSuggestionReviewPrompt(params.latestUserMessage, suggestedRoles);
+    const parse = (rawText: string) => parseTargetRoleSuggestionReviewDecision(
+        rawText,
+        params.latestUserMessage,
+        suggestedRoles,
+    );
+    const first = await completeJsonAttempt(
+        params,
+        prompt,
+        "chat.onboarding.target_role.suggestion_review",
+        parse,
+    );
+    const reviewed = first.decision
+        ? first
+        : await completeJsonAttempt(
+            params,
+            buildTargetRoleSuggestionReviewCorrectionPrompt(prompt, first.rawText),
+            "chat.onboarding.target_role.suggestion_review.retry",
+            parse,
+        );
+    if (reviewed.decision?.verdict === "SELECTED") {
+        return { status: "READY", targetRole: reviewed.decision.targetRole, discoveryFacts };
+    }
+    if (reviewed.decision?.verdict === "CLARIFY_SELECTION") {
+        return {
+            status: "NEEDS_CLARIFICATION",
+            question: reviewed.decision.question,
+            subject: resolveTargetDiscoverySubject(undefined, reviewed.decision.question),
+            discoveryFacts,
+        };
+    }
+    return null;
+};
+
 export const resolveTargetRoleDecision = async (
     params: ResolveTargetRoleDecisionParams,
 ): Promise<TargetRoleDecision> => {
     const targetState = params.conversation.onboardingFlow?.nearTermTarget;
+    const suggestedRoles = targetState?.suggestedRoles ?? [];
+    if (suggestedRoles.length > 0) {
+        const suggestionDecision = await resolveSuggestedRoleSelection(
+            params,
+            suggestedRoles,
+            targetState?.discoveryFacts ?? {},
+        );
+        if (suggestionDecision) {
+            return suggestionDecision;
+        }
+    }
     const previousAssistantMessage = [...params.conversation.messages]
         .reverse()
         .find((message) => message.role === "assistant")?.content;
+    const previousAssistantMessages = params.conversation.messages
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.content);
     const fallbackQuestion = buildTargetRoleFallbackReply(previousAssistantMessage);
     const prompt = buildTargetRoleDecisionPrompt(
         params.conversation,
@@ -142,9 +188,11 @@ export const resolveTargetRoleDecision = async (
             return decision;
         }
         const repeatedSubject = (targetState?.coveredSubjects ?? []).includes(decision.subject);
-        const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-            === decision.question.trim().toLowerCase();
-        return mustOfferChoices || repeatedSubject || repeatedQuestion ? null : decision;
+        const disallowedQuestion = isTargetDiscoveryQuestionDisallowed(
+            decision.question,
+            previousAssistantMessages,
+        );
+        return mustOfferChoices || repeatedSubject || disallowedQuestion ? null : decision;
     };
     const first = await completeJsonAttempt(
         params,
@@ -177,9 +225,11 @@ export const resolveTargetRoleDecision = async (
             return decision;
         }
         const repeatedSubject = (targetState?.coveredSubjects ?? []).includes(decision.subject);
-        const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-            === decision.question.trim().toLowerCase();
-        return repeatedSubject || repeatedQuestion ? null : decision;
+        const disallowedQuestion = isTargetDiscoveryQuestionDisallowed(
+            decision.question,
+            previousAssistantMessages,
+        );
+        return repeatedSubject || disallowedQuestion ? null : decision;
     };
     const firstOptionsReview = optionsReviewPrompt
         ? await completeJsonAttempt(
@@ -251,7 +301,10 @@ export const resolveTargetRoleDecision = async (
     if (grounding.decision?.kind === "GROUNDED_SUGGESTION") {
         return resolved;
     }
-    if (grounding.decision?.kind === "NEEDS_CLARIFICATION") {
+    if (
+        grounding.decision?.kind === "NEEDS_CLARIFICATION"
+        && !isTargetDiscoveryQuestionDisallowed(grounding.decision.question, previousAssistantMessages)
+    ) {
         if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
             return optionsFallback;
         }
@@ -278,7 +331,10 @@ export const resolveTargetRoleDecision = async (
     if (groundingRetry.decision?.kind === "GROUNDED_SUGGESTION") {
         return resolved;
     }
-    if (groundingRetry.decision?.kind === "NEEDS_CLARIFICATION") {
+    if (
+        groundingRetry.decision?.kind === "NEEDS_CLARIFICATION"
+        && !isTargetDiscoveryQuestionDisallowed(groundingRetry.decision.question, previousAssistantMessages)
+    ) {
         if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
             return optionsFallback;
         }

@@ -17,6 +17,9 @@ import {
 const MAX_DISCOVERY_FACTS = 20;
 const MAX_DISCOVERY_FACT_CHARS = 240;
 const MAX_DISCOVERY_SUBJECT_CHARS = 80;
+const GENERIC_TARGET_DISCOVERY_QUESTION_PATTERNS: readonly RegExp[] = [
+    /\bwhat (?:specific )?aspects? of .+\bare you (?:unsure|uncertain|confused) about\b/i,
+];
 
 const parseDiscoveryFactValue = (value: unknown): string | null => {
     if (typeof value === "string") {
@@ -62,6 +65,26 @@ export const normalizeTargetDiscoveryQuestion = (value: string): string => {
     }
     const capitalized = `${withoutTrailingPunctuation.charAt(0).toUpperCase()}${withoutTrailingPunctuation.slice(1)}`;
     return capitalized.endsWith("?") ? capitalized : `${capitalized}?`;
+};
+
+const normalizeTargetDiscoveryQuestionForComparison = (value: string): string => value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+export const isTargetDiscoveryQuestionDisallowed = (
+    question: string,
+    previousAssistantMessages: readonly string[],
+): boolean => {
+    if (GENERIC_TARGET_DISCOVERY_QUESTION_PATTERNS.some((pattern) => pattern.test(question))) {
+        return true;
+    }
+
+    const normalizedQuestion = normalizeTargetDiscoveryQuestionForComparison(question);
+    return previousAssistantMessages.some(
+        (message) => normalizeTargetDiscoveryQuestionForComparison(message) === normalizedQuestion,
+    );
 };
 
 const normalizeDiscoverySubject = (value: string): string => value
