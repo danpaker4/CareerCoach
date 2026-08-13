@@ -41,9 +41,10 @@ const buildBackgroundPrompt = (
 
     return `You classify the user's professional background for a career coach.
 Return ONLY compact JSON, no markdown:
-{"response":"message","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false}
+{"response":"","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false}
 
 Rules:${COMMON_RULES}
+- Put the complete user-facing reply in response. Never leave it empty, return a placeholder, or put a question only in background.summary.
 - FOUND means the latest message or supplied account context contains usable work, study, project, or technical experience. Set advance=true.
 - NONE means the user explicitly has no experience or is seeking a first job. Set advance=true.
 - UNKNOWN means there is no usable background. Set advance=false and ask once for relevant background.
@@ -65,9 +66,10 @@ export const buildBackgroundReviewPrompt = (
     userAccountContext: string,
 ): string => `Review a proposed professional-background classification before it is saved.
 Return ONLY compact JSON, no markdown:
-{"response":"message","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false}
+{"response":"","background":{"status":"FOUND|NONE|UNKNOWN","role":null,"yearsOfExperience":null,"companies":[],"technologies":[],"education":[],"summary":null},"mode":null,"advance":false}
 
 Rules:${COMMON_RULES}
+- Put the complete user-facing reply in response. Never leave it empty, return a placeholder, or put a question only in background.summary.
 - FOUND requires actual current or past work, study, project, or technical experience stated by the user.
 - Supplied account context may establish real background when the latest message only states career intent.
 - A desired job, target role, job-search request, or statement that the user wants something new is career intent, not professional background.

@@ -66,6 +66,35 @@ describe("parseOnboardingLlmDecisionFromJson", () => {
         assert.doesNotMatch(decision.response, /NEAR_TERM|DREAMJOB|GUIDED|\[/);
         assert.match(decision.response, /looking for a job now/i);
     });
+
+    it("recovers the user-facing reply when the model copies the response placeholder", () => {
+        const decision = parseOnboardingLlmDecisionFromJson(JSON.stringify({
+            response: "message",
+            background: {
+                status: "NONE",
+                role: null,
+                yearsOfExperience: null,
+                companies: [],
+                technologies: [],
+                education: [{ name: "High School" }],
+                summary: "Recent high school graduate, looking to explore career options. "
+                    + "Are you looking for a job now, aiming for a longer-term role in the future, "
+                    + "or still figuring out what you want?",
+            },
+            mode: null,
+            advance: true,
+        }));
+
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            decision,
+            "hi my name is shai and i just finished high school",
+        );
+
+        assert.notEqual(step.reply, "message");
+        assert.match(step.reply, /recent high school graduate/i);
+        assert.match(step.reply, /looking for a job now/i);
+    });
 });
 
 describe("buildOnboardingPrompt", () => {
@@ -81,6 +110,7 @@ describe("buildOnboardingPrompt", () => {
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
         assert.match(prompt, /correct spelling.*natural professional language/i);
         assert.match(prompt, /do not replace or contradict/i);
+        assert.doesNotMatch(prompt, /"response":"message"/);
     });
 
     it("tells the model to resolve obvious misspellings from conversation context", () => {
@@ -384,6 +414,32 @@ describe("applyOnboardingDecision", () => {
         assert.match(step.reply, /same role/i);
         assert.match(step.reply, /different role/i);
         assert.doesNotMatch(step.reply, /You've been/);
+    });
+
+    it("asks for a first target job when a near-term user has no current role", () => {
+        const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
+            response: "You are just starting out. What are you looking for?",
+            background: { status: "NONE", role: null },
+            mode: null,
+            advance: true,
+        }).onboardingFlow;
+
+        const step = applyOnboardingDecision(
+            afterBackground,
+            {
+                response: "Let's find something you can start soon.",
+                background: { status: "UNKNOWN" },
+                mode: "NEAR_TERM",
+                advance: true,
+            },
+            "i am looking for some job rn",
+        );
+
+        assert.match(step.reply, /what kind of job/i);
+        assert.doesNotMatch(step.reply, /same role|different role/i);
+        assert.equal(step.onboardingFlow.directionResolved, true);
+        assert.equal(step.onboardingFlow.nearTermTarget?.step, "discovering_target");
+        assert.equal(step.completedThisTurn, false);
     });
 
     it("searches the current role only after the user chooses the same role", () => {

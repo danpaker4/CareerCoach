@@ -9,6 +9,7 @@ import type { TargetRoleOption } from "./onboarding.target-role.types";
 import {
     ONBOARDING_DIFFERENT_ROLE_REPLY,
     ONBOARDING_DIRECTION_REASK_REPLY,
+    ONBOARDING_FIRST_ROLE_REPLY,
     ONBOARDING_ROLE_CHOICE_REPLY,
 } from "./onboarding.types";
 
@@ -165,15 +166,31 @@ export const startNearTermTargetSelection = (
     current: OnboardingFlow,
     latestUserMessage: string,
 ): OnboardingStepResult => {
+    const currentRole = normalizeTargetRole(current.background?.role);
     const explicitTarget = normalizeTargetRole(extractNearTermSearchQuery(latestUserMessage));
     if (explicitTarget) {
-        const currentRole = current.background?.role?.trim().toLowerCase();
-        const roleChoice = currentRole === explicitTarget.toLowerCase() ? "SAME_ROLE" : "DIFFERENT_ROLE";
+        const roleChoice = currentRole?.toLowerCase() === explicitTarget.toLowerCase()
+            ? "SAME_ROLE"
+            : "DIFFERENT_ROLE";
         return completeNearTermTarget(current, explicitTarget, roleChoice);
     }
 
+    if (!currentRole) {
+        return {
+            reply: ONBOARDING_FIRST_ROLE_REPLY,
+            onboardingFlow: {
+                ...current,
+                directionResolved: true,
+                completed: false,
+                initialMode: "NEAR_TERM",
+                nearTermTarget: { step: "discovering_target", clarificationCount: 0 },
+            },
+            completedThisTurn: false,
+        };
+    }
+
     return {
-        reply: buildNearTermRoleChoiceReply(current.background?.role),
+        reply: buildNearTermRoleChoiceReply(currentRole),
         onboardingFlow: {
             ...current,
             directionResolved: true,
