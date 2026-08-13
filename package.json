@@ -11,6 +11,7 @@
     "dev:roadmap-service": "npm --prefix roadmap-service run dev",
     "dev:evaluation-service": "npm --prefix evaluation-service run dev",
     "dev:frontend": "npm --prefix frontend run dev",
+    "import:shai-conversation": "npm --prefix chat-service run import:shai-conversation",
     "dev:promptfoo-view": "npm --prefix evals/promptfoo run view",
     "dev": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,ROADMAP,EVAL,FRONT,PROMPTFOO \"npm run dev:users-service\" \"npm run dev:chat-service\" \"npm run dev:chat-worker\" \"npm run dev:job-service\" \"npm run dev:roadmap-service\" \"npm run dev:evaluation-service\" \"npm run dev:frontend\" \"npm run dev:promptfoo-view\"",
     "build": "concurrently -n USERS,CHAT,CHAT_WORKER,JOBS,ROADMAP,EVAL,FRONT \"npm run build:users-service\" \"npm run build:chat-service\" \"npm run build:chat-worker\" \"npm run build:job-service\" \"npm run build:roadmap-service\" \"npm run build:evaluation-service\" \"npm run build:frontend\"",
