@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
+import { hashStringToNumber, parsePipelineJobIdToEntryId } from '../job-suggestions/job-suggestions.utils';
 import { fetchStageOpportunities } from './career-roadmap-opportunities.utils';
 import type { StageOpportunity, StageOpportunitiesResponse } from './career-roadmap.types';
 
@@ -17,11 +18,14 @@ const EMPTY_PAGE: StageOpportunitiesResponse = {
 
 const FILTER_SEPARATOR = '\u001f';
 
-const OpportunityList = ({ title, items, expandedJobId, onToggleDetails }: {
+const OpportunityList = ({ title, items, expandedJobId, addingJobId, pipelineJobIds, onToggleDetails, onAddToPipeline }: {
   title: string;
   items: StageOpportunity[];
   expandedJobId: string | null;
+  addingJobId: string | null;
+  pipelineJobIds: ReadonlySet<number>;
   onToggleDetails: (jobId: string) => void;
+  onAddToPipeline: (job: StageOpportunity) => void;
 }) => {
   if (items.length === 0) return null;
   return (
@@ -30,12 +34,13 @@ const OpportunityList = ({ title, items, expandedJobId, onToggleDetails }: {
       <ul className="roadmap-jobs-list">
         {items.map((item) => {
           const expanded = expandedJobId === item.jobId;
+          const inPipeline = pipelineJobIds.has(hashStringToNumber(item.jobId));
           return (
             <li key={item.jobId} className="roadmap-job-card">
               <div className="roadmap-job-card-head">
                 <div>
                   <h5>{item.title}</h5>
-                  <p>{item.company} · {item.seniority || 'Seniority not specified'} · {item.matchPct}% match</p>
+                  <p>{item.company} · {item.seniority || 'Seniority not specified'}</p>
                 </div>
                 <span className={`roadmap-job-fit roadmap-job-fit--${item.fit}`}>{item.fit === 'apply-now' ? 'Apply now' : 'Target job'}</span>
               </div>
@@ -53,7 +58,9 @@ const OpportunityList = ({ title, items, expandedJobId, onToggleDetails }: {
               )}
               <div className="roadmap-job-actions">
                 <button type="button" onClick={() => onToggleDetails(item.jobId)}>{expanded ? 'Hide details' : 'See details'}</button>
-                <a href={item.url} target="_blank" rel="noopener noreferrer">Open job</a>
+                <button type="button" onClick={() => onAddToPipeline(item)} disabled={inPipeline || addingJobId === item.jobId}>
+                  {inPipeline ? 'In my pipeline' : addingJobId === item.jobId ? 'Adding…' : 'Add to my pipeline'}
+                </button>
               </div>
             </li>
           );
@@ -75,6 +82,9 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
   const [editingAlert, setEditingAlert] = useState(false);
   const [seniority, setSeniority] = useState('');
   const [location, setLocation] = useState('');
+  const [addingJobId, setAddingJobId] = useState<string | null>(null);
+  const [pipelineJobIds, setPipelineJobIds] = useState<ReadonlySet<number>>(new Set());
+  const [pipelineError, setPipelineError] = useState('');
   const primaryRole = roleCategories[0] ?? '';
   const [searchTitle, setSearchTitle] = useState(primaryRole);
   const [activeSearchTitle, setActiveSearchTitle] = useState(primaryRole);
@@ -94,6 +104,14 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
       .catch(() => setError('Could not load jobs for this roadmap stage.'))
       .finally(() => setLoading(false));
   }, [open, page, roleCategoriesKey, userSkillsKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline/${userId}`, { credentials: 'include' })
+      .then(async (response) => response.status === 404 ? [] : response.ok ? response.json() : Promise.reject(new Error('Failed to load pipeline')))
+      .then((data: unknown) => setPipelineJobIds(new Set(parsePipelineJobIdToEntryId(data).keys())))
+      .catch(() => setPipelineError('Could not check your pipeline. Please try again.'));
+  }, [open, userId]);
 
   useEffect(() => {
     if (!open) return;
@@ -137,6 +155,32 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
     }
   };
 
+  const addToPipeline = async (job: StageOpportunity) => {
+    const numericJobId = hashStringToNumber(job.jobId);
+    setAddingJobId(job.jobId);
+    setPipelineError('');
+    try {
+      const response = await apiFetch(`${ENV.JOB_SERVICE_BASE_URL}/jobs-in-pipeline`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          jobId: numericJobId,
+          jobStage: 'wishlist',
+          description: `${job.title} at ${job.company}`,
+          source: 'career-roadmap',
+        }),
+      });
+      if (!response.ok && response.status !== 409) throw new Error('Failed to add job to pipeline');
+      setPipelineJobIds((current) => new Set(current).add(numericJobId));
+    } catch {
+      setPipelineError('Could not add this job to your pipeline. Please try again.');
+    } finally {
+      setAddingJobId(null);
+    }
+  };
+
   const applyNow = result.opportunities.filter((item) => item.fit === 'apply-now');
   const targetJobs = result.opportunities.filter((item) => item.fit === 'target');
 
@@ -171,6 +215,7 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
               </form>
               {loading && <p className="journey-opportunities-loading">Loading jobs…</p>}
               {error && <p className="journey-opportunities-error">{error}</p>}
+              {pipelineError && <p className="journey-opportunities-error">{pipelineError}</p>}
               {!loading && !error && result.opportunities.length === 0 && (
                 <div className="roadmap-jobs-empty">
                   <h4>No matching jobs are available right now</h4>
@@ -192,8 +237,8 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
               )}
               {!loading && !error && (
                 <>
-                  <OpportunityList title="Apply now" items={applyNow} expandedJobId={expandedJobId} onToggleDetails={(id) => setExpandedJobId((value) => value === id ? null : id)} />
-                  <OpportunityList title="Target jobs" items={targetJobs} expandedJobId={expandedJobId} onToggleDetails={(id) => setExpandedJobId((value) => value === id ? null : id)} />
+                  <OpportunityList title="Apply now" items={applyNow} expandedJobId={expandedJobId} addingJobId={addingJobId} pipelineJobIds={pipelineJobIds} onToggleDetails={(id) => setExpandedJobId((value) => value === id ? null : id)} onAddToPipeline={(job) => void addToPipeline(job)} />
+                  <OpportunityList title="Target jobs" items={targetJobs} expandedJobId={expandedJobId} addingJobId={addingJobId} pipelineJobIds={pipelineJobIds} onToggleDetails={(id) => setExpandedJobId((value) => value === id ? null : id)} onAddToPipeline={(job) => void addToPipeline(job)} />
                 </>
               )}
             </div>
