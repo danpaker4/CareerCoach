@@ -4,6 +4,29 @@ import type { EnrichedJob } from "../../../poller/job-poller-api-stack/stages/en
 import { discoverStageOpportunities } from "../career-roadmap-opportunities.utils";
 
 describe("discoverStageOpportunities", () => {
+    it("finds a company-specific fintech CEO job for the generic fintech CEO roadmap role", async () => {
+        const payoneerJob = {
+            id: "payoneer-ceo",
+            jobTitle: "CEO of Payoneer Fintech",
+            company: "Payoneer",
+            seniority: "executive",
+            url: "https://example.test/jobs/payoneer-ceo",
+            description: "Lead Payoneer's fintech business.",
+        } as EnrichedJob;
+        const find = vi.fn((query: { jobTitle: { $regex: string; $options: string } }) => {
+            const matcher = new RegExp(query.jobTitle.$regex, query.jobTitle.$options);
+            const matchingJobs = [payoneerJob].filter((job) => matcher.test(job.jobTitle));
+            return { limit: () => ({ toArray: async () => matchingJobs }) };
+        });
+        const collection = { find } as unknown as Collection<EnrichedJob>;
+
+        const result = await discoverStageOpportunities(collection, {
+            roleCategories: ["ceo of fintech company"],
+        });
+
+        expect(result.opportunities.map((opportunity) => opportunity.title)).toContain("CEO of Payoneer Fintech");
+    });
+
     it("supports legacy jobs without enrichment arrays", async () => {
         const legacyJob = {
             id: "legacy-job",

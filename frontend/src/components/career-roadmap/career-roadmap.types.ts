@@ -3,6 +3,9 @@ import type { User } from '../../types/user';
 export type ResourceType = 'course' | 'video' | 'practice' | 'article' | 'docs' | 'repository' | 'certification';
 
 export type ProgressionType = 'learning' | 'experience' | 'hybrid';
+export type RoadmapStageKind = 'learning' | 'experience' | 'leadership' | 'role-readiness';
+
+export interface StageCompletionOption { id: string; label: string; }
 
 export type RecommendationSource = 'profile-match' | 'job-market' | 'employer-signal' | 'reviewed-template' | 'ai-personalized';
 
@@ -112,6 +115,11 @@ export interface StageContent {
   howToGetThere?: string;
   whatYouGain?: string;
   progressionType?: ProgressionType;
+  careerPathRole?: string;
+  roleGroupIndex?: number;
+  stageKind?: RoadmapStageKind;
+  completionOptions?: StageCompletionOption[];
+  allowCustomCompletionOption?: boolean;
   requiredCapabilities?: string[];
   skillsToBuild?: string[];
   responsibilitiesToGain?: string[];
@@ -151,6 +159,8 @@ export interface RoadmapStage {
   selectedProjectId?: string;
   completedProjectIds?: string[];
   dismissedRecommendationIds?: string[];
+  selectedCompletionOptionId?: string;
+  customCompletionOption?: string;
 }
 
 export interface CareerRoadmapData {

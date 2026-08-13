@@ -34,6 +34,11 @@ export type DeterministicStage = {
     readonly howToGetThere?: string;
     readonly whatYouGain?: string;
     readonly progressionType: "learning" | "experience" | "hybrid";
+    readonly careerPathRole?: string;
+    readonly roleGroupIndex?: number;
+    readonly stageKind?: "learning" | "experience" | "leadership" | "role-readiness";
+    readonly completionOptions?: readonly { readonly id: string; readonly label: string }[];
+    readonly allowCustomCompletionOption?: boolean;
     readonly actions: readonly string[];
     readonly actionIds: readonly string[];
     readonly resources: readonly {

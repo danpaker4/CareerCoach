@@ -619,14 +619,20 @@
   border-radius: 14px;
 }
 
-.roadmap-path-options-head p { margin: 4px 0 0; color: var(--text-muted); }
-
-.roadmap-path-options-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+.roadmap-path-options-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
 }
+.roadmap-path-options-head::-webkit-details-marker { display: none; }
+.roadmap-path-options-head > span:first-child { display: grid; gap: 4px; }
+.roadmap-path-options-head small { color: var(--text-muted); font-weight: 400; }
+.roadmap-dropdown-label { display: flex; align-items: center; gap: 9px; color: var(--text-muted); white-space: nowrap; }
+.roadmap-path-options[open] .roadmap-path-options-head .journey-caret { margin-top: 3px; transform: rotate(-135deg); }
+.roadmap-path-options[open] .roadmap-path-option { margin-top: 14px; }
 
 .roadmap-path-option {
   padding: 14px;
@@ -641,6 +647,41 @@
 .roadmap-path-option h4 span { margin-left: 8px; color: var(--clr-purple); font-size: 0.72rem; text-transform: uppercase; }
 .roadmap-path-option p { color: var(--text-muted); }
 .roadmap-path-option ol { margin-bottom: 0; padding-left: 20px; }
+
+.journey-role-group {
+  width: 100%;
+  margin: 22px 0 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.journey-role-group--open { border-color: var(--clr-purple); }
+.journey-role-group > span:first-child { display: grid; gap: 3px; }
+.journey-role-group small { color: var(--text-muted); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.06em; }
+.journey-role-group > span:last-child { color: var(--text-muted); white-space: nowrap; }
+
+.journey-stage-job-search {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.journey-stage-job-search > strong { color: var(--text-primary); }
+.journey-stage-job-search > span { color: var(--text-muted); }
+.journey-already-know { margin: 4px 0 12px; }
 
 .journey-ordering {
   display: grid;
@@ -727,57 +768,6 @@
   .stage-evidence-form { grid-template-columns: 1fr; }
 }
 
-.roadmap-upgrade-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0 20px;
-}
-
-.roadmap-upgrade-row button {
-  flex: none;
-  padding: 8px 12px;
-  border: 1px solid var(--clr-purple);
-  border-radius: 8px;
-  background: var(--clr-purple-bg);
-  color: var(--clr-purple);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.roadmap-upgrade-row span { color: var(--text-muted); font-size: 0.85rem; }
-
-.roadmap-upgrade-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1001;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgb(15 23 42 / 58%);
-}
-
-.roadmap-upgrade-dialog {
-  width: min(680px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
-  padding: 24px;
-  border-radius: 16px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-xl);
-}
-
-.roadmap-upgrade-dialog h3 { margin-top: 0; }
-.roadmap-upgrade-dialog ol { display: grid; gap: 8px; padding-left: 24px; }
-.roadmap-upgrade-dialog li strong,
-.roadmap-upgrade-dialog li span { display: block; }
-.roadmap-upgrade-dialog li span { margin-top: 2px; color: var(--text-muted); font-size: 0.82rem; }
-.roadmap-upgrade-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.roadmap-upgrade-actions button { padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-muted); color: var(--text-primary); cursor: pointer; }
-.roadmap-upgrade-actions .primary { border-color: var(--clr-purple); background: var(--clr-purple); color: white; }
-
 .roadmap-feasibility {
   display: grid;
   gap: 4px;
@@ -803,30 +793,6 @@
   background: var(--surface-muted);
   color: var(--text-primary);
 }
-
-.stage-improve-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 9px;
-  margin-top: 14px;
-}
-
-.stage-improve-row button {
-  padding: 8px 11px;
-  border: 1px solid var(--clr-purple);
-  border-radius: var(--r-sm);
-  background: var(--clr-purple-bg);
-  color: var(--clr-purple);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.stage-improve-row span { color: var(--text-muted); font-size: var(--fz-sm); }
-.stage-upgrade-summary { display: grid; gap: 6px; padding: 13px; border-radius: var(--r-md); background: var(--surface-muted); }
-.stage-upgrade-summary span { color: var(--text-muted); font-size: var(--fz-sm); }
-.stage-upgrade-summary p { margin: 3px 0 0; }
 
 .stage-action-plan-head,
 .stage-project-head,
@@ -870,6 +836,19 @@
 
 .stage-plan-reason { padding: 10px; border-radius: var(--r-sm); background: var(--surface-subtle); color: var(--text-secondary); }
 .stage-plan-section { display: grid; gap: 10px; padding-top: 13px; border-top: 1px solid var(--border-subtle); }
+.stage-plan-section-dropdown > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-heading);
+  font-weight: 700;
+  cursor: pointer;
+}
+.stage-plan-section-dropdown > summary small { color: var(--text-muted); font-weight: 500; }
+.stage-dropdown-meta { display: inline-flex; align-items: center; gap: 10px; }
+.stage-plan-section-dropdown[open] > summary .journey-caret { margin-top: 3px; transform: rotate(-135deg); }
+.stage-plan-section-dropdown[open] > summary { margin-bottom: 10px; }
 .stage-role-list,
 .stage-project-list,
 .stage-route-alternatives { display: grid; gap: 10px; }
@@ -1642,6 +1621,40 @@
   padding: 22px;
 }
 
+.roadmap-job-title-search {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.roadmap-job-title-search label { color: var(--text-primary); font-weight: 700; }
+.roadmap-job-title-search > div { display: flex; gap: 10px; }
+.roadmap-job-title-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font: inherit;
+}
+.roadmap-job-title-search button {
+  padding: 10px 14px;
+  border: 1px solid var(--clr-primary);
+  border-radius: 8px;
+  background: var(--clr-primary);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roadmap-job-title-search button:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .roadmap-jobs-group + .roadmap-jobs-group {
   margin-top: 28px;
 }
@@ -1750,5 +1763,6 @@
   .roadmap-jobs-backdrop { padding: 0; }
   .roadmap-jobs-dialog { width: 100%; max-height: 100vh; min-height: 100vh; border-radius: 0; }
   .roadmap-job-card-head { align-items: flex-start; flex-direction: column; }
+  .roadmap-job-title-search > div { flex-direction: column; }
   .roadmap-alert-options { grid-template-columns: 1fr; }
 }

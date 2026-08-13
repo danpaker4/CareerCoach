@@ -127,8 +127,11 @@ export const StageActionPlanPanel = ({ stage, userId, userSkills, onUpdate }: St
       ))}
 
       {visibleRoles.length > 0 && (
-        <div className="stage-plan-section">
-          <h6>Roles that build this experience</h6>
+        <details className="stage-plan-section stage-plan-section-dropdown">
+          <summary>
+            <span>Jobs that build this experience</span>
+            <span className="stage-dropdown-meta"><small>{availableRoles.length} options</small><span className="journey-caret" aria-hidden="true" /></span>
+          </summary>
           <div className="stage-role-list">
             {visibleRoles.map((role) => (
               <article key={role.id} className="stage-role-option">
@@ -143,12 +146,15 @@ export const StageActionPlanPanel = ({ stage, userId, userSkills, onUpdate }: St
             ))}
           </div>
           {availableRoles.length > 3 && <button type="button" className="stage-plan-more" onClick={() => setShowMoreRoles((value) => !value)}>{showMoreRoles ? 'Show fewer roles' : 'Show more roles'}</button>}
-        </div>
+        </details>
       )}
 
       {visibleProjects.length > 0 && (
-        <div className="stage-plan-section">
-          <h6>Projects you can choose</h6>
+        <details className="stage-plan-section stage-plan-section-dropdown">
+          <summary>
+            <span>Projects you can choose</span>
+            <span className="stage-dropdown-meta"><small>{availableProjects.length} options</small><span className="journey-caret" aria-hidden="true" /></span>
+          </summary>
           <div className="stage-project-list">
             {visibleProjects.map((project) => (
               <ProjectBrief
@@ -169,7 +175,7 @@ export const StageActionPlanPanel = ({ stage, userId, userSkills, onUpdate }: St
             ))}
           </div>
           {availableProjects.length > 3 && <button type="button" className="stage-plan-more" onClick={() => setShowMoreProjects((value) => !value)}>{showMoreProjects ? 'Show fewer projects' : 'Show more projects'}</button>}
-        </div>
+        </details>
       )}
 
       <button type="button" className="stage-route-alternatives-toggle" onClick={() => setShowAlternatives((value) => !value)}>{showAlternatives ? 'Hide other routes' : 'Other routes'}</button>
