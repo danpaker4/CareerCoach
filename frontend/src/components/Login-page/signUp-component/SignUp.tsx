@@ -5,6 +5,7 @@ import { ENV } from '../../../config';
 import { apiFetch } from '../../../lib/apiClient';
 import { readAuthResponse } from '../../../lib/authResponse';
 import { setStoredAccessToken } from '../../../lib/authSession';
+import { BirthDatePicker } from './BirthDatePicker';
 
 interface SignUpProps {
     onLoginSuccess: (user: User) => void;
@@ -25,6 +26,11 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (isSubmitting) {
+            return;
+        }
+
+        if (!birthDate) {
+            setError('Please select your date of birth.');
             return;
         }
 
@@ -84,7 +90,7 @@ export const SignUp = ({ onLoginSuccess }: SignUpProps) => {
 
             <div className="input-group">
                 <label>Date of Birth</label>
-                <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required />
+                <BirthDatePicker value={birthDate} onChange={setBirthDate} />
             </div>
 
             <div className="input-group">
