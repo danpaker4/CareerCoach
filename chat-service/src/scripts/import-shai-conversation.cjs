@@ -3,6 +3,7 @@ const { MongoClient, ObjectId } = require("mongodb");
 const { isDeepStrictEqual } = require("node:util");
 const { z } = require("zod");
 const rawConversation = require("./shai-conversation.seed.json");
+const rawLegacyConversation = require("./shai-legacy-conversation.seed.json");
 
 dotenv.config();
 
@@ -40,6 +41,14 @@ const ConversationExportSchema = z.object({
     messages: z.array(ConversationMessageSchema).min(1),
 }).strict();
 
+const LegacyConversationExportSchema = z.object({
+    id: z.string().refine((value) => ObjectId.isValid(value), "Invalid conversation id"),
+    chat: z.array(z.object({
+        user: z.string(),
+        chatbot: z.string(),
+    }).strict()).min(1),
+}).strict();
+
 const TargetUserSchema = z.object({
     _id: z.string().uuid(),
     firstName: z.string(),
@@ -62,9 +71,86 @@ const serializeMessages = (messages) => messages.map((message) => ({
     timestamp: message.timestamp.toISOString(),
 }));
 
+const normalizeCurrentConversation = (value) => {
+    const exportedConversation = ConversationExportSchema.parse(value);
+    return {
+        conversationId: exportedConversation.conversationId,
+        messages: exportedConversation.messages.map((message) => ({
+            ...message,
+            timestamp: new Date(message.timestamp),
+        })),
+    };
+};
+
+const normalizeLegacyConversation = (value) => {
+    const exportedConversation = LegacyConversationExportSchema.parse(value);
+    const conversationId = new ObjectId(exportedConversation.id);
+    const timestampOrigin = conversationId.getTimestamp().getTime();
+    const messagesWithoutTimestamps = exportedConversation.chat.flatMap((turn) => [
+        ...(turn.user.length > 0 ? [{ role: "user", content: turn.user }] : []),
+        ...(turn.chatbot.length > 0 ? [{ role: "assistant", content: turn.chatbot }] : []),
+    ]);
+
+    return {
+        conversationId: exportedConversation.id,
+        messages: messagesWithoutTimestamps.map((message, index) => ({
+            ...message,
+            timestamp: new Date(timestampOrigin + index),
+        })),
+    };
+};
+
+const ensureConversation = async (conversationsCollection, targetUser, conversation) => {
+    const conversationId = new ObjectId(conversation.conversationId);
+    const firstMessage = conversation.messages[0];
+    const lastMessage = conversation.messages.at(-1);
+    if (!firstMessage || !lastMessage) {
+        throw new Error("The conversation must contain at least one message");
+    }
+
+    const existingConversation = await conversationsCollection.findOne({ _id: conversationId });
+    const stageProgress = createCompletedStageProgress();
+
+    if (existingConversation) {
+        if (existingConversation.userId !== targetUser._id) {
+            throw new Error(`Conversation ${conversation.conversationId} already belongs to a different user`);
+        }
+        const matchesImport = isDeepStrictEqual(
+            serializeMessages(existingConversation.messages),
+            serializeMessages(conversation.messages),
+        )
+            && existingConversation.createdAt.getTime() === firstMessage.timestamp.getTime()
+            && existingConversation.updatedAt.getTime() === lastMessage.timestamp.getTime()
+            && isDeepStrictEqual(existingConversation.stageProgress, stageProgress);
+        if (!matchesImport) {
+            throw new Error(`Conversation ${conversation.conversationId} already exists but does not match the import`);
+        }
+        console.log(
+            `Conversation ${conversation.conversationId} already exists for ${TARGET_FIRST_NAME} ${TARGET_LAST_NAME}`,
+        );
+        return;
+    }
+
+    await conversationsCollection.insertOne({
+        _id: conversationId,
+        userId: targetUser._id,
+        messages: conversation.messages,
+        stageProgress,
+        createdAt: firstMessage.timestamp,
+        updatedAt: lastMessage.timestamp,
+    });
+    console.log(
+        `Imported conversation ${conversation.conversationId} with ${conversation.messages.length} messages `
+            + `for ${targetUser.firstName} ${targetUser.lastName}`,
+    );
+};
+
 const runImport = async () => {
     const env = ImportEnvSchema.parse(process.env);
-    const exportedConversation = ConversationExportSchema.parse(rawConversation);
+    const conversations = [
+        normalizeCurrentConversation(rawConversation),
+        normalizeLegacyConversation(rawLegacyConversation),
+    ];
     const client = new MongoClient(
         env.MONGO_CONNECTION_STRING,
         getMongoClientOptions(env.MONGO_KEY_PATH),
@@ -90,56 +176,12 @@ const runImport = async () => {
         }
 
         const targetUser = TargetUserSchema.parse(matchingUsers[0]);
-        const conversationId = new ObjectId(exportedConversation.conversationId);
-        const messages = exportedConversation.messages.map((message) => ({
-            ...message,
-            timestamp: new Date(message.timestamp),
-        }));
-        const firstMessage = messages[0];
-        const lastMessage = messages.at(-1);
-        if (!firstMessage || !lastMessage) {
-            throw new Error("The conversation must contain at least one message");
-        }
-
         const conversationsCollection = database.collection("conversations");
-        const existingConversation = await conversationsCollection.findOne({ _id: conversationId });
-        const stageProgress = createCompletedStageProgress();
-
-        if (existingConversation) {
-            if (existingConversation.userId !== targetUser._id) {
-                throw new Error(
-                    `Conversation ${exportedConversation.conversationId} already belongs to a different user`,
-                );
-            }
-            const matchesExport = isDeepStrictEqual(
-                serializeMessages(existingConversation.messages),
-                exportedConversation.messages,
-            )
-                && existingConversation.createdAt.getTime() === firstMessage.timestamp.getTime()
-                && existingConversation.updatedAt.getTime() === lastMessage.timestamp.getTime()
-                && isDeepStrictEqual(existingConversation.stageProgress, stageProgress);
-            if (!matchesExport) {
-                throw new Error(
-                    `Conversation ${exportedConversation.conversationId} already exists but does not match the import`,
-                );
-            }
-            console.log(
-                `Conversation ${exportedConversation.conversationId} already exists for ${TARGET_FIRST_NAME} ${TARGET_LAST_NAME}`,
-            );
-            return;
-        }
-
-        await conversationsCollection.insertOne({
-            _id: conversationId,
-            userId: targetUser._id,
-            messages,
-            stageProgress,
-            createdAt: firstMessage.timestamp,
-            updatedAt: lastMessage.timestamp,
-        });
-        console.log(
-            `Imported conversation ${exportedConversation.conversationId} with ${messages.length} messages `
-                + `for ${targetUser.firstName} ${targetUser.lastName}`,
+        await conversations.reduce(
+            (previousImport, conversation) => previousImport.then(
+                () => ensureConversation(conversationsCollection, targetUser, conversation),
+            ),
+            Promise.resolve(),
         );
     } finally {
         await client.close();
