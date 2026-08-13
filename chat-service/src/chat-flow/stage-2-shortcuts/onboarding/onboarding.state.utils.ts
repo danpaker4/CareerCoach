@@ -7,7 +7,7 @@ import {
     ONBOARDING_BACKGROUND_REASK_REPLY,
     ONBOARDING_DIRECTION_REASK_REPLY,
 } from "./onboarding.types";
-import { resolveOnboardingDirectionMode } from "./onboarding.direction.utils";
+import { isFirstJobDirectionMessage, resolveOnboardingDirectionMode } from "./onboarding.direction.utils";
 import {
     applyChatStatedFactsToBackground,
     buildChatStatedBackgroundReply,
@@ -90,7 +90,7 @@ export const applyOnboardingDecision = (
                 resolveOnboardingDirectionMode(latestUserMessage);
             if (resolvedMode) {
                 if (resolvedMode === "NEAR_TERM") {
-                    return startNearTermTargetSelection(withBackground, latestUserMessage);
+                    return startNearTermTargetSelection(withBackground, latestUserMessage, decision);
                 }
                 const next: OnboardingFlow = {
                     ...withBackground,
@@ -149,12 +149,14 @@ export const applyOnboardingDecision = (
     }
 
     if (!current.directionResolved) {
-        const resolvedMode: OnboardingInitialMode | null =
-            decision.mode ?? resolveOnboardingDirectionMode(latestUserMessage);
+        const detectedMode = resolveOnboardingDirectionMode(latestUserMessage);
+        const resolvedMode: OnboardingInitialMode | null = isFirstJobDirectionMessage(latestUserMessage)
+            ? detectedMode
+            : decision.mode ?? detectedMode;
 
         if (resolvedMode) {
             if (resolvedMode === "NEAR_TERM") {
-                return startNearTermTargetSelection(current, latestUserMessage);
+                return startNearTermTargetSelection(current, latestUserMessage, decision);
             }
             const next: OnboardingFlow = {
                 ...current,

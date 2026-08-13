@@ -165,6 +165,7 @@ const completeNearTermTarget = (
 export const startNearTermTargetSelection = (
     current: OnboardingFlow,
     latestUserMessage: string,
+    decision?: OnboardingLlmDecision,
 ): OnboardingStepResult => {
     const currentRole = normalizeTargetRole(current.background?.role);
     const explicitTarget = normalizeTargetRole(extractNearTermSearchQuery(latestUserMessage));
@@ -176,14 +177,24 @@ export const startNearTermTargetSelection = (
     }
 
     if (!currentRole) {
+        const candidateQuestion = decision?.response.trim();
+        const subject = decision?.targetDiscoverySubject?.trim();
+        const validatedQuestion = candidateQuestion ? buildDifferentRoleDiscoveryReply(candidateQuestion) : null;
+        const modelGeneratedQuestion = candidateQuestion && subject && validatedQuestion === candidateQuestion
+            ? candidateQuestion
+            : null;
         return {
-            reply: ONBOARDING_FIRST_ROLE_REPLY,
+            reply: modelGeneratedQuestion ?? ONBOARDING_FIRST_ROLE_REPLY,
             onboardingFlow: {
                 ...current,
                 directionResolved: true,
                 completed: false,
                 initialMode: "NEAR_TERM",
-                nearTermTarget: { step: "discovering_target", clarificationCount: 0 },
+                nearTermTarget: {
+                    step: "discovering_target",
+                    clarificationCount: modelGeneratedQuestion ? 1 : 0,
+                    ...(modelGeneratedQuestion && subject ? { coveredSubjects: [subject] } : {}),
+                },
             },
             completedThisTurn: false,
         };
@@ -215,12 +226,19 @@ export const continueNearTermTargetSelection = (
     const coveredSubjects = decision.targetDiscoverySubject
         ? [...new Set([...(targetFlow.coveredSubjects ?? []), decision.targetDiscoverySubject])]
         : targetFlow.coveredSubjects;
+    const rejectedSuggestedRoles = decision.rejectedTargetRoleOptions
+        ? [...new Set([
+            ...(targetFlow.rejectedSuggestedRoles ?? []),
+            ...(targetFlow.suggestedRoles ?? []),
+        ])]
+        : targetFlow.rejectedSuggestedRoles;
     const currentWithDiscovery: OnboardingFlow = {
         ...current,
         nearTermTarget: {
             ...targetFlow,
             discoveryFacts,
             coveredSubjects,
+            rejectedSuggestedRoles,
         },
     };
     const explicitTarget = normalizeTargetRole(extractNearTermSearchQuery(latestUserMessage));
@@ -286,6 +304,7 @@ export const continueNearTermTargetSelection = (
                 suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles ?? [],
                 discoveryFacts,
                 coveredSubjects,
+                rejectedSuggestedRoles,
             },
         },
         completedThisTurn: false,

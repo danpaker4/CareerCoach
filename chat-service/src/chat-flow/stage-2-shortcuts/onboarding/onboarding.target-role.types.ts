@@ -13,13 +13,25 @@ type TargetRoleDecisionBase = {
 
 export type TargetRoleDecision = TargetRoleDecisionBase & (
     | { readonly status: "READY"; readonly targetRole: string }
-    | { readonly status: "NEEDS_CLARIFICATION"; readonly question: string; readonly subject: string }
+    | {
+        readonly status: "NEEDS_CLARIFICATION";
+        readonly question: string;
+        readonly subject: string;
+        readonly rejectedSuggestedRoles?: boolean;
+    }
     | { readonly status: "ROLE_OPTIONS"; readonly summary: string; readonly roles: readonly TargetRoleOption[] }
 );
 
 export type TargetRoleOptionsReviewDecision =
     | { readonly verdict: "KEEP_OPTIONS" }
-    | { readonly verdict: "READY"; readonly targetRole: string; readonly evidenceQuote: string };
+    | { readonly verdict: "READY"; readonly targetRole: string; readonly evidenceQuote: string }
+    | {
+        readonly verdict: "RESUME_DISCOVERY";
+        readonly question: string;
+        readonly subject: string;
+        readonly discoveryFacts: Readonly<Record<string, string>>;
+        readonly rejectedSuggestedRoles: boolean;
+    };
 
 export type TargetRoleGroundingDecision =
     | { readonly kind: "GROUNDED_ROLE"; readonly evidenceQuote: string; readonly normalizedTargetRole: string }

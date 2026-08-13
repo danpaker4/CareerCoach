@@ -107,7 +107,13 @@ export const parseTargetRoleDecision = (rawText: string, latestUserMessage?: str
         const subject = object.subject.trim().slice(0, 80);
         const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
         return validatedQuestion === question && subject.length >= 2
-            ? { status: "NEEDS_CLARIFICATION", question, subject, discoveryFacts }
+            ? {
+                status: "NEEDS_CLARIFICATION",
+                question,
+                subject,
+                discoveryFacts,
+                ...(object.rejectedSuggestedRoles === true ? { rejectedSuggestedRoles: true } : {}),
+            }
             : null;
     }
 
@@ -133,6 +139,24 @@ export const parseTargetRoleOptionsReviewDecision = (
     const verdict = object.verdict.trim().toUpperCase().replace(/[\s-]+/g, "_");
     if (verdict === "KEEP_OPTIONS") {
         return { verdict: "KEEP_OPTIONS" };
+    }
+    if (
+        verdict === "RESUME_DISCOVERY"
+        && typeof object.question === "string"
+        && typeof object.subject === "string"
+    ) {
+        const question = object.question.trim();
+        const subject = object.subject.trim().slice(0, 80);
+        const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
+        return validatedQuestion === question && subject.length >= 2
+            ? {
+                verdict: "RESUME_DISCOVERY",
+                question,
+                subject,
+                discoveryFacts: parseTargetDiscoveryFacts(object.discoveryFacts),
+                rejectedSuggestedRoles: object.rejectedSuggestedRoles === true,
+            }
+            : null;
     }
     if (verdict !== "READY") {
         return null;

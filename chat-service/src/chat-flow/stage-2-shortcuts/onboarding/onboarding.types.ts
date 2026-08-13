@@ -14,6 +14,7 @@ export type OnboardingLlmDecision = {
     targetRole?: string | null;
     targetRoleReady?: boolean;
     targetRoleOptions?: string[];
+    rejectedTargetRoleOptions?: boolean;
     targetDiscoveryFacts?: Readonly<Record<string, string>>;
     targetDiscoverySubject?: string | null;
 };
