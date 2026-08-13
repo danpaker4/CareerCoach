@@ -208,6 +208,19 @@
   margin: 0;
 }
 
+.journey-destination-search-empty p {
+  margin: 0;
+}
+
+.journey-destination-wishlist-button {
+  margin-top: 12px;
+  padding: 8px 14px;
+}
+
+.journey-destination-search-empty .journey-destination-search-error {
+  margin-top: 10px;
+}
+
 .journey-destination-search-error {
   font-size: var(--fz-sm);
   color: var(--clr-error);
