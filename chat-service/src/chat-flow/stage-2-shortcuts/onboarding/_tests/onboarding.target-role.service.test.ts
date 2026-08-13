@@ -6,6 +6,7 @@ import {
     parseTargetRoleDecision,
     parseTargetRoleGroundingDecision,
     parseTargetRoleOptionsReviewDecision,
+    parseTargetRoleSuggestionReviewDecision,
 } from "../onboarding.target-role.llm.utils";
 import { buildTargetRoleDecisionPrompt } from "../onboarding.target-role.prompt.utils";
 import { resolveTargetRoleDecision } from "../onboarding.target-role.service";
@@ -221,7 +222,7 @@ describe("buildTargetRoleDecisionPrompt", () => {
         assert.doesNotMatch(prompt, /prefer ROLE_OPTIONS now/i);
     });
 
-    it("prefers grounded role options once discovery has enough useful facts", () => {
+    it("distinguishes useful discovery from background and uncertainty", () => {
         const latestUserMessage = "i enjoy design and drawing";
         const conversation = createFirstRoleConversation(latestUserMessage);
         if (conversation.onboardingFlow?.nearTermTarget) {
@@ -233,8 +234,8 @@ describe("buildTargetRoleDecisionPrompt", () => {
 
         const prompt = buildTargetRoleDecisionPrompt(conversation, latestUserMessage, "Name: shai");
 
-        assert.match(prompt, /Once at least 2 meaningful facts are known, prefer ROLE_OPTIONS/i);
-        assert.match(prompt, /one critical discriminator/i);
+        assert.match(prompt, /known skills or preferences distinguish useful paths/i);
+        assert.match(prompt, /background, timing, and uncertainty do not count/i);
         assert.ok(prompt.length < 4_000);
     });
 });
@@ -322,6 +323,40 @@ describe("parseTargetRoleOptionsReviewDecision", () => {
             targetRole: "Software Developer",
             evidenceQuote: "i want a hitech job",
         }), "i want a hitech job");
+
+        assert.equal(decision, null);
+    });
+});
+
+describe("parseTargetRoleSuggestionReviewDecision", () => {
+    it("accepts a model-inferred reference to an active suggestion", () => {
+        const decision = parseTargetRoleSuggestionReviewDecision(
+            JSON.stringify({
+                verdict: "SELECTED",
+                targetRole: "Graphic Designer",
+                evidenceQuote: "the first option sounds nice",
+            }),
+            "the first option sounds nice",
+            ["Graphic Designer", "Digital Illustrator", "UI/UX Designer"],
+        );
+
+        assert.deepEqual(decision, {
+            verdict: "SELECTED",
+            targetRole: "Graphic Designer",
+            evidenceQuote: "the first option sounds nice",
+        });
+    });
+
+    it("rejects a model-selected role that was not offered", () => {
+        const decision = parseTargetRoleSuggestionReviewDecision(
+            JSON.stringify({
+                verdict: "SELECTED",
+                targetRole: "Art Director",
+                evidenceQuote: "the first option sounds nice",
+            }),
+            "the first option sounds nice",
+            ["Graphic Designer", "Digital Illustrator", "UI/UX Designer"],
+        );
 
         assert.equal(decision, null);
     });
@@ -455,7 +490,7 @@ describe("resolveTargetRoleDecision", () => {
             ],
             discoveryFacts: { interest: "drawing" },
         };
-        const outputs = [JSON.stringify(roleOptions), "not-json"];
+        const outputs = [JSON.stringify(roleOptions), JSON.stringify({ verdict: "KEEP_OPTIONS" })];
         const prompts: string[] = [];
         const textCompletion: TextCompletionPort = {
             complete: async (prompt) => {
@@ -531,6 +566,7 @@ describe("resolveTargetRoleDecision", () => {
             ];
         }
         const outputs = [
+            JSON.stringify({ verdict: "CONTINUE_DISCOVERY" }),
             JSON.stringify({
                 status: "ROLE_OPTIONS",
                 summary: "Here are some alternatives.",
@@ -581,6 +617,7 @@ describe("resolveTargetRoleDecision", () => {
             ];
         }
         const outputs = [
+            JSON.stringify({ verdict: "CONTINUE_DISCOVERY" }),
             JSON.stringify({
                 status: "READY",
                 targetRole: "Data Analyst",
@@ -615,7 +652,7 @@ describe("resolveTargetRoleDecision", () => {
         });
     });
 
-    it("preserves useful role options when a reviewer invents an unsupported target", async () => {
+    it("preserves useful role options when the reviewer approves them", async () => {
         const roleOptions = {
             status: "ROLE_OPTIONS",
             summary: "Your interest in working with data points to these paths.",
@@ -628,15 +665,7 @@ describe("resolveTargetRoleDecision", () => {
         };
         const outputs = [
             JSON.stringify(roleOptions),
-            JSON.stringify({
-                status: "READY",
-                targetRole: "Product Manager",
-                discoveryFacts: { desired_work: "own product direction" },
-            }),
-            JSON.stringify({
-                kind: "NEEDS_CLARIFICATION",
-                question: "Which specific data role interests you most?",
-            }),
+            JSON.stringify({ verdict: "KEEP_OPTIONS" }),
         ];
         const textCompletion: TextCompletionPort = {
             complete: async () => outputs.shift() ?? "",
@@ -737,6 +766,7 @@ describe("resolveTargetRoleDecision", () => {
             ];
         }
         const outputs = [
+            JSON.stringify({ verdict: "CONTINUE_DISCOVERY" }),
             JSON.stringify({
                 status: "ROLE_OPTIONS",
                 summary: "Your technical background and desire to work with data point to these paths.",
@@ -771,9 +801,9 @@ describe("resolveTargetRoleDecision", () => {
         });
 
         assert.deepEqual(decision, { status: "READY", targetRole: "data analyst", discoveryFacts: {} });
-        assert.equal(prompts.length, 3);
-        assert.match(prompts[1] ?? "", /review the prior role decision/i);
-        assert.match(prompts[1] ?? "", /what about data analyst\?/i);
+        assert.equal(prompts.length, 4);
+        assert.match(prompts[2] ?? "", /review the prior role decision/i);
+        assert.match(prompts[2] ?? "", /what about data analyst\?/i);
     });
 
     it("treats an explicitly named DevOps target as ready instead of offering adjacent roles", async () => {
@@ -863,6 +893,82 @@ describe("resolveTargetRoleDecision", () => {
         assert.match(prompts[2] ?? "", /review the prior role decision/i);
     });
 
+    it("recovers with a new question when premature role options fail review", async () => {
+        const latestUserMessage = "mix of both";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 3;
+            conversation.onboardingFlow.nearTermTarget.discoveryFacts = {
+                recent_high_school_graduation: "true",
+                job_search_now: "true",
+                human_interaction_needed: "?",
+            };
+            conversation.onboardingFlow.nearTermTarget.coveredSubjects = [
+                "task_oriented_work",
+                "people_and_technology",
+            ];
+        }
+        const recoveryQuestion = "Would you rather create things, solve problems, or help people directly?";
+        const outputs = [
+            JSON.stringify({
+                status: "ROLE_OPTIONS",
+                summary: "",
+                roles: [
+                    { title: "Data Entry Clerk", reason: "Recent high school graduation and human interaction." },
+                    { title: "Customer Service Representative", reason: "Interest in people and technology." },
+                    { title: "Help Desk Technician", reason: "Recent high school graduation and technology." },
+                ],
+                discoveryFacts: {
+                    recent_high_school_graduation: "true",
+                    job_search_now: "true",
+                    human_interaction_needed: "?",
+                },
+            }),
+            JSON.stringify({
+                verdict: "RESUME_DISCOVERY",
+                question: "What specific tasks would you like to perform in your job?",
+                subject: "task_oriented_work",
+                discoveryFacts: {},
+                rejectedSuggestedRoles: false,
+            }),
+            JSON.stringify({
+                verdict: "READY",
+                targetRole: "Data Entry Clerk",
+                evidenceQuote: "i dont know",
+            }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: recoveryQuestion,
+                subject: "preferred_contribution",
+                discoveryFacts: { people_and_technology: "mix of both" },
+            }),
+        ];
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return outputs.shift() ?? "";
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage,
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: recoveryQuestion,
+            subject: "preferred_contribution",
+            discoveryFacts: { people_and_technology: "mix of both" },
+        });
+        assert.equal(prompts.length, 4);
+    });
+
     it("understands selection of a previously generated role suggestion", async () => {
         const conversation = createDifferentRoleConversation("the first one");
         if (conversation.onboardingFlow?.nearTermTarget) {
@@ -872,15 +978,11 @@ describe("resolveTargetRoleDecision", () => {
                 "Operations Manager",
             ];
         }
-        const outputs = [
-            JSON.stringify({
-                status: "READY",
-                targetRole: "Product Manager",
-                evidenceQuote: "the first one",
-                discoveryFacts: {},
-            }),
-            JSON.stringify({ kind: "GROUNDED_SUGGESTION", evidenceQuote: "the first one" }),
-        ];
+        const outputs = [JSON.stringify({
+            verdict: "SELECTED",
+            targetRole: "Product Manager",
+            evidenceQuote: "the first one",
+        })];
         const textCompletion: TextCompletionPort = {
             complete: async () => outputs.shift() ?? "",
         };
@@ -897,6 +999,122 @@ describe("resolveTargetRoleDecision", () => {
         assert.deepEqual(decision, { status: "READY", targetRole: "Product Manager", discoveryFacts: {} });
     });
 
+    it("resolves a clear suggestion reference before general discovery", async () => {
+        const latestUserMessage = "the first option sounds nice";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.suggestedRoles = [
+                "Graphic Designer",
+                "Digital Illustrator",
+                "UI/UX Designer",
+            ];
+        }
+        const outputs = [JSON.stringify({
+            verdict: "SELECTED",
+            targetRole: "Graphic Designer",
+            evidenceQuote: latestUserMessage,
+        })];
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return outputs.shift() ?? "";
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage,
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "Graphic Designer", discoveryFacts: {} });
+        assert.equal(prompts.length, 1);
+        assert.match(prompts[0] ?? "", /Infer references semantically/);
+        assert.match(prompts[0] ?? "", /1\. Graphic Designer/);
+    });
+
+    it("resolves a selected saved role before invalid general decisions can trigger discovery", async () => {
+        const latestUserMessage = "UI/UX Designer sounds great";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.suggestedRoles = [
+                "UI/UX Designer",
+                "Web Developer",
+                "Graphic Designer",
+            ];
+        }
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                if (prompt.includes("Decide whether the latest reply selects")) {
+                    return JSON.stringify({
+                        verdict: "SELECTED",
+                        targetRole: "UI/UX Designer",
+                        evidenceQuote: latestUserMessage,
+                    });
+                }
+                return JSON.stringify({
+                    status: "READY",
+                    targetRole: "",
+                    evidenceQuote: latestUserMessage,
+                    discoveryFacts: {},
+                });
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage,
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, { status: "READY", targetRole: "UI/UX Designer", discoveryFacts: {} });
+        assert.equal(prompts.length, 1);
+    });
+
+    it("uses the model's targeted clarification when a suggestion reference is ambiguous", async () => {
+        const latestUserMessage = "one of the design ones sounds good";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.suggestedRoles = [
+                "Graphic Designer",
+                "Digital Illustrator",
+                "UI/UX Designer",
+            ];
+        }
+        const outputs = [JSON.stringify({
+            verdict: "CLARIFY_SELECTION",
+            question: "Do you mean Graphic Designer, Digital Illustrator, or UI/UX Designer?",
+        })];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage,
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: "Do you mean Graphic Designer, Digital Illustrator, or UI/UX Designer?",
+            subject: "question_do_you_mean_graphic_designer_digital_illustrator_or_ui_ux_designer",
+            discoveryFacts: {},
+        });
+    });
+
     it("accepts a suggested role title without requiring its description", async () => {
         const conversation = createDifferentRoleConversation("Financial Analyst");
         if (conversation.onboardingFlow?.nearTermTarget) {
@@ -906,19 +1124,11 @@ describe("resolveTargetRoleDecision", () => {
                 "Financial Analyst",
             ];
         }
-        const outputs = [
-            JSON.stringify({
-                status: "READY",
-                targetRole: "Financial Analyst",
-                evidenceQuote: "Financial Analyst",
-                discoveryFacts: {},
-            }),
-            JSON.stringify({
-                kind: "GROUNDED_ROLE",
-                evidenceQuote: "Financial Analyst",
-                normalizedTargetRole: "Financial Analyst",
-            }),
-        ];
+        const outputs = [JSON.stringify({
+            verdict: "SELECTED",
+            targetRole: "Financial Analyst",
+            evidenceQuote: "Financial Analyst",
+        })];
         const prompts: string[] = [];
         const textCompletion: TextCompletionPort = {
             complete: async (prompt) => {
@@ -937,7 +1147,7 @@ describe("resolveTargetRoleDecision", () => {
         });
 
         assert.deepEqual(decision, { status: "READY", targetRole: "Financial Analyst", discoveryFacts: {} });
-        assert.equal(prompts.length, 2);
+        assert.equal(prompts.length, 1);
     });
 
     it("offers roles instead of searching when the user has not selected a target", async () => {

@@ -11,6 +11,7 @@ import type {
     TargetRoleGroundingDecision,
     TargetRoleOption,
     TargetRoleOptionsReviewDecision,
+    TargetRoleSuggestionReviewDecision,
 } from "./onboarding.target-role.types";
 
 const MAX_ROLE_REASON_CHARS = 240;
@@ -169,6 +170,37 @@ export const parseTargetRoleOptionsReviewDecision = (
         ? normalizeEvidence(evidenceQuote).includes(normalizeEvidence(targetRole))
         : false;
     return targetRole && evidenceQuote && targetIsExplicit ? { verdict: "READY", targetRole, evidenceQuote } : null;
+};
+
+export const parseTargetRoleSuggestionReviewDecision = (
+    rawText: string,
+    latestUserMessage: string,
+    suggestedRoles: readonly string[],
+): TargetRoleSuggestionReviewDecision | null => {
+    const object = parseJsonObjectFromLlm(rawText);
+    if (!object || typeof object.verdict !== "string") {
+        return null;
+    }
+    const verdict = object.verdict.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    if (verdict === "CONTINUE_DISCOVERY") {
+        return { verdict: "CONTINUE_DISCOVERY" };
+    }
+    if (verdict === "CLARIFY_SELECTION" && typeof object.question === "string") {
+        const question = normalizeTargetDiscoveryQuestion(object.question);
+        const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
+        return validatedQuestion === question ? { verdict: "CLARIFY_SELECTION", question } : null;
+    }
+    if (verdict !== "SELECTED" || typeof object.targetRole !== "string") {
+        return null;
+    }
+    const returnedTargetRole = object.targetRole;
+    const selectedRole = suggestedRoles.find(
+        (role) => normalizeEvidence(role) === normalizeEvidence(returnedTargetRole),
+    );
+    const evidenceQuote = parseExactEvidenceQuote(object.evidenceQuote, latestUserMessage);
+    return selectedRole && evidenceQuote
+        ? { verdict: "SELECTED", targetRole: selectedRole, evidenceQuote }
+        : null;
 };
 
 export const parseTargetRoleGroundingDecision = (

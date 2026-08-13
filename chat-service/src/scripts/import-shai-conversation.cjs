@@ -1,16 +1,14 @@
-import dotenv from "dotenv";
-import { MongoClient, ObjectId, type MongoClientOptions } from "mongodb";
-import { isDeepStrictEqual } from "node:util";
-import { z } from "zod";
-import type { Conversation } from "../routes/conversation/conversation.model";
-import { completeAllStages, getCurrentStage } from "../routes/conversation/conversation.stage.utils";
-import { defaultStageProgress } from "../routes/conversation/conversation.utils";
-import rawConversation from "./shai-conversation.seed.json";
+const dotenv = require("dotenv");
+const { MongoClient, ObjectId } = require("mongodb");
+const { isDeepStrictEqual } = require("node:util");
+const { z } = require("zod");
+const rawConversation = require("./shai-conversation.seed.json");
 
 dotenv.config();
 
 const TARGET_FIRST_NAME = "shai";
 const TARGET_LAST_NAME = "shai";
+const COMPLETED_STAGE_IDS = ["achievements", "timeline", "preferences"];
 
 const ImportEnvSchema = z.object({
     MONGO_CONNECTION_STRING: z.string().trim().min(1, "MONGO_CONNECTION_STRING is required"),
@@ -48,10 +46,23 @@ const TargetUserSchema = z.object({
     lastName: z.string(),
 });
 
-const getMongoClientOptions = (mongoKeyPath: string | undefined): MongoClientOptions =>
+const getMongoClientOptions = (mongoKeyPath) =>
     mongoKeyPath && mongoKeyPath !== "none" ? { tlsCertificateKeyFile: mongoKeyPath } : {};
 
-const runImport = async (): Promise<void> => {
+const createCompletedStageProgress = () => ({
+    currentStageIndex: COMPLETED_STAGE_IDS.length,
+    completedStageIds: COMPLETED_STAGE_IDS,
+    awaitingConfirmation: false,
+    stageNotes: {},
+    surfacedAchievementIds: [],
+});
+
+const serializeMessages = (messages) => messages.map((message) => ({
+    ...message,
+    timestamp: message.timestamp.toISOString(),
+}));
+
+const runImport = async () => {
     const env = ImportEnvSchema.parse(process.env);
     const exportedConversation = ConversationExportSchema.parse(rawConversation);
     const client = new MongoClient(
@@ -90,8 +101,9 @@ const runImport = async (): Promise<void> => {
             throw new Error("The conversation must contain at least one message");
         }
 
-        const conversationsCollection = database.collection<Conversation>("conversations");
+        const conversationsCollection = database.collection("conversations");
         const existingConversation = await conversationsCollection.findOne({ _id: conversationId });
+        const stageProgress = createCompletedStageProgress();
 
         if (existingConversation) {
             if (existingConversation.userId !== targetUser._id) {
@@ -99,17 +111,13 @@ const runImport = async (): Promise<void> => {
                     `Conversation ${exportedConversation.conversationId} already belongs to a different user`,
                 );
             }
-            const existingMessages = existingConversation.messages.map((message) => ({
-                ...message,
-                timestamp: message.timestamp.toISOString(),
-            }));
-            const latestUserMessage = [...existingConversation.messages]
-                .reverse()
-                .find((message) => message.role === "user")?.content;
-            const matchesExport = isDeepStrictEqual(existingMessages, exportedConversation.messages)
+            const matchesExport = isDeepStrictEqual(
+                serializeMessages(existingConversation.messages),
+                exportedConversation.messages,
+            )
                 && existingConversation.createdAt.getTime() === firstMessage.timestamp.getTime()
                 && existingConversation.updatedAt.getTime() === lastMessage.timestamp.getTime()
-                && getCurrentStage(existingConversation, latestUserMessage) === null;
+                && isDeepStrictEqual(existingConversation.stageProgress, stageProgress);
             if (!matchesExport) {
                 throw new Error(
                     `Conversation ${exportedConversation.conversationId} already exists but does not match the import`,
@@ -121,16 +129,14 @@ const runImport = async (): Promise<void> => {
             return;
         }
 
-        const conversation: Conversation = {
+        await conversationsCollection.insertOne({
             _id: conversationId,
             userId: targetUser._id,
             messages,
-            stageProgress: completeAllStages(defaultStageProgress()),
+            stageProgress,
             createdAt: firstMessage.timestamp,
             updatedAt: lastMessage.timestamp,
-        };
-
-        await conversationsCollection.insertOne(conversation);
+        });
         console.log(
             `Imported conversation ${exportedConversation.conversationId} with ${messages.length} messages `
                 + `for ${targetUser.firstName} ${targetUser.lastName}`,
@@ -140,7 +146,7 @@ const runImport = async (): Promise<void> => {
     }
 };
 
-runImport().catch((error: unknown) => {
+runImport().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
 });
