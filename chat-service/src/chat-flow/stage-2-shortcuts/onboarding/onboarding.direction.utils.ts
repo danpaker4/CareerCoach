@@ -6,6 +6,9 @@ import {
 } from "../../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
 
 /** Extra near-term phrases common during the onboarding direction question. */
+export const isFirstJobDirectionMessage = (message: string): boolean =>
+    /\bfirst\s+(?:job|role|position)\b/i.test(message);
+
 const ONBOARDING_NEAR_TERM_PATTERNS: readonly RegExp[] = [
     /\blooking for something\s+(?:now|soon|asap)\b/i,
     /\b(?:want|wanna|need)\s+something\s+(?:now|soon|asap)\b/i,
@@ -31,7 +34,11 @@ export const resolveOnboardingDirectionMode = (message: string): OnboardingIniti
     if (isDreamJobPivotMessage(trimmed)) {
         return "DREAMJOB";
     }
-    if (isNearTermPivotMessage(trimmed) || ONBOARDING_NEAR_TERM_PATTERNS.some((pattern) => pattern.test(trimmed))) {
+    if (
+        isFirstJobDirectionMessage(trimmed)
+        || isNearTermPivotMessage(trimmed)
+        || ONBOARDING_NEAR_TERM_PATTERNS.some((pattern) => pattern.test(trimmed))
+    ) {
         return "NEAR_TERM";
     }
     return null;

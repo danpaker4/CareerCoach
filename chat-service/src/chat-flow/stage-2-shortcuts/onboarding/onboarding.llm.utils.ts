@@ -5,7 +5,11 @@ import type {
 } from "../../../routes/conversation/conversation.types";
 import { parseJsonObjectFromLlm } from "../../shared/llm/json-response.utils";
 import type { OnboardingLlmDecision } from "./onboarding.types";
-import { ONBOARDING_DIRECTION_REASK_REPLY, ONBOARDING_PARSE_FALLBACK_REPLY } from "./onboarding.types";
+import {
+    ONBOARDING_BACKGROUND_REASK_REPLY,
+    ONBOARDING_DIRECTION_REASK_REPLY,
+    ONBOARDING_PARSE_FALLBACK_REPLY,
+} from "./onboarding.types";
 import { parseTargetDiscoveryFacts } from "./onboarding.target-role.utils";
 
 const INTERNAL_LABEL_LEAK_PATTERN =
@@ -95,21 +99,40 @@ const parseBackground = (value: unknown): OnboardingBackground => {
     };
 };
 
+const resolveUserResponse = (obj: Record<string, unknown>, background: OnboardingBackground): string => {
+    const candidate = typeof obj.response === "string" && obj.response.trim().length > 0
+        ? obj.response.trim()
+        : typeof obj.r === "string" && obj.r.trim().length > 0
+            ? obj.r.trim()
+            : null;
+
+    if (candidate && candidate.toLowerCase() !== "message") {
+        return candidate;
+    }
+    if (background.status === "UNKNOWN") {
+        return ONBOARDING_BACKGROUND_REASK_REPLY;
+    }
+    if (!background.summary) {
+        return ONBOARDING_DIRECTION_REASK_REPLY;
+    }
+    if (background.summary.includes("?")) {
+        return background.summary;
+    }
+    return `${background.summary.replace(/[.\s]+$/, "")}. ${ONBOARDING_DIRECTION_REASK_REPLY}`;
+};
+
 export const parseOnboardingLlmDecisionFromJson = (rawText: string): OnboardingLlmDecision => {
     const obj = parseJsonObjectFromLlm(rawText);
     if (!obj) {
         throw new Error("Onboarding LLM returned invalid JSON");
     }
 
-    const rawResponse = typeof obj.response === "string" && obj.response.trim().length > 0
-        ? obj.response.trim()
-        : typeof obj.r === "string" && obj.r.trim().length > 0
-            ? obj.r.trim()
-            : ONBOARDING_PARSE_FALLBACK_REPLY;
+    const background = parseBackground(obj.background);
+    const rawResponse = resolveUserResponse(obj, background);
 
     return {
         response: sanitizeOnboardingUserResponse(rawResponse),
-        background: parseBackground(obj.background),
+        background,
         mode: parseMode(obj.mode),
         advance: obj.advance === true,
         roleChoice: parseRoleChoice(obj.roleChoice),

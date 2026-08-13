@@ -5,18 +5,39 @@ import type {
 import { extractNearTermSearchQuery } from "../../stage-1-prepare-context/mode-detection/conversation-mode.pivot.utils";
 import { sanitizeClaimedRole } from "../role-conflict/role-conflict.utils";
 import type { OnboardingLlmDecision, OnboardingStepResult } from "./onboarding.types";
+import { TARGET_DISCOVERY_SUBJECT_PLACEHOLDERS } from "./onboarding.target-role.consts";
 import type { TargetRoleOption } from "./onboarding.target-role.types";
 import {
     ONBOARDING_DIFFERENT_ROLE_REPLY,
     ONBOARDING_DIRECTION_REASK_REPLY,
+    ONBOARDING_FIRST_ROLE_REPLY,
     ONBOARDING_ROLE_CHOICE_REPLY,
 } from "./onboarding.types";
 
 const MAX_DISCOVERY_FACTS = 20;
 const MAX_DISCOVERY_FACT_CHARS = 240;
+const MAX_DISCOVERY_SUBJECT_CHARS = 80;
 
-const isStringFactEntry = (entry: [string, unknown]): entry is [string, string] =>
-    entry[0].trim().length > 0 && typeof entry[1] === "string";
+const parseDiscoveryFactValue = (value: unknown): string | null => {
+    if (typeof value === "string") {
+        return value.trim().slice(0, MAX_DISCOVERY_FACT_CHARS) || null;
+    }
+    if (!Array.isArray(value)) {
+        return null;
+    }
+    const items = value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    return items.length > 0 ? items.join(", ").slice(0, MAX_DISCOVERY_FACT_CHARS) : null;
+};
+
+const parseDiscoveryFactEntry = (entry: [string, unknown]): readonly [string, string] | null => {
+    const key = entry[0].trim().slice(0, 80);
+    const fact = parseDiscoveryFactValue(entry[1]);
+    return key && fact ? [key, fact] : null;
+};
 
 export const parseTargetDiscoveryFacts = (value: unknown): Readonly<Record<string, string>> => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -24,11 +45,39 @@ export const parseTargetDiscoveryFacts = (value: unknown): Readonly<Record<strin
     }
     return Object.fromEntries(
         Object.entries(value)
-            .filter(isStringFactEntry)
-            .map(([key, fact]) => [key.trim().slice(0, 80), fact.trim().slice(0, MAX_DISCOVERY_FACT_CHARS)])
-            .filter(([, fact]) => fact.length > 0)
+            .map(parseDiscoveryFactEntry)
+            .filter((entry): entry is readonly [string, string] => entry !== null)
             .slice(0, MAX_DISCOVERY_FACTS),
     );
+};
+
+export const normalizeTargetDiscoveryQuestion = (value: string): string => {
+    const trimmed = value.trim();
+    const withNaturalSpacing = /^[a-z0-9_]+$/i.test(trimmed)
+        ? trimmed.replace(/_+/g, " ")
+        : trimmed;
+    const withoutTrailingPunctuation = withNaturalSpacing.replace(/[.!]+$/, "").trim();
+    if (!withoutTrailingPunctuation) {
+        return "";
+    }
+    const capitalized = `${withoutTrailingPunctuation.charAt(0).toUpperCase()}${withoutTrailingPunctuation.slice(1)}`;
+    return capitalized.endsWith("?") ? capitalized : `${capitalized}?`;
+};
+
+const normalizeDiscoverySubject = (value: string): string => value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, MAX_DISCOVERY_SUBJECT_CHARS);
+
+export const resolveTargetDiscoverySubject = (value: unknown, question: string): string => {
+    const candidate = typeof value === "string" ? normalizeDiscoverySubject(value) : "";
+    const isPlaceholder = TARGET_DISCOVERY_SUBJECT_PLACEHOLDERS.some((placeholder) => placeholder === candidate);
+    if (candidate.length >= 2 && !isPlaceholder) {
+        return candidate;
+    }
+    return `question_${normalizeDiscoverySubject(question)}`.slice(0, MAX_DISCOVERY_SUBJECT_CHARS);
 };
 
 const SAME_ROLE_PATTERNS: readonly RegExp[] = [
@@ -110,7 +159,7 @@ export const buildTargetRoleFallbackReply = (previousAssistantMessage: string | 
 export const formatTargetRoleOptionsReply = (summary: string, roles: readonly TargetRoleOption[]): string => {
     const roleLines = roles.map((role, index) => `${index + 1}. ${role.title} — ${role.reason}`);
     return [
-        summary.trim(),
+        ...(summary.trim() ? [summary.trim()] : []),
         ...roleLines,
         "Which role feels closest, or do none of them fit?",
     ].join("\n");
@@ -164,16 +213,45 @@ const completeNearTermTarget = (
 export const startNearTermTargetSelection = (
     current: OnboardingFlow,
     latestUserMessage: string,
+    decision?: OnboardingLlmDecision,
 ): OnboardingStepResult => {
+    const currentRole = normalizeTargetRole(current.background?.role);
     const explicitTarget = normalizeTargetRole(extractNearTermSearchQuery(latestUserMessage));
     if (explicitTarget) {
-        const currentRole = current.background?.role?.trim().toLowerCase();
-        const roleChoice = currentRole === explicitTarget.toLowerCase() ? "SAME_ROLE" : "DIFFERENT_ROLE";
+        const roleChoice = currentRole?.toLowerCase() === explicitTarget.toLowerCase()
+            ? "SAME_ROLE"
+            : "DIFFERENT_ROLE";
         return completeNearTermTarget(current, explicitTarget, roleChoice);
     }
 
+    if (!currentRole) {
+        const candidateQuestion = decision?.response.trim();
+        const validatedQuestion = candidateQuestion ? buildDifferentRoleDiscoveryReply(candidateQuestion) : null;
+        const modelGeneratedQuestion = candidateQuestion && validatedQuestion === candidateQuestion
+            ? candidateQuestion
+            : null;
+        const subject = modelGeneratedQuestion
+            ? resolveTargetDiscoverySubject(decision?.targetDiscoverySubject, modelGeneratedQuestion)
+            : null;
+        return {
+            reply: modelGeneratedQuestion ?? ONBOARDING_FIRST_ROLE_REPLY,
+            onboardingFlow: {
+                ...current,
+                directionResolved: true,
+                completed: false,
+                initialMode: "NEAR_TERM",
+                nearTermTarget: {
+                    step: "discovering_target",
+                    clarificationCount: modelGeneratedQuestion ? 1 : 0,
+                    ...(subject ? { coveredSubjects: [subject] } : {}),
+                },
+            },
+            completedThisTurn: false,
+        };
+    }
+
     return {
-        reply: buildNearTermRoleChoiceReply(current.background?.role),
+        reply: buildNearTermRoleChoiceReply(currentRole),
         onboardingFlow: {
             ...current,
             directionResolved: true,
@@ -198,12 +276,19 @@ export const continueNearTermTargetSelection = (
     const coveredSubjects = decision.targetDiscoverySubject
         ? [...new Set([...(targetFlow.coveredSubjects ?? []), decision.targetDiscoverySubject])]
         : targetFlow.coveredSubjects;
+    const rejectedSuggestedRoles = decision.rejectedTargetRoleOptions
+        ? [...new Set([
+            ...(targetFlow.rejectedSuggestedRoles ?? []),
+            ...(targetFlow.suggestedRoles ?? []),
+        ])]
+        : targetFlow.rejectedSuggestedRoles;
     const currentWithDiscovery: OnboardingFlow = {
         ...current,
         nearTermTarget: {
             ...targetFlow,
             discoveryFacts,
             coveredSubjects,
+            rejectedSuggestedRoles,
         },
     };
     const explicitTarget = normalizeTargetRole(extractNearTermSearchQuery(latestUserMessage));
@@ -269,6 +354,7 @@ export const continueNearTermTargetSelection = (
                 suggestedRoles: decision.targetRoleOptions ?? targetFlow.suggestedRoles ?? [],
                 discoveryFacts,
                 coveredSubjects,
+                rejectedSuggestedRoles,
             },
         },
         completedThisTurn: false,

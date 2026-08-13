@@ -51,6 +51,7 @@ export type OnboardingNearTermTarget = {
     searchQuery?: string;
     clarificationCount?: number;
     suggestedRoles?: string[];
+    rejectedSuggestedRoles?: string[];
     discoveryFacts?: OnboardingTargetDiscoveryFacts;
     coveredSubjects?: string[];
 };

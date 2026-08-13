@@ -212,6 +212,7 @@ const resolveOnboardingDecision = async (
         targetRoleReady: false,
         targetDiscoveryFacts: targetDecision.discoveryFacts,
         targetDiscoverySubject: targetDecision.subject,
+        rejectedTargetRoleOptions: targetDecision.rejectedSuggestedRoles,
     };
 };
 

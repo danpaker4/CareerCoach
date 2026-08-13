@@ -5,6 +5,7 @@ import type { TextCompletionPort } from "../../../../litellm/text-completion/tex
 import {
     parseTargetRoleDecision,
     parseTargetRoleGroundingDecision,
+    parseTargetRoleOptionsReviewDecision,
 } from "../onboarding.target-role.llm.utils";
 import { buildTargetRoleDecisionPrompt } from "../onboarding.target-role.prompt.utils";
 import { resolveTargetRoleDecision } from "../onboarding.target-role.service";
@@ -47,6 +48,27 @@ const createDifferentRoleConversation = (latestUserMessage = "product manager"):
     createdAt: new Date(0),
     updatedAt: new Date(4),
 });
+
+const createFirstRoleConversation = (latestUserMessage: string): Conversation => {
+    const conversation = createDifferentRoleConversation(latestUserMessage);
+    const onboardingFlow = conversation.onboardingFlow;
+    if (!onboardingFlow) {
+        throw new Error("Expected onboarding flow in test conversation");
+    }
+    return {
+        ...conversation,
+        messages: [
+            { role: "user", content: "i want to find my first job", timestamp: new Date(0) },
+            { role: "assistant", content: "What kind of job would you like to look for?", timestamp: new Date(1) },
+            { role: "user", content: latestUserMessage, timestamp: new Date(2) },
+        ],
+        onboardingFlow: {
+            ...onboardingFlow,
+            background: { status: "NONE", role: null },
+            nearTermTarget: { step: "discovering_target", clarificationCount: 0 },
+        },
+    };
+};
 
 describe("parseTargetRoleDecision", () => {
     it("accepts a concrete target role", () => {
@@ -112,6 +134,38 @@ describe("parseTargetRoleDecision", () => {
         });
     });
 
+    it("recovers a natural question and string facts from compact model formatting", () => {
+        const decision = parseTargetRoleDecision(JSON.stringify({
+            status: "NEEDS_CLARIFICATION",
+            question: "would_you_rather_design_interfaces_write_code_or_help_customers",
+            discoveryFacts: { interests: ["designing", "drawing"] },
+        }));
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: "Would you rather design interfaces write code or help customers?",
+            subject: "question_would_you_rather_design_interfaces_write_code_or_help_customers",
+            discoveryFacts: { interests: "designing, drawing" },
+        });
+    });
+
+    it("accepts grounded role options when the optional summary is empty", () => {
+        const decision = parseTargetRoleDecision(JSON.stringify({
+            status: "ROLE_OPTIONS",
+            summary: "",
+            roles: [
+                { title: "UX Designer", reason: "Connects visual design with shaping digital product experiences." },
+                { title: "Graphic Designer", reason: "Uses drawing and composition to create visual communication." },
+                { title: "Digital Illustrator", reason: "Applies drawing skills directly in digital creative work." },
+            ],
+            discoveryFacts: { interests: ["designing", "drawing"] },
+        }));
+
+        assert.equal(decision?.status, "ROLE_OPTIONS");
+        assert.equal(decision?.summary, "");
+        assert.deepEqual(decision?.discoveryFacts, { interests: "designing, drawing" });
+    });
+
     it("formats validated role options as a readable numbered list", () => {
         const reply = formatTargetRoleOptionsReply("These paths fit what you described.", [
             { title: "Product Manager", reason: "Connects your technical background with product ownership." },
@@ -148,6 +202,40 @@ describe("buildTargetRoleDecisionPrompt", () => {
         assert.match(prompt, /evidenceQuote/);
         assert.doesNotMatch(prompt, /own product direction/i);
         assert.doesNotMatch(prompt, /combines technical context with product ownership/i);
+    });
+
+    it("guides first-job discovery without pretending the user changed roles", () => {
+        const latestUserMessage = "i dont really know";
+        const prompt = buildTargetRoleDecisionPrompt(
+            createFirstRoleConversation(latestUserMessage),
+            latestUserMessage,
+            "Name: shai",
+        );
+
+        assert.match(prompt, /choosing a first target role/i);
+        assert.doesNotMatch(prompt, /already chose to move into a DIFFERENT role/);
+        assert.match(prompt, /2-3 related job-relevant signals/i);
+        assert.match(prompt, /generic continuation/i);
+        assert.match(prompt, /uncertain answer.*easier.*concrete/i);
+        assert.match(prompt, /each distinct newly stated signal.*own discoveryFacts entry/i);
+        assert.doesNotMatch(prompt, /prefer ROLE_OPTIONS now/i);
+    });
+
+    it("prefers grounded role options once discovery has enough useful facts", () => {
+        const latestUserMessage = "i enjoy design and drawing";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.discoveryFacts = {
+                interests: "drawing and design",
+                preferred_activity: "creating visual work",
+            };
+        }
+
+        const prompt = buildTargetRoleDecisionPrompt(conversation, latestUserMessage, "Name: shai");
+
+        assert.match(prompt, /Once at least 2 meaningful facts are known, prefer ROLE_OPTIONS/i);
+        assert.match(prompt, /one critical discriminator/i);
+        assert.ok(prompt.length < 4_000);
     });
 });
 
@@ -214,9 +302,275 @@ describe("parseTargetRoleGroundingDecision", () => {
 
         assert.equal(decision, null);
     });
+
+    it("accepts a wrapped clarification when the configured model omits the inner discriminator", () => {
+        const question = "Would you rather focus on visual design, user research, or front-end implementation?";
+        const decision = parseTargetRoleGroundingDecision(
+            JSON.stringify({ NEEDS_CLARIFICATION: { question } }),
+            "Software Developer",
+            "i enjoy designing and drawing",
+        );
+
+        assert.deepEqual(decision, { kind: "NEEDS_CLARIFICATION", question });
+    });
+});
+
+describe("parseTargetRoleOptionsReviewDecision", () => {
+    it("rejects a role inferred from a broad field preference", () => {
+        const decision = parseTargetRoleOptionsReviewDecision(JSON.stringify({
+            verdict: "READY",
+            targetRole: "Software Developer",
+            evidenceQuote: "i want a hitech job",
+        }), "i want a hitech job");
+
+        assert.equal(decision, null);
+    });
 });
 
 describe("resolveTargetRoleDecision", () => {
+    it("returns relevant drawing roles from the configured model even when its summary is empty", async () => {
+        const latestUserMessage = "i would like to work around designing and drawing";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 4;
+            conversation.onboardingFlow.nearTermTarget.discoveryFacts = {
+                education: "finished high school",
+                preferred_field: "high tech",
+            };
+            conversation.onboardingFlow.nearTermTarget.coveredSubjects = [
+                "preferred_activity",
+                "work_environment",
+                "technical_interest",
+            ];
+        }
+        const roleOptions = {
+            status: "ROLE_OPTIONS" as const,
+            summary: "",
+            roles: [
+                { title: "UX Designer", reason: "Designing and drawing skills can support digital user experiences." },
+                { title: "Graphic Designer", reason: "Uses drawing and composition in visual communication work." },
+                { title: "Digital Illustrator", reason: "Applies drawing skills directly to digital creative projects." },
+            ],
+            discoveryFacts: { interests: "designing, drawing" },
+        };
+        const outputs = [
+            JSON.stringify({
+                status: "READY",
+                targetRole: "",
+                evidenceQuote: latestUserMessage,
+                discoveryFacts: {},
+            }),
+            JSON.stringify({
+                ...roleOptions,
+                discoveryFacts: { interests: ["designing", "drawing"] },
+            }),
+            "not-json",
+            "not-json",
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage,
+            userAccountContext: "Name: shai; Education: finished high school",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, roleOptions);
+    });
+
+    it("keeps a new model-generated question when the model repeats a placeholder subject", async () => {
+        const latestUserMessage = "i want a hitech job";
+        const conversation = createFirstRoleConversation(latestUserMessage);
+        const previousQuestion = "What specific aspects of your first job are you most interested in or concerned about?";
+        const nextQuestion = "Would you prefer creating visual interfaces, writing code, or helping customers with technology?";
+        conversation.messages.splice(-1, 0,
+            { role: "user", content: "i dont know whats out there", timestamp: new Date(2) },
+            { role: "assistant", content: previousQuestion, timestamp: new Date(3) },
+        );
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 1;
+            conversation.onboardingFlow.nearTermTarget.coveredSubjects = ["semantic focus"];
+        }
+        const modelDecision = JSON.stringify({
+            status: "NEEDS_CLARIFICATION",
+            question: nextQuestion,
+            subject: "semantic focus",
+            discoveryFacts: { preferred_industry: "high tech" },
+        });
+        const textCompletion: TextCompletionPort = {
+            complete: async () => modelDecision,
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage,
+            userAccountContext: "Name: shai; Education: finished high school",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.equal(decision.status, "NEEDS_CLARIFICATION");
+        if (decision.status !== "NEEDS_CLARIFICATION") {
+            throw new Error("Expected a discovery question");
+        }
+        assert.equal(decision.question, nextQuestion);
+        assert.notEqual(decision.subject, "semantic focus");
+        assert.deepEqual(decision.discoveryFacts, { preferred_industry: "high tech" });
+    });
+
+    it("keeps model-generated role suggestions when the user explicitly asks for them", async () => {
+        const conversation = createFirstRoleConversation("you suggest");
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.messages.splice(-1, 0,
+                { role: "user", content: "i dont know", timestamp: new Date(2) },
+                {
+                    role: "assistant",
+                    content: "Which school subjects or activities have you enjoyed most?",
+                    timestamp: new Date(3),
+                },
+                { role: "user", content: "i like drawing", timestamp: new Date(4) },
+                {
+                    role: "assistant",
+                    content: "Would you like creative work on paper, on a computer, or with physical objects?",
+                    timestamp: new Date(5),
+                },
+            );
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 2;
+            conversation.onboardingFlow.nearTermTarget.discoveryFacts = { interest: "drawing" };
+            conversation.onboardingFlow.nearTermTarget.coveredSubjects = ["school_interests", "creative_medium"];
+        }
+        const roleOptions = {
+            status: "ROLE_OPTIONS" as const,
+            summary: "Since you enjoy drawing, these entry-level directions may fit.",
+            roles: [
+                { title: "Graphic Design Assistant", reason: "Uses drawing and visual composition in practical design work." },
+                { title: "Junior Illustrator", reason: "Focuses directly on creating drawings for visual projects." },
+                { title: "Print Production Assistant", reason: "Combines visual attention with hands-on production tasks." },
+            ],
+            discoveryFacts: { interest: "drawing" },
+        };
+        const outputs = [JSON.stringify(roleOptions), "not-json"];
+        const prompts: string[] = [];
+        const textCompletion: TextCompletionPort = {
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return outputs.shift() ?? "";
+            },
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "you suggest",
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, roleOptions);
+        assert.match(prompts[0] ?? "", /USER: i like drawing/i);
+        assert.match(prompts[0] ?? "", /Latest user message: you suggest/i);
+    });
+
+    it("continues with a model-generated question after a first uncertain answer", async () => {
+        const roleOptions = {
+            status: "ROLE_OPTIONS",
+            summary: "Here are a few paths.",
+            roles: [
+                { title: "Data Analyst", reason: "Could suit someone interested in working with information." },
+                { title: "Marketing Assistant", reason: "Could suit someone interested in creative communication." },
+                { title: "Customer Service Representative", reason: "Could suit someone who enjoys helping people." },
+            ],
+            discoveryFacts: {},
+        };
+        const outputs = [
+            JSON.stringify(roleOptions),
+            JSON.stringify({
+                verdict: "RESUME_DISCOVERY",
+                question: "Which school subjects or activities have you enjoyed most?",
+                subject: "school_interests",
+                discoveryFacts: {},
+                rejectedSuggestedRoles: false,
+            }),
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation: createFirstRoleConversation("i dont really know"),
+            latestUserMessage: "i dont really know",
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: "Which school subjects or activities have you enjoyed most?",
+            subject: "school_interests",
+            discoveryFacts: {},
+            rejectedSuggestedRoles: false,
+        });
+    });
+
+    it("returns to model-generated discovery when the user rejects all suggested roles", async () => {
+        const conversation = createFirstRoleConversation("none of them fit");
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.suggestedRoles = [
+                "Data Analyst",
+                "Digital Marketing Specialist",
+                "Customer Service Representative",
+            ];
+        }
+        const outputs = [
+            JSON.stringify({
+                status: "ROLE_OPTIONS",
+                summary: "Here are some alternatives.",
+                roles: [
+                    { title: "Data Analyst", reason: "Works with data and reports." },
+                    { title: "Digital Marketing Specialist", reason: "Works on creative campaigns." },
+                    { title: "Customer Service Representative", reason: "Helps customers solve problems." },
+                ],
+                discoveryFacts: {},
+            }),
+            JSON.stringify({
+                verdict: "RESUME_DISCOVERY",
+                question: "Would you rather spend your day working with people, ideas, or practical tasks?",
+                subject: "preferred_activity",
+                discoveryFacts: {},
+                rejectedSuggestedRoles: true,
+            }),
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "none of them fit",
+            userAccountContext: "Name: shai",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: "Would you rather spend your day working with people, ideas, or practical tasks?",
+            subject: "preferred_activity",
+            discoveryFacts: {},
+            rejectedSuggestedRoles: true,
+        });
+    });
+
     it("accepts the discriminator-wrapped grounding shape returned by the configured model", async () => {
         const conversation = createDifferentRoleConversation("data analyst sounds good");
         if (conversation.onboardingFlow?.nearTermTarget) {
@@ -287,10 +641,17 @@ describe("resolveTargetRoleDecision", () => {
         const textCompletion: TextCompletionPort = {
             complete: async () => outputs.shift() ?? "",
         };
+        const conversation = createDifferentRoleConversation("something that involves working with data");
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.discoveryFacts = {
+                enjoyed_work: "solving analytical problems",
+                preferred_domain: "data",
+            };
+        }
 
         const decision = await resolveTargetRoleDecision({
             textCompletion,
-            conversation: createDifferentRoleConversation("something that involves working with data"),
+            conversation,
             latestUserMessage: "something that involves working with data",
             userAccountContext: "Current role / headline: software developer",
             userId: "user-1",
@@ -686,9 +1047,23 @@ describe("resolveTargetRoleDecision", () => {
         assert.match(prompts[2] ?? "", /Do not demand a subtype, specialization, seniority/i);
     });
 
-    it("does not repeat the previous discovery question after two invalid model responses", async () => {
+    it("uses a focused model recovery question after two invalid decision responses", async () => {
+        const recoveryQuestion = "Would you rather create things, solve technical problems, or work directly with people?";
+        const outputs = [
+            "not-json",
+            "not-json",
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: recoveryQuestion,
+                discoveryFacts: {},
+            }),
+        ];
+        const prompts: string[] = [];
         const textCompletion: TextCompletionPort = {
-            complete: async () => "not-json",
+            complete: async (prompt) => {
+                prompts.push(prompt);
+                return outputs.shift() ?? "";
+            },
         };
 
         const decision = await resolveTargetRoleDecision({
@@ -700,11 +1075,11 @@ describe("resolveTargetRoleDecision", () => {
             conversationId: "conversation-1",
         });
 
-        assert.deepEqual(decision, {
-            status: "NEEDS_CLARIFICATION",
-            question: "Could you name a specific job title, or would you like me to suggest a few roles?",
-            subject: "target_direction",
-            discoveryFacts: {},
-        });
+        assert.equal(decision.status, "NEEDS_CLARIFICATION");
+        if (decision.status !== "NEEDS_CLARIFICATION") {
+            throw new Error("Expected a recovery question");
+        }
+        assert.equal(decision.question, recoveryQuestion);
+        assert.match(prompts[2] ?? "", /Do not ask for a job title/i);
     });
 });

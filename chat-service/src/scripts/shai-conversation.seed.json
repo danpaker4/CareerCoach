@@ -1,0 +1,185 @@
+{
+    "conversationId": "6a7d911a1f0ed24aec4beb20",
+    "userId": "be68cd9c-8231-44c0-9326-56abb97346c2",
+    "currentStageId": null,
+    "achievements": [],
+    "messages": [
+        {
+            "role": "assistant",
+            "content": "Hi shai, tell me a little about your professional background.",
+            "timestamp": "2026-08-13T09:40:42.059Z"
+        },
+        {
+            "role": "user",
+            "content": "hi my name is shai and i just finished high school",
+            "timestamp": "2026-08-13T09:40:51.347Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Let's explore your professional background, Shai!",
+            "timestamp": "2026-08-13T09:41:05.279Z"
+        },
+        {
+            "role": "user",
+            "content": "ok",
+            "timestamp": "2026-08-13T09:41:13.823Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Are you looking for a job now, aiming for a longer-term role in the future, or still figuring out what you want?",
+            "timestamp": "2026-08-13T09:41:36.952Z"
+        },
+        {
+            "role": "user",
+            "content": "now",
+            "timestamp": "2026-08-13T09:41:42.164Z"
+        },
+        {
+            "role": "assistant",
+            "content": "What kind of work are you interested in doing right away?",
+            "timestamp": "2026-08-13T09:41:51.382Z"
+        },
+        {
+            "role": "user",
+            "content": "i dont know",
+            "timestamp": "2026-08-13T09:42:11.360Z"
+        },
+        {
+            "role": "assistant",
+            "content": "What kind of tasks would you like to perform in your first job?",
+            "timestamp": "2026-08-13T09:43:16.075Z"
+        },
+        {
+            "role": "user",
+            "content": "i dont know",
+            "timestamp": "2026-08-13T09:43:29.577Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Do you prefer working with people, creating things, or solving problems?",
+            "timestamp": "2026-08-13T09:44:10.419Z"
+        },
+        {
+            "role": "user",
+            "content": "i like to crete things, somethimes i draw in my personal time",
+            "timestamp": "2026-08-13T09:44:38.157Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Are you interested in designing digital products or creating physical art?",
+            "timestamp": "2026-08-13T09:45:45.012Z"
+        },
+        {
+            "role": "user",
+            "content": "sounds interesting",
+            "timestamp": "2026-08-13T09:45:58.144Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Can you think of a specific type of creative work that excites you?",
+            "timestamp": "2026-08-13T09:47:18.701Z"
+        },
+        {
+            "role": "user",
+            "content": "no, what can you offer?",
+            "timestamp": "2026-08-13T09:47:34.461Z"
+        },
+        {
+            "role": "assistant",
+            "content": "What kind of digital products would you like to design?",
+            "timestamp": "2026-08-13T09:48:27.246Z"
+        },
+        {
+            "role": "user",
+            "content": "whast can you offer? i dont know the option",
+            "timestamp": "2026-08-13T09:48:47.790Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Explore creative roles that match your interests\n1. Digital Product Designer — You mentioned liking to create things and drawing in your personal time\n2. Graphic Designer — Your interest in creating digital products aligns with this role\n3. UX/UI Designer — Your creative inclination and problem-solving skills could be a good fit\nWhich role feels closest, or do none of them fit?",
+            "timestamp": "2026-08-13T09:50:13.887Z"
+        },
+        {
+            "role": "user",
+            "content": "graphic designer sounds good",
+            "timestamp": "2026-08-13T09:51:10.032Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Got it — I'll look for Graphic Designer roles you can move into soon.",
+            "timestamp": "2026-08-13T09:52:10.063Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Here are the roles I found that could fit — do any of these work for you? Tell me which one to add to your pipeline (e.g. \"add the first one\" or \"add the Zendesk role\"). If none fit, just say \"none\" and I can save a role to your wishlist so you're alerted when a better match appears.",
+            "timestamp": "2026-08-13T09:52:10.124Z",
+            "attachedJobs": [
+                {
+                    "jobId": "job6-Israel",
+                    "jobTitle": "UX/UI Designer",
+                    "url": "https://example.com/jobs/3456",
+                    "seniority": "Senior",
+                    "description": "Join Zendesk's UX/UI Design team as a Senior UX/UI Designer! You'll work on designing and implementing user-centered design solutions, collaborating with cross-functional teams to ensure seamless product delivery.",
+                    "company": "Zendesk",
+                    "salary": 90000
+                },
+                {
+                    "jobId": "job8",
+                    "jobTitle": "UX Designer",
+                    "url": "https://example.com/jobs/1357",
+                    "seniority": "Junior",
+                    "description": "Join Facebook's UX Design team as a Junior UX Designer! As a junior designer, you will be responsible for designing and developing innovative user interfaces to meet business needs. You will work closely with cross-functional teams to identify and prioritize features, and collaborate with developers to develop cutting-edge technology.",
+                    "company": "Facebook",
+                    "salary": 80000
+                },
+                {
+                    "jobId": "8-90123",
+                    "jobTitle": "UX Designer",
+                    "url": "https://example.com/jobs/9012",
+                    "seniority": "Junior",
+                    "description": "We are seeking a talented UX Designer to join our design team. As a key member of the user experience design team, you will be responsible for designing and developing intuitive and user-friendly software applications using Sketch, Figma, or Adobe XD. You will work closely with designers, developers, and other teams to ensure successful product launches. Must have experience with UX design, human-centered design, and design systems.",
+                    "company": "Figma",
+                    "salary": 70000
+                },
+                {
+                    "jobId": "8a4b5c6d7e",
+                    "jobTitle": "UX/UI Designer",
+                    "url": "https://example.com/jobs/5556667777",
+                    "seniority": "Junior",
+                    "description": "We're looking for a talented UX/UI Designer to join our team. As a junior member of our design team, you will be responsible for designing and implementing user-centered interfaces, collaborating with cross-functional teams, and contributing to the development of our software products.",
+                    "company": "Tesla",
+                    "salary": 50000
+                },
+                {
+                    "jobId": "55555",
+                    "jobTitle": "UX Designer",
+                    "url": "https://example.com/jobs/55555",
+                    "seniority": "Junior",
+                    "description": "We are seeking a talented UX Designer to join our team. The ideal candidate will have 1-2 years of experience in user experience design, with expertise in tools like Sketch, Figma, or Adobe XD. Strong understanding of human-centered design principles and usability testing is required.",
+                    "company": "Designwise Ltd.",
+                    "salary": 50000
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": "add UX/UI Designer at Zendesk to my pipeline",
+            "timestamp": "2026-08-13T09:54:30.709Z"
+        },
+        {
+            "role": "assistant",
+            "content": "Done — I added the UX/UI Designer role at Tesla to your pipeline.\n\nYou can now track it from My Pipeline. Want help preparing for interviews, strengthening a missing skill, or exploring more roles?",
+            "timestamp": "2026-08-13T09:54:47.433Z"
+        },
+        {
+            "role": "user",
+            "content": "nothing, this is good for me thats all thanks",
+            "timestamp": "2026-08-13T09:56:54.539Z"
+        },
+        {
+            "role": "assistant",
+            "content": "You're all set for now. I'm available whenever you want help with your job search, pipeline, interviews, or career plans.",
+            "timestamp": "2026-08-13T09:57:12.544Z"
+        }
+    ]
+}
