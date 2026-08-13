@@ -1,62 +1,50 @@
-const dotenv = require("dotenv");
-const { MongoClient, ObjectId } = require("mongodb");
-const { isDeepStrictEqual } = require("node:util");
-const { z } = require("zod");
+const { spawnSync } = require("node:child_process");
+const { readFileSync } = require("node:fs");
+const { resolve } = require("node:path");
 const rawConversation = require("./shai-conversation.seed.json");
 const rawLegacyConversation = require("./shai-legacy-conversation.seed.json");
 
-dotenv.config();
-
 const TARGET_FIRST_NAME = "shai";
 const TARGET_LAST_NAME = "shai";
+const DEFAULT_MONGODB_CONTAINER = "mongodb-careercoach";
+const DEFAULT_MONGODB_PORT = "27017";
 const COMPLETED_STAGE_IDS = ["achievements", "timeline", "preferences"];
+const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i;
 
-const ImportEnvSchema = z.object({
-    MONGO_CONNECTION_STRING: z.string().trim().min(1, "MONGO_CONNECTION_STRING is required"),
-    MONGO_KEY_PATH: z.string().trim().min(1).optional(),
-});
+const readDotEnv = () => {
+    const envPath = resolve(__dirname, "../..", ".env");
+    try {
+        return readFileSync(envPath, "utf8").split(/\r?\n/).reduce((values, line) => {
+            const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z\d_]*)\s*=\s*(.*)\s*$/);
+            if (!match) {
+                return values;
+            }
+            const [, key, rawValue] = match;
+            const value = rawValue.replace(/^(?:"([\s\S]*)"|'([\s\S]*)')$/, (_, doubleQuoted, singleQuoted) =>
+                doubleQuoted ?? singleQuoted ?? "");
+            return { ...values, [key]: value };
+        }, {});
+    } catch (error) {
+        if (error && error.code === "ENOENT") {
+            return {};
+        }
+        throw error;
+    }
+};
 
-const AttachedJobSchema = z.object({
-    jobId: z.string(),
-    jobTitle: z.string(),
-    url: z.string(),
-    seniority: z.string(),
-    description: z.string(),
-    company: z.string(),
-    salary: z.number().finite(),
-}).strict();
+const requireObjectId = (value, fieldName) => {
+    if (typeof value !== "string" || !OBJECT_ID_PATTERN.test(value)) {
+        throw new Error(`${fieldName} must be a 24-character MongoDB ObjectId`);
+    }
+    return value;
+};
 
-const ConversationMessageSchema = z.object({
-    role: z.enum(["system", "user", "assistant"]),
-    content: z.string(),
-    timestamp: z.string().datetime(),
-    attachedJobs: z.array(AttachedJobSchema).optional(),
-}).strict();
-
-const ConversationExportSchema = z.object({
-    conversationId: z.string().refine((value) => ObjectId.isValid(value), "Invalid conversationId"),
-    userId: z.string().uuid(),
-    currentStageId: z.null(),
-    achievements: z.array(z.unknown()),
-    messages: z.array(ConversationMessageSchema).min(1),
-}).strict();
-
-const LegacyConversationExportSchema = z.object({
-    id: z.string().refine((value) => ObjectId.isValid(value), "Invalid conversation id"),
-    chat: z.array(z.object({
-        user: z.string(),
-        chatbot: z.string(),
-    }).strict()).min(1),
-}).strict();
-
-const TargetUserSchema = z.object({
-    _id: z.string().uuid(),
-    firstName: z.string(),
-    lastName: z.string(),
-});
-
-const getMongoClientOptions = (mongoKeyPath) =>
-    mongoKeyPath && mongoKeyPath !== "none" ? { tlsCertificateKeyFile: mongoKeyPath } : {};
+const requireString = (value, fieldName) => {
+    if (typeof value !== "string") {
+        throw new Error(`${fieldName} must be a string`);
+    }
+    return value;
+};
 
 const createCompletedStageProgress = () => ({
     currentStageIndex: COMPLETED_STAGE_IDS.length,
@@ -66,129 +54,152 @@ const createCompletedStageProgress = () => ({
     surfacedAchievementIds: [],
 });
 
-const serializeMessages = (messages) => messages.map((message) => ({
-    ...message,
-    timestamp: message.timestamp.toISOString(),
-}));
-
 const normalizeCurrentConversation = (value) => {
-    const exportedConversation = ConversationExportSchema.parse(value);
-    return {
-        conversationId: exportedConversation.conversationId,
-        messages: exportedConversation.messages.map((message) => ({
-            ...message,
-            timestamp: new Date(message.timestamp),
-        })),
-    };
+    const conversationId = requireObjectId(value.conversationId, "conversationId");
+    if (!Array.isArray(value.messages) || value.messages.length === 0) {
+        throw new Error(`Conversation ${conversationId} must contain messages`);
+    }
+    const messages = value.messages.map((message, index) => {
+        const timestamp = new Date(requireString(message.timestamp, `messages[${index}].timestamp`));
+        if (Number.isNaN(timestamp.getTime())) {
+            throw new Error(`messages[${index}].timestamp must be an ISO date`);
+        }
+        return {
+            role: requireString(message.role, `messages[${index}].role`),
+            content: requireString(message.content, `messages[${index}].content`),
+            timestamp: timestamp.toISOString(),
+            ...(message.attachedJobs ? { attachedJobs: message.attachedJobs } : {}),
+        };
+    });
+    return { conversationId, messages };
 };
 
 const normalizeLegacyConversation = (value) => {
-    const exportedConversation = LegacyConversationExportSchema.parse(value);
-    const conversationId = new ObjectId(exportedConversation.id);
-    const timestampOrigin = conversationId.getTimestamp().getTime();
-    const messagesWithoutTimestamps = exportedConversation.chat.flatMap((turn) => [
-        ...(turn.user.length > 0 ? [{ role: "user", content: turn.user }] : []),
-        ...(turn.chatbot.length > 0 ? [{ role: "assistant", content: turn.chatbot }] : []),
-    ]);
-
-    return {
-        conversationId: exportedConversation.id,
-        messages: messagesWithoutTimestamps.map((message, index) => ({
-            ...message,
-            timestamp: new Date(timestampOrigin + index),
-        })),
-    };
+    const conversationId = requireObjectId(value.id, "id");
+    if (!Array.isArray(value.chat) || value.chat.length === 0) {
+        throw new Error(`Conversation ${conversationId} must contain chat turns`);
+    }
+    const timestampOrigin = Number.parseInt(conversationId.slice(0, 8), 16) * 1000;
+    const messagesWithoutTimestamps = value.chat.flatMap((turn, index) => {
+        const user = requireString(turn.user, `chat[${index}].user`);
+        const chatbot = requireString(turn.chatbot, `chat[${index}].chatbot`);
+        return [
+            ...(user.length > 0 ? [{ role: "user", content: user }] : []),
+            ...(chatbot.length > 0 ? [{ role: "assistant", content: chatbot }] : []),
+        ];
+    });
+    if (messagesWithoutTimestamps.length === 0) {
+        throw new Error(`Conversation ${conversationId} must contain non-empty messages`);
+    }
+    const messages = messagesWithoutTimestamps.map((message, index) => ({
+        ...message,
+        timestamp: new Date(timestampOrigin + index).toISOString(),
+    }));
+    return { conversationId, messages };
 };
 
-const ensureConversation = async (conversationsCollection, targetUser, conversation) => {
-    const conversationId = new ObjectId(conversation.conversationId);
-    const firstMessage = conversation.messages[0];
-    const lastMessage = conversation.messages.at(-1);
-    if (!firstMessage || !lastMessage) {
-        throw new Error("The conversation must contain at least one message");
+const getDatabaseName = (connectionString, explicitDatabaseName) => {
+    if (explicitDatabaseName) {
+        return explicitDatabaseName;
     }
-
-    const existingConversation = await conversationsCollection.findOne({ _id: conversationId });
-    const stageProgress = createCompletedStageProgress();
-
-    if (existingConversation) {
-        if (existingConversation.userId !== targetUser._id) {
-            throw new Error(`Conversation ${conversation.conversationId} already belongs to a different user`);
-        }
-        const matchesImport = isDeepStrictEqual(
-            serializeMessages(existingConversation.messages),
-            serializeMessages(conversation.messages),
-        )
-            && existingConversation.createdAt.getTime() === firstMessage.timestamp.getTime()
-            && existingConversation.updatedAt.getTime() === lastMessage.timestamp.getTime()
-            && isDeepStrictEqual(existingConversation.stageProgress, stageProgress);
-        if (!matchesImport) {
-            throw new Error(`Conversation ${conversation.conversationId} already exists but does not match the import`);
-        }
-        console.log(
-            `Conversation ${conversation.conversationId} already exists for ${TARGET_FIRST_NAME} ${TARGET_LAST_NAME}`,
-        );
-        return;
+    if (!connectionString) {
+        throw new Error("MONGO_CONNECTION_STRING or MONGO_DATABASE_NAME is required");
     }
+    const databasePath = new URL(connectionString).pathname.replace(/^\//, "");
+    if (!databasePath) {
+        throw new Error("MONGO_CONNECTION_STRING must include a database name");
+    }
+    return decodeURIComponent(databasePath);
+};
 
-    await conversationsCollection.insertOne({
+const createMongoShellScript = (payload) => `
+const payload = JSON.parse(${JSON.stringify(JSON.stringify(payload))});
+const database = db.getSiblingDB(payload.databaseName);
+const users = await database.users.find(
+    { firstName: /^shai$/i, lastName: /^shai$/i },
+    { _id: 1, firstName: 1, lastName: 1 },
+).limit(2).toArray();
+if (users.length === 0) {
+    throw new Error("No user named shai shai was found");
+}
+if (users.length > 1) {
+    throw new Error("Multiple users named shai shai were found");
+}
+const targetUser = users[0];
+const stageProgress = ${JSON.stringify(createCompletedStageProgress())};
+for (const importedConversation of payload.conversations) {
+    const conversationId = new ObjectId(importedConversation.conversationId);
+    const messages = importedConversation.messages.map((message) => ({
+        ...message,
+        timestamp: new Date(message.timestamp),
+    }));
+    const firstMessage = messages[0];
+    const lastMessage = messages[messages.length - 1];
+    const document = {
         _id: conversationId,
         userId: targetUser._id,
-        messages: conversation.messages,
+        messages,
         stageProgress,
         createdAt: firstMessage.timestamp,
         updatedAt: lastMessage.timestamp,
-    });
-    console.log(
-        `Imported conversation ${conversation.conversationId} with ${conversation.messages.length} messages `
-            + `for ${targetUser.firstName} ${targetUser.lastName}`,
-    );
-};
-
-const runImport = async () => {
-    const env = ImportEnvSchema.parse(process.env);
-    const conversations = [
-        normalizeCurrentConversation(rawConversation),
-        normalizeLegacyConversation(rawLegacyConversation),
-    ];
-    const client = new MongoClient(
-        env.MONGO_CONNECTION_STRING,
-        getMongoClientOptions(env.MONGO_KEY_PATH),
-    );
-
-    await client.connect();
-    try {
-        const database = client.db();
-        const usersCollection = database.collection("users");
-        const matchingUsers = await usersCollection.find(
-            { firstName: TARGET_FIRST_NAME, lastName: TARGET_LAST_NAME },
-            {
-                collation: { locale: "en", strength: 2 },
-                projection: { _id: 1, firstName: 1, lastName: 1 },
-            },
-        ).limit(2).toArray();
-
-        if (matchingUsers.length === 0) {
-            throw new Error(`No user named ${TARGET_FIRST_NAME} ${TARGET_LAST_NAME} was found`);
+    };
+    const existing = await database.conversations.findOne({ _id: conversationId });
+    if (existing) {
+        if (String(existing.userId) !== String(targetUser._id)) {
+            throw new Error("Conversation " + importedConversation.conversationId + " belongs to a different user");
         }
-        if (matchingUsers.length > 1) {
-            throw new Error(`Multiple users named ${TARGET_FIRST_NAME} ${TARGET_LAST_NAME} were found`);
+        const matchesImport = JSON.stringify(existing.messages) === JSON.stringify(document.messages)
+            && existing.createdAt.getTime() === document.createdAt.getTime()
+            && existing.updatedAt.getTime() === document.updatedAt.getTime()
+            && JSON.stringify(existing.stageProgress) === JSON.stringify(document.stageProgress);
+        if (!matchesImport) {
+            throw new Error("Conversation " + importedConversation.conversationId + " does not match the import");
         }
+        print("Conversation " + importedConversation.conversationId + " already exists for shai shai");
+        continue;
+    }
+    await database.conversations.insertOne(document);
+    print(
+        "Imported conversation " + importedConversation.conversationId + " with " + messages.length
+            + " messages for " + targetUser.firstName + " " + targetUser.lastName,
+    );
+}
+`;
 
-        const targetUser = TargetUserSchema.parse(matchingUsers[0]);
-        const conversationsCollection = database.collection("conversations");
-        await conversations.reduce(
-            (previousImport, conversation) => previousImport.then(
-                () => ensureConversation(conversationsCollection, targetUser, conversation),
-            ),
-            Promise.resolve(),
-        );
-    } finally {
-        await client.close();
+const runImport = () => {
+    const fileEnv = readDotEnv();
+    const env = { ...fileEnv, ...process.env };
+    const databaseName = getDatabaseName(env.MONGO_CONNECTION_STRING, env.MONGO_DATABASE_NAME);
+    const containerName = env.MONGODB_CONTAINER || DEFAULT_MONGODB_CONTAINER;
+    const mongoShellConnectionString = env.MONGO_IMPORT_CONNECTION_STRING
+        || `mongodb://127.0.0.1:${DEFAULT_MONGODB_PORT}/${encodeURIComponent(databaseName)}?directConnection=true`;
+    const payload = {
+        databaseName,
+        conversations: [
+            normalizeCurrentConversation(rawConversation),
+            normalizeLegacyConversation(rawLegacyConversation),
+        ],
+    };
+    const result = spawnSync(
+        "docker",
+        ["exec", "-i", containerName, "mongosh", "--quiet", mongoShellConnectionString],
+        {
+            input: createMongoShellScript(payload),
+            encoding: "utf8",
+            stdio: ["pipe", "inherit", "inherit"],
+        },
+    );
+    if (result.error) {
+        throw result.error;
+    }
+    if (result.status !== 0) {
+        throw new Error(`mongosh exited with status ${result.status}`);
     }
 };
 
-runImport().catch((error) => {
+try {
+    runImport();
+} catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
-});
+}
