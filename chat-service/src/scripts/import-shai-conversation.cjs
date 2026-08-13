@@ -7,6 +7,7 @@ const rawLegacyConversation = require("./shai-legacy-conversation.seed.json");
 const TARGET_FIRST_NAME = "shai";
 const TARGET_LAST_NAME = "shai";
 const DEFAULT_MONGODB_CONTAINER = "mongodb-careercoach";
+const DEFAULT_MONGODB_DATABASE = "careerCoachDB";
 const DEFAULT_MONGODB_PORT = "27017";
 const COMPLETED_STAGE_IDS = ["achievements", "timeline", "preferences"];
 const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i;
@@ -103,7 +104,7 @@ const getDatabaseName = (connectionString, explicitDatabaseName) => {
         return explicitDatabaseName;
     }
     if (!connectionString) {
-        throw new Error("MONGO_CONNECTION_STRING or MONGO_DATABASE_NAME is required");
+        return DEFAULT_MONGODB_DATABASE;
     }
     const databasePath = new URL(connectionString).pathname.replace(/^\//, "");
     if (!databasePath) {
@@ -180,6 +181,7 @@ const runImport = () => {
             normalizeLegacyConversation(rawLegacyConversation),
         ],
     };
+    console.log(`Import target: container=${containerName}, database=${databaseName}`);
     const result = spawnSync(
         "docker",
         ["exec", "-i", containerName, "mongosh", "--quiet", mongoShellConnectionString],
