@@ -144,6 +144,11 @@ export const StageContentSchema = z.object({
     howToGetThere: z.string().optional(),
     whatYouGain: z.string().optional(),
     progressionType: ProgressionTypeSchema.optional(),
+    careerPathRole: z.string().optional(),
+    roleGroupIndex: z.number().int().nonnegative().optional(),
+    stageKind: z.enum(["learning", "experience", "leadership", "role-readiness"]).optional(),
+    completionOptions: z.array(z.object({ id: z.string(), label: z.string() })).optional(),
+    allowCustomCompletionOption: z.boolean().optional(),
     requiredCapabilities: z.array(z.string()).optional(),
     skillsToBuild: z.array(z.string()).optional(),
     responsibilitiesToGain: z.array(z.string()).optional(),
@@ -186,6 +191,8 @@ export const StageToDreamJobSchema = z.object({
     selectedProjectId: z.string().optional(),
     completedProjectIds: z.array(z.string()).optional(),
     dismissedRecommendationIds: z.array(z.string()).optional(),
+    selectedCompletionOptionId: z.string().optional(),
+    customCompletionOption: z.string().optional(),
 });
 
 export const CareerRoadMapSchema = z.object({

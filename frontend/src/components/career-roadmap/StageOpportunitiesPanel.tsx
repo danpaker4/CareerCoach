@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ENV } from '../../config';
 import { apiFetch } from '../../lib/apiClient';
 import { fetchStageOpportunities } from './career-roadmap-opportunities.utils';
@@ -64,6 +64,7 @@ const OpportunityList = ({ title, items, expandedJobId, onToggleDetails }: {
 };
 
 export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: StageOpportunitiesPanelProps) => {
+  const searchTitleInputId = useId();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<StageOpportunitiesResponse>(EMPTY_PAGE);
@@ -75,7 +76,9 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
   const [seniority, setSeniority] = useState('');
   const [location, setLocation] = useState('');
   const primaryRole = roleCategories[0] ?? '';
-  const roleCategoriesKey = roleCategories.join(FILTER_SEPARATOR);
+  const [searchTitle, setSearchTitle] = useState(primaryRole);
+  const [activeSearchTitle, setActiveSearchTitle] = useState(primaryRole);
+  const roleCategoriesKey = activeSearchTitle;
   const userSkillsKey = (userSkills ?? []).join(FILTER_SEPARATOR);
 
   useEffect(() => {
@@ -103,6 +106,15 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
 
   if (roleCategories.length === 0) return null;
 
+  const searchJobs = () => {
+    const nextTitle = searchTitle.trim();
+    if (!nextTitle) return;
+    setPage(1);
+    setExpandedJobId(null);
+    setAlertState('idle');
+    setActiveSearchTitle(nextTitle);
+  };
+
   const saveAlert = async () => {
     setAlertState('saving');
     try {
@@ -112,11 +124,11 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
         credentials: 'include',
         body: JSON.stringify({
           userId,
-          jobTitle: primaryRole,
-          keywords: roleCategories,
+          jobTitle: activeSearchTitle,
+          keywords: [activeSearchTitle],
           ...(seniority.trim() ? { seniority: seniority.trim() } : {}),
           ...(location.trim() ? { location: location.trim() } : {}),
-          rawText: `Roadmap alert for ${primaryRole}`,
+          rawText: `Roadmap alert for ${activeSearchTitle}`,
         }),
       });
       setAlertState(res.ok ? 'saved' : 'error');
@@ -139,11 +151,24 @@ export const StageOpportunitiesPanel = ({ roleCategories, userId, userSkills }: 
             <header className="roadmap-jobs-dialog-head">
               <div>
                 <span>Roadmap opportunities</span>
-                <h3 id="roadmap-jobs-title">Jobs connected to {primaryRole}</h3>
+                <h3 id="roadmap-jobs-title">Jobs connected to {activeSearchTitle}</h3>
               </div>
               <button type="button" className="roadmap-jobs-close" onClick={() => setOpen(false)} aria-label="Close jobs dialog">×</button>
             </header>
             <div className="roadmap-jobs-scroll">
+              <form className="roadmap-job-title-search" onSubmit={(event) => { event.preventDefault(); searchJobs(); }}>
+                <label htmlFor={searchTitleInputId}>Search job title</label>
+                <div>
+                  <input
+                    id={searchTitleInputId}
+                    type="search"
+                    value={searchTitle}
+                    onChange={(event) => setSearchTitle(event.target.value)}
+                    placeholder="For example: CEO of Payoneer Fintech"
+                  />
+                  <button type="submit" disabled={!searchTitle.trim() || loading}>Search jobs</button>
+                </div>
+              </form>
               {loading && <p className="journey-opportunities-loading">Loading jobs…</p>}
               {error && <p className="journey-opportunities-error">{error}</p>}
               {!loading && !error && result.opportunities.length === 0 && (

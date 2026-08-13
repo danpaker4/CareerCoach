@@ -414,6 +414,8 @@ const mapCatalogResource = (resource: CatalogResource, skills: readonly string[]
 const buildStagesFromRoleMilestones = (params: {
     readonly dreamJob: string;
     readonly milestonePlan: RoleMilestonePlan;
+    readonly gaps: readonly CapabilityGap[];
+    readonly careerPathRoles: readonly string[];
     readonly hoursPerWeek: number;
     readonly assumedAvailability: boolean;
     readonly measurableCompletionEnabled: boolean;
@@ -421,7 +423,8 @@ const buildStagesFromRoleMilestones = (params: {
     readonly courseBudget: "free" | "mixed" | "paid";
     readonly userContext: UserCareerContext;
 }): DeterministicStage[] =>
-    params.milestonePlan.milestones.map((milestone, index) => {
+    params.milestonePlan.milestones.flatMap((milestone, index) => {
+        const careerPathRole = params.careerPathRoles[index] ?? milestone.targetRole;
         const stageId = `stage.${index + 1}.${milestone.id}`;
         const resources = filterResourcesByBudget(pickResourcesForCapabilityIds(milestone.capabilityIds), params.courseBudget);
         const labels = milestone.capabilityIds
@@ -451,15 +454,33 @@ const buildStagesFromRoleMilestones = (params: {
             (role, roleIndex, all) => all.indexOf(role) === roleIndex
         );
 
-        return {
+        const stageKind = milestone.progressionType === "learning"
+            ? "learning" as const
+            : milestone.capabilityIds.some((capabilityId) => capabilityId === "cap.leadership" || capabilityId === "cap.executive.leadership")
+              ? "leadership" as const
+              : "experience" as const;
+        const specificGoal = milestone.progressionType === "learning" && labels[0]
+            ? `Learn ${labels[0]} fundamentals`
+            : milestone.label;
+        const completionOptions = stageKind === "learning"
+            ? undefined
+            : milestone.actions.slice(0, 4).map((action, optionIndex) => ({
+                  id: `${milestone.id}.option.${optionIndex + 1}`,
+                  label: action,
+              }));
+        const preparationStage: DeterministicStage = {
             stageId,
             templateId: milestone.id,
-            label: milestone.label,
+            label: `Preparing for ${careerPathRole} — ${specificGoal}`,
             description: `How to get there:\n${milestone.howToGetThere}`,
             whyItMatters: milestone.whyItMatters,
             howToGetThere: milestone.howToGetThere,
             whatYouGain: milestone.whatYouGain,
             progressionType: milestone.progressionType,
+            careerPathRole,
+            roleGroupIndex: index,
+            stageKind,
+            ...(completionOptions ? { completionOptions, allowCustomCompletionOption: true } : {}),
             actions: [...milestone.actions],
             actionIds: milestone.actions.map((_, actionIndex) => `${milestone.id}.action.${actionIndex + 1}`),
             resources: resources.map((resource) => mapCatalogResource(resource, labels, milestone.whatYouGain)),
@@ -530,6 +551,97 @@ const buildStagesFromRoleMilestones = (params: {
                 resourceUrls: resources.map((resource) => resource.url),
             }),
         };
+        const readinessStageId = `${stageId}.readiness`;
+        const readinessOptions = [
+            `Confirm you can consistently perform the core responsibilities of ${careerPathRole}`,
+            `Complete a project that demonstrates ${careerPathRole} scope`,
+            `Take on equivalent responsibilities at work, in a side project, or through volunteering`,
+            `Transition into a ${careerPathRole} role`,
+        ].map((label, optionIndex) => ({ id: `${readinessStageId}.option.${optionIndex + 1}`, label }));
+        const readinessStage: DeterministicStage = {
+            ...preparationStage,
+            stageId: readinessStageId,
+            templateId: `${milestone.id}.readiness`,
+            label: `Ready for ${careerPathRole} — Demonstrate role-level capability`,
+            description: `Choose one suitable way to confirm that you are ready for ${careerPathRole}. No proof is required.`,
+            whyItMatters: `This milestone anchors the detailed roadmap to the recommended path role: ${careerPathRole}.`,
+            howToGetThere: `Select one completion option that fits your circumstances, then mark the milestone complete.`,
+            whatYouGain: `A clear transition point into the ${careerPathRole} phase of your recommended path.`,
+            progressionType: "experience",
+            stageKind: "role-readiness",
+            actions: [],
+            actionIds: [],
+            resources: [],
+            resourceIds: [],
+            completionOptions: readinessOptions,
+            allowCustomCompletionOption: true,
+            completionCriteria: [{
+                id: `${readinessStageId}.criteria.1`,
+                description: "Select one suitable readiness option and confirm completion",
+                metric: "self_attest",
+                targetValue: 1,
+            }],
+            prerequisiteStageIds: [stageId],
+            parallelStageIds: [],
+            orderingReason: `Complete the preparation for ${careerPathRole} before confirming role readiness.`,
+        };
+        const milestoneIndexForGap = (gap: CapabilityGap): number => {
+            const exactIndex = params.milestonePlan.milestones.findIndex((candidate) => candidate.capabilityIds.includes(gap.capabilityId));
+            if (exactIndex >= 0) return exactIndex;
+            if (gap.category === "leadership") {
+                const leadershipIndex = params.milestonePlan.milestones.findIndex((candidate) =>
+                    candidate.capabilityIds.includes("cap.leadership") || candidate.capabilityIds.includes("cap.executive.leadership")
+                );
+                return leadershipIndex >= 0 ? leadershipIndex : params.milestonePlan.milestones.length - 1;
+            }
+            if (gap.category === "responsibility" || gap.category === "experience") {
+                const experienceIndex = params.milestonePlan.milestones.findIndex((candidate) => candidate.progressionType !== "learning");
+                return experienceIndex >= 0 ? experienceIndex : 0;
+            }
+            return 0;
+        };
+        const learningStages = params.gaps
+            .filter((gap) => milestoneIndexForGap(gap) === index)
+            .filter((gap) => gap.category === "technical" || gap.category === "domain" || gap.category === "architecture")
+            .map((gap, learningIndex): DeterministicStage => {
+                const learningStageId = `${stageId}.learning.${learningIndex + 1}`;
+                const learningResources = filterResourcesByBudget(pickResourcesForCapabilityIds([gap.capabilityId]), params.courseBudget);
+                return {
+                    ...preparationStage,
+                    stageId: learningStageId,
+                    templateId: `${milestone.id}.learning.${gap.capabilityId}`,
+                    label: `Preparing for ${careerPathRole} — Learn ${gap.label} fundamentals`,
+                    description: `Build one concrete, verifiable learning outcome in ${gap.label} for the ${careerPathRole} role.`,
+                    whyItMatters: `${gap.label} is a blocking capability gap for this career transition.`,
+                    howToGetThere: `Learn the core concepts of ${gap.label}, practice them, and confirm when you can apply them independently.`,
+                    whatYouGain: `Working foundations in ${gap.label}.`,
+                    progressionType: "learning",
+                    stageKind: "learning",
+                    actions: [`Learn the fundamentals of ${gap.label}`, `Practice ${gap.label} in a focused exercise`, `Apply ${gap.label} in a small project`],
+                    actionIds: [1, 2, 3].map((actionIndex) => `${learningStageId}.action.${actionIndex}`),
+                    resources: learningResources.map((resource) => mapCatalogResource(resource, [gap.label], `Apply ${gap.label} independently`)),
+                    resourceIds: learningResources.map((resource) => resource.id),
+                    capabilityIds: [gap.capabilityId],
+                    gapIds: [gap.gapId],
+                    skillsToBuild: [gap.label],
+                    responsibilitiesToGain: [],
+                    requiredCapabilities: [gap.label],
+                    roleCategories: [],
+                    experienceAccumulation: `A practical foundation in ${gap.label}.`,
+                    completionOptions: undefined,
+                    allowCustomCompletionOption: undefined,
+                    completionCriteria: [{
+                        id: `${learningStageId}.criteria.1`,
+                        description: `Confirm that you understand and can apply ${gap.label}`,
+                        metric: "self_attest",
+                        targetValue: 1,
+                    }],
+                    prerequisiteStageIds: [],
+                    parallelStageIds: [],
+                    orderingReason: `This learning step can overlap with other preparation for ${careerPathRole}.`,
+                };
+            });
+        return [...learningStages, preparationStage, readinessStage];
     });
 
 export const buildDeterministicStages = (params: {
@@ -567,6 +679,8 @@ export const buildDeterministicStages = (params: {
         return buildStagesFromRoleMilestones({
             dreamJob: params.dreamJob,
             milestonePlan: params.milestonePlan,
+            gaps: params.gaps,
+            careerPathRoles: params.preparedForRoles ?? [],
             hoursPerWeek,
             assumedAvailability,
             measurableCompletionEnabled,

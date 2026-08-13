@@ -245,6 +245,12 @@ describe("role milestone stages", () => {
         assert.ok(stages.some((stage) => stage.resources.some((resource) => resource.url.includes("coursera.org/learn/wharton-finance"))));
         assert.ok(stages.flatMap((stage) => stage.resources).every((resource) => !resource.url.includes("google.com/search")));
         assert.ok(stages.every((stage) => stage.actionPlan));
+        assert.ok(stages.every((stage) => stage.careerPathRole));
+        assert.ok(stages.every((stage) => stage.label.includes(stage.careerPathRole!)));
+        assert.ok(stages.some((stage) => stage.stageKind === "role-readiness"));
+        assert.ok(stages
+            .filter((stage) => stage.stageKind === "experience" || stage.stageKind === "leadership" || stage.stageKind === "role-readiness")
+            .every((stage) => (stage.completionOptions?.length ?? 0) > 0));
         const firstPlan = stages[0]?.actionPlan;
         assert.ok(firstPlan);
         assert.ok(firstPlan.routes.length >= 3);

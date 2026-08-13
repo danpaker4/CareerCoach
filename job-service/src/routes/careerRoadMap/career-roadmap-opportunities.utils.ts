@@ -47,7 +47,7 @@ const buildRoleSearchTerms = (roles: readonly string[]): string[] => {
             .filter(Boolean);
         const aliases = fragments.flatMap((fragment) => {
             const normalized = fragment.toLowerCase();
-            return Object.entries(ROLE_ALIASES).flatMap(([key, values]) => normalized.includes(key) ? values : []);
+            return Object.entries(ROLE_ALIASES).flatMap(([key, values]) => normalized.includes(key) ? [key, ...values] : []);
         });
         return [role.trim(), ...fragments, ...aliases];
     });

@@ -18,6 +18,13 @@ export type ResourceType = "course" | "video" | "practice" | "article" | "docs" 
 
 export type ProgressionType = "learning" | "experience" | "hybrid";
 
+export type RoadmapStageKind = "learning" | "experience" | "leadership" | "role-readiness";
+
+export type StageCompletionOption = {
+    id: string;
+    label: string;
+};
+
 export type GeneratedResource = {
     title: string;
     platform: string;
@@ -156,6 +163,11 @@ export type GeneratedStageContent = {
     howToGetThere?: string;
     whatYouGain?: string;
     progressionType: ProgressionType;
+    careerPathRole?: string;
+    roleGroupIndex?: number;
+    stageKind?: RoadmapStageKind;
+    completionOptions?: StageCompletionOption[];
+    allowCustomCompletionOption?: boolean;
     requiredCapabilities: string[];
     skillsToBuild: string[];
     responsibilitiesToGain: string[];
