@@ -1,8 +1,10 @@
 import { parseJsonObjectFromLlm } from "../../shared/llm/json-response.utils";
 import {
     buildDifferentRoleDiscoveryReply,
+    normalizeTargetDiscoveryQuestion,
     normalizeTargetRole,
     parseTargetDiscoveryFacts,
+    resolveTargetDiscoverySubject,
 } from "./onboarding.target-role.utils";
 import type {
     TargetRoleDecision,
@@ -32,11 +34,13 @@ const unwrapGroundingDecisionObject = (object: Record<string, unknown>): Record<
     }
     const wrappedDecisions = GROUNDING_DECISION_KINDS.flatMap((expectedKind) => {
         const wrapped = object[expectedKind];
-        if (!isUnknownRecord(wrapped) || typeof wrapped.kind !== "string") {
+        if (!isUnknownRecord(wrapped)) {
             return [];
         }
-        const actualKind = wrapped.kind.trim().toUpperCase().replace(/[\s-]+/g, "_");
-        return actualKind === expectedKind ? [wrapped] : [];
+        const actualKind = typeof wrapped.kind === "string"
+            ? wrapped.kind.trim().toUpperCase().replace(/[\s-]+/g, "_")
+            : expectedKind;
+        return actualKind === expectedKind ? [{ ...wrapped, kind: expectedKind }] : [];
     });
     return wrappedDecisions[0] ?? object;
 };
@@ -101,20 +105,25 @@ export const parseTargetRoleDecision = (rawText: string, latestUserMessage?: str
     if (
         status === "NEEDS_CLARIFICATION"
         && typeof object.question === "string"
-        && typeof object.subject === "string"
     ) {
-        const question = object.question.trim();
-        const subject = object.subject.trim().slice(0, 80);
+        const question = normalizeTargetDiscoveryQuestion(object.question);
+        const subject = resolveTargetDiscoverySubject(object.subject, question);
         const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
         return validatedQuestion === question && subject.length >= 2
-            ? { status: "NEEDS_CLARIFICATION", question, subject, discoveryFacts }
+            ? {
+                status: "NEEDS_CLARIFICATION",
+                question,
+                subject,
+                discoveryFacts,
+                ...(object.rejectedSuggestedRoles === true ? { rejectedSuggestedRoles: true } : {}),
+            }
             : null;
     }
 
-    if (status === "ROLE_OPTIONS" && typeof object.summary === "string") {
-        const summary = object.summary.trim().slice(0, 400);
+    if (status === "ROLE_OPTIONS") {
+        const summary = typeof object.summary === "string" ? object.summary.trim().slice(0, 400) : "";
         const roles = parseRoleList(object.roles);
-        return roles && summary.length > 0 && !INVALID_ROLE_TITLE_PATTERN.test(summary)
+        return roles && !INVALID_ROLE_TITLE_PATTERN.test(summary)
             ? { status: "ROLE_OPTIONS", summary, roles, discoveryFacts }
             : null;
     }
@@ -134,12 +143,32 @@ export const parseTargetRoleOptionsReviewDecision = (
     if (verdict === "KEEP_OPTIONS") {
         return { verdict: "KEEP_OPTIONS" };
     }
+    if (
+        verdict === "RESUME_DISCOVERY"
+        && typeof object.question === "string"
+    ) {
+        const question = normalizeTargetDiscoveryQuestion(object.question);
+        const subject = resolveTargetDiscoverySubject(object.subject, question);
+        const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
+        return validatedQuestion === question && subject.length >= 2
+            ? {
+                verdict: "RESUME_DISCOVERY",
+                question,
+                subject,
+                discoveryFacts: parseTargetDiscoveryFacts(object.discoveryFacts),
+                rejectedSuggestedRoles: object.rejectedSuggestedRoles === true,
+            }
+            : null;
+    }
     if (verdict !== "READY") {
         return null;
     }
     const targetRole = normalizeRoleTitle(object.targetRole);
     const evidenceQuote = parseExactEvidenceQuote(object.evidenceQuote, latestUserMessage);
-    return targetRole && evidenceQuote ? { verdict: "READY", targetRole, evidenceQuote } : null;
+    const targetIsExplicit = targetRole && evidenceQuote
+        ? normalizeEvidence(evidenceQuote).includes(normalizeEvidence(targetRole))
+        : false;
+    return targetRole && evidenceQuote && targetIsExplicit ? { verdict: "READY", targetRole, evidenceQuote } : null;
 };
 
 export const parseTargetRoleGroundingDecision = (
@@ -212,7 +241,7 @@ export const parseTargetRoleGroundingDecision = (
     }
 
     if (kind === "NEEDS_CLARIFICATION" && typeof object.question === "string") {
-        const question = object.question.trim();
+        const question = normalizeTargetDiscoveryQuestion(object.question);
         const validatedQuestion = buildDifferentRoleDiscoveryReply(question);
         return validatedQuestion === question
             ? { kind: "NEEDS_CLARIFICATION", question }

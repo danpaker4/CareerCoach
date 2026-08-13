@@ -66,6 +66,35 @@ describe("parseOnboardingLlmDecisionFromJson", () => {
         assert.doesNotMatch(decision.response, /NEAR_TERM|DREAMJOB|GUIDED|\[/);
         assert.match(decision.response, /looking for a job now/i);
     });
+
+    it("recovers the user-facing reply when the model copies the response placeholder", () => {
+        const decision = parseOnboardingLlmDecisionFromJson(JSON.stringify({
+            response: "message",
+            background: {
+                status: "NONE",
+                role: null,
+                yearsOfExperience: null,
+                companies: [],
+                technologies: [],
+                education: [{ name: "High School" }],
+                summary: "Recent high school graduate, looking to explore career options. "
+                    + "Are you looking for a job now, aiming for a longer-term role in the future, "
+                    + "or still figuring out what you want?",
+            },
+            mode: null,
+            advance: true,
+        }));
+
+        const step = applyOnboardingDecision(
+            defaultOnboardingFlow(),
+            decision,
+            "hi my name is shai and i just finished high school",
+        );
+
+        assert.notEqual(step.reply, "message");
+        assert.match(step.reply, /recent high school graduate/i);
+        assert.match(step.reply, /looking for a job now/i);
+    });
 });
 
 describe("buildOnboardingPrompt", () => {
@@ -81,6 +110,7 @@ describe("buildOnboardingPrompt", () => {
         assert.match(prompt, /CHAT_STATED_FACTS are authoritative/);
         assert.match(prompt, /correct spelling.*natural professional language/i);
         assert.match(prompt, /do not replace or contradict/i);
+        assert.doesNotMatch(prompt, /"response":"message"/);
     });
 
     it("tells the model to resolve obvious misspellings from conversation context", () => {
@@ -116,7 +146,7 @@ describe("buildOnboardingPrompt", () => {
         assert.doesNotMatch(prompt, /nearTermTarget\.step|discovering_target/);
         assert.match(prompt, /CHAT_STATED_FACTS: name=gal, role=software developer, yearsOfExperience=5/);
         assert.match(prompt, /Understand role descriptions.*yourself/i);
-        assert.ok(prompt.length < 3_000);
+        assert.ok(prompt.length < 1_800);
     });
 
     it("asks the model to reject job-search intent misclassified as background", () => {
@@ -176,6 +206,26 @@ describe("buildOnboardingPrompt", () => {
         assert.match(prompt, /Do not ask for information already known/i);
         assert.match(prompt, /targetDiscoverySubject/);
     });
+
+    it("asks the model to generate the first-job discovery question", () => {
+        const flow = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            background: { status: "NONE" as const, role: null },
+        };
+        const prompt = buildOnboardingPrompt(
+            emptyConversation(),
+            "i want to find my first job",
+            "Name: shai",
+            flow,
+        );
+
+        assert.match(prompt, /Current role: none/);
+        assert.match(prompt, /targetDiscoverySubject/);
+        assert.match(prompt, /first job.*NEAR_TERM/i);
+        assert.match(prompt, /2-3 related job-relevant signals/i);
+        assert.match(prompt, /generic continuation/i);
+    });
 });
 
 describe("resolveOnboardingDirectionMode", () => {
@@ -183,6 +233,7 @@ describe("resolveOnboardingDirectionMode", () => {
         assert.equal(resolveOnboardingDirectionMode("im looking for something now"), "NEAR_TERM");
         assert.equal(resolveOnboardingDirectionMode("now"), "NEAR_TERM");
         assert.equal(resolveOnboardingDirectionMode("looking for a job now"), "NEAR_TERM");
+        assert.equal(resolveOnboardingDirectionMode("i am looking to find my first job"), "NEAR_TERM");
         assert.equal(
             resolveOnboardingDirectionMode("i need to change jobs soon, maybe in the next 2 months"),
             "NEAR_TERM",
@@ -386,6 +437,85 @@ describe("applyOnboardingDecision", () => {
         assert.doesNotMatch(step.reply, /You've been/);
     });
 
+    it("uses a model-generated discovery question when a near-term user has no current role", () => {
+        const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
+            response: "You are just starting out. What are you looking for?",
+            background: { status: "NONE", role: null },
+            mode: null,
+            advance: true,
+        }).onboardingFlow;
+
+        const step = applyOnboardingDecision(
+            afterBackground,
+            {
+                response: "Which school subjects or activities have you enjoyed most?",
+                background: { status: "UNKNOWN" },
+                mode: "NEAR_TERM",
+                advance: true,
+                targetDiscoverySubject: "school_interests",
+            },
+            "i am looking for some job rn",
+        );
+
+        assert.equal(step.reply, "Which school subjects or activities have you enjoyed most?");
+        assert.doesNotMatch(step.reply, /same role|different role/i);
+        assert.equal(step.onboardingFlow.directionResolved, true);
+        assert.equal(step.onboardingFlow.nearTermTarget?.step, "discovering_target");
+        assert.equal(step.onboardingFlow.nearTermTarget?.clarificationCount, 1);
+        assert.deepEqual(step.onboardingFlow.nearTermTarget?.coveredSubjects, ["school_interests"]);
+        assert.equal(step.completedThisTurn, false);
+    });
+
+    it("uses the model-generated first discovery question when its subject metadata is missing", () => {
+        const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
+            response: "You are just starting out. What are you looking for?",
+            background: { status: "NONE", role: null },
+            mode: null,
+            advance: true,
+        }).onboardingFlow;
+        const modelQuestion = "Would you rather create things, solve technical problems, or work directly with people?";
+
+        const step = applyOnboardingDecision(
+            afterBackground,
+            {
+                response: modelQuestion,
+                background: { status: "UNKNOWN" },
+                mode: "NEAR_TERM",
+                advance: true,
+            },
+            "now",
+        );
+
+        assert.equal(step.reply, modelQuestion);
+        assert.equal(step.onboardingFlow.nearTermTarget?.clarificationCount, 1);
+        assert.notEqual(step.onboardingFlow.nearTermTarget?.coveredSubjects?.[0], "semantic focus");
+    });
+
+    it("keeps an explicit first-job request near-term when the model misclassifies it", () => {
+        const afterBackground = applyOnboardingDecision(defaultOnboardingFlow(), {
+            response: "You are just starting out. What are you looking for?",
+            background: { status: "NONE", role: null },
+            mode: null,
+            advance: true,
+        }).onboardingFlow;
+
+        const step = applyOnboardingDecision(
+            afterBackground,
+            {
+                response: "What kinds of activities, strengths, and work settings appeal to you?",
+                background: { status: "NONE", role: null },
+                mode: "DREAMJOB",
+                advance: true,
+                targetDiscoverySubject: "career_preferences",
+            },
+            "i am looking to find my first job",
+        );
+
+        assert.equal(step.onboardingFlow.initialMode, "NEAR_TERM");
+        assert.equal(step.onboardingFlow.nearTermTarget?.step, "discovering_target");
+        assert.equal(step.onboardingFlow.completed, false);
+    });
+
     it("searches the current role only after the user chooses the same role", () => {
         const awaitingChoice = {
             ...defaultOnboardingFlow(),
@@ -556,6 +686,44 @@ describe("applyOnboardingDecision", () => {
             "Solutions Engineer",
         ]);
         assert.match(step.reply, /1\. Product Manager/);
+    });
+
+    it("stores rejected suggestions and uses the model-generated follow-up question", () => {
+        const flow = {
+            ...defaultOnboardingFlow(),
+            backgroundResolved: true,
+            directionResolved: true,
+            initialMode: "NEAR_TERM" as const,
+            background: { status: "NONE" as const, role: null },
+            nearTermTarget: {
+                step: "discovering_target" as const,
+                clarificationCount: 0,
+                suggestedRoles: ["Data Analyst", "Marketing Assistant", "Customer Service Representative"],
+            },
+        };
+        const modelQuestion = "Would you rather work with people, ideas, or practical tasks?";
+
+        const step = applyOnboardingDecision(
+            flow,
+            {
+                response: modelQuestion,
+                background: flow.background,
+                mode: null,
+                advance: false,
+                targetDiscoverySubject: "preferred_activity",
+                targetDiscoveryFacts: {},
+                rejectedTargetRoleOptions: true,
+            },
+            "none of them fit",
+        );
+
+        assert.equal(step.reply, modelQuestion);
+        assert.equal(step.onboardingFlow.nearTermTarget?.clarificationCount, 1);
+        assert.deepEqual(step.onboardingFlow.nearTermTarget?.rejectedSuggestedRoles, [
+            "Data Analyst",
+            "Marketing Assistant",
+            "Customer Service Representative",
+        ]);
     });
 
     it("rejects the old direction question while discovering a different target role", () => {

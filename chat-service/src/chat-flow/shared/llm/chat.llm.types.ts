@@ -6,7 +6,9 @@ export type ChatLlmObservedOperation =
     | "chat.onboarding.background_review"
     | "chat.onboarding.target_role"
     | "chat.onboarding.target_role.retry"
+    | "chat.onboarding.target_role.discovery"
     | "chat.onboarding.target_role.review"
+    | "chat.onboarding.target_role.review.retry"
     | "chat.onboarding.target_role.verify"
     | "chat.onboarding.target_role.verify.retry"
     | "chat.conversation_end";

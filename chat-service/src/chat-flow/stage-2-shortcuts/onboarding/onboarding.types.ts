@@ -14,6 +14,7 @@ export type OnboardingLlmDecision = {
     targetRole?: string | null;
     targetRoleReady?: boolean;
     targetRoleOptions?: string[];
+    rejectedTargetRoleOptions?: boolean;
     targetDiscoveryFacts?: Readonly<Record<string, string>>;
     targetDiscoverySubject?: string | null;
 };
@@ -35,6 +36,9 @@ export const ONBOARDING_DIRECTION_REASK_REPLY =
 
 export const ONBOARDING_ROLE_CHOICE_REPLY =
     "Are you looking for your next job in the same role, or do you want to move into a different role?";
+
+export const ONBOARDING_FIRST_ROLE_REPLY =
+    "What kind of job would you like to look for?";
 
 export const ONBOARDING_DIFFERENT_ROLE_REPLY =
     "What role or kind of work would you like to move into?";

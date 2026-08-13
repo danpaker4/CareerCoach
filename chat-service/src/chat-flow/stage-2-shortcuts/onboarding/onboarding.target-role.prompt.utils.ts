@@ -1,5 +1,8 @@
 import type { Conversation } from "../../../routes/conversation/conversation.model";
-import { MAX_OPEN_TARGET_ROLE_QUESTIONS } from "./onboarding.target-role.consts";
+import {
+    MAX_OPEN_TARGET_ROLE_QUESTIONS,
+    MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS,
+} from "./onboarding.target-role.consts";
 
 const MAX_HISTORY_MESSAGES = 40;
 const MAX_HISTORY_MESSAGE_CHARS = 400;
@@ -25,42 +28,50 @@ export const buildTargetRoleDecisionPrompt = (
     const targetState = conversation.onboardingFlow?.nearTermTarget;
     const clarificationCount = targetState?.clarificationCount ?? 0;
     const suggestedRoles = targetState?.suggestedRoles ?? [];
-    const mustOfferChoices = clarificationCount >= MAX_OPEN_TARGET_ROLE_QUESTIONS;
-    return `
-You identify the concrete role a career-coaching user wants next. The user already chose to move into a DIFFERENT role.
-Return ONLY one compact JSON object with no markdown. Use exactly one of these field contracts:
-- READY: status is "READY"; targetRole is the selected searchable role or domain; evidenceQuote is an exact quote from the latest user message supporting that selection; discoveryFacts is an object.
-- NEEDS_CLARIFICATION: status is "NEEDS_CLARIFICATION"; question is one concise question; subject is its short semantic subject; discoveryFacts is an object.
-- ROLE_OPTIONS: status is "ROLE_OPTIONS"; summary is concise; roles is an array of 3-5 objects containing title and reason; discoveryFacts is an object.
-The contracts describe structure only. Generate every value from the conversation instead of copying wording from these instructions.
+    const rejectedSuggestedRoles = targetState?.rejectedSuggestedRoles ?? [];
+    const mustOfferChoices = clarificationCount >= MAX_OPEN_TARGET_ROLE_QUESTIONS && suggestedRoles.length === 0;
+    const currentRole = conversation.onboardingFlow?.background?.role?.trim();
+    const roleContext = currentRole
+        ? "The user chose to move into a different role."
+        : "The user has no current role and is choosing a first target role.";
+    return `You identify the user's next concrete job target. ${roleContext}
+Return ONLY one compact JSON object, using one contract:
+- READY: {"status":"READY","targetRole":"","evidenceQuote":"exact latest-user quote","discoveryFacts":{}}
+- NEEDS_CLARIFICATION: status, question, subject, discoveryFacts, and rejectedSuggestedRoles
+- ROLE_OPTIONS: {"status":"ROLE_OPTIONS","summary":"","roles":[{"title":"","reason":""}],"discoveryFacts":{}}
+Generate values from the conversation; contract strings are not answers.
 
-Rules:
-- Interpret obvious spelling mistakes and informal wording from context before deciding. A misspelled but recognizable role or domain should be treated as the intended role; ask for clarification only when multiple meanings remain plausible.
-- Understand the user's natural language yourself. Do not require special phrasing or a hardcoded title list.
-- READY when the user explicitly names a concrete searchable role/domain or selects one of the assistant's previously suggested roles. READY always requires evidenceQuote copied exactly from the latest user message.
-- NEEDS_CLARIFICATION is allowed only before the open-question limit. Ask exactly one high-value, natural question and identify its short semantic subject. The subject describes what the question learns; it is not chosen from a fixed list.
-- Choose the next subject dynamically from the full conversation, stored discovery facts, and covered subjects. Examples include enjoyed or disliked work, desired responsibilities, strengths, work style, domain, constraints, or remote/hybrid/office preference, but these are guidance rather than a checklist.
-- Do not follow a fixed question order. Skip anything already known, do not repeat or paraphrase an earlier question, and ask about workplace setting only when it would materially improve the recommendations.
-- ROLE_OPTIONS means: synthesize all accumulated preferences and propose 3-5 distinct concrete searchable roles with one specific fit reason each. The application formats the list and choice question.
-- ROLE_OPTIONS must not include the user's current/background role because the user explicitly chose to move into a different role.
-- If the user asks to see jobs without selecting a concrete role, return ROLE_OPTIONS rather than starting a broad search. Job search waits for the user to choose a role.
-- Treat repeated uncertainty, inability to answer, or vague value words as a signal to switch from interrogation to ROLE_OPTIONS.
-- If roles were already suggested, understand natural selections such as a role name, "the first one", or "compare the first two" from the conversation.
-- Selecting one previously suggested role by name, position, or unambiguous reference takes priority over mustOfferChoices. Return READY with that exact suggested role and quote the user's selection as evidenceQuote.
-- Use the user's background and profile as context, but use only this conversation to decide what target the user wants. Do not treat a background role as a selected target.
-- discoveryFacts must contain only concise facts explicitly supported by the user's messages. Return newly learned or corrected facts using short semantic keys. Never invent a preference.
-- Never ask whether they want a job now, in the future, or whether they want the same versus a different role; those decisions are already resolved.
+Decision policy, in order:
+1. READY only for a concrete searchable role/domain explicitly named now or unambiguously selected from prior suggestions. Copy exact evidenceQuote. A selected suggestion overrides mustOfferChoices.
+2. ROLE_OPTIONS gives 3-5 distinct searchable roles with specific reasons grounded in explicit facts. Use it when suggestions are requested, the question limit is reached, or enough facts support useful choices. Once at least ${MIN_TARGET_DISCOVERY_FACTS_FOR_OPTIONS} meaningful facts are known, prefer ROLE_OPTIONS unless one critical discriminator would materially change the choices.
+3. Otherwise NEEDS_CLARIFICATION, only before the limit. Ask one easy, concise question that maximizes information gain by collecting 2-3 related job-relevant signals which distinguish plausible paths. Choose those signals dynamically from what is unknown; do not follow a fixed checklist.
+
+Discovery quality:
+- Build on known facts and skip covered subjects. Never repeat/paraphrase a question or ask a generic continuation question that only invites elaboration.
+- For NEEDS_CLARIFICATION, subject must be a short snake_case topic specific to the generated question. Never return placeholder labels such as "semantic focus", "subject", "focus", or "topic".
+- Use concrete tradeoffs or examples when they make answering easier. After an uncertain answer, make the next question easier and more concrete.
+- Save each distinct newly stated signal as its own discoveryFacts entry with a short semantic key. Facts and option reasons must be explicit; never infer preferences from inexperience or uncertainty.
+- Every discoveryFacts value must be a short string. Never use booleans, arrays, or objects as fact values.
+- If all active suggestions are rejected, mark rejectedSuggestedRoles=true and ask about a new discriminator; do not replace or repeat the list unless asked.
+
+Boundaries:
+- Interpret informal wording and obvious typos. Ask only when meaning is genuinely ambiguous.
+- A broad interest/activity/skill is evidence, not a selected role. Background/profile is context, not proof of target preference.
+- Do not repeat prior/rejected titles unless selected. Exclude the current role after a change-role choice.
+- A request to see jobs without a selected role means ROLE_OPTIONS; search starts only after selection.
+- Never revisit timing or same-vs-different-role decisions.
 
 Discovery state:
 clarificationCount=${clarificationCount}
 openQuestionLimit=${MAX_OPEN_TARGET_ROLE_QUESTIONS}
 mustOfferChoices=${mustOfferChoices}
 previouslySuggestedRoles=${JSON.stringify(suggestedRoles)}
+rejectedSuggestedRoles=${JSON.stringify(rejectedSuggestedRoles)}
 storedDiscoveryFacts=${JSON.stringify(targetState?.discoveryFacts ?? {})}
 coveredSubjects=${JSON.stringify(targetState?.coveredSubjects ?? [])}
 ${mustOfferChoices
-        ? "You MUST NOT return NEEDS_CLARIFICATION. Return READY or ROLE_OPTIONS."
-        : "You may ask one useful clarification, but prefer ROLE_OPTIONS now if the user is already struggling to answer."}
+        ? "NEEDS_CLARIFICATION is forbidden now; return READY or ROLE_OPTIONS."
+        : "Follow the decision policy above."}
 
 Relevant conversation:
 ${buildDiscoveryHistory(conversation, latestUserMessage)}
@@ -76,25 +87,83 @@ ${originalPrompt}
 Your previous output was invalid or asked a question from the wrong conversation stage.
 Re-evaluate the latest user message and return exactly one valid JSON object from the allowed shapes above.
 Preserve a correct intent status and repair only its missing or invalid fields. READY requires an exact evidenceQuote from the latest user message. ROLE_OPTIONS must include 3-5 real searchable titles and a specific reason for each.
+For NEEDS_CLARIFICATION, generate a specific snake_case subject that names the question's actual topic; never copy schema or placeholder wording.
 Previous invalid output: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
+`;
+
+export const buildTargetRoleDiscoveryRecoveryPrompt = (
+    conversation: Conversation,
+    latestUserMessage: string,
+): string => `
+You are a career coach choosing the next discovery question for a first-time job seeker who does not know which role fits yet.
+Return ONLY one compact JSON object: {"status":"NEEDS_CLARIFICATION","question":"","discoveryFacts":{}}
+
+Rules:
+- Generate one natural question ending in "?". The question must come from the conversation, not from this instruction.
+- Ask about 2-3 concrete, related preferences that distinguish plausible job paths, using easy choices when helpful.
+- Build on interests the user already stated and make an uncertain user's next question easier to answer.
+- Do not ask for a job title, ask what role they want, ask generic "what aspects" questions, or revisit timing.
+- Do not repeat or paraphrase an earlier assistant question.
+- Put newly stated facts in discoveryFacts using short semantic keys and string values only.
+
+Stored discovery facts: ${JSON.stringify(conversation.onboardingFlow?.nearTermTarget?.discoveryFacts ?? {})}
+Covered subjects: ${JSON.stringify(conversation.onboardingFlow?.nearTermTarget?.coveredSubjects ?? [])}
+Relevant conversation:
+${buildDiscoveryHistory(conversation, latestUserMessage)}
+Latest user message: ${latestUserMessage}
 `;
 
 export const buildTargetRoleOptionsReviewPrompt = (
     conversation: Conversation,
     latestUserMessage: string,
     priorOutput: string,
-): string => `
-Review the prior role decision, which returned ROLE_OPTIONS for a career-coaching user who chose to move into a different role.
+): string => {
+    const targetState = conversation.onboardingFlow?.nearTermTarget;
+    const clarificationCount = targetState?.clarificationCount ?? 0;
+    const mustOfferChoices = clarificationCount >= MAX_OPEN_TARGET_ROLE_QUESTIONS
+        && (targetState?.suggestedRoles?.length ?? 0) === 0;
+    const reviewContext = conversation.onboardingFlow?.background?.role?.trim()
+        ? "The user chose to move into a different role."
+        : "The user is choosing a first target role.";
+    return `
+Review the prior role decision, which returned ROLE_OPTIONS. ${reviewContext}
 Return ONLY one compact JSON object with one of these contracts:
 - KEEP_OPTIONS: verdict is "KEEP_OPTIONS" and there are no other fields.
 - READY: verdict is "READY"; targetRole is the shortest searchable role or domain explicitly selected by the user; evidenceQuote is the exact supporting text from the latest user message.
+- RESUME_DISCOVERY: verdict is "RESUME_DISCOVERY"; question is one concise, model-generated discovery question; subject is its short semantic subject; discoveryFacts contains only facts explicitly supported by the user's messages; rejectedSuggestedRoles is true only when the user rejected the active suggestions.
 
-The latest user message is authoritative. Use KEEP_OPTIONS unless it explicitly names a concrete searchable role/domain or unambiguously selects a previously suggested role. A broad activity, responsibility, skill, or interest is not READY. Do not infer an adjacent role, and do not copy role or preference values from the surrounding instructions.
+Rules:
+- The latest user message is authoritative. Use READY only when it explicitly names a concrete searchable role/domain or unambiguously selects a previously suggested role.
+- Use KEEP_OPTIONS only when the options are grounded in stored or prior-output discoveryFacts, the open-question limit was reached, or the user explicitly requested suggestions.
+- Use RESUME_DISCOVERY when preferences are still insufficient, when a single uncertain answer caused premature options, when the options invent preferences, or when the user rejects all active suggestions.
+- A broad activity, responsibility, skill, or interest is not READY. Do not infer an adjacent role.
+- The discovery question must be easy and concrete, collect 2-3 related job-relevant signals, and distinguish plausible paths. Avoid generic continuation, repetition, or paraphrase.
+- If the user rejected the active options, set rejectedSuggestedRoles=true and do not repeat those titles.
+- Do not copy role, preference, or question values from these instructions.
+Discovery state:
+clarificationCount=${clarificationCount}
+openQuestionLimit=${MAX_OPEN_TARGET_ROLE_QUESTIONS}
+mustOfferChoices=${mustOfferChoices}
+storedDiscoveryFacts=${JSON.stringify(targetState?.discoveryFacts ?? {})}
+coveredSubjects=${JSON.stringify(targetState?.coveredSubjects ?? [])}
+rejectedSuggestedRoles=${JSON.stringify(targetState?.rejectedSuggestedRoles ?? [])}
 Relevant conversation:
 ${buildDiscoveryHistory(conversation, latestUserMessage)}
 Latest user message: ${latestUserMessage}
-Previously suggested roles: ${JSON.stringify(conversation.onboardingFlow?.nearTermTarget?.suggestedRoles ?? [])}
+Active suggested roles: ${JSON.stringify(targetState?.suggestedRoles ?? [])}
 Prior decision: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
+`;
+};
+
+export const buildTargetRoleOptionsReviewCorrectionPrompt = (
+    originalPrompt: string,
+    priorOutput: string,
+): string => `
+${originalPrompt}
+
+Your previous review output was invalid, inferred a role the user did not select, or repeated a covered question.
+Return exactly one valid review object. If more discovery is needed, ask a new natural-language question ending in "?" about an uncovered topic and give it a specific snake_case subject.
+Previous invalid review: ${priorOutput.slice(0, MAX_PRIOR_OUTPUT_CHARS)}
 `;
 
 export const buildTargetRoleGroundingPrompt = (
