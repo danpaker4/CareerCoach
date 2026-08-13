@@ -59,12 +59,12 @@ const readStringArray = (value: unknown): string[] =>
         ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
         : [];
 
-const buildRelevanceReason = (job: EnrichedJob, roleCategory: string, score: number): string => {
+const buildRelevanceReason = (job: EnrichedJob, roleCategory: string): string => {
     const normalized = normalizeRoleCategory(job.jobTitle, job.seniority ?? "");
     if (normalized.toLowerCase().includes(roleCategory.toLowerCase().split(" ").slice(-2).join(" "))) {
-        return `Title aligns with ${roleCategory} milestone (match score ${score}%).`;
+        return `Title aligns with the ${roleCategory} milestone.`;
     }
-    return `Matches skills and seniority expectations for ${roleCategory} (match score ${score}%).`;
+    return `Matches skills and seniority expectations for ${roleCategory}.`;
 };
 
 export const discoverStageOpportunities = async (
@@ -106,7 +106,7 @@ export const discoverStageOpportunities = async (
             return {
                 job,
                 score: scoreResult.overallScore,
-                relevanceReason: buildRelevanceReason(job, bestCategory, scoreResult.overallScore),
+                relevanceReason: buildRelevanceReason(job, bestCategory),
                 requirements,
                 missingRequirements: [...mustKnowSkills, ...requirements]
                     .filter((requirement, index, all) => all.indexOf(requirement) === index)
