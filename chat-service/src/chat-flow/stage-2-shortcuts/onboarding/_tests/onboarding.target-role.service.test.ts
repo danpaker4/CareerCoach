@@ -459,6 +459,118 @@ describe("resolveTargetRoleDecision", () => {
         assert.deepEqual(decision.discoveryFacts, { preferred_industry: "high tech" });
     });
 
+    it("rejects a question repeated from earlier in the conversation even when its subject changes", async () => {
+        const repeatedQuestion = "What specific aspects of 'work' or 'job' are you unsure about?";
+        const recoveryQuestion = "Would you rather create visual designs, digital products, or physical objects?";
+        const conversation = createFirstRoleConversation("creating things");
+        conversation.messages = [
+            { role: "assistant", content: "What kind of work are you most interested in doing?", timestamp: new Date(0) },
+            { role: "user", content: "i actually dont know", timestamp: new Date(1) },
+            { role: "assistant", content: repeatedQuestion, timestamp: new Date(2) },
+            { role: "user", content: "i am not sure in what field i want to work", timestamp: new Date(3) },
+            {
+                role: "assistant",
+                content: "Do you envision your first job involving working with people, creating things, or analyzing data?",
+                timestamp: new Date(4),
+            },
+            { role: "user", content: "creating things", timestamp: new Date(5) },
+        ];
+        if (conversation.onboardingFlow?.nearTermTarget) {
+            conversation.onboardingFlow.nearTermTarget.clarificationCount = 3;
+            conversation.onboardingFlow.nearTermTarget.coveredSubjects = [
+                "work_interests",
+                "job_type_uncertainty",
+                "preferred_contribution",
+            ];
+        }
+        const outputs = [
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: repeatedQuestion,
+                subject: "uncertainty_about_job_type",
+                discoveryFacts: {},
+            }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: repeatedQuestion,
+                subject: "uncertainty_about_work",
+                discoveryFacts: {},
+            }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: recoveryQuestion,
+                subject: "creative_medium",
+                discoveryFacts: { preferred_activity: "creating things" },
+            }),
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "creating things",
+            userAccountContext: "Name: shai; Education: finished high school",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: recoveryQuestion,
+            subject: "creative_medium",
+            discoveryFacts: { preferred_activity: "creating things" },
+        });
+        assert.equal(outputs.length, 0);
+    });
+
+    it("rejects generic uncertainty questions that do not build on the user's answer", async () => {
+        const genericQuestion = "What specific aspects of work are you unsure about?";
+        const recoveryQuestion = "Would you rather create visual designs, digital products, or physical objects?";
+        const conversation = createFirstRoleConversation("creating things");
+        const outputs = [
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: genericQuestion,
+                subject: "work_uncertainty",
+                discoveryFacts: {},
+            }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: genericQuestion,
+                subject: "uncertainty_details",
+                discoveryFacts: {},
+            }),
+            JSON.stringify({
+                status: "NEEDS_CLARIFICATION",
+                question: recoveryQuestion,
+                subject: "creative_medium",
+                discoveryFacts: { preferred_activity: "creating things" },
+            }),
+        ];
+        const textCompletion: TextCompletionPort = {
+            complete: async () => outputs.shift() ?? "",
+        };
+
+        const decision = await resolveTargetRoleDecision({
+            textCompletion,
+            conversation,
+            latestUserMessage: "creating things",
+            userAccountContext: "Name: shai; Education: finished high school",
+            userId: "user-1",
+            conversationId: "conversation-1",
+        });
+
+        assert.deepEqual(decision, {
+            status: "NEEDS_CLARIFICATION",
+            question: recoveryQuestion,
+            subject: "creative_medium",
+            discoveryFacts: { preferred_activity: "creating things" },
+        });
+        assert.equal(outputs.length, 0);
+    });
+
     it("keeps model-generated role suggestions when the user explicitly asks for them", async () => {
         const conversation = createFirstRoleConversation("you suggest");
         if (conversation.onboardingFlow?.nearTermTarget) {

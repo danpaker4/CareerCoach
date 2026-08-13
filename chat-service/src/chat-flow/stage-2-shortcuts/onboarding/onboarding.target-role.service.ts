@@ -21,6 +21,7 @@ import {
 } from "./onboarding.target-role.prompt.utils";
 import {
     buildTargetRoleFallbackReply,
+    isTargetDiscoveryQuestionDisallowed,
     resolveTargetDiscoverySubject,
 } from "./onboarding.target-role.utils";
 import type {
@@ -87,9 +88,9 @@ const resolveDiscoveryRecovery = async (
     params: ResolveTargetRoleDecisionParams,
     fallbackQuestion: string,
 ): Promise<TargetRoleDecision> => {
-    const previousAssistantMessage = [...params.conversation.messages]
-        .reverse()
-        .find((message) => message.role === "assistant")?.content;
+    const previousAssistantMessages = params.conversation.messages
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.content);
     const attempt = await completeJsonAttempt(
         params,
         buildTargetRoleDiscoveryRecoveryPrompt(params.conversation, params.latestUserMessage),
@@ -99,9 +100,9 @@ const resolveDiscoveryRecovery = async (
             if (decision?.status !== "NEEDS_CLARIFICATION") {
                 return null;
             }
-            const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-                === decision.question.trim().toLowerCase();
-            return repeatedQuestion ? null : decision;
+            return isTargetDiscoveryQuestionDisallowed(decision.question, previousAssistantMessages)
+                ? null
+                : decision;
         },
     );
     return attempt.decision ?? {
@@ -169,6 +170,9 @@ export const resolveTargetRoleDecision = async (
     const previousAssistantMessage = [...params.conversation.messages]
         .reverse()
         .find((message) => message.role === "assistant")?.content;
+    const previousAssistantMessages = params.conversation.messages
+        .filter((message) => message.role === "assistant")
+        .map((message) => message.content);
     const fallbackQuestion = buildTargetRoleFallbackReply(previousAssistantMessage);
     const prompt = buildTargetRoleDecisionPrompt(
         params.conversation,
@@ -184,9 +188,11 @@ export const resolveTargetRoleDecision = async (
             return decision;
         }
         const repeatedSubject = (targetState?.coveredSubjects ?? []).includes(decision.subject);
-        const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-            === decision.question.trim().toLowerCase();
-        return mustOfferChoices || repeatedSubject || repeatedQuestion ? null : decision;
+        const disallowedQuestion = isTargetDiscoveryQuestionDisallowed(
+            decision.question,
+            previousAssistantMessages,
+        );
+        return mustOfferChoices || repeatedSubject || disallowedQuestion ? null : decision;
     };
     const first = await completeJsonAttempt(
         params,
@@ -219,9 +225,11 @@ export const resolveTargetRoleDecision = async (
             return decision;
         }
         const repeatedSubject = (targetState?.coveredSubjects ?? []).includes(decision.subject);
-        const repeatedQuestion = previousAssistantMessage?.trim().toLowerCase()
-            === decision.question.trim().toLowerCase();
-        return repeatedSubject || repeatedQuestion ? null : decision;
+        const disallowedQuestion = isTargetDiscoveryQuestionDisallowed(
+            decision.question,
+            previousAssistantMessages,
+        );
+        return repeatedSubject || disallowedQuestion ? null : decision;
     };
     const firstOptionsReview = optionsReviewPrompt
         ? await completeJsonAttempt(
@@ -293,7 +301,10 @@ export const resolveTargetRoleDecision = async (
     if (grounding.decision?.kind === "GROUNDED_SUGGESTION") {
         return resolved;
     }
-    if (grounding.decision?.kind === "NEEDS_CLARIFICATION") {
+    if (
+        grounding.decision?.kind === "NEEDS_CLARIFICATION"
+        && !isTargetDiscoveryQuestionDisallowed(grounding.decision.question, previousAssistantMessages)
+    ) {
         if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
             return optionsFallback;
         }
@@ -320,7 +331,10 @@ export const resolveTargetRoleDecision = async (
     if (groundingRetry.decision?.kind === "GROUNDED_SUGGESTION") {
         return resolved;
     }
-    if (groundingRetry.decision?.kind === "NEEDS_CLARIFICATION") {
+    if (
+        groundingRetry.decision?.kind === "NEEDS_CLARIFICATION"
+        && !isTargetDiscoveryQuestionDisallowed(groundingRetry.decision.question, previousAssistantMessages)
+    ) {
         if (optionsFallback && shouldUseTargetRoleOptions(optionsFallback, targetState, mustOfferChoices, false)) {
             return optionsFallback;
         }
